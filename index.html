@@ -5482,17 +5482,25 @@ input:checked + .slider:before {
             const lines = text.split('\n');
             const blocks = [];
             let buffer = [];
-            let state = 'default'; // 'default', 'in_snippet', 'in_div'
+            let state = 'default'; // 'default', 'in_block', 'in_snippet', 'in_div'
             let divNestingLevel = 0;
 
             for (const line of lines) {
                 const trimmedLine = line.trim();
 
                 if (state === 'default') {
-                    if (trimmedLine.startsWith('<snippet>')) {
+                    if (trimmedLine.startsWith('<block')) { // <-- 【核心新增】识别 <block> 标签
+                        buffer.push(line);
+                        state = 'in_block';
+                        // 如果 <block> 和 </block> 在同一行，直接处理掉
+                        if (trimmedLine.includes('</block>')) { 
+                            blocks.push(buffer.join('\n'));
+                            buffer = [];
+                            state = 'default';
+                        }
+                    } else if (trimmedLine.startsWith('<snippet>')) {
                         buffer.push(line);
                         state = 'in_snippet';
-                        // 如果<snippet>和</snippet>在同一行，直接处理掉
                         if (trimmedLine.endsWith('</snippet>')) {
                             blocks.push(buffer.join('\n'));
                             buffer = [];
@@ -5501,18 +5509,22 @@ input:checked + .slider:before {
                     } else if (trimmedLine.startsWith('<div')) {
                         buffer.push(line);
                         state = 'in_div';
-                        // 计算当前行增加了多少层嵌套
                         divNestingLevel += (line.match(/<div/g) || []).length;
                         divNestingLevel -= (line.match(/<\/div>/g) || []).length;
-                        // 如果在同一行就闭合了，直接处理掉
                         if (divNestingLevel === 0) {
                             blocks.push(buffer.join('\n'));
                             buffer = [];
                             state = 'default';
                         }
                     } else if (trimmedLine) {
-                        // 对于单行指令或纯文本，直接作为一个区块
                         blocks.push(line);
+                    }
+                } else if (state === 'in_block') { // <-- 【核心新增】处理 <block> 内部的多行内容
+                    buffer.push(line);
+                    if (trimmedLine.includes('</block>')) {
+                        blocks.push(buffer.join('\n'));
+                        buffer = [];
+                        state = 'default';
                     }
                 } else if (state === 'in_snippet') {
                     buffer.push(line);
@@ -5523,7 +5535,6 @@ input:checked + .slider:before {
                     }
                 } else if (state === 'in_div') {
                     buffer.push(line);
-                    // 核心逻辑：追踪嵌套层级
                     divNestingLevel += (line.match(/<div/g) || []).length;
                     divNestingLevel -= (line.match(/<\/div>/g) || []).length;
                     
@@ -5531,12 +5542,11 @@ input:checked + .slider:before {
                         blocks.push(buffer.join('\n'));
                         buffer = [];
                         state = 'default';
-                        divNestingLevel = 0; // 重置计数器
+                        divNestingLevel = 0; 
                     }
                 }
             }
 
-            // 如果循环结束后缓冲区还有未闭合的内容，也将其作为一个区块
             if (buffer.length > 0) {
                 blocks.push(buffer.join('\n'));
             }
@@ -10329,6 +10339,9 @@ You were receiving a video call from {{user}}, but they hung up before you could
 
             const closeUI = () => {
                 if (callUIWrapper.parentElement) callUIWrapper.remove();
+                // --- 核心新增：在这里恢复按钮的显示 ---
+                const dynamicBtn = document.getElementById('dynamic-decoration-btn');
+                if (dynamicBtn) dynamicBtn.style.display = '';
             };
 
             callUIWrapper.querySelector('#minimize-call-btn').addEventListener('click', () => {
@@ -16583,6 +16596,10 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             
             stopTimer();
             clearInterval(callState.dialogueInterval);
+
+            // --- 核心新增：在这里恢复按钮的显示 ---
+            const dynamicBtn = document.getElementById('dynamic-decoration-btn');
+            if (dynamicBtn) dynamicBtn.style.display = '';
             
             const duration = timerEl.textContent.trim();
             
@@ -16672,6 +16689,15 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
 
                 const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${chatId}`, []);
                 worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
+                    // --- 【核心新增】: 在这里检查世界书名称 ---
+                    // 如果世界书的名称包含特殊标记 (VC-IGNORE)，则跳过该条目
+                    if (entry.name.includes('(VC-IGNORE)')) {
+                        console.log(`[Video Call] Ignoring Worldbook entry: "${entry.name}"`);
+                        return; // 跳过本次循环，不将此世界书内容添加到Prompt中
+                    }
+                    // --- 新增逻辑结束 ---
+
+                    // 只有不包含标记的世界书才会走到这里
                     fullSystemPrompt += `\n[Background Information: ${entry.name}]\n${entry.content}\n`;
                 });
 
@@ -16883,6 +16909,15 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
 
                 const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${chatId}`, []);
                 worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
+                    // --- 【核心新增】: 在这里检查世界书名称 ---
+                    // 如果世界书的名称包含特殊标记 (VC-IGNORE)，则跳过该条目
+                    if (entry.name.includes('(VC-IGNORE)')) {
+                        console.log(`[Video Call] Ignoring Worldbook entry: "${entry.name}"`);
+                        return; // 跳过本次循环，不将此世界书内容添加到Prompt中
+                    }
+                    // --- 新增逻辑结束 ---
+
+                    // 只有不包含标记的世界书才会走到这里
                     fullSystemPrompt += `\n[Background Information: ${entry.name}]\n${entry.content}\n`;
                 });
                 
