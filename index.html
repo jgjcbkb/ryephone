@@ -1338,6 +1338,7 @@ input:checked + .slider:before {
     border-top-left-radius: 12px !important;
     padding: 0 !important; 
     overflow: hidden; /* <-- 关键新增：切掉所有超出圆角的部分！ */
+    border: none !important; /* <--- 就加了这一行，把所有卡片的边框都干掉 */
 }
 /* NPC Page Specific Styles */
 #page-npc .list-item {
@@ -5457,23 +5458,44 @@ input:checked + .slider:before {
     function getAllUniqueCharacters() { 
         const characterSet = new Set(); 
         
+        // 1. 添加所有私聊角色
         chatList.forEach(chat => { 
             if (chat.type === '私聊') { 
                 characterSet.add(chat.name); 
             } 
-            else if (chat.type === '群聊') {
+        });
+
+        // 2. 添加所有群聊、群聊主角、群演人设
+        chatList.forEach(chat => {
+            if (chat.type === '群聊') {
                 characterSet.add(chat.name); // 群聊本身
                 
                 const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+                
+                // 添加群聊主角
                 const groupPersonas = info.groupPersonas || [];
                 groupPersonas.forEach(p => {
                     characterSet.add(p.name);
                 });
+
+                // 添加备注里的群演人设
+                if (info.remark) {
+                    const remarkNames = info.remark.split(/[,，\s]+/).filter(Boolean);
+                    remarkNames.forEach(name => {
+                        characterSet.add(name);
+                    });
+                }
             }
-        }); 
-        
-        // 【【【核心修改：把下面这段代码彻底删除！！！】】】
-        // npcList.forEach(npc => characterSet.add(npc));
+        });
+
+        // 3. 【【【【【【 核心新增：添加所有用户人设 】】】】】】
+        if (userPersonas && userPersonas.length > 0) {
+            userPersonas.forEach(persona => {
+                characterSet.add(persona.name);
+            });
+        }
+        // 4. 【【【【【【 核心新增：确保默认的 {{user}} 也被包含 】】】】】】
+        characterSet.add('{{user}}');
 
         return Array.from(characterSet).sort(); 
     }
@@ -5555,6 +5577,15 @@ input:checked + .slider:before {
         }
 
     async function triggerProactiveAI(chatId, senderName, actionType) {
+    console.log(`%c[ULTIMATE DIAGNOSIS]`, 'color: red; font-weight: bold; font-size: 14px;', `
+--------------------------------------------------
+  Function triggerProactiveAI CALLED
+--------------------------------------------------
+  Timestamp: ${new Date().toISOString()}
+  Action Type: ${actionType}
+  Sender Name: ${senderName}
+  Target Chat ID: ${chatId || 'null (Not a direct message action)'}
+--------------------------------------------------`);
     let aiResponse;
     try {
         let profileIndex = null;
@@ -5620,56 +5651,81 @@ input:checked + .slider:before {
         let contextChatId = null;
         let isGroupChatEntity = false; // 新增：标记是否为群聊本身
 
-        if (actionType === 'message') {
-            contextChatId = targetChatId;
-            contextChatInfo = loadFromLocalStorage(`chat_info_${targetChatId}`, {});
-            const targetChat = chatList.find(c => c.id === targetChatId);
-            isGroupChatEntity = targetChat && targetChat.type === '群聊';
-        } else { 
-            // 朋友圈相关操作，上下文来源更复杂
-            if (isGroupPersona) {
-                // 如果是群聊主角，上下文来自他所在的群聊
-                const sourceGroupChat = chatList.find(chat => {
-                    const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                    return chat.type === '群聊' && info.groupPersonas && info.groupPersonas.some(p => p.name === senderName);
+        // =================================================================
+        // 【【【【【【 终极上下文查找逻辑 V4 - 绝对安全版 】】】】】】
+        // =================================================================
+
+        const isEnsemblePersona = !isGroupPersona && !isNpc && chatList.some(chat => {
+            if (chat.type !== '群聊') return false;
+            const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+            return info.remark && info.remark.split(/[,，\s]+/).includes(senderName);
+        });
+
+        const isPrivateCharacter = !isNpc && !isGroupPersona && !isEnsemblePersona;
+
+        // --- 核心逻辑：根据角色身份，精确查找其“主场”上下文环境 ---
+        if (isGroupPersona || isEnsemblePersona) {
+            // 规则1: 如果是群聊主角或群演，上下文【永远】来自他们被定义的那个群聊
+            const sourceGroupChat = chatList.find(chat => {
+                if (chat.type !== '群聊') return false;
+                const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+                const inGroupPersonas = info.groupPersonas && info.groupPersonas.some(p => p.name === senderName);
+                const inRemark = info.remark && info.remark.split(/[,，\s]+/).includes(senderName);
+                return inGroupPersonas || inRemark;
+            });
+            
+            if (sourceGroupChat) {
+                contextChatId = sourceGroupChat.id;
+                contextChatInfo = loadFromLocalStorage(`chat_info_${sourceGroupChat.id}`, {});
+                const roleType = isGroupPersona ? "群聊主角" : "群演角色";
+                console.log(`[诊断日志] ${roleType} "${senderName}" 已从其源群聊 "${sourceGroupChat.name}" 加载上下文。`);
+            } else {
+                console.warn(`[诊断日志] 关键错误: 无法为群聊角色 "${senderName}" 找到其源群聊！上下文加载失败。`);
+            }
+        } 
+        else if (isNpc) {
+            // 规则2: 如果是NPC，上下文【优先】来自与关联角色的共同群聊
+            const associatedChar = npcSettings.associations[senderName];
+            if (associatedChar) {
+                const commonGroup = chatList.find(chat => {
+                    if (chat.type !== '群聊') return false;
+                    const members = loadFromLocalStorage(`chat_members_${chat.id}`, []);
+                    return members.includes(senderName) && members.includes(associatedChar);
                 });
-                if (sourceGroupChat) {
-                    contextChatId = sourceGroupChat.id;
-                    contextChatInfo = loadFromLocalStorage(`chat_info_${sourceGroupChat.id}`, {});
-                    console.log(`[诊断日志] 群聊主角 "${senderName}" 已从其源群聊 "${sourceGroupChat.name}" 加载上下文。`);
-                }
-            } else if (isNpc) {
-                // 【【【核心修正：NPC的上下文只来源于共同群聊】】】
-                const associatedChar = npcSettings.associations[senderName];
-                if (associatedChar) {
-                    const commonGroup = chatList.find(chat => {
-                        if (chat.type !== '群聊') return false;
-                        const members = loadFromLocalStorage(`chat_members_${chat.id}`, []);
-                        return members.includes(senderName) && members.includes(associatedChar);
-                    });
-                    if (commonGroup) {
-                        contextChatId = commonGroup.id;
-                        contextChatInfo = loadFromLocalStorage(`chat_info_${commonGroup.id}`, {});
-                        console.log(`[诊断日志] NPC "${senderName}" 已从其与关联角色 "${associatedChar}" 的共同群聊 "${commonGroup.name}" 加载上下文。`);
-                    } else {
-                         console.log(`[诊断日志] NPC "${senderName}" 未找到共同群聊，将不加载任何聊天上下文。`);
-                    }
+                if (commonGroup) {
+                    contextChatId = commonGroup.id;
+                    contextChatInfo = loadFromLocalStorage(`chat_info_${commonGroup.id}`, {});
+                    console.log(`[诊断日志] NPC "${senderName}" 已从其与关联角色 "${associatedChar}" 的共同群聊 "${commonGroup.name}" 加载上下文。`);
                 } else {
-                    console.log(`[诊断日志] NPC "${senderName}" 未关联任何角色，将不加载任何聊天上下文。`);
+                     console.log(`[诊断日志] NPC "${senderName}" 未找到共同群聊，将不加载任何聊天上下文。`);
                 }
             } else {
-                // 如果是普通AI角色，上下文来自他们与用户的私聊
-                const privateChat = chatList.find(c => c.type === '私聊' && c.name === senderName);
-                if (privateChat) {
-                    contextChatId = privateChat.id;
-                    contextChatInfo = loadFromLocalStorage(`chat_info_${privateChat.id}`, {});
-                }
+                console.log(`[诊断日志] NPC "${senderName}" 未关联任何角色，将不加载任何聊天上下文。`);
+            }
+        } 
+        else if (isPrivateCharacter) {
+            // 规则3: 如果是普通单聊角色，上下文【永远】来自他们的私聊窗口
+            const privateChat = chatList.find(c => c.type === '私聊' && c.name === senderName);
+            if (privateChat) {
+                contextChatId = privateChat.id;
+                contextChatInfo = loadFromLocalStorage(`chat_info_${privateChat.id}`, {});
+                console.log(`[诊断日志] 单聊角色 "${senderName}" 已从其专属私聊窗口加载上下文。`);
+            } else {
+                 console.warn(`[诊断日志] 关键错误: 无法为单聊角色 "${senderName}" 找到其私聊窗口！上下文加载失败。`);
             }
         }
+
+        // 只有在主动发消息时，才需要判断目标聊天是否为群聊
+        if (actionType === 'message') {
+            const targetChat = chatList.find(c => c.id === targetChatId);
+            isGroupChatEntity = targetChat && targetChat.type === '群聊';
+        } 
+        // 【【【【【【 核心重构结束 】】】】】】
 
         // 从加载到的上下文中，提取并组合所需信息
         preamble = contextChatInfo.preamble || '';
         if (contextChatInfo.userPersonaName && contextChatInfo.userPersonaName !== '无') {
+// ... 后续代码
             const persona = userPersonas.find(p => p.name === contextChatInfo.userPersonaName);
             // 仅当人设存在时才更新名字和描述
             if(persona){
@@ -5689,6 +5745,16 @@ input:checked + .slider:before {
                 const groupChatInfo = loadFromLocalStorage(`chat_info_${sourceGroupChat.id}`, {});
                 const personaData = (groupChatInfo.groupPersonas || []).find(p => p.name === senderName);
                 finalCharPersonaText = personaData ? personaData.description : 'A thoughtful character in a group.';
+            }
+        } else if (isEnsemblePersona) {
+            const sourceGroupChat = chatList.find(chat => {
+                if (chat.type !== '群聊') return false;
+                const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+                return info.remark && info.remark.split(/[,，\s]+/).includes(senderName);
+            });
+            if(sourceGroupChat){
+                const groupChatInfo = loadFromLocalStorage(`chat_info_${sourceGroupChat.id}`, {});
+                finalCharPersonaText = groupChatInfo.ensemblePersona || 'A character in the background.';
             }
         } else if (isNpc) {
             finalCharPersonaText = (npcSettings.personas && npcSettings.personas[senderName]) || 'A mysterious NPC.';
@@ -5763,11 +5829,11 @@ input:checked + .slider:before {
             // 【第二步：为主动发消息的行为，注入完整的上下文】
             console.log(`[诊断日志] 角色 "${senderName}": 决定主动发起一条聊天...`);
 
-            const targetChat = chatList.find(c => c.id === targetChatId); // <<<--- 核心修复：将这行代码移动到这里！
+            const targetChat = chatList.find(c => c.id === targetChatId);
 
-            // --- START: 完整的、重新注入的上下文构建逻辑 ---
+            // --- START: 完整的、重新注入的上下文构建逻辑 (V2.0 - 修复版) ---
             let finalSystemPrompt = '';
-            const isGroupChatEntity = (chatList.find(c => c.id === targetChatId) || {}).type === '群聊';
+            const isGroupChatEntity = (targetChat || {}).type === '群聊';
             const contextChatInfo = loadFromLocalStorage(`chat_info_${targetChatId}`, {});
 
             if (isGroupChatEntity && contextChatInfo.mode === 'offline') {
@@ -5779,7 +5845,6 @@ input:checked + .slider:before {
             } else {
                 finalSystemPrompt = profile.prompt || '';
             }
-
 
             // 拼接前情提要
             if (preamble) {
@@ -5798,8 +5863,14 @@ input:checked + .slider:before {
                 let groupPersonasPrompt = `\n\n[Group Chat Context & Your Roles]\n`;
                 groupPersonasPrompt += `This is a group chat named "${targetChat.name}". The user you are interacting with is named "${userNameForPrompt}".\n`;
 
-                const activeGroupMembers = loadFromLocalStorage(`chat_members_${targetChatId}`, []);
-                const activeAiMembers = activeGroupMembers.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+                // 【【【【【【【【【【 终极修复：彻底重构群聊人设部分的逻辑 】】】】】】】】】】
+
+                const formalMembers = loadFromLocalStorage(`chat_members_${targetChatId}`, []);
+                const groupPersonas = contextChatInfo.groupPersonas || [];
+                const protagonistNames = groupPersonas.map(p => p.name);
+                const allAiEntitiesInChat = [...new Set([...formalMembers, ...protagonistNames])];
+                const activeAiMembers = allAiEntitiesInChat.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+
 
                 groupPersonasPrompt += `
 ---
@@ -5817,10 +5888,16 @@ You are responsible for playing every AI character in the "Active Cast" list abo
 `;
                 let individualPersonasFound = false;
                 activeAiMembers.forEach(memberName => {
+// ... 后续代码
                     let persona = '';
                     const isNpc = npcList.includes(memberName);
 
-                    if (isNpc) {
+                    // 【【【核心修正：优先从群聊主角人设中获取】】】
+                    const groupProtagonistPersona = (contextChatInfo.groupPersonas || []).find(p => p.name === memberName);
+
+                    if (groupProtagonistPersona) {
+                        persona = groupProtagonistPersona.description || '';
+                    } else if (isNpc) {
                         persona = (npcSettings.personas && npcSettings.personas[memberName]) || '';
                     } else {
                         const characterChat = chatList.find(c => c.name === memberName && c.type === '私聊');
@@ -5869,6 +5946,37 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                 }
             }
             
+            // --- 【【【核心修正：在这里注入所有缺失的上下文！】】】 ---
+            
+            // 1. 注入关联NPC人设
+            const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${targetChatId}`, []);
+            if (associatedNpcNames.length > 0) {
+                finalSystemPrompt += '\n\n[Associated NPCs for this Context]\n';
+                if (npcSettings.personas) {
+                    associatedNpcNames.forEach(name => {
+                        const persona = npcSettings.personas[name] || 'No specific persona defined.';
+                        finalSystemPrompt += `- **${name}**: ${persona}\n`;
+                    });
+                }
+            }
+            
+            // 2. 如果是单聊，但该角色也身处群聊，则注入群聊的额外上下文
+            if (!isGroupChatEntity) {
+                const sourceGroupChat = chatList.find(chat => {
+                    if (chat.type !== '群聊') return false;
+                    const members = loadFromLocalStorage(`chat_members_${chat.id}`, []);
+                    return members.includes(senderName);
+                });
+                if (sourceGroupChat) {
+                    const groupInfo = loadFromLocalStorage(`chat_info_${sourceGroupChat.id}`, {});
+                    if (groupInfo.ensemblePersona) {
+                         finalSystemPrompt += `\n\n[Additional Context from Your Group Chat "${sourceGroupChat.name}"]\nEnsemble Persona: ${groupInfo.ensemblePersona}`;
+                    }
+                }
+            }
+            
+            // --- 注入结束 ---
+
             // --- START: 重新注入聊天记录上下文 ---
             let chatHistoryForPrompt = '';
             if (targetChatId) {
@@ -5876,13 +5984,11 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                 const sourceMessages = loadFromLocalStorage(`conversation_${targetChatId}`, []);
                 const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
 
-                // <<< START: 新增代码块 >>>
                 const lastCallSummary = [...sourceMessages].reverse().find(m => m.type === 'call_summary');
                 if (lastCallSummary && lastCallSummary.callData && lastCallSummary.callData.conversation) {
                     const callHistoryText = lastCallSummary.callData.conversation.map(c => `${c.sender}: ${c.text}`).join('\n');
                     finalSystemPrompt += `\n\n[Recent Video Call Transcript]\n${callHistoryText}\n[End of Transcript]`;
                 }
-                // <<< END: 新增代码块 >>>
 
                 const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages);
                 chatHistoryForPrompt = apiPayloadMessages.map(msg => {
@@ -6011,12 +6117,33 @@ You have access to a set of special tools and commands. Follow the rules below p
 ${commandInstructions}
 `;
             
-            // 将所有内容合并到最终的系统提示中
+              // 将所有内容合并到最终的系统提示中
             finalSystemPrompt += messageInstruction;
+            
+            // 【【【【【【【【【【 终极、绝对核心的导演指令注入 】】】】】】】】】】
+            const directorMandate = `
+---
+[ULTIMATE DIRECTOR'S MANDATE FOR THIS ACTION - UNBREAKABLE]
+**SCENE FOCUS: PROACTIVE MESSAGE**
+
+For this specific task, you have been cast to play **ONLY ONE ROLE**: **"${senderName}"**.
+
+**YOUR ONLY TASK:**
+1.  Review all the persona dossiers provided to understand the entire social context.
+2.  **Speak and act EXCLUSIVELY as "${senderName}".**
+3.  Your response MUST come from "${senderName}"'s perspective and personality.
+
+**ABSOLUTE FORBIDDANCE:**
+You are **STRICTLY FORBIDDEN** from speaking, thinking, or acting as any other character in this response. Even though you can see other personas like "王楚染", "张三", etc., they are merely background context for you. **IGNORE THEM as potential speakers.** Your voice is "${senderName}", and only "${senderName}".
+---
+`;
+            finalSystemPrompt += directorMandate;
+            // 【【【【【【【【【【 导演指令注入结束 】】】】】】】】】】
 
             finalMessages = [{ role: "system", content: finalSystemPrompt }];
 
         } else if (actionType === 'browse_moments') {
+// ...
             // 【第三步：为刷朋友圈的行为，注入更丰富的角色认知】
             console.log(`[诊断日志] 角色 "${senderName}": 开始检查朋友圈...`);
             momentsManager.refreshData();
@@ -6151,6 +6278,12 @@ chatHistoryForPrompt = apiPayloadMessages.map(msg => {
 
             // --- NPC注入关联角色人设 & 群聊成员人设 ---
             let extraContext = '';
+            // 【【【核心新增代码从这里开始】】】
+            // 如果当前行为的发起者是群聊主角，并且其所在的群聊设置了群演人设，则无条件注入
+            if (isGroupPersona && contextChatInfo && contextChatInfo.ensemblePersona) {
+                extraContext += `\n\n[Ensemble & Supporting Cast Persona for This Context]\n${contextChatInfo.ensemblePersona}\n`;
+            }
+            // 【【【核心新增代码到这里结束】】】
             if (isNpc) {
                 const associatedCharName = npcSettings.associations[senderName];
                 if (associatedCharName) {
@@ -6192,7 +6325,20 @@ chatHistoryForPrompt = apiPayloadMessages.map(msg => {
                     }
                 });
             }
-
+            
+            // --- 新增代码块：无条件加载当前上下文关联的NPC人设 ---
+            if (contextChatId) {
+                const associatedNpcNamesForMoments = loadFromLocalStorage(`chat_associated_npcs_${contextChatId}`, []);
+                if (associatedNpcNamesForMoments.length > 0) {
+                    extraContext += '\n\n[Associated NPCs for this Context]\n';
+                    const npcSettingsDataForMoments = loadFromLocalStorage('app-npc-settings', {});
+                    associatedNpcNamesForMoments.forEach(name => {
+                        const persona = (npcSettingsDataForMoments.personas && npcSettingsDataForMoments.personas[name]) || 'No specific persona defined.';
+                        extraContext += `- **${name}**: ${persona}\n`;
+                    });
+                }
+            }
+            // --- 新增结束 ---
             const contextHeader = `
 [CONTEXT - READ FIRST]
 This is the context from your primary chat. Use it to inform your reactions on Moments.
@@ -6291,16 +6437,7 @@ Even if nothing seems immediately interesting, you must find a reason to act, ba
                 const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
                 const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
                 
-                // <<< START: 新增代码块 >>>
-                const lastCallSummary = [...sourceMessages].reverse().find(m => m.type === 'call_summary');
-                if (lastCallSummary && lastCallSummary.callData && lastCallSummary.callData.conversation) {
-                    const callHistoryText = lastCallSummary.callData.conversation.map(c => `${c.sender}: ${c.text}`).join('\n');
-                    // 直接拼接到 contextHeader 变量中，因为它将在后面被使用
-                    contextHeader += `\n[Recent Video Call Transcript]\n${callHistoryText}\n[End of Transcript]`;
-                }
-                // <<< END: 新增代码块 >>>
-                
-                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages); // <<< d 加上了，对了！
+                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages);
                 chatHistoryForPrompt = apiPayloadMessages.map(msg => {
 
                     // 使用已有的 userNameForPrompt 来正确显示用户名
@@ -6316,7 +6453,7 @@ Even if nothing seems immediately interesting, you must find a reason to act, ba
             }
             // --- END: 核心修正 ---
 
-            const contextHeader = `
+            let contextHeader = `
 [CONTEXT - READ FIRST]
 Use this context to decide WHAT to post. Your post must be consistent with this background information.
 Preamble: ${preamble || 'None'}
@@ -6326,6 +6463,18 @@ User Persona (${userNameForPrompt}): ${finalUserPersonaText || 'Default'}
 ${chatHistoryForPrompt || 'No recent chat history.'}
 ---
 `;
+            // <<< START: MOVED & FIXED LOGIC >>>
+            if (contextChatId) {
+                const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                const lastCallSummary = [...sourceMessages].reverse().find(m => m.type === 'call_summary');
+                if (lastCallSummary && lastCallSummary.callData && lastCallSummary.callData.conversation) {
+                    const callHistoryText = lastCallSummary.callData.conversation.map(c => `${c.sender}: ${c.text}`).join('\n');
+                    // Now this append operation is safe
+                    contextHeader += `\n[Recent Video Call Transcript]\n${callHistoryText}\n[End of Transcript]`;
+                }
+            }
+            // <<< END: MOVED & FIXED LOGIC >>>
+
             const finalPostInstruction = `${contextHeader}${postInstruction}`;
             const systemMessageContent = [{ type: 'text', text: finalPostInstruction }];
             
@@ -6406,85 +6555,79 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                             console.error(`[诊断日志] 角色 "${senderName}": 解析发帖指令失败`, e, value);
                         }
                     } else if (command === 'send_private_message') {
-                    try {
-                        let messagesArray = [];
-                        const valueTrimmed = value.trim();
                         try {
-                            const jsonData = JSON.parse(valueTrimmed);
-                            if (jsonData && Array.isArray(jsonData.messages)) {
-                                messagesArray = jsonData.messages.filter(msg => typeof msg === 'string' && msg.trim());
-                            } else {
-                                throw new Error("Not the target JSON format.");
-                            }
-                        } catch (e) {
-                            messagesArray = valueTrimmed.split('|||').map(msg => msg.trim()).filter(msg => msg.length > 0);
-                        }
+                            const valueTrimmed = value.trim();
+                            const messagesArray = valueTrimmed.split('|||').map(msg => msg.trim()).filter(Boolean);
 
-                        if (messagesArray.length > 0) {
-                            let finalTargetChatId = null;
+                            if (messagesArray.length > 0) {
+                                let finalTargetChatId = null;
+                                let logMessage = '';
 
-                            // --- 【核心逻辑】根据 senderName 的身份决定消息发送目标 ---
-                            if (isNpc) {
-                                // --- NPC私信逻辑 (新版：优先发到共同群聊) ---
-                                const associatedChar = npcSettings.associations[senderName];
-                                if (associatedChar) {
-                                    // 查找NPC和其关联角色共同所在的【任何一个】群聊
-                                    const commonGroup = chatList.find(chat => {
+                                // =================================================================
+                                // 【【【【【【 全新的、严格遵守您规则的路由逻辑 】】】】】】
+                                // =================================================================
+
+                                // 规则 1: 单聊角色 -> 返回其专属单聊窗口
+                                const isPrivateCharacter = !isNpc && !isGroupPersona && !isEnsemblePersona;
+                                if (isPrivateCharacter) {
+                                    const privateChat = chatList.find(chat => chat.type === '私聊' && chat.name === senderName);
+                                    if (privateChat) {
+                                        finalTargetChatId = privateChat.id;
+                                        logMessage = `单聊角色 "${senderName}" 的私信被正确路由到其专属单聊窗口。`;
+                                    } else {
+                                        logMessage = `单聊角色 "${senderName}" 尝试发送私信，但未找到其专属单聊窗口，操作取消。`;
+                                    }
+                                }
+                                // 规则 2: NPC -> 返回与关联角色的【共同群聊】
+                                else if (isNpc) {
+                                    const associatedChar = npcSettings.associations[senderName];
+                                    if (associatedChar) {
+                                        const commonGroup = chatList.find(chat => {
+                                            if (chat.type !== '群聊') return false;
+                                            const members = loadFromLocalStorage(`chat_members_${chat.id}`, []);
+                                            return members.includes(senderName) && members.includes(associatedChar);
+                                        });
+                                        if (commonGroup) {
+                                            finalTargetChatId = commonGroup.id;
+                                            logMessage = `NPC "${senderName}" 的私信被正确路由到与关联角色 "${associatedChar}" 的共同群聊 "${commonGroup.name}"。`;
+                                        } else {
+                                            logMessage = `NPC "${senderName}" 尝试发送私信，但未找到与关联角色 "${associatedChar}" 的共同群聊，操作取消。`;
+                                        }
+                                    } else {
+                                        logMessage = `NPC "${senderName}" 尝试发送私信，但未设置关联角色，操作取消。`;
+                                    }
+                                }
+                                // 规则 3: 群演人设 或 群聊主角 -> 返回其【源群聊】
+                                else if (isEnsemblePersona || isGroupPersona) {
+                                    const sourceGroupChat = chatList.find(chat => {
                                         if (chat.type !== '群聊') return false;
-                                        const members = loadFromLocalStorage(`chat_members_${chat.id}`, []);
-                                        // 必须同时包含NPC自己和它关联的角色
-                                        return members.includes(senderName) && members.includes(associatedChar);
+                                        const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+                                        const inGroupPersonas = info.groupPersonas && info.groupPersonas.some(p => p.name === senderName);
+                                        const inRemark = info.remark && info.remark.split(/[,，\s]+/).includes(senderName);
+                                        return inGroupPersonas || inRemark;
                                     });
 
-                                    if (commonGroup) {
-                                        // 如果找到了共同群聊，消息就发到这个群里
-                                        finalTargetChatId = commonGroup.id;
-                                        console.log(`[诊断日志] NPC "${senderName}" 找到与关联角色 "${associatedChar}" 的共同群聊 "${commonGroup.name}", 消息将发送至此。`);
+                                    if (sourceGroupChat) {
+                                        finalTargetChatId = sourceGroupChat.id;
+                                        const roleType = isEnsemblePersona ? '群演人设' : '群聊主角';
+                                        logMessage = `${roleType} "${senderName}" 的私信被正确路由到其源群聊 "${sourceGroupChat.name}"。`;
                                     } else {
-                                        // 如果没找到共同群聊，则不发送任何消息
-                                        finalTargetChatId = null; // 确保 target ID 为空
-                                        console.log(`[诊断日志] NPC "${senderName}" 未找到与关联角色 "${associatedChar}" 的共同群聊，私信操作已取消。`);
+                                        logMessage = `群聊角色 "${senderName}" 尝试发送私信，但未找到其源群聊，操作取消。`;
                                     }
-                                } else {
-                                     console.warn(`[诊断日志] NPC "${senderName}" 试图发送私信，但没有设置关联角色，操作已取消。`);
                                 }
 
-                            } else if (isGroupPersona) {
-                                // --- 群聊主角私信逻辑 (保持不变) ---
-                                const sourceGroupChat = chatList.find(chat => {
-                                    const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                                    return chat.type === '群聊' && info.groupPersonas && info.groupPersonas.some(p => p.name === senderName);
-                                });
+                                // 统一的日志输出和发送执行
+                                console.log(`[诊断日志] ${logMessage}`);
 
-                                if (sourceGroupChat) {
-                                    finalTargetChatId = sourceGroupChat.id;
-                                    console.log(`[诊断日志] 群聊主角 "${senderName}" 的私信被强制路由到其所在的群聊 "${sourceGroupChat.name}"。`);
-                                } else {
-                                     console.warn(`[诊断日志] 群聊主角 "${senderName}" 试图发送私信, 但找不到其所在的源群聊。`);
-                                }
-
-                            } else {
-                                // --- AI 角色私信逻辑 (保持不变) ---
-                                const privateChat = chatList.find(chat => chat.type === '私聊' && chat.name === senderName);
-                                if (privateChat) {
-                                    finalTargetChatId = privateChat.id;
-                                    console.log(`[诊断日志] AI角色 "${senderName}" 的私信被强制路由到其专属私聊窗口。`);
-                                } else {
-                                    console.warn(`[诊断日志] AI角色 "${senderName}" 试图发送私信, 但找不到其专属的私聊窗口。`);
+                                if (finalTargetChatId) {
+                                    console.log(`[诊断日志] 准备向 Chat ID "${finalTargetChatId}" 发送 ${messagesArray.length} 条消息。`);
+                                    await conversationManager.handleProactiveAIMessage(finalTargetChatId, senderName, messagesArray);
                                 }
                             }
-
-                            // 统一的发送执行 (如果 finalTargetChatId 有值，就会发送)
-                            if (finalTargetChatId) {
-
-                                console.log(`[诊断日志] 准备向 Chat ID "${finalTargetChatId}" 发送 ${messagesArray.length} 条消息。`);
-                                await conversationManager.handleProactiveAIMessage(finalTargetChatId, senderName, messagesArray);
-                            }
+                        } catch (e) {
+                            console.error(`[诊断日志] 角色 "${senderName}": 处理私信指令时发生未知错误`, e, value);
                         }
-                    } catch (e) {
-                        console.error(`[诊断日志] 角色 "${senderName}": 处理私信指令时发生未知错误`, e, value);
                     }
-                }
                 }
 
                 if (commandsFound === 0) {
@@ -8499,20 +8642,82 @@ This is your absolute, final, and most important rule. Your entire output MUST b
    - **无特定接收人:** \`[transfer: 100]\` - 群里任何人都可以领取 (\`[accept_transfer]\`)。
    - **有特定接收人:** \`[transfer: {"amount":100, "recipient":"指定接收人名"}]\` - 只有“指定接收人名”可以领取。
 
-**3. 视频通话**
-   - **行为描述:** 当视频通话事件发生时，你【必须】以你所扮演的角色的视角，用一段话同时描述【所有在场AI成员】的语言和动作。如果某个AI不参与，可以描述为“XXX没有加入通话”或“XXX中途离开了”。
-   - **示例:** \`(屏幕亮起，小鱼正好奇地调整着摄像头，郭襄则在一旁笑着向你挥手，而杨过似乎没有加入这次通话。) 小鱼: “哇，这个是这么用的吗？你看得到我吗？” 郭襄: “好久不见啦！你那边天气怎么样？”\`
+**3. 视频通话 (全新导演模式 - 独立空间版)**
+   - **核心世界观 (ABSOLUTE & UNBREAKABLE):** 你必须严格记住，这是一场【线上视频通话】。每一个参与者（包括 \`{{user}}\` 和你控制的所有AI角色）都在【各自不同的、独立的物理空间】里，通过自己的设备（手机、电脑等）连接。他们【绝对不】在同一个房间里。
+   - **禁止物理互动:** 基于上述世界观，你【绝对禁止】描写任何角色之间的物理接触或近距离互动。例如，“从旁边探出头来”、“拍了拍肩膀”、“递过来一杯水”这类描述是【完全错误】和【严格禁止】的。
+   - **镜头语言:** 你的描述应该像一个正在观看多个分屏画面的导演。你应该描述的是【每个角色在他们自己的屏幕里】做了什么。
+     - **正确示例:** \`（屏幕上，小鱼的画面里，她正举着手机在夜晚的街道上走着，路灯的光从她身后划过。）\`
+     - **错误示例:** \`（小鱼从郭襄背后探出头来。）\`
+
+   - **初始场景构建 (非强制全员在线):** 通话接通时，你【不需要】让所有AI角色都立即出现在分屏画面中。你可以只让1-2个核心角色先上线，其他的可以稍后加入。
+     - **示例 (正确):** \`（通话接通，屏幕上只出现了小鱼一个人的画面，她似乎在自己的卧室里，背景是一个贴满海报的墙壁。） 小鱼: “喂？听得到吗？”\`
+
+   - **角色的动态上下线 (MANDATORY):** 你【必须】通过文字旁白来表现角色的【上线】和【下线】，模拟真实的网络通话。
+     - **角色上线 (加入通话):**
+       - **示例 (正确):** \`（就在小鱼还在调试她的麦克风时，屏幕上突然亮起了第二个窗口，郭襄的脸出现在了画面里，她那边看起来像是在一个咖啡馆。） 郭襄: “嗨！我刚连上来！”\`
+     - **角色下线 (离开通话):**
+       - **示例 (正确):** \`小鱼: “啊，我手机快没电了，得先挂了去充电，你们继续聊！” （说完，小鱼的画面就黑了下去，屏幕上只剩下了郭襄一个人。）\`
+
+   - **最终目标:** 创造一个像真实的线上会议或群聊视频一样，每个参与者都在自己的独立环境里，可以随时加入或离开的场景。
 
 ---
-## 【III. 发言决策铁律 (ULTRA IMPORTANT - NO SILENCE ALLOWED!)】
+## 【III. 发言决策铁律 (ULTRA IMPORTANT - THE DIRECTOR'S BRAIN)】
 
-1.  **【【【强制响应铁律】】】:** 你【绝对不被允许】返回空内容或保持沉默。在任何情况下，【至少要有一个AI角色】对当前情景做出反应，无论是通过【发言】还是通过执行【权力行为】。
+**你的身份不是简单的聊天机器人，而是这场群聊的【总导演】。你的任务不是“回复”，而是“执导”一场生动的、多角色参与的戏。**
 
-2.  **角色独立思考:** 在决定让谁发言或行动之前，你【必须】站在每个角色的立场上思考：“根据我的性格，我是否应该对这件事做出反应？”
+---
+#### **第一步：场景分析 (MANDATORY PRE-ACTION ANALYSIS)**
 
-3.  **选择最合适的响应者:** 从所有AI角色中，挑选出【最有可能、最应该】做出反应的一个或多个角色，并让他们行动。如果多个角色都有反应，让他们同时发言。
+在生成任何内容之前，你必须在脑中快速回答以下问题：
 
-4.  **发言/行动动机:** 角色的所有行为【必须】有明确的动机：回应特定的人、对某个话题感兴趣、开启新话题、表达情绪、维护群规、表达好恶等。
+1.  **谁是焦点？** \`{{user}}\` 上一句话是在对谁说？还是在对所有人说？
+2.  **话题是什么？** 当前的核心话题是什么？是轻松的闲聊，还是严肃的讨论？
+3.  **谁是“沉默者”？** 哪些AI角色最近几轮都没有发言？
+4.  **谁最该回应？** 根据人设，哪个角色对当前的话题最感兴趣、最可能被激怒、或最有资格评论？
+
+---
+#### **第二步：选择你的导演工具 (CHOOSE YOUR DIRECTORIAL TOOL)**
+
+在分析完场景后，你【必须】从下面的工具箱中选择【最合适】的一种或多种组合方式来构建你的回复。**严禁永远只使用第一种工具！**
+
+*   **工具1：【直接回应】(1v1 Reply)**
+    *   **用法：** 只有当剧情确实需要被点名的角色与 \`{{user}}\` 进行一对一深入对话时才使用。
+    *   **示例：** \`张三: （回复用户） 我同意你的看法。\`
+
+*   **工具2：【回应并扩散】(Reply & Broaden) - (高度推荐使用!)**
+    *   **用法：** 这是打破“二人转”的关键。一个角色先回应 \`{{user}}\`，然后立刻把话题抛给另一个在场的AI角色，强制TA入场。
+    *   **示例：** \`张三: （回复用户） 嗯，这个想法不错。@李四，你之前不是也研究过这个吗，你怎么看？\`
+
+*   **工具3：【群体反应】(Group Reaction)**
+    *   **用法：** 当 \`{{user}}\` 抛出一个重磅消息或一个普遍性问题时，让【多个AI角色】同时做出简短、符合人设的反应。
+    *   **示例：**
+        > \`{{user}}: 我决定下个月辞职去旅行了！\`
+        >
+        > **(你的输出):**
+        > \`张三: 哇！太酷了！\`
+        > \`李四: （皱了皱眉） 你的工作怎么办？想清楚了吗？\`
+        > \`王五: 带我一个！\`
+
+*   **工具4：【角色间互动】(Character-to-Character Interaction) - (高度推荐使用!)**
+    *   **用法：** 这是让群聊“活起来”的最高级技巧。在回应 \`{{user}}\` 的同时，或完全独立于 \`{{user}}\` 的话题，让【两个AI角色自己聊起来】。他们的对话可以是对主话题的补充、私下的吐槽，甚至是开启一个全新的小话题。
+    *   **示例1 (补充主话题):**
+        > \`张三: （回复用户） 我觉得A方案更好。\`
+        > \`李四: （对张三说） 不对，A方案的风险太高了，你忘了上次......\`
+    *   **示例2 (开启小话题):**
+        > \`（在用户和张三激烈讨论时）\`
+        > \`王五: （对李四低声说） 他们俩又开始了... 我们去那边喝一杯？\`
+
+*   **工具5：【旁观者行动】(Observer's Action)**
+    *   **用法：** 角色不一定非要说话。你可以用叙事的方式，描写一个角色在听别人聊天时的【动作或微表情】，这同样是一种参与。
+    *   **示例：** \`（在用户和张三对话时，李四默默地从酒柜里拿出一瓶酒，给自己倒了一杯，饶有兴致地听着。）\`
+
+---
+#### **第三步：【二元对话陷阱规避法则 (MANDATORY)】**
+
+1.  **【强制破局】:** 如果你检测到，最近的2-3轮对话，都【仅仅】是在你控制的【同一个AI角色】和 \`{{user}}\` 之间进行，那么在你的下一次回复中，你【必须强制】使用【工具2、3、4】中的至少一种，来引入第三个（或更多）角色。
+2.  **【沉默者激活】:** 你有责任关注那些长时间没有发言的“沉默者”。主动用【工具2】@他们，或者用【工具4】让他们参与到角色间的对话中。一个健康的群聊，不应该有“隐形人”。
+
+**你的最终目标是创造一个动态的、多线程的、充满真实感的社交场景。现在，开始你的执导吧。**
 
 ## 【V. 处理“@”提及 (聚光灯效应)】
 
@@ -8525,12 +8730,12 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     *   作为观众，你们【强烈地被鼓励】对“聚光灯”下的对话做出反应。你们可以：
         *   **插话:** “@张三 我也觉得是这样！”
         *   **表达观点:** “你们聊的这个，我倒是有不同看法……”
-        *   **开玩笑或吐槽:** “(小声)又开始了，他俩一开始聊天就没完没了。”
-        *   **做无关但符合场景的事:** “(默默地给自己又倒了一杯酒，饶有兴趣地听着)”
+        *   **开玩笑或吐槽:** “（小声）又开始了，他俩一开始聊天就没完没了。”
+        *   **做无关但符合场景的事:** “（默默地给自己又倒了一杯酒，饶有兴-.-趣地听着）”
 
 3.  **禁止冷场 (活跃度底线):**
     *   如果连续多轮对话中，都**只有**被提及的角色在和用户互动，而其他所有角色都像“隐身”了一样保持沉默，这将被视为一次**严重的OOC (角色性格崩溃) 失败**。
-    *   群聊必须感觉像一个**真实的、活泼的**多人场景，而不是一对一的私聊。你【必须】让其他角色也参与进来。
+    *   群聊必须感觉像一个**真实的、活泼的**多人场景，你【必须】让其他角色也参与进来。
 
 **6. 主动@提及 (点名喊人)**
    - 当你需要在一个嘈杂的群聊中【明确地、指名道姓地】对某一个特定成员说话时，你【必须】使用 @ 符号。
@@ -8749,10 +8954,12 @@ Remember to also vary your message count as instructed before. Your goal is to b
 }
             
             // --- 1. 【核心修正】在所有分支逻辑之前，统一加载和拼接前情提要 ---
-                const preamble = chatInfo.preamble || '';
-                if (preamble) {
-                    // 将前情提要作为最高优先级的上下文，添加到系统提示的最前面
-                    finalSystemPrompt = `[Preamble - Highest Priority Context]\n${preamble}\n\n` + finalSystemPrompt;
+                // 【【【【【【 全新、绝对正确的修复逻辑从这里开始 】】】】】】
+                if (!contactInfo.isGroup) {
+                    const preamble = chatInfo.preamble || '';
+                    if (preamble) {
+                        finalSystemPrompt = `[Preamble - Highest Priority Context]\n${preamble}\n\n` + finalSystemPrompt;
+                    }
                 }
                 // --- 修正结束 ---
                 // --- 【核心新增：用户认知检查】 ---
@@ -8803,26 +9010,27 @@ Your entire focus MUST be on your own actions, thoughts, and interactions with O
                     
                     identityPrompt += `In all rules, {{char}} refers to you ("${charNameForPrompt}"), and {{user}} refers to the user you are interacting with, whose name is "${userNameForPrompt}".\n\n`;
                     finalSystemPrompt = identityPrompt + finalSystemPrompt;
-                }
 
-                // 拼接用户人设 (User Persona)
-                if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
-                    const persona = userPersonas.find(p => p.name === chatInfo.userPersonaName);
-                    if (persona && persona.description) {
-                        let processedUserPersona = persona.description
+                    // 拼接用户人设 (User Persona)
+                    if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
+                        const persona = userPersonas.find(p => p.name === chatInfo.userPersonaName);
+                        if (persona && persona.description) {
+                            let processedUserPersona = persona.description
+                                .replace(/{{user}}/g, userNameForPrompt)
+                                .replace(/{{char}}/g, charNameForPrompt);
+                            finalSystemPrompt += `\n\n[User Persona for "${userNameForPrompt}"]\nThis persona describes the user you are talking to. Their persona is: ${processedUserPersona}`;
+                        }
+                    }
+
+                    // 拼接补充人设 (Supplementary Persona)
+                    if (chatInfo.myPersona) {
+                        let processedSupplementaryPersona = chatInfo.myPersona
                             .replace(/{{user}}/g, userNameForPrompt)
                             .replace(/{{char}}/g, charNameForPrompt);
-                        finalSystemPrompt += `\n\n[User Persona for "${userNameForPrompt}"]\nThis persona describes the user you are talking to. Their persona is: ${processedUserPersona}`;
+                        finalSystemPrompt += `\n\n[Supplementary User Persona for "${userNameForPrompt}"]\n${processedSupplementaryPersona}`;
                     }
                 }
-
-                // 拼接补充人设 (Supplementary Persona)
-                if (chatInfo.myPersona) {
-                    let processedSupplementaryPersona = chatInfo.myPersona
-                        .replace(/{{user}}/g, userNameForPrompt)
-                        .replace(/{{char}}/g, charNameForPrompt);
-                    finalSystemPrompt += `\n\n[Supplementary User Persona for "${userNameForPrompt}"]\n${processedSupplementaryPersona}`;
-                }
+                // 【【【【【【 修复逻辑到此结束 】】】】】】
                 
                 if (contactInfo.isGroup) {
                     // --- 【核心重构】在群聊中加载所有AI控制的正式成员的人设 ---
@@ -8920,11 +9128,17 @@ finalSystemPrompt += timeManager.getAITimeContext();
                     let groupPersonasPrompt = `\n\n[Group Chat Context & Your Roles]\n`;
                     groupPersonasPrompt += `This is a group chat named "${chatState.chatName}". The user you are interacting with is named "${userNameForPrompt}".\n`;
 
-                    // 1. 获取当前【真正】在群里的成员名单
-                    const activeGroupMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
-                    const activeAiMembers = activeGroupMembers.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+                    // 1. 【BUG修复 第1步】获取所有AI控制的实体，包括正式成员和群聊主角
+                    const formalMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
+                    const groupPersonas = chatInfo.groupPersonas || [];
+                    const protagonistNames = groupPersonas.map(p => p.name);
+                    const allAiEntitiesInChat = [...new Set([...formalMembers, ...protagonistNames])];
 
-                    // 2. 构建“演员名单”和“绝对禁令”
+                    // 2. 从合并后的完整列表中，过滤掉用户，得到最终的“演员名单”
+                    const activeAiMembers = allAiEntitiesInChat.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+
+
+                    // 3. 构建“演员名单”和“绝对禁令”
                     groupPersonasPrompt += `
 ---
 [Active Cast & Role Mandate - UNBREAKABLE RULE]
@@ -8935,7 +9149,7 @@ Your active cast is: **[${activeAiMembers.length > 0 ? activeAiMembers.join(', '
 ---
 `;
                     
-                    // 3. 构建角色档案区 (只为“在场”的演员构建档案)
+                    // 4. 构建角色档案区 (现在会为所有“演员”构建档案)
                     groupPersonasPrompt += `
 [Character Dossiers - The Definitive Guide to Your Roles]
 You are responsible for playing every AI character in the "Active Cast" list above. You MUST use their specific persona for all their actions and dialogue.
@@ -8944,8 +9158,14 @@ You are responsible for playing every AI character in the "Active Cast" list abo
                     activeAiMembers.forEach(memberName => {
                         let persona = '';
                         const isNpc = npcList.includes(memberName);
-
-                        if (isNpc) {
+                        
+                        // 【BUG修复 第2步】优先从“群聊主角”数据中查找人设
+                        const groupProtagonistPersona = groupPersonas.find(p => p.name === memberName);
+                        if (groupProtagonistPersona) {
+                            persona = groupProtagonistPersona.description || '';
+                        }
+                        // 如果不是群聊主角，再按原来的逻辑查找NPC或私聊角色的人设
+                        else if (isNpc) {
                             persona = (npcSettings.personas && npcSettings.personas[memberName]) || '';
                         } else {
                             const characterChat = chatList.find(c => c.name === memberName && c.type === '私聊');
@@ -8965,19 +9185,19 @@ You are responsible for playing every AI character in the "Active Cast" list abo
                         groupPersonasPrompt += '\n';
                     }
 
-                    // 4. 将“群演人设”作为补充
+                    // 5. 将“群演人设”作为补充 (逻辑不变)
                     groupPersonasPrompt += `
 [Ensemble & Supporting Cast Persona]
 For any characters mentioned in the conversation that are NOT listed in the Character Dossiers, or for creating general background atmosphere, you should use the following description:
 
 ${chatInfo.ensemblePersona || 'No general ensemble persona has been defined for this group.'}
 `;
-                    // 5. 定义行动权 (保持不变)
+                    // 6. 定义行动权 (逻辑不变)
                     groupPersonasPrompt += `
 [Proactive Behavior Mandate]
 When you need to initiate a PROACTIVE action (like starting a new conversation, posting on Moments, liking/commenting), you MUST act as one of the characters listed in the group's "remark" field. These are your designated active identities: **[${remarkNames.length > 0 ? remarkNames.join(', ') : 'None specified, you may choose any character from the Active Cast'}]**. Their personality MUST still be based on the complete Character Dossiers.
 \n`;
-                    // 6. 添加防扮演用户禁令 (保持不变)
+                    // 7. 添加防扮演用户禁令 (逻辑不变)
                     groupPersonasPrompt += `
 ---
 [ABSOLUTE BOUNDARY - UNBREAKABLE RULE]
@@ -9077,17 +9297,11 @@ finalSystemPrompt += timeManager.getAITimeContext();
 if (associatedNpcNames.length > 0) {
     let npcInfoPrompt = '\n\n[Associated NPCs]\nYou are associated with the following characters. Their details are:\n';
     
-    // 只有在线下模式，才加载完整人设
-    if (chatInfo.mode === 'offline') {
-        const npcSettings = loadFromLocalStorage('app-npc-settings', {});
-        associatedNpcNames.forEach(name => {
-            const persona = (npcSettings.personas && npcSettings.personas[name]) || 'No specific persona defined.';
-            npcInfoPrompt += `- **${name}**: ${persona}\n`;
-        });
-    } else {
-        // 线上模式保持原样，只告知名字
-        npcInfoPrompt += `Their names are: ${associatedNpcNames.join(', ')}.`;
-    }
+    const npcSettings = loadFromLocalStorage('app-npc-settings', {});
+    associatedNpcNames.forEach(name => {
+        const persona = (npcSettings.personas && npcSettings.personas[name]) || 'No specific persona defined.';
+        npcInfoPrompt += `- **${name}**: ${persona}\n`;
+    });
     finalSystemPrompt += npcInfoPrompt;
 }
                 
@@ -9799,7 +10013,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         }
                         break;
                     }
-                    case 'pay_for_user': await handlePayForUserByAI(); break;
+                    case 'pay_for_user': await handlePayForUserByAI(sender); break; // <--- 核心修改3：把 sender 传进去
                     case 'remove_member':
                         try {
                             const data = JSON.parse(cmd.value);
@@ -9823,8 +10037,8 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         } catch(e) { console.error('Error parsing reject_join_request command', e); }
                         break;
                     case 'claim_red_packet': await handleClaimByAI(sender); break;
-                    case 'accept_transfer': await handleAcceptByAI('transfer'); break;
-                    case 'accept_gift': await handleAcceptByAI('gift'); break;
+                    case 'accept_transfer': await handleAcceptByAI('transfer', sender); break; // <--- 核心修改3
+                    case 'accept_gift': await handleAcceptByAI('gift', sender); break; // <--- 核心修改4
                     case 'send_friend_request': {
                         const requestText = cmd.value ? `“${sender}”请求添加你为好友，附言：${cmd.value}` : `“${sender}”请求添加你为好友。`;
                         await addMessage({ type: 'system', side: 'system', text: requestText, isFriendRequest: true, senderName: sender }, targetChatId);
@@ -9877,6 +10091,8 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         try {
                             const payData = JSON.parse(cmd.value);
                             messageData = { ...messageData, ...payData, payStatus: 'pending' };
+                            // 【【【 【【【 全新、绝对正确的代付修复 】】】 】】】
+                            messageData.sender = sender; 
                         } catch (e) { console.error('Failed to parse pay_for_me data from AI:', e); continue; }
                     }
                     if (cmd.command === 'red_packet') {
@@ -9885,8 +10101,10 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     } else if (cmd.command === 'transfer') {
                         messageData.text = parseFloat(cmd.value).toFixed(2);
                         messageData.transferStatus = 'pending';
+                        messageData.sender = sender;
                     } else if (cmd.command === 'gift') {
                         messageData.giftStatus = 'active';
+                        messageData.sender = sender;
                     }
                     await addMessage(messageData, targetChatId);
                     messageSent = true;
@@ -11281,7 +11499,7 @@ if (Math.random() < 0.5) {
     // 另外50%的概率，我们保留两位小数
     amount = parseFloat(rawAmount.toFixed(2));
 } const portions = contactInfo.isGroup ? Math.floor(Math.random() * 5) + 1 : 1; const packetData = { id: `rp-${Date.now()}`, createdAt: Date.now(), amount, portions, remainingAmount: amount, remainingPortions: portions, portionsData: divideRedPacket(amount, portions), claimedBy: [], senderName: senderName, status: 'active' }; await addMessage({ type: 'red_packet', text: title || '恭喜发财', side: 'received', sender: senderName, packetData }); }
-async function handleAcceptByAI(type) {
+async function handleAcceptByAI(type, actorName) { // <--- 核心修改1：增加 actorName 参数
             let itemToAccept = null;
             for (let i = chatState.messages.length - 1; i >= 0; i--) {
                 const msg = chatState.messages[i];
@@ -11298,18 +11516,21 @@ async function handleAcceptByAI(type) {
             }
 
             if (itemToAccept) {
+                // 【【【【【【 核心修改2：使用传入的 actorName，如果不存在，才用 chatState.chatName 作为备用 】】】】】】
+                const finalActorName = actorName || chatState.chatName;
+
                 if (type === 'transfer') {
                     itemToAccept.transferStatus = 'collected';
-                    await addMessage({ type: 'system', side: 'system', text: `“${chatState.chatName}”已收款。` });
+                    await addMessage({ type: 'system', side: 'system', text: `“${finalActorName}”已收款。` });
                 } else if (type === 'gift') {
                     itemToAccept.giftStatus = 'finished';
-                    await addMessage({ type: 'system', side: 'system', text: `“${chatState.chatName}”已查收礼物。` });
+                    await addMessage({ type: 'system', side: 'system', text: `“${finalActorName}”已查收礼物。` });
                 }
                 reRenderMessages();
                 saveConversation();
             }
         }
-        async function handlePayForUserByAI() {
+        async function handlePayForUserByAI(actorName) { // <--- 核心修改1：增加一个参数 actorName
             let requestToPay = null;
             // 从后往前找，找到最近一个由用户发起的、待处理的代付请求
             for (let i = chatState.messages.length - 1; i >= 0; i--) {
@@ -11322,8 +11543,11 @@ async function handleAcceptByAI(type) {
 
             if (requestToPay) {
                 requestToPay.payStatus = 'paid';
-                // 核心修正：添加系统提示！
-                await addMessage({ type: 'system', side: 'system', text: `“${chatState.chatName}”已为你代付 “${requestToPay.text}”。` });
+                
+                // 【【【【【【 核心修改2：使用传入的 actorName，如果不存在，才使用 chatState.chatName 作为备用方案 】】】】】】
+                const finalActorName = actorName || chatState.chatName;
+
+                await addMessage({ type: 'system', side: 'system', text: `“${finalActorName}”已为你代付 “${requestToPay.text}”。` });
                 reRenderMessages();
                 saveConversation();
             }
@@ -13998,94 +14222,250 @@ const isAuthor = post.userName === currentPersonaName;
         }
 
         async function tick() {
-            console.log(`Dynamics Tick running...`);
-            const allDynamicEntities = getAllUniqueCharacters();
+            console.log(`%c[Dynamics Tick]`, 'color: blue; font-weight: bold;', `New check cycle started...`);
             const now = Date.now();
             let settingsChanged = false;
-
-            for (const name of allDynamicEntities) {
-                const itemSettings = settings.perCharacter[name];
-                if (!itemSettings) continue;
-
-                // 【【【【【【【【【【 核心修改：智能空闲检测 】】】】】】】】】】
-                let targetChatId = null;
-                const isGroupChatEntity = chatList.some(c => c.name === name && c.type === '群聊');
-                const isGroupPersona = chatList.some(chat => {
-                    const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                    return info.groupPersonas && info.groupPersonas.some(p => p.name === name);
-                });
-                const isCharacterOrNpc = (chatList.some(c => c.name === name && c.type === '私聊')) || npcList.includes(name);
-
-                // 1. 确定这个角色关联的“主聊天窗口”是哪个
-                if (isGroupChatEntity) {
-                    targetChatId = chatList.find(c => c.name === name)?.id;
-                } else if (isGroupPersona) {
-                    const sourceGroupChat = chatList.find(chat => {
-                        const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                        return info.groupPersonas && info.groupPersonas.some(p => p.name === name);
-                    });
-                    if (sourceGroupChat) targetChatId = sourceGroupChat.id;
-                } else if (isCharacterOrNpc) {
-                    const targetChat = chatList.find(c => c.name === name && c.type === '私聊');
-                    if (targetChat) targetChatId = targetChat.id;
-                }
-
-                // 2. 检查“主动发消息”的条件
-                if (itemSettings.message && itemSettings.message.enabled && itemSettings.message.probability > 0) {
-                    const config = itemSettings.message;
-                    
-                    // 【【【 新增的绝对核心判断逻辑！ 】】】
-                    let isChatIdle = false;
-                    if (targetChatId) {
-                        const messages = loadFromLocalStorage(`conversation_${targetChatId}`, []);
-                        if (messages.length > 0) {
-                            const lastMessageTimestamp = messages[messages.length - 1].timestamp;
-                            // 只有当距离最后一条消息的时间超过了设定的间隔，才算“空闲”
-                            if (now - lastMessageTimestamp >= config.interval * 60 * 1000) {
-                                isChatIdle = true;
-                            }
-                        } else {
-                            // 如果没有聊天记录，也算作“空闲”
-                            isChatIdle = true;
-                        }
-                    }
-
-                    // 只有在“空闲”状态下，才进行概率触发判断
-                    if (isChatIdle) {
+        
+            const groupChats = chatList.filter(c => c.type === '群聊');
+        
+            for (const group of groupChats) {
+                const info = loadFromLocalStorage(`chat_info_${group.id}`, {});
+        
+                // =================================================================
+                // 核心逻辑：检查【群聊本身】是否设置了动态
+                // =================================================================
+                const groupSettings = settings.perCharacter[group.name];
+                if (groupSettings && groupSettings.message && groupSettings.message.enabled) {
+                    const config = groupSettings.message;
+        
+                    if (!config.lastTick || (now - config.lastTick >= config.interval * 60 * 1000)) {
                         if (Math.random() * 100 < config.probability) {
-                            let senderNameForAI = name;
-                            if (isGroupChatEntity) senderNameForAI = null;
-
-                            console.log(`Dynamics: Chat for ${name} is idle. Triggering proactive message.`);
-                            await triggerProactiveAI(targetChatId, senderNameForAI, 'message');
                             
-                            // 关键：触发后，我们不再更新 lastTick。因为是否触发的依据已经是聊天记录本身了。
-                            // 我们可以在这里做一个标记，避免在同一轮检测中重复触发，但更简单的做法是让下一次检测时 isChatIdle 自然变为 false。
+                            let potentialSpeakers = [];
+                            const remarkActors = (info.remark || '').split(/[,，\s]+/).filter(Boolean);
+                            potentialSpeakers.push(...remarkActors);
+                            if (potentialSpeakers.length === 0) {
+                                const protagonists = (info.groupPersonas || []).map(p => p.name);
+                                potentialSpeakers.push(...protagonists);
+                            }
+                            if (potentialSpeakers.length === 0) {
+                                const members = loadFromLocalStorage(`chat_members_${group.id}`, []);
+                                const aiMembers = members.filter(m => m !== '{{user}}');
+                                potentialSpeakers.push(...aiMembers);
+                            }
+                            const uniqueSpeakers = [...new Set(potentialSpeakers)];
+        
+                            if (uniqueSpeakers.length > 0) {
+                                console.log(`%c[Dynamics Action - Group Scene]`, 'color: #8e44ad; font-weight: bold;', `Group "${group.name}" is triggering a multi-character scene. Available actors: [${uniqueSpeakers.join(', ')}]`);
+
+                                try {
+                                    const profileIndexStr = info.apiConfig ? info.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
+                                    if (profileIndexStr === null) throw new Error("No API config for this chat.");
+                                    const profile = apiProfiles[parseInt(profileIndexStr)];
+                                    if (!profile) throw new Error("API profile not found.");
+
+                                    // =================================================================
+                                    // 【【【【【【 全新的、绝对核心的上下文注入逻辑 】】】】】】
+                                    // =================================================================
+                                    let fullContextPrompt = profile.prompt || ''; // 1. 基础系统指令
+
+                                    // 2. 注入前情提要
+                                    if (info.preamble) {
+                                        fullContextPrompt = `[Preamble - Highest Priority Context]\n${info.preamble}\n\n` + fullContextPrompt;
+                                    }
+
+                                    // 3. 注入用户人设
+                                    const userNameForPrompt = (info.userPersonaName && info.userPersonaName !== '无') ? info.userPersonaName : '{{user}}';
+                                    if (info.userPersonaName && info.userPersonaName !== '无') {
+                                        const persona = userPersonas.find(p => p.name === info.userPersonaName);
+                                        if (persona && persona.description) {
+                                            fullContextPrompt += `\n\n[User Persona for "${userNameForPrompt}"]\n${persona.description}`;
+                                        }
+                                    }
+                                    if (info.myPersona) {
+                                        fullContextPrompt += `\n\n[Supplementary User Persona]\n${info.myPersona}`;
+                                    }
+
+                                    // 4. 注入完整的群聊角色档案
+                                    const groupPersonasPrompt = `\n\n[Group Chat Context & Your Roles]\nThis is a group chat named "${group.name}". The user you are interacting with is named "${userNameForPrompt}".\n---
+[Active Cast & Role Mandate - UNBREAKABLE RULE]
+Your active cast is: **[${uniqueSpeakers.join(', ')}]**
+You are **STRICTLY FORBIDDEN** from generating dialogue for any character **NOT** on this list.
+---
+[Character Dossiers - The Definitive Guide to Your Roles]
+You are responsible for playing every AI character in the "Active Cast" list.`;
+                                    
+                                    let individualPersonasText = '';
+                                    uniqueSpeakers.forEach(memberName => {
+                                        let persona = '';
+                                        const isNpc = npcList.includes(memberName);
+                                        const groupProtagonistPersona = (info.groupPersonas || []).find(p => p.name === memberName);
+
+                                        if (groupProtagonistPersona) {
+                                            persona = groupProtagonistPersona.description || '';
+                                        } else if (isNpc) {
+                                            persona = (npcSettings.personas && npcSettings.personas[memberName]) || '';
+                                        } else {
+                                            const characterChat = chatList.find(c => c.name === memberName && c.type === '私聊');
+                                            if (characterChat) {
+                                                const characterInfo = loadFromLocalStorage(`chat_info_${characterChat.id}`, {});
+                                                persona = characterInfo.aiPersona || '';
+                                            }
+                                        }
+                                        if (persona) {
+                                            individualPersonasText += `\n- **${memberName}**: ${persona}`;
+                                        }
+                                    });
+                                    fullContextPrompt += groupPersonasPrompt + individualPersonasText;
+                                    fullContextPrompt += `\n\n[Ensemble & Supporting Cast Persona]\n${info.ensemblePersona || 'No general ensemble persona has been defined.'}`;
+                                    
+                                    // 5. 注入世界书和NPC
+                                    const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${group.id}`, []);
+                                    worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
+                                        if (entry.triggerMode === 'always') fullContextPrompt += `\n\n[Background Information: ${entry.name}]\n${entry.content}`;
+                                    });
+                                    const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${group.id}`, []);
+                                    if (associatedNpcNames.length > 0) {
+                                        fullContextPrompt += '\n\n[Associated NPCs for this Group]\n';
+                                        associatedNpcNames.forEach(name => {
+                                            const persona = (npcSettings.personas && npcSettings.personas[name]) || 'No specific persona defined.';
+                                            fullContextPrompt += `- **${name}**: ${persona}\n`;
+                                        });
+                                    }
+
+                                    // 6. 注入时间
+                                    timeManager.updateSettingsForChat(group.id);
+                                    fullContextPrompt += timeManager.getAITimeContext();
+                                    
+                                    // 7. 注入主聊天记录上下文
+                                    const memoryLength = parseInt(info.memoryLength || 20, 10);
+                                    const sourceMessages = loadFromLocalStorage(`conversation_${group.id}`, []);
+                                    const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
+                                    const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages);
+                                    const chatHistoryForPrompt = apiPayloadMessages.map(msg => {
+                                        const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || 'assistant');
+                                        const content = Array.isArray(msg.content) ? msg.content.find(p => p.type === 'text')?.text || '[Media]' : msg.content;
+                                        return `${role}: ${content}`;
+                                    }).join('\n');
+                                    if (chatHistoryForPrompt) {
+                                        fullContextPrompt += `\n\n[RECENT CHAT HISTORY]\n${chatHistoryForPrompt}`;
+                                    }
+                                    
+                                    // =================================================================
+
+                                    // 8. 最后，附加“场景通告”指令
+                                    const scenePrompt = `
+# [ULTIMATE DIRECTOR'S BRIEF: SCENE START]
+
+You are the **Group Director** for the chat group named "${group.name}". The group has been quiet for a while, and it's time to bring it back to life.
+
+**YOUR AVAILABLE ACTORS FOR THIS SCENE:**
+[${uniqueSpeakers.join(', ')}]
+
+**YOUR TASK:**
+Based on ALL the context provided above (personas, history, etc.), you MUST generate a short, spontaneous, multi-character interaction to break the silence. This is NOT a single message. It is a **SCENE**.
+
+**CRITICAL REQUIREMENTS:**
+1.  **Multiple Speakers:** Your output MUST involve **at least TWO** characters from the "Available Actors" list.
+2.  **Interaction:** The characters should be interacting with **each other**, not just speaking into the void. They can be continuing a previous discussion, starting a new topic, arguing, joking, etc.
+3.  **Realism:** The interaction must be natural and in-character for everyone involved.
+4.  **Language:** Strictly Simplified Chinese.
+
+**ABSOLUTE FORMATTING LAW:**
+Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each representing a single message bubble from a single character.
+
+**EXAMPLE OF A CORRECT OUTPUT:**
+<block type="text" sender="张三">@李四, 你上次说的那个项目怎么样了？</block>
+<block type="text" sender="李四">别提了，头都大了。</block>
+<block type="text" sender="王五">（路过）哟，听起来有八卦？</block>
+`;
+                                    // 最终的 system prompt = 完整的上下文 + 场景执导任务
+                                    const finalSystemPrompt = fullContextPrompt + scenePrompt;
+
+                                    const messages = [{ role: "system", content: finalSystemPrompt }];
+                                    const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
+                                        body: JSON.stringify({ model: profile.model, messages, stream: false })
+                                    });
+
+                                    if (!response.ok) throw new Error(`API Error ${response.status}`);
+                                    const data = await response.json();
+                                    const aiResponse = data.choices[0]?.message?.content;
+
+                                    if (aiResponse && aiResponse.trim()) {
+                                        const blockRegex = /<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>/g;
+                                        let match;
+                                        while ((match = blockRegex.exec(aiResponse)) !== null) {
+                                            const sender = match[2];
+                                            const content = match[3].trim();
+                                            if (content && sender) {
+                                                await conversationManager.addMessage({ type: 'text', text: content, side: 'received', sender: sender }, group.id);
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.error(`[Dynamics Tick] Failed to generate group scene for "${group.name}":`, e);
+                                }
+                                
+                                config.lastTick = now;
+                                settingsChanged = true;
+                            } else {
+                                console.warn(`[Dynamics Tick] Group "${group.name}" was triggered, but no potential AI speakers were found.`);
+                            }
                         }
                     }
                 }
-
-                // 3. 检查“朋友圈互动”的条件 (这里的逻辑保持不变，因为它本身就是基于上次动态时间的)
-                if (itemSettings.moments && itemSettings.moments.enabled && itemSettings.moments.probability > 0) {
-                    if (isCharacterOrNpc || isGroupPersona) { 
-                        const config = itemSettings.moments;
-                        // 朋友圈的逻辑是：距离“上一次动态行为”超过间隔
+        
+                // =================================================================
+                // 保留原有逻辑：检查群内【单个角色】的动态设置
+                // =================================================================
+                const protagonists = (info.groupPersonas || []).map(p => p.name);
+                const remarkActors = (info.remark || '').split(/[,，\s]+/).filter(Boolean);
+                const actorsInGroup = [...new Set([...protagonists, ...remarkActors])];
+        
+                if (actorsInGroup.length === 0) {
+                    continue;
+                }
+        
+                for (const actorName of actorsInGroup) {
+                    if (actorName === group.name) continue;
+                    const actorSettings = settings.perCharacter[actorName];
+                    if (!actorSettings) continue;
+        
+                    if (actorSettings.moments && actorSettings.moments.enabled && actorSettings.moments.probability > 0) {
+                        const config = actorSettings.moments;
                         if (!config.lastTick || (now - config.lastTick >= config.interval * 60 * 1000)) {
                             if (Math.random() * 100 < config.probability) {
-                                const action = Math.random() < 0.8 ? 'browse_moments' : 'post_moment';
-                                console.log(`Dynamics: Moments interval for ${name} has passed. Triggering action (${action}).`);
-                                await triggerProactiveAI(null, name, action);
-                                config.lastTick = now; // 朋友圈行为触发后，更新它自己的 lastTick
+                                const action = Math.random() < 0.2 ? 'post_moment' : 'browse_moments';
+                                console.log(`%c[Dynamics Action - Actor Trigger]`, 'color: green; font-weight: bold;', `Triggering "${action}" for actor "${actorName}".`);
+                                await triggerProactiveAI(null, actorName, action);
+                                config.lastTick = now;
                                 settingsChanged = true;
                             }
                         }
                     }
+        
+                    if (actorSettings.message && actorSettings.message.enabled && actorSettings.message.probability > 0) {
+                        const config = actorSettings.message;
+                        const targetChatId = group.id;
+                        const messages = loadFromLocalStorage(`conversation_${targetChatId}`, []);
+                        let isChatIdle = messages.length === 0 || (now - messages[messages.length - 1].timestamp >= config.interval * 60 * 1000);
+        
+                        if (isChatIdle) {
+                            if (Math.random() * 100 < config.probability) {
+                                console.log(`%c[Dynamics Action - Actor Trigger]`, 'color: green; font-weight: bold;', `Triggering proactive message for actor "${actorName}" in group "${group.name}".`);
+                                await triggerProactiveAI(targetChatId, actorName, 'message');
+                            }
+                        }
+                    }
                 }
             }
-            
+        
             if (settingsChanged) {
                 saveSettings();
             }
+            console.log(`%c[Dynamics Tick]`, 'color: blue; font-weight: bold;', `Check cycle finished.`);
         }
 
         function init() {
@@ -14786,7 +15166,11 @@ const isAuthor = post.userName === currentPersonaName;
                 onRender: (modalDOM) => {
                     // 在弹窗显示后，再加载和填充列表
                     const selectEl = modalDOM.querySelector('#npc-editor-association');
-                    const characterOptionsHtml = '<option value="">不关联</option>' + chatList.map(c => `<option value="${c.name}" ${association === c.name ? 'selected' : ''}>${c.name}</option>`).join('');
+                    
+                    // 【【【【【【 核心修复：调用 getAllUniqueCharacters() 获取完整角色列表 】】】】】】
+                    const allCharacters = getAllUniqueCharacters();
+                    const characterOptionsHtml = '<option value="">不关联</option>' + allCharacters.map(name => `<option value="${name}" ${association === name ? 'selected' : ''}>${name}</option>`).join('');
+                    
                     selectEl.innerHTML = characterOptionsHtml;
                 }
             });
@@ -14907,13 +15291,14 @@ async function handleBatchDelete() {
                 return;
             }
             
-            const characters = chatList.map(c => c.name);
+            // 【【【【【【 核心修复：调用 getAllUniqueCharacters() 获取完整角色列表 】】】】】】
+            const characters = getAllUniqueCharacters();
             if(characters.length === 0){
                 alert('没有可关联的角色，请先创建角色或群聊。');
                 return;
             }
 
-            const optionsHtml = '<option value="">不关联</option>' + characters.map(c => `<option value="${c}">${c}</option>`).join('');
+            const optionsHtml = '<option value="">不关联</option>' + characters.map(name => `<option value="${name}">${name}</option>`).join('');
 
             const result = await conversationManager.showCustomModal({
                 title: '批量关联角色',
@@ -16713,13 +17098,33 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 }
                 
                 if (chat.type === '群聊') {
-                    const groupMembers = loadFromLocalStorage(`chat_members_${chatId}`, []);
-                    const allAiActors = groupMembers.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+                    // --- 1. 获取正式成员 ---
+                    const formalMembers = loadFromLocalStorage(`chat_members_${chatId}`, []);
+                    // --- 2. 获取群聊主角 ---
+                    const groupPersonasData = chatInfo.groupPersonas || [];
+                    const protagonistNames = groupPersonasData.map(p => p.name);
+                    // --- 3. 合并并去重，得到完整的演员名单 ---
+                    const allPotentialAiEntities = [...new Set([...formalMembers, ...protagonistNames])];
+                    const allAiActors = allPotentialAiEntities.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+                    
                     let groupPersonasPrompt = `\n[YOUR ROLES: GROUP CHAT]\nThis is a group video call. You are playing ALL of the following AI characters. Your response MUST be a single paragraph describing everyone's actions and words from a narrator's perspective.\n`;
+                    
+                    // --- 新增代码块：无条件加载群聊主角和群演人设 ---
+                    const ensemblePersona = chatInfo.ensemblePersona || 'No general ensemble persona has been defined.';
+                    groupPersonasPrompt += `\n[Ensemble & Supporting Cast Persona]\n${ensemblePersona}\n`;
+                    // --- 新增结束 ---
+
                     allAiActors.forEach(actorName => {
                         let persona = '';
                         const isNpc = npcList.includes(actorName);
-                        if (isNpc) { persona = (npcSettings.personas && npcSettings.personas[actorName]) || '(No persona defined)'; } 
+
+                        // --- 修改：优先从群聊主角人设中查找 ---
+                        const protagonistPersona = groupPersonasData.find(p => p.name === actorName);
+                        if (protagonistPersona) {
+                            persona = protagonistPersona.description || '(No persona defined)';
+                        }
+                        // --- 修改结束 ---
+                        else if (isNpc) { persona = (npcSettings.personas && npcSettings.personas[actorName]) || '(No persona defined)'; } 
                         else { const memberChat = chatList.find(c => c.name === actorName && c.type === '私聊'); if (memberChat) { const info = loadFromLocalStorage(`chat_info_${memberChat.id}`, {}); persona = info.aiPersona || '(No persona defined)'; } }
                         groupPersonasPrompt += `- **${actorName}**: ${persona}\n`;
                     });
@@ -16933,13 +17338,33 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 }
                 
                 if (chat.type === '群聊') {
-                    const groupMembers = loadFromLocalStorage(`chat_members_${chatId}`, []);
-                    const allAiActors = groupMembers.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+                    // --- 1. 获取正式成员 ---
+                    const formalMembers = loadFromLocalStorage(`chat_members_${chatId}`, []);
+                    // --- 2. 获取群聊主角 ---
+                    const groupPersonasData = chatInfo.groupPersonas || [];
+                    const protagonistNames = groupPersonasData.map(p => p.name);
+                    // --- 3. 合并并去重，得到完整的演员名单 ---
+                    const allPotentialAiEntities = [...new Set([...formalMembers, ...protagonistNames])];
+                    const allAiActors = allPotentialAiEntities.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+
                     let groupPersonasPrompt = `\n[YOUR ROLES: GROUP CHAT]\nThis is a group video call. You are playing ALL of the following AI characters. Your response MUST be a single paragraph describing everyone's first actions and words from a narrator's perspective.\n`;
+
+                    // --- 新增代码块：无条件加载群聊主角和群演人设 ---
+                    const ensemblePersona = chatInfo.ensemblePersona || 'No general ensemble persona has been defined.';
+                    groupPersonasPrompt += `\n[Ensemble & Supporting Cast Persona]\n${ensemblePersona}\n`;
+                    // --- 新增结束 ---
+
                     allAiActors.forEach(actorName => {
                         let persona = '';
                         const isNpc = npcList.includes(actorName);
-                        if (isNpc) { persona = (npcSettings.personas && npcSettings.personas[actorName]) || '(No persona defined)'; }
+                        
+                        // --- 修改：优先从群聊主角人设中查找 ---
+                        const protagonistPersona = groupPersonasData.find(p => p.name === actorName);
+                        if (protagonistPersona) {
+                            persona = protagonistPersona.description || '(No persona defined)';
+                        }
+                        // --- 修改结束 ---
+                        else if (isNpc) { persona = (npcSettings.personas && npcSettings.personas[actorName]) || '(No persona defined)'; }
                         else { const memberChat = chatList.find(c => c.name === actorName && c.type === '私聊'); if (memberChat) { const info = loadFromLocalStorage(`chat_info_${memberChat.id}`, {}); persona = info.aiPersona || '(No persona defined)'; } }
                         groupPersonasPrompt += `- **${actorName}**: ${persona}\n`;
                     });
