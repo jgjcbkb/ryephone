@@ -6504,20 +6504,47 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
 
         console.log(`[诊断日志] 角色 "${senderName}": API已返回内容。`);
         if (aiResponse && aiResponse.trim()) {
-            // 【【【核心、致命的修改在这里！！！】】】
+            // 【【【【【【 全新、绝对正确的最终修复逻辑 】】】】】】
             if (actionType === 'message' || actionType === 'post_moment') {
-            console.log(`[诊断日志] 角色 "${senderName}": 开始解析主动行为内容 (类型: ${actionType})...`);
-            // 【核心修改】使用智能区块解析器，而不是简单的按行分割
-            const blocks = parseResponseIntoBlocks(aiResponse);
-            for (const block of blocks) {
-                if (block.trim()) { 
-                    // 现在，每个 block 都是一个完整的、未被拆分的单元（纯文本、HTML块或指令块）
-                    await conversationManager.processAIResponseLine(block, targetChatId, senderName);
-                }
-            }
-            console.log(`[诊断日志] 角色 "${senderName}": 主动行为内容解析并执行完毕。`);
+                console.log(`[诊断日志] 角色 "${senderName}": 开始解析主动行为内容 (类型: ${actionType})...`);
+                
+                // 1. 使用正则表达式从AI的完整回复中提取出所有的 <block> 块
+                const blockRegex = /<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>/g;
+                let match;
 
-        } else {
+                // 2. 循环遍历每一个匹配到的 <block> 块
+                while ((match = blockRegex.exec(aiResponse)) !== null) {
+                    const type = match[1];      // "text" or "html" or "command"
+                    const sender = match[2];    // 发送者名字 (例如: 顾瑾瑜)
+                    const content = match[3].trim(); // <block> 内部的内容
+
+                    if (!content) continue; // 如果内容为空，就跳过
+
+                    // 3. 根据 block 的类型，执行和您回复时完全相同的处理逻辑
+                    switch (type) {
+                        case 'text':
+                        case 'html':
+                            // 如果是文本或HTML，就直接调用 addMessage 函数，
+                            // 并把解析出来的 sender 传进去，这样就不会显示群名了。
+                            await conversationManager.addMessage({
+                                type: 'text',
+                                text: content,
+                                side: 'received',
+                                sender: sender || null,
+                            }, targetChatId);
+                            break;
+                        
+                        case 'command':
+                            // 如果是指令 (比如发红包)，就调用指令处理函数，
+                            // 同样把正确的 sender 传进去。
+                            await conversationManager.processAIResponseLine(content, targetChatId, sender);
+                            break;
+                    }
+                }
+                
+                console.log(`[诊断日志] 角色 "${senderName}": 主动行为内容解析并执行完毕。`);
+
+            } else {
 
                 if (aiResponse.trim() === "No action taken.") {
 
