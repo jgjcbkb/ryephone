@@ -6256,6 +6256,8 @@ if (isGroupPersona) {
             
             // --- START: 需求 1 & 2 的核心修改 - 加载聊天记录 ---
             let chatHistoryForPrompt = '';
+            // 【【【【【【 核心修复：彻底禁用此处的聊天记录加载，防止指令过长 】】】】】】
+            /*
             if (contextChatId) { // 仅当上下文聊天ID存在时才加载
                 const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
 const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
@@ -6274,6 +6276,7 @@ chatHistoryForPrompt = apiPayloadMessages.map(msg => {
                     return `${role}: ${content}`;
                 }).join('\n');
             }
+            */
             // --- END: 需求 1 & 2 的核心修改 ---
 
             // --- NPC注入关联角色人设 & 群聊成员人设 ---
@@ -6504,50 +6507,44 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
 
         console.log(`[诊断日志] 角色 "${senderName}": API已返回内容。`);
         if (aiResponse && aiResponse.trim()) {
-            // 【【【【【【 全新、绝对正确的最终修复逻辑 】】】】】】
-            if (actionType === 'message' || actionType === 'post_moment') {
-                console.log(`[诊断日志] 角色 "${senderName}": 开始解析主动行为内容 (类型: ${actionType})...`);
+
+            if (actionType === 'message') {
+                console.log(`[诊断日志] 角色 "${senderName}": 开始解析【主动消息】内容...`);
                 
-                // 1. 使用正则表达式从AI的完整回复中提取出所有的 <block> 块
-                const blockRegex = /<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>/g;
-                let match;
+                // 步骤1: 使用强大的解析器将AI的原始输出分割成逻辑块（文本、HTML、命令等）。
+                const blocks = parseResponseIntoBlocks(aiResponse);
 
-                // 2. 循环遍历每一个匹配到的 <block> 块
-                while ((match = blockRegex.exec(aiResponse)) !== null) {
-                    const type = match[1];      // "text" or "html" or "command"
-                    const sender = match[2];    // 发送者名字 (例如: 顾瑾瑜)
-                    const content = match[3].trim(); // <block> 内部的内容
+                // 步骤2: 循环遍历每个块并单独处理，确保每个块都成为一个独立的气泡。
+                for (const block of blocks) {
+                    const trimmedBlock = block.trim();
+                    if (!trimmedBlock) continue; // 跳过空块
 
-                    if (!content) continue; // 如果内容为空，就跳过
-
-                    // 3. 根据 block 的类型，执行和您回复时完全相同的处理逻辑
-                    switch (type) {
-                        case 'text':
-                        case 'html':
-                            // 如果是文本或HTML，就直接调用 addMessage 函数，
-                            // 并把解析出来的 sender 传进去，这样就不会显示群名了。
-                            await conversationManager.addMessage({
-                                type: 'text',
-                                text: content,
-                                side: 'received',
-                                sender: sender || null,
-                            }, targetChatId);
-                            break;
-                        
-                        case 'command':
-                            // 如果是指令 (比如发红包)，就调用指令处理函数，
-                            // 同样把正确的 sender 传进去。
-                            await conversationManager.processAIResponseLine(content, targetChatId, sender);
-                            break;
-                    }
+                    // 步骤3: 调用久经考验的 processAIResponseLine 函数处理每个块。
+                    // 对于主动消息，发送者始终是发起动作的角色。
+                    await conversationManager.processAIResponseLine(trimmedBlock, targetChatId, senderName);
                 }
-                
-                console.log(`[诊断日志] 角色 "${senderName}": 主动行为内容解析并执行完毕。`);
 
-            } else {
+                console.log(`[诊断日志] 角色 "${senderName}": 主动消息解析并执行完毕。`);
 
+            } else if (actionType === 'post_moment') {
+                // 这个逻辑是专门用于发帖的，保持不变，但要确保它在自己的分支里。
+                console.log(`[诊断日志] 角色 "${senderName}": 开始解析【主动发帖】指令...`);
+                try {
+                    const commandRegex = /\[(post_moment):\s*([\s\S]+?)\]/g;
+                    const match = commandRegex.exec(aiResponse);
+                    if (match) {
+                        const value = match[2];
+                        const jsonString = value.replace(/```json/g, '').replace(/```/g, '').trim();
+                        const postData = JSON.parse(jsonString);
+                        momentsManager.createPostFromAI(senderName, postData);
+                    } else {
+                         console.warn(`[诊断日志] 角色 "${senderName}": AI意图发帖，但未找到有效的 [post_moment:...] 指令。`);
+                    }
+                } catch (e) {
+                    console.error(`[诊断日志] 角色 "${senderName}": 解析主动发帖指令失败`, e, aiResponse);
+                }
+            } else { // 这是朋友圈互动（browse_moments）的逻辑，保持不变
                 if (aiResponse.trim() === "No action taken.") {
-
                     console.log(`[诊断日志] 角色 "${senderName}": AI决定不采取行动。`);
                     return;
                 }
@@ -9860,6 +9857,37 @@ You were receiving a video call from {{user}}, but they hung up before you could
 
             let chatContent = line.trim();
             if (!chatContent) return;
+            
+            // <<< 新增：区块解析逻辑 开始 >>>
+            // 这个正则表达式现在能正确捕获多行内容
+            const blockMatch = chatContent.match(/^<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>$/);
+
+            if (blockMatch) {
+                const type = blockMatch[1];
+                const senderFromBlock = blockMatch[2];
+                let content = blockMatch[3].trim();
+
+                // 优先使用 block 中指定的 sender，其次是函数传入的 forcedSender
+                const finalSender = senderFromBlock || forcedSender;
+
+                if (type === 'text' || type === 'html') {
+                    // 如果是文本或HTML块，直接将其内容作为消息发送，然后结束处理。
+                    await addMessage({
+                        type: 'text', // 统一作为文本类型消息，由渲染器决定如何显示HTML
+                        text: content,
+                        side: 'received',
+                        sender: finalSender || null,
+                    }, targetChatId);
+                    return; // 处理完毕，必须立即返回
+                } else if (type === 'command') {
+                    // 如果是命令块，则将内部的命令内容提取出来，交给后续的逻辑处理。
+                    chatContent = content;
+                    // 更新 forcedSender，确保后续逻辑能正确识别发送者
+                    forcedSender = finalSender;
+                }
+            }
+            // <<< 新增：区块解析逻辑 结束 >>>
+
 
             // --- 终极净化步骤 ---
             if (chatContent.startsWith('<div') && chatContent.endsWith('</div>')) {
@@ -9868,7 +9896,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
             // --- 净化结束 ---
             
             let sender, textContent;
-            const systemMatch = line.match(/^系统:\s*([\s\S]*)$/);
+            const systemMatch = chatContent.match(/^系统:\s*([\s\S]*)$/);
             if (systemMatch) { await addMessage({ type: 'system', text: systemMatch[1].trim(), side: 'system' }, targetChatId); return; }
 
             // --- 核心重构：不再依赖全局 contactInfo，而是根据 targetChatId 自行判断 ---
@@ -9876,12 +9904,12 @@ You were receiving a video call from {{user}}, but they hung up before you could
             const isTargetGroup = targetChat && targetChat.type === '群聊';
 
             if (forcedSender) {
-                // 如果有强制发送者（来自主动消息），直接使用
+                // 如果有强制发送者（来自主动消息或block解析），直接使用
                 sender = forcedSender;
-                textContent = line.trim();
+                textContent = chatContent.trim(); // 使用已经被block解析器处理过的 chatContent
             } else if (isTargetGroup) {
                 // 如果是群聊，并且没有强制发送者，才尝试解析 "名字: 内容" 格式
-                const groupMatch = line.match(/^([^:]+):\s*([\s\S]*)$/);
+                const groupMatch = chatContent.match(/^([^:]+):\s*([\s\S]*)$/);
                 if (groupMatch) {
                     [ , sender, textContent] = groupMatch.map(s => s.trim());
                     
@@ -9896,14 +9924,14 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     // 如果解析失败，说明是AI直接返回内容，此时 sender 应该是未知的，但我们不能用“群成员”
                     // 这种情况通常是主动消息，应该由 forcedSender 处理，如果走到这里说明逻辑有误，但做一个保护
                     sender = chatState.chatName; // Fallback to current chat name, though should be avoided
-                    textContent = line.trim(); 
+                    textContent = chatContent.trim(); 
                 }
             } else { 
                 // 私聊模式
                 sender = targetChat ? targetChat.name : chatState.chatName; 
-                textContent = line.trim(); 
+                textContent = chatContent.trim(); 
             }
-
+            
             
             
             // --- 优先处理关系指令 ---
