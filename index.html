@@ -7731,7 +7731,7 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
             
             // <<<< 3. 等所有循环都跑完，我们在这里统一检查并发送唯一的一条消息 >>>>
             if (systemMessageToShow) {
-                await conversationManager.addMessage({ type: 'text', sender: systemMessageToShow.sender, text: systemMessageToShow.text, side: 'received' });
+                await conversationManager.addMessage({ type: 'text', sender: systemMessageToShow.sender, text: systemMessageToShow.text, side: 'received' }, targetChatId);
             }
             
             const finalCleanedText = tempResponse.replace(updateRegex, '').trim();
@@ -14617,6 +14617,53 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                     }
                 }
             }
+        
+            // =================================================================
+            // 【【【【【【 全新、绝对核心的单聊角色检查逻辑 】】】】】】
+            // =================================================================
+            const privateChats = chatList.filter(c => c.type === '私聊');
+            for (const chat of privateChats) {
+                const charName = chat.name;
+                const charSettings = settings.perCharacter[charName];
+
+                // 如果该单聊角色没有设置或没有启用任何动态，直接跳过
+                if (!charSettings || (!charSettings.message?.enabled && !charSettings.moments?.enabled)) {
+                    continue;
+                }
+
+                // --- 1. 检查主动发消息 ---
+                if (charSettings.message && charSettings.message.enabled && charSettings.message.probability > 0) {
+                    const config = charSettings.message;
+                    const messages = loadFromLocalStorage(`conversation_${chat.id}`, []);
+                    // 判断条件：聊天记录为空，或者距离上一条消息的时间超过了设定的间隔
+                    const isChatIdle = messages.length === 0 || (now - (messages[messages.length - 1]?.timestamp || 0) >= config.interval * 60 * 1000);
+
+                    if (isChatIdle) {
+                        if (Math.random() * 100 < config.probability) {
+                            console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering proactive message for private character "${charName}".`);
+                            await triggerProactiveAI(chat.id, charName, 'message');
+                            // 注意：单聊的主动消息不更新 lastTick，因为它只在空闲时触发一次
+                        }
+                    }
+                }
+
+                // --- 2. 检查朋友圈互动 ---
+                if (charSettings.moments && charSettings.moments.enabled && charSettings.moments.probability > 0) {
+                    const config = charSettings.moments;
+                    if (!config.lastTick || (now - config.lastTick >= config.interval * 60 * 1000)) {
+                        if (Math.random() * 100 < config.probability) {
+                            const action = Math.random() < 0.2 ? 'post_moment' : 'browse_moments';
+                            console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering moment action (${action}) for private character "${charName}".`);
+                            await triggerProactiveAI(chat.id, charName, action);
+                            config.lastTick = now; // 更新时间戳
+                            settingsChanged = true;
+                        }
+                    }
+                }
+            }
+            // =================================================================
+            // 【【【【【【 新增代码块到此结束 】】】】】】
+            // =================================================================
         
             if (settingsChanged) {
                 saveSettings();
