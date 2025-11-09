@@ -6353,11 +6353,21 @@ ${extraContext}
 ${chatHistoryForPrompt || 'No recent chat history.'}
 ---
 `;
-            const instruction = `${contextHeader}
+            const instruction = `
+# [ULTIMATE IDENTITY LOCK-IN - UNBREAKABLE RULE]
+**FOR THIS SPECIFIC ACTION, YOUR IDENTITY IS LOCKED. YOU ARE, AND ONLY ARE, "${senderName}".**
+- **Your Persona:** ${personaText}
+- **Your Thoughts:** All internal monologues and decisions MUST originate from "${senderName}"'s perspective.
+- **Your Actions:** All actions (liking, commenting, messaging) MUST be performed by "${senderName}".
+- **ABSOLUTE FORBIDDANCE:** You are **STRICTLY FORBIDDEN** from thinking, acting, or speaking as any other character. Even if you see posts from other people you know, you are merely observing as "${senderName}".
+
+---
+${contextHeader}
 # [ULTIMATE DIRECTIVE: THE ART OF SOCIALIZING ON MOMENTS]
 
-You are ${senderName}. ${personaText}
-You are now browsing Moments, a public social space. Your primary goal is to **act like a real, social being within your entire known circle**, not just focus on one person.
+You are now browsing Moments, a public social space, as **${senderName}**. Your primary goal is to **act like a real, social being within your entire known circle**, not just focus on one person.
+
+
 
 **LANGUAGE REQUIREMENT (ABSOLUTE):** All your generated content (comments, replies, private messages) MUST be in **Simplified Chinese (简体中文)**.
 
@@ -6478,7 +6488,17 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
             }
             // <<< END: MOVED & FIXED LOGIC >>>
 
-            const finalPostInstruction = `${contextHeader}${postInstruction}`;
+            // --- 核心修正：注入身份锁定指令 ---
+            const identityLockInPrompt = `
+# [ULTIMATE IDENTITY LOCK-IN - UNBREAKABLE RULE]
+**FOR THIS SPECIFIC ACTION, YOUR IDENTITY IS LOCKED. YOU ARE, AND ONLY ARE, "${senderName}".**
+- **Your Persona:** ${personaText}
+- **Your Task:** You are about to post on Moments. The content of your post MUST originate from your locked identity as "${senderName}".
+- **ABSOLUTE FORBIDDANCE:** You are **STRICTLY FORBIDDEN** from posting in the voice or from the perspective of any other character.
+---
+`;
+            // 将身份锁定指令、上下文、和发帖指南拼接在一起
+            const finalPostInstruction = `${identityLockInPrompt}${contextHeader}${postInstruction}`;
             const systemMessageContent = [{ type: 'text', text: finalPostInstruction }];
             
             finalMessages = [{ role: "system", content: systemMessageContent }];
