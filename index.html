@@ -4204,6 +4204,40 @@ input:checked + .slider:before {
     opacity: 0.9; /* 稍微带一点透明度，更有质感 */
 }
 /* --- END: 新增内心独白样式 --- */
+/* --- START: 新增群聊账户切换按钮样式 --- */
+.account-header .account-nav-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 10px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin: -10px -16px 15px -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+}
+.account-nav-buttons.single-center {
+    justify-content: center;
+}
+.account-nav-buttons .fragment-generate-btn {
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+    left: auto !important;
+}
+.account-nav-buttons button {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #ddd;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background-color 0.2s;
+}
+.account-nav-buttons button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+/* --- END: 新增群聊账户切换按钮样式 --- */
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -5282,7 +5316,6 @@ input:checked + .slider:before {
             <div id="account-app-container">
                 <!-- JS will inject account content here -->
             </div>
-            <div id="account-generate-btn" class="dynamic-decoration fragment-generate-btn"></div>
         </div>
     </div>
                 <!-- PAGE 12: User Persona (NEW) -->
@@ -6302,6 +6335,21 @@ chatHistoryForPrompt = apiPayloadMessages.map(msg => {
                     }
                 }
             } 
+            
+            
+            // --- 新增代码块：无条件加载当前上下文关联的NPC人设 ---
+            if (contextChatId) {
+                const associatedNpcNamesForMoments = loadFromLocalStorage(`chat_associated_npcs_${contextChatId}`, []);
+                if (associatedNpcNamesForMoments.length > 0) {
+                    extraContext += '\n\n[Associated NPCs for this Context]\n';
+                    const npcSettingsDataForMoments = loadFromLocalStorage('app-npc-settings', {});
+                    associatedNpcNamesForMoments.forEach(name => {
+                        const persona = (npcSettingsDataForMoments.personas && npcSettingsDataForMoments.personas[name]) || 'No specific persona defined.';
+                        extraContext += `- **${name}**: ${persona}\n`;
+                    });
+                }
+            }
+            // --- 新增结束 ---
             // 你的新需求：朋友圈私信时可以读取群里其他人人设上下文
             const allGroupMembers = new Set();
             chatList.filter(c => c.type === '群聊').forEach(group => {
@@ -6328,20 +6376,6 @@ chatHistoryForPrompt = apiPayloadMessages.map(msg => {
                     }
                 });
             }
-            
-            // --- 新增代码块：无条件加载当前上下文关联的NPC人设 ---
-            if (contextChatId) {
-                const associatedNpcNamesForMoments = loadFromLocalStorage(`chat_associated_npcs_${contextChatId}`, []);
-                if (associatedNpcNamesForMoments.length > 0) {
-                    extraContext += '\n\n[Associated NPCs for this Context]\n';
-                    const npcSettingsDataForMoments = loadFromLocalStorage('app-npc-settings', {});
-                    associatedNpcNamesForMoments.forEach(name => {
-                        const persona = (npcSettingsDataForMoments.personas && npcSettingsDataForMoments.personas[name]) || 'No specific persona defined.';
-                        extraContext += `- **${name}**: ${persona}\n`;
-                    });
-                }
-            }
-            // --- 新增结束 ---
             const contextHeader = `
 [CONTEXT - READ FIRST]
 This is the context from your primary chat. Use it to inform your reactions on Moments.
@@ -7511,51 +7545,63 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
         let isMultiSelectMode = false, selectedMessageIds = [];
         let callAttemptState = { callId: null, closeUI: null }; // <--- 新增这一行
         async function executeBackgroundUpdatesAndCleanText(aiResponseText, targetChatId, senderName) {
-            // 匹配所有后台更新标签（使用全局非贪婪模式）
-            const updateRegex = /<background_update type="([^"]+)">([\s\S]*?)<\/background_update>/g;
+            // 匹配所有后台更新标签，现在能捕获 sender 属性
+            const updateRegex = /<background_update type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/background_update>/g;
             let updatesFound = false;
             let updateMatch;
+            let systemMessageToShow = null; // <<<< 1. 在循环外创建一个变量来暂存消息
             
-            // 必须重新创建 updateRegex 的副本，以确保每次循环都能从头开始匹配
             const tempResponse = aiResponseText;
 
-            // 循环处理所有匹配的后台更新标签
             while ((updateMatch = updateRegex.exec(aiResponseText)) !== null) {
                 updatesFound = true;
                 const type = updateMatch[1];
-                const data = updateMatch[2].trim();
+                const senderFromBlock = updateMatch[2]; // 获取 sender 属性
+                const data = updateMatch[3].trim();     // 获取内容
                 
-                // --- SWITCH CASE: 执行后台任务 (内容与之前修改的 case 保持一致) ---
+                // --- 核心修正：决定最终使用的发送者名字 ---
+                // 优先使用AI在block里明确指定的sender，如果没有，才用函数传入的senderName作为备用
+                const finalSenderName = senderFromBlock || senderName;
+
                 switch (type) {
                     case 'mood_card': {
                         const now = new Date();
                         const dateStr = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
                         const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-                        const content = `${dateStr} ${timeStr}\n\n${data}`;
+                        
+                        let finalData = data;
+                        const chat = chatList.find(c => c.id === targetChatId);
+                        // 检查是否是群聊，并且我们有一个有效的角色名
+                        if (chat && chat.type === '群聊' && senderFromBlock) {
+                            finalData = `[${senderFromBlock}]\n${data}`;
+                        }
+
+                        const content = `${dateStr} ${timeStr}\n\n${finalData}`;
                         const storageKey = `app-mood-cards_${targetChatId}`;
-//...
                         const moods = loadFromLocalStorage(storageKey, []);
                         moods.unshift({ content: content, timestamp: Date.now() });
                         saveToLocalStorage(storageKey, moods);
-                        console.log(`[Background Update] Mood Card updated.`);
+                        console.log(`[Background Update] Mood Card updated by "${finalSenderName}".`);
                         break;
                     }
                     case 'pager': {
-                        // AI现在只会返回一个完整的、可能包含多行的备忘录内容
                         const memoContent = data.trim();
 
                         if (memoContent) {
-                            // 直接调用安全的方法将这整个内容块添加为一个新的MEMO
-                            pagerManager.addNoteFromAI(memoContent);
-                            console.log(`[Background Update] Pager updated: A new memo was added for ${senderName}.`);
+                            let finalContent = memoContent;
+                            const chat = chatList.find(c => c.id === targetChatId);
+                            // 检查是否是群聊，并且我们有一个有效的角色名
+                            if (chat && chat.type === '群聊' && senderFromBlock) {
+                                finalContent = `[${senderFromBlock}]\n${memoContent}`;
+                            }
+
+                            pagerManager.addNoteFromAI(finalContent);
+                            console.log(`[Background Update] Pager updated: A new memo was added by "${finalSenderName}".`);
                         }
                         break;
                     }
-
-
                     case 'account': {
                         const aiResponseData = data;
-                        console.log('[后台更新] AI返回的原始账户数据:', { aiResponseData: aiResponseData });
                         const balanceSourcesMatch = aiResponseData.match(/\[BALANCE_SOURCES\]\s*([\s\S]*?)\[\/BALANCE_SOURCES\]/);
                         const transactionsMatch = aiResponseData.match(/\[NEW_TRANSACTIONS\]\s*([\s\S]*?)\[\/NEW_TRANSACTIONS\]/);
                         const systemMessageMatch = aiResponseData.match(/\[SYSTEM_MESSAGE\]\s*([\s\S]*?)\[\/SYSTEM_MESSAGE\]/);
@@ -7566,42 +7612,72 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                         }
 
                         try {
-                            // 1. 定义角色专属的存储键
                             const storageKey = `app_account_data_${targetChatId}`;
-                            // 2. 加载该角色的旧数据，如果不存在则使用全局默认值
-                            let characterAccountData = loadFromLocalStorage(storageKey, staticAccountData);
+                            const chat = chatList.find(c => c.id === targetChatId);
+                            const isGroupChat = chat && chat.type === '群聊';
 
+                            // 提取AI返回的新数据
                             const newBalanceSourcesXml = balanceSourcesMatch[1].trim();
                             const newTransactionsXml = transactionsMatch[1].trim();
-                            
                             const balanceContent = newBalanceSourcesXml.match(/<balance>([\s\S]*?)<\/balance>/)[0];
                             const sourcesContent = newBalanceSourcesXml.match(/<sources>([\s\S]*?)<\/sources>/)[0];
-                            const newEntryContent = newTransactionsXml.match(/<entry>[\s\S]*?<\/entry>/)[0];
+                            const newEntryMatches = newTransactionsXml.match(/<entry>[\s\S]*?<\/entry>/g);
+                            const newEntriesContent = newEntryMatches ? newEntryMatches.join('\n        ') : '';
                             
-                            // 从该角色的旧数据中提取历史账单
-                            const oldStatementMatch = characterAccountData.match(/<statement>([\s\S]*?)<\/statement>/);
-                            const oldEntries = oldStatementMatch ? oldStatementMatch[1] : '';
+                            if (isGroupChat) {
+                                // --- 群聊逻辑：更新指定角色的账户 ---
+                                let groupAccountObject = loadFromLocalStorage(storageKey, {});
+                                const characterToUpdate = senderName; // finalSenderName 是从 block 的 sender 属性来的
 
-                            const finalAccountXml = `<account id="self">
+                                if (!characterToUpdate) {
+                                    console.error("Group account update failed: No sender specified in block.");
+                                    break;
+                                }
+
+                                let characterAccountData = groupAccountObject[characterToUpdate] || staticAccountData;
+                                
+                                const oldStatementMatch = characterAccountData.match(/<statement>([\s\S]*?)<\/statement>/);
+                                const oldEntries = oldStatementMatch ? oldStatementMatch[1] : '';
+
+                                const finalAccountXml = `<account id="self">
     ${balanceContent}
     ${sourcesContent}
     <statement>
         ${oldEntries}
-        ${newEntryContent}
+        ${newEntriesContent}
     </statement>
 </account>`;
+                                // 更新这个角色的数据
+                                groupAccountObject[characterToUpdate] = `\n        [账户]\n        ${finalAccountXml}\n        `;
+                                // 保存整个群聊的账户对象
+                                saveToLocalStorage(storageKey, groupAccountObject);
+                                console.log(`[Background Update] Group account for "${characterToUpdate}" in chat "${chat.name}" was updated.`);
 
-                            // 3. 更新角色专属的数据变量
-                            characterAccountData = `\n        [账户]\n        ${finalAccountXml}\n        `;
-                            // 4. 保存到角色专属的存储键
-                            saveToLocalStorage(storageKey, characterAccountData);
-                            
-                            console.log(`[Background Update] Account data completely rebuilt and saved for ${senderName}.`);
+                            } else {
+                                // --- 单聊逻辑 (已修正) ---
+                                let characterAccountData = loadFromLocalStorage(storageKey, staticAccountData);
+                                const oldStatementMatch = characterAccountData.match(/<statement>([\s\S]*?)<\/statement>/);
+                                const oldEntries = oldStatementMatch ? oldStatementMatch[1] : '';
 
+                                const finalAccountXml = `<account id="self">
+    ${balanceContent}
+    ${sourcesContent}
+    <statement>
+        ${oldEntries}
+        ${newEntriesContent}
+    </statement>
+</account>`;
+                                characterAccountData = `\n        [账户]\n        ${finalAccountXml}\n        `;
+                                saveToLocalStorage(storageKey, characterAccountData);
+                                // 使用 chat.name 来确保日志的准确性
+                                console.log(`[Background Update] Single chat account for "${chat.name}" was updated.`);
+                            }
+
+                            // <<<< 2. 在这里，我们不再立刻发送消息，而是把消息存起来 >>>>
                             if (systemMessageMatch) {
                                 const systemMessageText = systemMessageMatch[1].trim();
                                 if (systemMessageText) {
-                                    await conversationManager.addMessage({ type: 'text', sender: senderName, text: systemMessageText, side: 'received' });
+                                    systemMessageToShow = { sender: finalSenderName, text: systemMessageText };
                                 }
                             }
 
@@ -7610,18 +7686,13 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                         }
                         break;
                     }
-// ...
-                 // ... in executeBackgrounduatesAndCleanText ...
-                case 'lifestyle': {
+
+                 case 'lifestyle': {
                     const newRecordsHtml = data;
                     try {
-                        // 步骤 1: 确定存储键
                         const storageKey = `app_lifestyle_data_${targetChatId}`;
-
-                        // 步骤 2: 加载旧数据
                         let characterLifestyleHTML = loadFromLocalStorage(storageKey, lifestyleHTML);
 
-                        // 步骤 3: 安全地追加新记录（这部分逻辑不变，因为它是在内存中操作，是安全的）
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(characterLifestyleHTML, 'text/html');
                         const tempContainer = document.createElement('div');
@@ -7647,27 +7718,22 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
 
                         const updatedHtmlString = doc.body.innerHTML;
                         
-                        // 步骤 4: 保存更新后的完整数据
                         saveToLocalStorage(storageKey, updatedHtmlString);
                         console.log(`[Background Update] Lifestyle records for ${senderName} saved to its specific key: ${storageKey}.`);
-
-                        // 步骤 5: 【【【核心修改：彻底删除所有实时更新界面的代码】】】
-                        // 我们不再检查弹窗是否打开，也不再执行任何 container.innerHTML 操作。
-                        // 只是在这里静静地完成数据保存，然后结束。
 
                     } catch (e) {
                         console.error("Error in lifestyle background update:", e);
                     }
                     break;
                 }
-// ...
                 }
             }
             
-            // --- 终极剥离 ---
-            // 确保移除所有匹配项。
-            // 由于 exec 会修改 lastIndex，我们现在直接对原始文本进行替换。
-            // 再次匹配以确保所有内容都被剥离（使用一个副本是为了避免 exec 的 side effect）
+            // <<<< 3. 等所有循环都跑完，我们在这里统一检查并发送唯一的一条消息 >>>>
+            if (systemMessageToShow) {
+                await conversationManager.addMessage({ type: 'text', sender: systemMessageToShow.sender, text: systemMessageToShow.text, side: 'received' });
+            }
+            
             const finalCleanedText = tempResponse.replace(updateRegex, '').trim();
             
             return finalCleanedText;
@@ -9365,7 +9431,7 @@ if (associatedNpcNames.length > 0) {
     finalSystemPrompt += npcInfoPrompt;
 }
                 
-                // --- 【【【核心修复】】】重新注入正确的后台任务生成逻辑 ---
+                // --- 【核心修复】】】重新注入正确的后台任务生成逻辑 ---
                 // 这一步是让AI在回复的同时，有机会生成心事或备忘录的关键
                 const lastUserTurnTextsForBgTask = [];
                 for (let i = chatState.messages.length - 1; i >= 0; i--) {
@@ -9377,10 +9443,9 @@ if (associatedNpcNames.length > 0) {
                     }
                 }
                 const combinedUserTextForBgTask = lastUserTurnTextsForBgTask.join(' ');
-                const backgroundTaskPrompt = await triggerBackgroundDataUpdate(combinedUserTextForBgTask, chatState.chatName);
+                const backgroundTaskPrompt = await triggerBackgroundDataUpdate(combinedUserTextForBgTask, chatState.chatName, originatingChatId);
                 finalSystemPrompt += backgroundTaskPrompt;
                 // --- 修复结束 ---
-                
                 const memoryLength = parseInt(chatInfo.memoryLength || 20, 10); // 这里 memoryLength 现在代表“轮次”
                 
                 let recentMessages;
@@ -16055,173 +16120,7 @@ async function handleRemoveMember() {
     momentsManager.init();
     videoCallManager.init();
 
-    // --- START: 新增生活/账户按钮事件监听 (V3 - 最终稳定版) ---
-    document.getElementById('lifestyle-generate-btn').addEventListener('click', async () => {
-        const btn = document.getElementById('lifestyle-generate-btn');
-        btn.classList.add('loading');
-        try {
-            // 1. 获取当前聊天上下文
-            const currentChatId = conversationManager.getCurrentChatId();
-            const senderName = currentChatId ? chatList.find(c => c.id === currentChatId).name : 'Character';
-            const chatInfo = loadFromLocalStorage(`chat_info_${currentChatId}`, {});
-            const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
-            if (profileIndexStr === null) throw new Error("未找到有效的API配置。");
-            const profile = apiProfiles[parseInt(profileIndexStr)];
-            if (!profile) throw new Error(`API配置索引 ${profileIndexStr} 不存在。`);
-
-            // 2. 实时加载最新数据并构建指令
-            const currentChatIdForGen = conversationManager.getCurrentChatId();
-const storageKeyForGen = `app_lifestyle_data_${currentChatIdForGen}`;
-const currentLifestyleHTML = loadFromLocalStorage(storageKeyForGen, lifestyleHTML);
-            const latestRecordMatch = currentLifestyleHTML.match(/<div class="record-card[\s\S]*?<\/div>/);
-            const context = latestRecordMatch ? `Your latest lifestyle record was: \`${latestRecordMatch[0]}\`.` : "You have no recent lifestyle records.";
-            const specialPrompt = `You are ${senderName}. Based on your character and this recent context ("${context}"), you MUST generate a block of new lifestyle records.
-**CRITICAL INSTRUCTIONS:**
-1.  **Quantity:** You MUST generate ONLY ONE new record.
-2.  **Variety:** Generate a 'travel', 'delivery', or 'shopping' type record.
-3.  **Format:** Use the exact HTML structure for <div class="record-card ..."> EXACTLY.
-4.  **Language:** Simplified Chinese.
-**Output Format (STRICTLY ONE BLOCK):** You MUST wrap your entire HTML output within a single \`<background_update type="lifestyle">\` block.`;
-
-            // 3. 直接调用API
-            const personaPrompt = { role: "system", content: `You are the character "${senderName}". Your persona is: "${chatInfo.aiPersona || 'a character'}".`};
-// ...
-            const taskPrompt = { role: "user", content: specialPrompt };
-            const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                body: JSON.stringify({ model: profile.model, messages: [personaPrompt, taskPrompt], stream: false })
-            });
-
-            if (!response.ok) {
-                const errorBody = await response.text();
-                throw new Error(`API返回错误 (状态码 ${response.status}): ${errorBody}`);
-            }
-            const data = await response.json();
-            const aiData = data.choices[0]?.message?.content;
-
-            // 4. 处理返回数据
-            if (aiData) {
-                await conversationManager.executeBackgroundUpdatesAndCleanText(aiData, currentChatId, senderName);
-                lifestyleManager.openLifestyle();
-                await conversationManager.customAlert('生活记录已更新！');
-            } else {
-                throw new Error('AI成功响应，但返回内容为空。');
-            }
-        } catch (e) {
-            await conversationManager.customAlert(`生活记录更新失败: ${e.message}`);
-        } finally {
-            btn.classList.remove('loading');
-        }
-    });
-
-    document.getElementById('account-generate-btn').addEventListener('click', async () => {
-        const btn = document.getElementById('account-generate-btn');
-        btn.classList.add('loading');
-        try {
-            // 1. 获取当前聊天上下文
-            const currentChatId = conversationManager.getCurrentChatId();
-            const senderName = currentChatId ? chatList.find(c => c.id === currentChatId).name : 'Character';
-            const chatInfo = loadFromLocalStorage(`chat_info_${currentChatId}`, {});
-            const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
-            if (profileIndexStr === null) throw new Error("未找到有效的API配置。");
-            const profile = apiProfiles[parseInt(profileIndexStr)];
-            if (!profile) throw new Error(`API配置索引 ${profileIndexStr} 不存在。`);
-
-            // 2. 实时加载最新数据并构建指令
-            const currentChatIdForGen = conversationManager.getCurrentChatId();
-const storageKeyForGen = `app_account_data_${currentChatIdForGen}`;
-let currentAccountData = loadFromLocalStorage(storageKeyForGen, staticAccountData);
-            const latestEntryMatch = currentAccountData.match(/<entry>[\s\S]*?<\/entry>/g);
-            const context = latestEntryMatch ? `Your latest transaction entry was: \`${latestEntryMatch[latestEntryMatch.length - 1]}\`.` : "You have no recent transactions.";
-            const specialPrompt = `You are ${senderName}. Based on your character and this recent context ("${context}"), you MUST update your account balance.
-
-**[ABSOLUTE CORE DIRECTIVE: REAL WORLD TRANSACTIONS ONLY]**
-**This is your most important rule. You are FORBIDDEN from generating internal fund transfers.**
-- **FORBIDDEN:** Transactions like "银行卡-转入微信", "支付宝提现", "从A账户转到B账户". These are meaningless and clutter the log.
-- **ALLOWED:** Your focus MUST be on transactions with the outside world:
-    - **REAL EXPENSES:** Buying coffee, paying rent, shopping, travel tickets, etc. (Negative amounts)
-    - **REAL INCOME:** Salary, investment gains, selling an item, receiving a payment, etc. (Positive amounts)
-
-**[CRITICAL RULES FOR ACCURACY & REALISM]**
-1.  **"UNCOUNTABLE" WEALTH:** If the character's wealth is immeasurable, you MUST use the special text "不可计数" for the <balance> tag and for all <source> tags. Do NOT use numbers.
-2.  **NUMERICAL WEALTH:**
-    a.  **SEED MONEY:** If the current balance is 0.00, invent a plausible starting capital.
-    b.  **CALCULATION ACCURACY:** The final balance MUST be the precise sum of the starting balance and all transactions. The sum of all source amounts MUST equal the final balance. Format all amounts to two decimal places.
-3.  **DEBT & INSTALLMENTS:** If the character is in debt (negative balance), generate transactions that reflect this, such as loan payments or borrowing money.
-
----
-
-**[TASK INSTRUCTIONS]**
-
-1.  **Generate Transactions:** Create at least TEN new, **REALISTIC, REAL WORLD** transactions following the core directive above.
-2.  **Calculate & Update:** Based on the rules, update the <balance> and all <source> amounts.
-3.  **Language:** Simplified Chinese.
-
-**CURRENT ACCOUNT DATA (FOR REFERENCE ONLY):**
-\`\`\`xml
-${currentAccountData.replace('[账户]', '').trim()}
-\`\`\`
-
-**Output Format (STRICTLY THREE BLOCKS):** You MUST wrap your entire output within a single \`<background_update type="account">\` block, containing the three required sections:
-
-[BALANCE_SOURCES]
-<account>
-    <balance>[NEW_TOTAL_BALANCE or "不可计数"]</balance>
-    <sources>
-        <source name="支付宝" amount="[Amount or '不可计数']" />
-        <source name="微信钱包" amount="[Amount or '不可计数']" />
-        <source name="银行卡" amount="[Amount or '不可计数']" />
-        <source name="基金" amount="[Amount or '不可计数']" />
-        <source name="股票" amount="[Amount or '不可计数']" />
-        <source name="其他" amount="[Amount or '不可计数']" />
-    </sources>
-</account>
-[/BALANCE_SOURCES]
-
-[NEW_TRANSACTIONS]
-<entry>
-    <date>${new Date().toISOString().slice(0, 10)}</date>
-    <!-- MUST INCLUDE AT LEAST TEN REALISTIC, REAL WORLD <item> TAGS HERE -->
-</entry>
-[/NEW_TRANSACTIONS]
-
-[SYSTEM_MESSAGE]
-Your optional message to the user about the update.
-[/SYSTEM_MESSAGE]`;
-
-
-            // 3. 直接调用API
-            const personaPrompt = { role: "system", content: `You are the character "${senderName}". Your persona is: "${chatInfo.aiPersona || 'a character'}".`};
-            const taskPrompt = { role: "user", content: specialPrompt };
-            const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                body: JSON.stringify({ model: profile.model, messages: [personaPrompt, taskPrompt], stream: false })
-            });
-
-            if (!response.ok) {
-                const errorBody = await response.text();
-                throw new Error(`API返回错误 (状态码 ${response.status}): ${errorBody}`);
-            }
-            const data = await response.json();
-            const aiData = data.choices[0]?.message?.content;
-
-            // 4. 处理返回数据
-            if (aiData) {
-                await conversationManager.executeBackgroundUpdatesAndCleanText(aiData, currentChatId, senderName);
-                accountManager.openAccount();
-                await conversationManager.customAlert('账户数据已更新！');
-            } else {
-                throw new Error('AI成功响应，但返回内容为空。');
-            }
-        } catch (e) {
-            await conversationManager.customAlert(`账户数据更新失败: ${e.message}`);
-        } finally {
-            btn.classList.remove('loading');
-        }
-    });
-    // --- END: 新增生活/账户按钮事件监听 (V3 - 最终稳定版) ---
+    
     
     
     
@@ -18357,6 +18256,11 @@ function renderDisplay() {
     // --- START: ACCOUNT MANAGER ---
     const accountManager = (function() {
         
+        // --- 核心修复：在这里声明群聊账户所需的变量 ---
+        let groupAccountCharacters = [];
+        let groupAccountData = {};
+        let currentGroupAccountIndex = 0;
+        let isGenerateBtnListenerAttached = false; // <<< --- 核心修复：新增这一行代码作为“开关”
         
         function parseAccountData() {
             const accountMatch = staticAccountData.match(/\[账户\]\s*([\s\S]*)/);
@@ -18472,7 +18376,40 @@ function renderDisplay() {
                 });
             });
         }
+async function handleAccountReset() {
+            const confirmed = await conversationManager.customConfirm(
+                '确定要重置当前角色的账户吗？所有账单记录将被清空，余额和来源将归零。此操作不可撤销。',
+                '重置确认'
+            );
+            if (!confirmed) return;
 
+            try {
+                const currentChatId = conversationManager.getCurrentChatId();
+                const chat = chatList.find(c => c.id === currentChatId);
+                const isGroupChat = chat && chat.type === '群聊';
+                const storageKey = `app_account_data_${currentChatId}`;
+
+                if (isGroupChat) {
+                    const senderName = groupAccountCharacters[currentGroupAccountIndex];
+                    let groupData = loadFromLocalStorage(storageKey, {});
+                    // 直接用初始模板覆盖这个角色的数据
+                    groupData[senderName] = staticAccountData;
+                    saveToLocalStorage(storageKey, groupData);
+                    // 关键：同步更新内存中的数据
+                    groupAccountData = groupData;
+                } else {
+                    // 单聊直接用初始模板覆盖
+                    saveToLocalStorage(storageKey, staticAccountData);
+                }
+
+                // 重新加载并渲染账户页面
+                accountManager.openAccount();
+                await conversationManager.customAlert('账户已成功重置为初始状态。');
+
+            } catch (e) {
+                await conversationManager.customAlert(`账户重置失败: ${e.message}`);
+            }
+        }
         function parseAndRenderStatement(accountId, accountsDoc) {
             const statementNode = accountsDoc.querySelector(`account[id="${accountId}"] statement`);
             const allList = document.getElementById("all-list"),
@@ -18507,14 +18444,7 @@ function renderDisplay() {
                     let categoryChar = type.charAt(0);
                     let title = description; 
                     
-                    if (type === '内部转账' && source) {
-                        if (amount > 0) {
-                           title = `${source}转入`;
-                        } else {
-                           title = `转出到${source}`;
-                        }
-                        categoryChar = '转';
-                    } else if (type === '支出') {
+                     if (type === '支出') {
                         categoryChar = '支';
                     } else if (type === '收入') {
                         categoryChar = '收';
@@ -18557,49 +18487,479 @@ function renderDisplay() {
         }
         
         function openAccount() {
+            let isGenerateBtnListenerAttached = false;
             const overlay = document.getElementById('account-modal-overlay');
             const container = document.getElementById('account-app-container');
             if (!overlay || !container) return;
 
-            // --- 核心修复：加载当前角色专属的数据 ---
             const currentChatId = conversationManager.getCurrentChatId();
-            const storageKey = `app_account_data_${currentChatId}`;
-            // 如果该角色没有数据，则使用全局默认的空模板
-            const characterAccountData = loadFromLocalStorage(storageKey, staticAccountData);
+            const chat = chatList.find(c => c.id === currentChatId);
+            const isGroupChat = chat && chat.type === '群聊';
 
-            // 1. 使用角色专属数据来渲染内容
-            const appRoot = container;
+            if (isGroupChat) {
+                // --- 群聊逻辑 ---
+                const chatInfo = loadFromLocalStorage(`chat_info_${currentChatId}`, {});
+                
+                // 1. 获取群内所有AI角色 (主角 + 群演)
+                const protagonists = (chatInfo.groupPersonas || []).map(p => p.name);
+                const ensemble = (chatInfo.remark || '').split(/[,，\s]+/).filter(Boolean);
+                groupAccountCharacters = [...new Set([...protagonists, ...ensemble])].sort();
+
+                if (groupAccountCharacters.length === 0) {
+                    container.innerHTML = `<div class="empty-state">该群聊没有设置任何AI角色 (群聊主角或群演)，无法查看账户。</div>`;
+                } else {
+                    // 2. 加载整个群的账户数据对象
+                    const storageKey = `app_account_data_${currentChatId}`;
+                    groupAccountData = loadFromLocalStorage(storageKey, {});
+                    currentGroupAccountIndex = 0; // 默认显示第一个角色
+                    
+                    // 3. 渲染界面
+                    renderGroupAccountView();
+                }
+
+            } else {
+                // --- 单聊逻辑 (保持不变) ---
+                const storageKey = `app_account_data_${currentChatId}`;
+                const characterAccountData = loadFromLocalStorage(storageKey, staticAccountData);
+                const accountMatch = characterAccountData.match(/\[账户\]\s*([\s\S]*)/);
+                const accountData = accountMatch ? accountMatch[1].trim() : '';
+
+                const parser = new DOMParser();
+                const accountsDoc = parser.parseFromString(`<root>${accountData}</root>`, "application/xml");
+                
+                renderAccountPage('self', accountsDoc);
+            }
+
+            
+
+            overlay.classList.add('visible');
+            
+            const closeHandler = (e) => {
+                // 核心修正：
+                // 检查点击事件的目标 (e.target) 是否是弹窗本身 (customFragmentContainer) 
+                // 或者弹窗的任何子元素。
+                // .closest() 方法会从 e.target 开始向上查找，如果找到了 customFragmentContainer，
+                // 说明点击发生在弹窗内部。
+                if (e.target.closest('.custom-fragment-container')) {
+                    // 如果点击在弹窗内部，就什么也不做，直接返回。
+                    return;
+                }
+
+                // 只有当点击事件发生在弹窗外部的遮罩层上时，才会执行关闭逻辑。
+                overlay.classList.remove('visible');
+                overlay.removeEventListener('click', closeHandler);
+            };
+
+            // 依然将事件监听器绑定在遮罩层上，但内部的判断逻辑已经改变。
+            overlay.addEventListener('click', closeHandler);
+
+            // --- 核心修复：在这里为按钮绑定事件 ---
+            if (!isGenerateBtnListenerAttached) {
+                document.getElementById('account-generate-btn').addEventListener('click', async () => {
+                    const btn = document.getElementById('account-generate-btn');
+                    btn.classList.add('loading');
+                    try {
+                        // 1. 获取当前聊天上下文
+                        const currentChatId = conversationManager.getCurrentChatId();
+                        const chatInfo = loadFromLocalStorage(`chat_info_${currentChatId}`, {});
+                        const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
+                        if (profileIndexStr === null) throw new Error("未找到有效的API配置。");
+                        const profile = apiProfiles[parseInt(profileIndexStr)];
+                        if (!profile) throw new Error(`API配置索引 ${profileIndexStr} 不存在。`);
+
+                        // 2. 实时加载最新数据并构建指令
+                        const currentChatIdForGen = conversationManager.getCurrentChatId();
+                        const storageKeyForGen = `app_account_data_${currentChatIdForGen}`;
+                        const chat = chatList.find(c => c.id === currentChatIdForGen);
+                        const isGroupChat = chat && chat.type === '群聊';
+
+                        let currentAccountData;
+                        let senderName;
+                        let fullSystemPrompt = profile.prompt || ''; // *** 新增：初始化完整的系统提示 ***
+
+                        if (isGroupChat) {
+                            // **群聊模式下，获取当前正在查看的角色信息**
+                            const currentCharacterName = groupAccountCharacters[currentGroupAccountIndex];
+                            senderName = currentCharacterName;
+                            
+                            const groupData = loadFromLocalStorage(storageKeyForGen, {});
+                            currentAccountData = groupData[senderName] || staticAccountData;
+                        } else {
+                            // 单聊模式保持不变
+                            currentAccountData = loadFromLocalStorage(storageKeyForGen, staticAccountData);
+                            senderName = currentChatId ? (chatList.find(c => c.id === currentChatId).name) : 'Character';
+                        }
+
+                        // *** 新增：开始构建完整的上下文 ***
+                        const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+                        // 注入前情提要
+                        if (chatInfo.preamble) {
+                            fullSystemPrompt = `[Preamble - Highest Priority Context]\n${chatInfo.preamble}\n\n` + fullSystemPrompt;
+                        }
+                        // 注入用户人设
+                        if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
+                            const persona = userPersonas.find(p => p.name === chatInfo.userPersonaName);
+                            if (persona && persona.description) {
+                                fullSystemPrompt += `\n\n[User Persona for "${userNameForPrompt}"]\n${persona.description}`;
+                            }
+                        }
+                        if (chatInfo.myPersona) {
+                            fullSystemPrompt += `\n\n[Supplementary User Persona]\n${chatInfo.myPersona}`;
+                        }
+                        
+                        // 注入群聊人设 (如果适用)
+                        if (isGroupChat) {
+                            const allAiActors = groupAccountCharacters; // 我们已经有了这个列表
+                            let groupPersonasPrompt = `\n\n[Group Chat Context & Your Roles]\nThis is a group chat. You are playing ALL of the following characters:\n`;
+                            allAiActors.forEach(actorName => {
+                                let persona = '';
+                                const isNpc = npcList.includes(actorName);
+                                const protagonistPersona = (chatInfo.groupPersonas || []).find(p => p.name === actorName);
+                                if (protagonistPersona) persona = protagonistPersona.description || '(No persona defined)';
+                                else if (isNpc) persona = (npcSettings.personas && npcSettings.personas[actorName]) || '(No persona defined)';
+                                else { const memberChat = chatList.find(c => c.name === actorName); if (memberChat) { const info = loadFromLocalStorage(`chat_info_${memberChat.id}`, {}); persona = info.aiPersona || '(No persona defined)'; } }
+                                groupPersonasPrompt += `- **${actorName}**: ${persona}\n`;
+                            });
+                            if (chatInfo.ensemblePersona) {
+                                groupPersonasPrompt += `\n[Ensemble Persona]\n${chatInfo.ensemblePersona}\n`;
+                            }
+                            fullSystemPrompt += groupPersonasPrompt;
+                        } else {
+                            // 单聊人设
+                            fullSystemPrompt += `\n\n[Your Character Persona]\n${chatInfo.aiPersona || 'A helpful assistant.'}`;
+                        }
+
+                        // 注入关联NPC人设
+                        const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${currentChatId}`, []);
+                        if (associatedNpcNames.length > 0) {
+                            fullSystemPrompt += '\n\n[Associated NPCs]\n';
+                            const npcSettingsData = loadFromLocalStorage('app-npc-settings', {});
+                            associatedNpcNames.forEach(name => {
+                                const persona = (npcSettingsData.personas && npcSettingsData.personas[name]) || 'No specific persona defined.';
+                                fullSystemPrompt += `- **${name}**: ${persona}\n`;
+                            });
+                        }
+
+                        // 注入聊天记录
+                        const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
+                        const sourceMessages = loadFromLocalStorage(`conversation_${currentChatId}`, []);
+                        const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
+                        const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages);
+                        const chatHistoryForPrompt = apiPayloadMessages.map(msg => {
+                            const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || senderName);
+                            const content = Array.isArray(msg.content) ? msg.content.find(p => p.type === 'text')?.text || '[Media]' : msg.content;
+                            return `${role}: ${content}`;
+                        }).join('\n');
+                        if (chatHistoryForPrompt) {
+                            fullSystemPrompt += `\n\n[RECENT CHAT HISTORY]\n${chatHistoryForPrompt}`;
+                        }
+                        // *** 上下文构建结束 ***
+
+                        // **现在 currentAccountData 必定是字符串，可以安全调用 .match()**
+                        const latestEntryMatch = currentAccountData.match(/<entry>[\s\S]*?<\/entry>/g);
+                        const context = latestEntryMatch ? `Your latest transaction entry was: \`${latestEntryMatch[latestEntryMatch.length - 1]}\`.` : "You have no recent transactions.";
+                        const specialPrompt = `You are ${senderName}. Based on your character and this recent context ("${context}"), you MUST update your account balance.
+
+**[ULTIMATE, UNBREAKABLE FINANCIAL LAW]**
+
+**1. WEALTH ASSESSMENT (MANDATORY FIRST STEP):** Analyze the character's persona.
+    *   If the persona describes **immense wealth** (e.g., "首富", "财阀", "顶级富豪"): Follow the **"WEALTHY CHARACTER"** rules.
+    *   Otherwise: Follow the **"NORMAL CHARACTER"** rule.
+
+**2. "WEALTHY CHARACTER" FINANCIAL MODEL (ABSOLUTE & UNBREAKABLE RULE):**
+    You MUST adopt the following Hybrid Balance model to portray wealth realistically:
+
+    *   **A. Daily Spending Wallets (支付宝, 微信钱包):**
+        *   These two accounts **MUST** have a specific, large, but believable numerical value (e.g., "123456.78"). They represent your readily available cash for daily (luxury) spending.
+        *   **You are STRICTLY FORBIDDEN from setting these two sources to "不可计数".**
+
+    *   **B. Primary & Investment Assets (银行卡, 基金, 股票, 其他):**
+        *   These accounts represent your vast, underlying wealth. To reflect this, they **MUST** use the exact text **"不可计数"**.
+        *   This signifies that their value is too large or complex to be easily quantified.
+
+    *   **C. Total Balance (\`<balance>\`):**
+        *   Because at least one of your primary assets is "不可计数", your total balance **MUST** also be set to the exact text **"不可计数"**.
+
+    *   **D. Transactions & Amounts (ABSOLUTE LAW - REALISM OVER EVERYTHING):**
+        *   Every single transaction item (\`<item>\`) **MUST ALWAYS** have a specific, numerical \`amount\` attribute. **You are STRICTLY FORBIDDEN from using "不可计数" for an individual transaction.**
+        *   **CRITICAL BEHAVIORAL SHIFT:** Your generated transactions **MUST be a realistic mix** of both **(A) high-value luxury/investment spending** and **(B) high-quality daily life consumption**. A wealthy person still lives a daily life.
+        *   **You MUST include both types of transactions.** Do not generate only one type.
+
+        *   **(A) Luxury & Investment Examples (Large amounts):**
+            *   Buying art, yachts, high-end dining, charity donations, company investments, luxury cars, real estate.
+
+        *   **(B) High-Quality Daily Life Examples (Smaller, frequent amounts):**
+            *   Dining at high-end but not Michelin-star restaurants.
+            *   Purchasing from designer clothing stores.
+            *   Specialty coffee shop visits.
+            *   Premium ride-hailing services (e.g., Uber Black).
+            *   High-end grocery shopping.
+            *   Gifts for friends or partners.
+
+        *   **The transaction amounts MUST be appropriately scaled** to reflect both the action and your wealthy persona. A coffee should not cost thousands, but it can be more expensive than average.
+
+**3. "NORMAL CHARACTER" RULE:**
+    *   **CALCULATION ACCURACY:** All numbers must be realistic. The final balance MUST be the precise sum of the starting balance and all new transactions. The sum of all source amounts MUST equal the final balance.
+
+    *   **[NEW & CRITICAL] Negative Balance Storytelling Mandate:**
+        If you decide that a source (like "支付宝" or "微信钱包") should have a negative balance, you are REQUIRED to generate a new transaction that logically explains this debt. You MUST choose an appropriate scenario from the library below.
+
+        **DEBT SCENARIO LIBRARY:**
+
+        -   **If "支付宝" becomes negative:** This is caused by an automatic payment for a "花呗" (Huabei) or "借呗" (Jiebei) bill that exceeded the available balance.
+            -   **Required Transaction Example:**
+                \`<item description="花呗账单分期还款" amount="-1500.00" type="支" source="支付宝"><time>09:15</time></item>\`
+
+        -   **If "微信钱包" becomes negative:** This can be caused by repaying a friend, or an automatic payment for a "Pay-Later" service.
+            -   **Required Transaction Example 1 (Repaying a friend):**
+                \`<item description="归还好友'张三'借款" amount="-2000.00" type="支" source="微信钱包"><time>14:30</time></item>\`
+            -   **Required Transaction Example 2 (Pay-Later Service):**
+                \`<item description="多多先用后付账单还款" amount="-500.00" type="支" source="微信钱包"><time>20:00</time></item>\`
+
+        -   **If "股票" or "基金" value drops significantly:** This is caused by a market downturn. The transaction should reflect a loss in value, not a spending event.
+            -   **Required Transaction Example:**
+                \`<item description="股市震荡，基金资产缩水" amount="-10000.00" type="他" source="基金"><time>10:00</time></item>\`
+
+        -   **For any other negative balance scenario:** You can create a transaction for a large, necessary expense like rent or a medical bill.
+            -   **Required Transaction Example:**
+                \`<item description="支付本月房租" amount="-3500.00" type="支" source="银行卡"><time>12:00</time></item>\`
+
+        **You are forbidden from creating a negative balance without a corresponding explanatory transaction from this library.**
+
+---
+
+**[TASK INSTRUCTIONS]**
+
+1.  **Assess Wealth Level.**
+2.  **Generate Transactions:** Create at least TEN new transactions that are **appropriate for the character's wealth level**, and **ensure every single one has a numerical amount.**
+3.  **Update Balances:** Update the \`<balance>\` and all \`<source>\` amounts according to the chosen wealth model.
+4.  **Language:** Simplified Chinese.
+
+**CURRENT ACCOUNT DATA (FOR REFERENCE ONLY):**
+\\\`\`\`xml
+${currentAccountData.replace('[账户]', '').trim()}
+\\\`\`\`
+
+**Output Format (STRICTLY THREE BLOCKS):** You MUST wrap your entire output within a single \`<background_update>\` block, containing the three required sections.
+
+**CRITICAL SENDER ATTRIBUTE:** The opening \`<background_update>\` tag **MUST** include the \`sender\` attribute, set to your name. The correct format is: \\\`<background_update type="account" sender="${senderName}">\\\`
+
+[BALANCE_SOURCES]
+<account>
+    <balance>不可计数</balance>  <!-- For wealthy characters, this must be "不可计数" -->
+    <sources>
+        <source name="支付宝" amount="[A LARGE, SPECIFIC NUMBER]" />
+        <source name="微信钱包" amount="[A LARGE, SPECIFIC NUMBER]" />
+        <source name="银行卡" amount="不可计数" />
+        <source name="基金" amount="不可计数" />
+        <source name="股票" amount="不可计数" />
+        <source name="其他" amount="不可计数" />
+    </sources>
+</account>
+[/BALANCE_SOURCES]
+
+[NEW_TRANSACTIONS]
+<entry>
+    <date>${new Date().toISOString().slice(0, 10)}</date>
+    <!-- MUST INCLUDE AT LEAST TEN REALISTIC, LUXURY-LEVEL <item> TAGS HERE. EACH <item> MUST HAVE A NUMERICAL AMOUNT. -->
+</entry>
+[/NEW_TRANSACTIONS]
+
+[SYSTEM_MESSAGE]
+Your optional message to the user about the update.
+[/SYSTEM_MESSAGE]`;
+
+                        // 3. **核心修复：将完整的上下文和具体任务组合成最终的API请求**
+                        const systemPromptMessage = { role: "system", content: fullSystemPrompt };
+                        const taskPrompt = { role: "user", content: specialPrompt };
+                        const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
+                            body: JSON.stringify({ model: profile.model, messages: [systemPromptMessage, taskPrompt], stream: false })
+                        });
+
+                        if (!response.ok) {
+                            const errorBody = await response.text();
+                            throw new Error(`API返回错误 (状态码 ${response.status}): ${errorBody}`);
+                        }
+                        const data = await response.json();
+                        const aiData = data.choices[0]?.message?.content;
+
+                        // 4. 处理返回数据
+                        if (aiData) {
+                            await conversationManager.executeBackgroundUpdatesAndCleanText(aiData, currentChatId, senderName);
+                            accountManager.openAccount();
+                            await conversationManager.customAlert('账户数据已更新！');
+                        } else {
+                            throw new Error('AI成功响应，但返回内容为空。');
+                        }
+                    } catch (e) {
+                        await conversationManager.customAlert(`账户数据更新失败: ${e.message}`);
+                    } finally {
+                        btn.classList.remove('loading');
+                    }
+                });
+                isGenerateBtnListenerAttached = true;
+            }
+        }
+
+         window.app.openAccount = openAccount;
+         function renderGroupAccountView() {
+            if (groupAccountCharacters.length === 0) return;
+            
+            // 确保索引在安全范围内
+            currentGroupAccountIndex = (currentGroupAccountIndex + groupAccountCharacters.length) % groupAccountCharacters.length;
+
+            const characterName = groupAccountCharacters[currentGroupAccountIndex];
+            const characterAccountData = groupAccountData[characterName] || staticAccountData;
+
             const accountMatch = characterAccountData.match(/\[账户\]\s*([\s\S]*)/);
             const accountData = accountMatch ? accountMatch[1].trim() : '';
-
             const parser = new DOMParser();
             const accountsDoc = parser.parseFromString(`<root>${accountData}</root>`, "application/xml");
             
-            renderAccountPage('self', accountsDoc);
-            
-            // === 新增逻辑：移动按钮 ===
-            // 找到按钮和它的目标父容器（黑色遮罩层）
-            const generateBtn = document.getElementById('account-generate-btn');
-            const customFragmentContainer = overlay.querySelector('.custom-fragment-container');
-            if (generateBtn && customFragmentContainer) {
-                // 将按钮从原来的位置，移动到弹窗容器（custom-fragment-container）的内部
-                // 这样按钮就会和弹窗一起显示和隐藏
-                customFragmentContainer.appendChild(generateBtn);
-            }
-            // === 新增逻辑结束 ===
-
-            overlay.classList.add('visible');
-            const closeHandler = (e) => {
-                if (e.target === overlay || e.target.closest('.modal-close-btn')) {
-                    overlay.classList.remove('visible');
-                    overlay.removeEventListener('click', closeHandler);
-                }
-            };
-            overlay.addEventListener('click', closeHandler);
+            // 调用旧的渲染函数，但传入了角色名进行覆盖
+            renderAccountPage('self', accountsDoc, characterName);
         }
-// ...
 
-         window.app.openAccount = openAccount;
+        function renderAccountPage(accountId, accountsDoc, characterNameOverride = null) {
+            const appRoot = document.getElementById('account-app-container');
+            
+            const currentChatId = conversationManager.getCurrentChatId();
+            const currentChat = chatList.find(c => c.id === currentChatId);
+            const chatInfo = loadFromLocalStorage(`chat_info_${currentChatId}`, {});
+            
+            // 核心修改：优先使用传入的 override-name
+            const characterName = characterNameOverride || chatInfo.remark || (currentChat ? currentChat.name : '角色');
+            const isGroup = !!characterNameOverride;
+
+            const accountNode = accountsDoc.querySelector(`account[id="${accountId}"]`);
+            
+            if (!accountNode) {
+                appRoot.innerHTML = `<div class="empty-state">未找到 ${characterName} 的账户信息</div>`;
+                return;
+            }
+
+            const balanceContent = accountNode.querySelector('balance')?.textContent || "0.00";
+            const isUncountable = balanceContent === "不可计数";
+            const balance = isUncountable ? 0 : parseFloat(balanceContent);
+            const isNegative = balance < 0;
+            const balanceDisplayValue = isUncountable ? "不可计数" : balance.toLocaleString("en-US", { minimumFractionDigits: 2 });
+            
+            let sourcesHTML = '';
+            accountNode.querySelectorAll('sources source').forEach(source => {
+                const name = source.getAttribute('name');
+                const amountContent = source.getAttribute('amount');
+                const sourceDisplayValue = amountContent === "不可计数" ? "不可计数" : parseFloat(amountContent).toLocaleString("en-US", { minimumFractionDigits: 2 });
+                
+                sourcesHTML += `<div class="source-item"><span class="source-name">${name}</span><span class="source-amount">¥ ${sourceDisplayValue}</span></div>`;
+            });
+
+            const navButtonsHTML = `
+                <div class="account-nav-buttons ${isGroup ? '' : 'single-center'}">
+                    ${isGroup ? '<button id="prev-account-btn">◀ 上一个</button>' : ''}
+                    <div id="account-generate-btn" class="dynamic-decoration fragment-generate-btn"></div>
+                    ${isGroup ? '<button id="next-account-btn">下一个 ▶</button>' : ''}
+                </div>
+            `;
+            const pageHTML = `
+                <div class="account-view">
+                    <div class="account-header">
+                        ${navButtonsHTML}
+                        <div class="account-header-top">
+                            <div class="balance-title">${characterName}的账户 ${isGroup ? `(${currentGroupAccountIndex + 1}/${groupAccountCharacters.length})` : ''}</div>
+                            <div style="display: flex; gap: 10px; margin-left: auto;">
+                                <button class="toggle-visibility" id="resetAccountBtn">[重置]</button>
+                                <button class="toggle-visibility" id="toggleVisibilityBtn">[隐藏]</button>
+                            </div>
+                        </div>
+                        <div class="balance-amount ${isNegative ? 'negative' : ''}" id="balanceDisplay" data-balance="${balance}">
+                            ${balanceDisplayValue}
+                        </div>
+                        <div class="balance-sources">${sourcesHTML}</div>
+                    </div>
+                    <div class="tab-container">
+                        <div class="tab active" data-target="all-list">全部</div>
+                        <div class="tab" data-target="expense-list">支出</div>
+                        <div class="tab" data-target="income-list">收入</div>
+                    </div>
+                    <div class="list-container">
+                        <div class="bill-list active" id="all-list"></div>
+                        <div class="bill-list" id="expense-list"></div>
+                        <div class="bill-list" id="income-list"></div>
+                    </div>
+                </div>
+            `;
+            appRoot.innerHTML = pageHTML;
+            attachAccountListeners(appRoot, isGroup); // 传入是否为群聊的标志
+            parseAndRenderStatement(accountId, accountsDoc);
+        }
+        
+        function attachAccountListeners(container, isGroup) { // 接收 isGroup 标志
+            let isHidden = false;
+            const toggleBtn = container.querySelector("#toggleVisibilityBtn");
+            const balanceDisplay = container.querySelector("#balanceDisplay");
+            const sourceAmounts = container.querySelectorAll(".source-amount");
+            const accountHeader = container.querySelector('.account-header');
+            const resetBtn = container.querySelector('#resetAccountBtn');
+
+            if (accountHeader) {
+                accountHeader.addEventListener('click', (e) => {
+                    if (e.target.closest('#toggleVisibilityBtn, .account-nav-buttons, #resetAccountBtn')) {
+                        return;
+                    }
+                    accountHeader.classList.toggle('collapsed');
+                });
+            }
+
+            if (resetBtn) {
+                resetBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handleAccountReset();
+                });
+            }
+
+            if (toggleBtn && balanceDisplay) {
+                toggleBtn.addEventListener("click", () => {
+                    isHidden = !isHidden;
+                    toggleBtn.textContent = isHidden ? "[显示]" : "[隐藏]";
+                    balanceDisplay.textContent = isHidden ? "******" : parseFloat(balanceDisplay.dataset.balance).toLocaleString("en-US", { minimumFractionDigits: 2 });
+                    sourceAmounts.forEach(el => {
+                        el.style.opacity = isHidden ? 0 : 1;
+                    });
+                });
+            }
+
+            container.querySelectorAll(".tab").forEach(tab => {
+                tab.addEventListener("click", () => {
+                    container.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+                    container.querySelectorAll(".bill-list").forEach(list => list.classList.remove("active"));
+                    tab.classList.add("active");
+                    const targetList = container.querySelector(`#${tab.dataset.target}`);
+                    if (targetList) targetList.classList.add("active");
+                });
+            });
+
+            // 如果是群聊，才绑定切换按钮的事件
+            if (isGroup) {
+                const prevBtn = container.querySelector('#prev-account-btn');
+                const nextBtn = container.querySelector('#next-account-btn');
+                if (prevBtn) {
+                    prevBtn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // 核心修复：阻止事件冒泡
+                        currentGroupAccountIndex--;
+                        renderGroupAccountView();
+                    });
+                }
+                if (nextBtn) {
+                    nextBtn.addEventListener('click', (e) => {
+                        e.stopPropagation(); // 核心修复：阻止事件冒泡
+                        currentGroupAccountIndex++;
+                        renderGroupAccountView();
+                    });
+                }
+            }
+        }
 
         return { openAccount };
     })();
@@ -18922,7 +19282,19 @@ function renderDisplay() {
         }
     }
 
-    async function updateAccountInBackground(context, senderName) {
+    async function updateAccountInBackground(context, senderName, chatId) {
+        const chat = chatList.find(c => c.id === chatId);
+        const isGroupChat = chat && chat.type === '群聊';
+        const storageKey = `app_account_data_${chatId}`;
+        let characterAccountData;
+
+        if (isGroupChat) {
+            const groupData = loadFromLocalStorage(storageKey, {});
+            characterAccountData = groupData[senderName] || staticAccountData;
+        } else {
+            characterAccountData = loadFromLocalStorage(storageKey, staticAccountData);
+        }
+
         const prompt = `You are ${senderName}. Based on your recent conversation ("${context}"), you MUST update your entire account balance.
 
 **CRITICAL INSTRUCTIONS:**
@@ -18936,7 +19308,7 @@ function renderDisplay() {
 
 **CURRENT ACCOUNT DATA:**
 \`\`\`xml
-${staticAccountData.replace('[账户]', '').trim()}
+${characterAccountData.replace('[账户]', '').trim()}
 \`\`\`
 
 Format your final, complete response STRICTLY as follows, containing ALL old and new entries:
@@ -18960,7 +19332,6 @@ Format your final, complete response STRICTLY as follows, containing ALL old and
     </statement>
 </account>
 [/XML]`;
-// ...
         
         const aiData = await getAiGeneratedDataForBackground(prompt, senderName);
         if (!aiData) return;
@@ -18969,43 +19340,43 @@ Format your final, complete response STRICTLY as follows, containing ALL old and
         if (xmlMatch && xmlMatch[1]) {
             const newAccountXmlString = xmlMatch[1].trim();
             
-            // --- 核心修改：使用 DOM 解析器进行外科手术式更新 ---
             try {
-                // 1. 将AI返回的新XML和现有的旧XML都解析成可操作的DOM对象
                 const parser = new DOMParser();
                 const newDoc = parser.parseFromString(newAccountXmlString, "application/xml");
                 
-                // 从 staticAccountData 中提取纯XML部分进行解析
-                const oldXmlMatch = staticAccountData.match(/<account id="self">[\s\S]*<\/account>/);
+                const oldXmlMatch = characterAccountData.match(/<account id="self">[\s\S]*<\/account>/);
                 if (!oldXmlMatch) throw new Error("Could not parse existing account data.");
                 const oldDoc = parser.parseFromString(oldXmlMatch[0], "application/xml");
 
-                // 2. 从新XML中提取需要更新的部分：余额、所有来源、以及最新的那条账单
                 const newBalanceNode = newDoc.querySelector('balance');
                 const newSourcesNode = newDoc.querySelector('sources');
-                const newEntryNode = newDoc.querySelector('statement > entry:last-of-type'); // 只取AI生成的那条最新的entry
+                const newEntryNode = newDoc.querySelector('statement > entry:last-of-type');
 
-                // 3. 在旧XML中找到对应的位置
                 const oldBalanceNode = oldDoc.querySelector('balance');
                 const oldSourcesNode = oldDoc.querySelector('sources');
                 const oldStatementNode = oldDoc.querySelector('statement');
 
-                // 4. 进行精确替换和追加，而不是整体覆盖
                 if (newBalanceNode && oldBalanceNode) {
-                    oldBalanceNode.textContent = newBalanceNode.textContent; // 更新余额
+                    oldBalanceNode.textContent = newBalanceNode.textContent;
                 }
                 if (newSourcesNode && oldSourcesNode) {
-                    oldSourcesNode.innerHTML = newSourcesNode.innerHTML; // 更新所有来源
+                    oldSourcesNode.innerHTML = newSourcesNode.innerHTML;
                 }
                 if (newEntryNode && oldStatementNode) {
-                    oldStatementNode.appendChild(newEntryNode.cloneNode(true)); // 追加新的账单明细
+                    oldStatementNode.appendChild(newEntryNode.cloneNode(true));
                 }
                 
-                // 5. 将修改后的XML对象转换回字符串，并更新到全局变量中
                 const serializer = new XMLSerializer();
                 const updatedAccountXml = serializer.serializeToString(oldDoc.documentElement);
-                
-                staticAccountData = `\n        [账户]\n        ${updatedAccountXml}\n        `;
+                const finalDataString = `\n        [账户]\n        ${updatedAccountXml}\n        `;
+
+                if (isGroupChat) {
+                    const groupData = loadFromLocalStorage(storageKey, {});
+                    groupData[senderName] = finalDataString;
+                    saveToLocalStorage(storageKey, groupData);
+                } else {
+                    saveToLocalStorage(storageKey, finalDataString);
+                }
                 console.log(`[Background Update] Account data surgically updated for ${senderName}.`);
 
             } catch (e) {
@@ -19081,30 +19452,29 @@ Format your response STRICTLY as follows, with NO extra text:
                     // 如果AI在更新后台的同时还说了什么，也显示出来
                     await conversationManager.addMessage({ type: 'text', sender: senderName, text: cleanedText, side: 'received' });
                 }
-                await conversationManager.customAlert(`${updateType === 'account' ? '账户' : '生活'}数据已在后台更新！`);
             } else {
-                await conversationManager.customAlert('后台数据更新失败，AI未返回有效内容。');
+                console.warn('后台数据更新失败，AI未返回有效内容。');
             }
         } catch (e) {
-            await conversationManager.customAlert(`后台数据更新时发生错误: ${e.message}`);
+            console.error(`后台数据更新时发生错误: ${e.message}`);
         } finally {
             dynamicDecorationBtn.classList.remove('loading');
         }
+    
     }
 
-    async function triggerBackgroundDataUpdate(context, senderName) {
+    async function triggerBackgroundDataUpdate(context, senderName, chatId) {
             if (!senderName || senderName === '{{user}}') {
                 return ""; // 如果不满足条件，返回空字符串
             }
             
-// --- 核心修改：实现精确的概率控制 ---
-        const rand = Math.random() * 100; // 生成一个0到100的随机数
+        const rand = Math.random() * 100;
         let choice = -1;
         let prompt = "";
 
-        if (rand < 95) {         // 95% 的概率
+        if (rand < 95) {
             choice = 0; // 心事
-        } else {                 // 剩下 5% 的概率
+        } else {
             choice = 1; // 备忘录
         }
 
@@ -19116,19 +19486,33 @@ Format your response STRICTLY as follows, with NO extra text:
                 prompt = `
 ---
 [BACKGROUND TASK: UPDATE MOOD JOURNAL]
-After you formulate your chat response, you MUST ALSO generate a private mood journal entry based on the current context.
+After your chat response, you MUST generate a private mood journal entry.
 
-**Requirements:**
-1.  **Substantial Content:** At least 50 characters.
-2.  **Emotional Depth:** Explore your feelings and thoughts.
-3.  **Language:** Simplified Chinese.
+**[ULTIMATE, UNBREAKABLE FORMATTING LAW]**
 
-Format this journal entry STRICTLY as follows, at the VERY END of your entire output:
-<background_update type="mood_card">
-Your detailed and emotional mood entry text here.
-</background_update>`;
+1.  **Persona Lock-in:** The journal entry MUST be from the perspective of your character, "${senderName}", reflecting their inner thoughts and feelings based on the recent conversation.
+2.  **Content Mandate:** The text inside the \`<background_update>\` block MUST be the final, in-character journal entry **ONLY**.
+3.  **STRICTLY FORBIDDEN CONTENT:** You are **ABSOLUTELY FORBIDDEN** from including any of the following inside the block:
+    *   Your reasoning, analysis, or thought process.
+    *   Meta-commentary about your instructions (e.g., "Proactive Behavior Mandate", "Active Cast").
+    *   Any debugging tags like \`[苦]\`.
+    *   Any English words or technical terms unless they are part of the character's natural speech.
+
+**[CRITICAL EXAMPLES - YOU MUST UNDERSTAND THIS]**
+
+*   **CORRECT EXAMPLE (What you SHOULD do):**
+    \`<background_update type="mood_card" sender="祁司礼">
+    今天阿衍似乎有些不开心，我该怎么哄她呢？也许明天带她去海边散散心会好一些。
+    </background_update>\`
+
+*   **WRONG, CATASTROPHIC FAILURE EXAMPLE (What you MUST NOT do):**
+    \`<background_update type="mood_card" sender="祁司礼">
+    [苦] 用户阿衍表示无聊。虽然核心Active Cast列表为空，但我启用了群备注中的角色祁司礼进行回应...
+    </background_update>\`
+
+**Final Instruction:** Generate the correctly formatted \`<background_update>\` block at the VERY END of your entire output.`;
                 break;
-            case 1: // 更新备忘录 (这是核心修改区域)
+            case 1: // 更新备忘录
                 prompt = `
 ---
 [BACKGROUND TASK: CREATE A SINGLE, MULTI-LINE MEMO]
@@ -19141,20 +19525,19 @@ After you formulate your chat response, you MUST ALSO generate a new memo for yo
 4.  **Language:** Simplified Chinese.
 
 **Format your response STRICTLY as follows, at the VERY END of your entire output:**
-<background_update type="pager">
+<background_update type="pager" sender="${senderName}">
 First line (note 1) of your memo.
 Second line (note 2) of your memo.
 Third line (note 3), and so on...
 </background_update>
 
 **EXAMPLE:**
-<background_update type="pager">
+<background_update type="pager" sender="张三">
 - 下午三点去银行取钱
 - 买菜：牛奶、鸡蛋、面包
 - 晚上记得打电话给妈妈
 </background_update>`;
                 break;
-
         }
         return prompt; // 返回生成的指令文本
     }
