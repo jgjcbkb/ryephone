@@ -8033,27 +8033,31 @@ A detailed, objective description of the cat image goes here. For example: A flu
                 if (msg.type === 'text' && msg.side === 'received') {
                     const trimmedMainText = mainText.trim();
 
-                    // 判断是否为一个HTML块
                     const isHtmlBlock = trimmedMainText.startsWith('<div') || trimmedMainText.startsWith('<snippet>');
-                    
-                    // 判断是否为一个多行指令块
                     const isRegexCommandBlock = trimmedMainText.startsWith('[') && trimmedMainText.endsWith(']') && trimmedMainText.includes('\n');
 
                     if (isHtmlBlock) {
-                        // <<< 核心修改：检查这个HTML块是否是需要记录的简单动作 >>>
+                        // 检查这个HTML块是否是需要记录的简单动作
                         if (trimmedMainText.includes('data-ai-log-as-text="true"')) {
-                            // 如果是，就提取它的纯文本内容，作为系统观察发给AI
+                            // 如果是，就提取它的纯文本内容
                             const tempDiv = document.createElement('div');
                             tempDiv.innerHTML = trimmedMainText;
                             const actionText = tempDiv.textContent.trim();
-                            // 格式化成AI能理解的记忆
-                            mainText = `[System observation of your previous action: ${actionText}]`;
+                            
+                            // 核心修正：直接用提取出的纯文本动作替换掉原来的代码块
+                            // 这样AI的记忆里就是一句干净的动作描述，而不是一个需要它模仿的系统指令
+                            if (actionText) {
+                                mainText = actionText;
+                            } else {
+                                // 如果提取不出任何文本，就按忽略处理
+                                mainText = '[System observation: A custom formatted block (HTML) was displayed here and is omitted for brevity.]';
+                            }
                         } else {
-                            // 如果不是（比如是复杂的小剧场），就按原来的方式处理，不发送给AI
+                            // 如果是没有暗号的复杂HTML块（小剧场），按原计划忽略
                             mainText = '[System observation: A custom formatted block (HTML) was displayed here and is omitted for brevity.]';
                         }
                     } else if (isRegexCommandBlock) {
-                        // 对于多行指令块，也按原来的方式处理，不发送给AI
+                        // 对于多行指令块，也按原计划忽略
                         mainText = '[System observation: A custom formatted block (regex command) was displayed here and is omitted for brevity.]';
                     }
                 }
