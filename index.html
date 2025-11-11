@@ -7721,7 +7721,8 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
             
             // <<<< 3. 等所有循环都跑完，我们在这里统一检查并发送唯一的一条消息 >>>>
             if (systemMessageToShow) {
-                await conversationManager.addMessage({ type: 'text', sender: systemMessageToShow.sender, text: systemMessageToShow.text, side: 'received' }, targetChatId);
+                // --- 核心修复：把消息类型从 'text' 和 'received' 改为正确的 'system' ---
+                await conversationManager.addMessage({ type: 'system', text: systemMessageToShow.text, side: 'system' }, targetChatId);
             }
             
             const finalCleanedText = tempResponse.replace(updateRegex, '').trim();
@@ -9890,74 +9891,67 @@ Okay, that's all the context and rules. Now, generate your full response.
     }
 
 // ===== 到这里结束复制 =====
-        async function regenerateFromMessage(messageId) {
-            const clickedIndex = chatState.messages.findIndex(m => m.id === messageId);
-            if (clickedIndex === -1) {
-                await customAlert('错误：找不到目标消息。');
-                return;
-            }
+        // ===== 从这里开始，完整复制下面所有的代码 =====
 
-            const clickedMessage = chatState.messages[clickedIndex];
-            
-            let spliceIndex;
-            let branchPointId;
-            let branchMessages;
-
-            if (clickedMessage.side === 'sent') {
-                // 如果点击的是【用户自己】的消息，则意图是重新生成AI对【这条消息】的回复。
-                // 因此，删除这条消息之后的所有内容。
-                spliceIndex = clickedIndex + 1;
-                branchPointId = clickedMessage.id;
-            } else { // side === 'received'
-                // 如果点击的是【AI】的消息，则意图是保留这条消息之前的所有内容（包括同一轮的其他AI消息），
-                // 并从【这条消息】开始重新生成。
-                // 因此，删除这条消息及之后的所有内容。
-                spliceIndex = clickedIndex;
-                branchPointId = clickedIndex > 0 ? chatState.messages[clickedIndex - 1].id : 'root';
-            }
-
-            // 检查是否有内容可供分支和删除
-            if (spliceIndex >= chatState.messages.length) {
-                 await customAlert('这是最后一条消息，无需从此重新生成。');
-                 return;
-            }
-            
-            // **核心逻辑：保存即将被覆盖的当前时间线**
-            // 我们将从 spliceIndex 开始的整个“尾巴”保存为一个分支。
-            const messagesToBranch = chatState.messages.slice(spliceIndex);
-            
-            if (messagesToBranch.length > 0) {
-                const chatId = conversationManager.getCurrentChatId();
-                const branchHistoryKey = `chat_branches_${chatId}`;
-                let branches = loadFromLocalStorage(branchHistoryKey, []);
-
-                // 使用即将被截断的主线作为新分支的完整内容快照
-                const fullConversationToBranch = [...chatState.messages]; 
-                
-                const lastMessage = fullConversationToBranch[fullConversationToBranch.length - 1];
-                const previewText = lastMessage ? (lastMessage.text || `[${lastMessage.type}]`).substring(0, 20) + '...' : '空分支';
-
-                const newBranch = {
-                    id: `branch_${Date.now()}`,
-                    branchedFromId: branchPointId,
-                    timestamp: Date.now(),
-                    messages: fullConversationToBranch, // 保存完整的对话快照
-                    preview: previewText
-                };
-                branches.unshift(newBranch);
-                if (branches.length > 20) { branches = branches.slice(0, 20); }
-                saveToLocalStorage(branchHistoryKey, branches);
-                console.log(`Saved a new branch from current timeline, forked from ${branchPointId}.`);
-            }
-
-            // **执行删除操作**
-            chatState.messages.splice(spliceIndex);
-
-            // **触发AI**
-            reRenderMessages();
-            saveConversation();
-            triggerAIContinuation(true);
+    async function regenerateFromMessage(messageId) {
+        const clickedIndex = chatState.messages.findIndex(m => m.id === messageId);
+        if (clickedIndex === -1) {
+            await customAlert('错误：找不到目标消息。');
+            return;
         }
+
+        // --- 核心修复：这是全新的、尊重你原始设计的逻辑 ---
+        // 1. 我们要删除的位置，就是从你点击的那条消息开始
+        const spliceIndex = clickedIndex;
+
+        // 2. 保存历史分支的分叉点，是前一条消息
+        const branchPointId = clickedIndex > 0 ? chatState.messages[clickedIndex - 1].id : 'root';
+        // --- 修复结束 ---
+
+        if (spliceIndex >= chatState.messages.length) {
+             await customAlert('这是最后一条消息，无需从此重新生成。');
+             return;
+        }
+        
+        // 保存即将被覆盖的时间线为分支 (这部分逻辑是正确的，予以保留)
+        const messagesToBranch = chatState.messages.slice(spliceIndex);
+        
+        if (messagesToBranch.length > 0) {
+            const chatId = conversationManager.getCurrentChatId();
+            const branchHistoryKey = `chat_branches_${chatId}`;
+            let branches = loadFromLocalStorage(branchHistoryKey, []);
+            const fullConversationToBranch = [...chatState.messages]; 
+            const lastMessage = fullConversationToBranch[fullConversationToBranch.length - 1];
+            const previewText = lastMessage ? (lastMessage.text || `[${lastMessage.type}]`).substring(0, 20) + '...' : '空分支';
+            const newBranch = {
+                id: `branch_${Date.now()}`,
+                branchedFromId: branchPointId,
+                timestamp: Date.now(),
+                messages: fullConversationToBranch,
+                preview: previewText
+            };
+            branches.unshift(newBranch);
+            if (branches.length > 20) { branches = branches.slice(0, 20); }
+            saveToLocalStorage(branchHistoryKey, branches);
+        }
+
+        // --- 核心修复：同时操作两个“账本” ---
+        // 1. 找出所有需要被删除的消息的 ID
+        const idsToDelete = chatState.messages.slice(spliceIndex).map(m => m.id);
+        
+        // 2. 在临时的“账本”中删除
+        chatState.messages.splice(spliceIndex);
+        
+        // 3. 在永久的“账本”中，根据 ID 过滤掉所有要删除的消息
+        fullMessageHistory = fullMessageHistory.filter(m => !idsToDelete.includes(m.id));
+        // --- 修复结束 ---
+
+        reRenderMessages();
+        saveConversation();
+        triggerAIContinuation(true);
+    }
+
+// ===== 到这里结束复制 =====
         async function handleOutgoingCallAttempt(callId) {
             // 这个函数现在只负责请求API，不再处理UI和错误弹窗
             try {
@@ -19787,7 +19781,6 @@ Your optional message to the user about the update.
             const currentChat = chatList.find(c => c.id === currentChatId);
             const chatInfo = loadFromLocalStorage(`chat_info_${currentChatId}`, {});
             
-            // 核心修改：优先使用传入的 override-name
             const characterName = characterNameOverride || chatInfo.remark || (currentChat ? currentChat.name : '角色');
             const isGroup = !!characterNameOverride;
 
@@ -19803,6 +19796,7 @@ Your optional message to the user about the update.
             const balance = isUncountable ? 0 : parseFloat(balanceContent);
             const isNegative = balance < 0;
             const balanceDisplayValue = isUncountable ? "不可计数" : balance.toLocaleString("en-US", { minimumFractionDigits: 2 });
+            const balanceTitleAttribute = isUncountable ? 'title="总资产已超过百亿，无法精确统计"' : ''; // 【【【 只需在这里，加上这一行我漏掉的代码 】】】
             
             let sourcesHTML = '';
             accountNode.querySelectorAll('sources source').forEach(source => {
@@ -19919,6 +19913,9 @@ Your optional message to the user about the update.
             }
         }
 
+// ===== 把上面那 2 行代码，替换成下面这 3 行 =====
+
+        window.app.openAccount = openAccount; // 【【【 只需在这里，加上这一行新代码 】】】
         return { openAccount };
     })();
     
