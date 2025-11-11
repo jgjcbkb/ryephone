@@ -9848,42 +9848,52 @@ Okay, that's all the context and rules. Now, generate your full response.
 }
         }
         
-        async function regenerateLastResponse() {
-            // --- START: NEW AND CORRECT REGENERATE LOGIC (Performance Optimized) ---
-            
-            // 1. 从后往前找到第一条不是由 AI 发送的消息的位置
-            let firstUserOrSystemMessageIndex = -1;
-            for (let i = chatState.messages.length - 1; i >= 0; i--) {
-                if (chatState.messages[i].side !== 'received') {
-                    firstUserOrSystemMessageIndex = i;
-                    break;
-                }
-            }
+    // ===== 从这里开始，完整复制下面所有的代码 =====
 
-            if (firstUserOrSystemMessageIndex === chatState.messages.length - 1) {
-                await customAlert('没有可重新生成的消息。');
-                return;
+    async function regenerateLastResponse() {
+        // 从后往前找到第一条不是由 AI 发送的消息的位置
+        let firstUserOrSystemMessageIndex = -1;
+        for (let i = chatState.messages.length - 1; i >= 0; i--) {
+            if (chatState.messages[i].side !== 'received') {
+                firstUserOrSystemMessageIndex = i;
+                break;
             }
-
-            // 2. 【核心性能修正】直接操作DOM，移除所有需要被删除的消息元素
-            for (let i = chatState.messages.length - 1; i > firstUserOrSystemMessageIndex; i--) {
-                const msg = chatState.messages[i];
-                const msgWrapper = messagesContainer.querySelector(`[data-message-id="${msg.id}"]`);
-                if (msgWrapper) {
-                    msgWrapper.remove();
-                }
-            }
-            
-            // 3. 然后再更新数据数组
-            chatState.messages.splice(firstUserOrSystemMessageIndex + 1);
-            
-            // 4. 执行后续操作
-            // 【核心性能修正】不再调用 reRenderMessages() 进行全局刷新
-            saveConversation();
-            triggerAIContinuation(true); // 传递 true 表示这是一次重新生成
-
-            // --- END: NEW AND CORRECT REGENERATE LOGIC (Performance Optimized) ---
         }
+
+        // 如果最后一条消息就不是AI发的，说明没有可供重新生成的内容
+        if (firstUserOrSystemMessageIndex === chatState.messages.length - 1) {
+            await customAlert('没有可重新生成的消息。');
+            return;
+        }
+
+        // --- 核心修复：同时操作两个“账本”（临时和永久） ---
+
+        // 1. 在临时的“账本”中，删除AI的所有回复
+        chatState.messages.splice(firstUserOrSystemMessageIndex + 1);
+
+        // 2. 找到分界点那条消息，用于在永久“账本”中定位
+        const lastMessageBeforeAI = chatState.messages[firstUserOrSystemMessageIndex];
+        if (lastMessageBeforeAI) {
+            // 3. 在永久的“账本”中，找到同样的分界点
+            const fullHistoryIndex = fullMessageHistory.findIndex(m => m.id === lastMessageBeforeAI.id);
+            if (fullHistoryIndex > -1) {
+                // 4. 从这个分界点之后，删除所有内容
+                fullMessageHistory.splice(fullHistoryIndex + 1);
+            }
+        } else if (firstUserOrSystemMessageIndex === -1) {
+            // 如果一条用户消息都找不到（整个聊天都是AI在说），那就清空所有记录
+            chatState.messages = [];
+            fullMessageHistory = [];
+        }
+        // --- 修复结束 ---
+        
+        // 重新渲染屏幕，保存永久记录，然后触发AI
+        reRenderMessages();
+        saveConversation();
+        triggerAIContinuation(true);
+    }
+
+// ===== 到这里结束复制 =====
         async function regenerateFromMessage(messageId) {
             const clickedIndex = chatState.messages.findIndex(m => m.id === messageId);
             if (clickedIndex === -1) {
