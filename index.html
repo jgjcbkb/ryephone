@@ -241,7 +241,7 @@
         line-height: 1.5; word-wrap: break-word; position: relative; 
     }
     #page-conversation .message.text, #page-conversation .message.voice { 
-    max-width: 230px;
+    max-width: 250px;
     padding: 10px 18px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
     width: -moz-fit-content; width: fit-content;
     min-width: 30px;
@@ -2833,12 +2833,12 @@ input:checked + .slider:before {
 #page-conversation .message.pay_for_me,
 #page-conversation .message.photo-description,
 #page-conversation .message.video {
-    width: 200px; /* 强制所有卡片宽度为230px */
-    max-width: 200px; /* 确保最大宽度也是230px */
+    width: 250px; /* 强制所有卡片宽度为250px */
+    max-width: 250px; /* 确保最大宽度也是250px */
     /* 移除任何可能导致收缩的fit-content行为 */
     width: -moz-initial !important;
     width: initial !important;
-    width: 200px !important; /* 使用 !important 给予最高优先级，杜绝后患 */
+    width: 250px !important; /* 使用 !important 给予最高优先级，杜绝后患 */
 }
 
 /* --- END: 修正所有卡片消息的宽度 --- */
@@ -4181,6 +4181,39 @@ input:checked + .slider:before {
     background: rgba(255, 255, 255, 0.2);
 }
 /* --- END: 新增群聊账户切换按钮样式 --- */
+/* --- 新增：手机框架隐藏模式样式 (V3 - 修复内容圆角) --- */
+        body.frame-hidden .phone {
+            width: 100vw;
+            height: 100vh;
+            max-width: none;
+            max-height: none;
+        }
+
+        body.frame-hidden .screen {
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        body.frame-hidden .screen::before {
+            display: none;
+        }
+        
+        /* ** 新增的核心修复：移除内部App容器的圆角 ** */
+        body.frame-hidden .app-container {
+            border-radius: 0;
+        }
+
+        /* 核心修复：隐藏状态栏和刘海 */
+        body.frame-hidden .status-bar {
+            display: none;
+        }
+
+        /* 核心修复：移除因隐藏状态栏而产生的多余顶部内边距 */
+        body.frame-hidden .page {
+            padding-top: 0 !important;
+        }
+        /* --- 新增样式结束 --- */
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -4838,6 +4871,24 @@ input:checked + .slider:before {
                                 </div>
                                 <p class="form-hint">从下拉菜单中选择一个已保存的字体以应用，或添加新字体。</p>
                             </div>
+                        </div>
+                         <!-- ******** 从这里开始插入新代码 ******** -->
+                        <div class="form-section">
+                            <h3>手机框架</h3>
+                            <div class="form-group-toggle">
+                                <label for="toggle-phone-frame" class="toggle-label">显示手机外壳与边框</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-phone-frame">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <!-- ******** 新代码到此结束 ******** -->
+
+                        <div class="form-section">
+                            <h3>主页图标</h3>
+                            <div id="home-icon-settings-container"></div>
+                            <p class="form-hint" style="padding: 0 15px 15px;">为指定功能设置图标。留空以使用默认图标。</p>
                         </div>
                         <div class="form-section">
                             <h3>主页图标</h3>
@@ -7310,9 +7361,28 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     4.  **代替 {{user}} 发言、行动或思考。**
 
 ---
-#### **## VII. 终极输出格式铁律：多区块组合 (ABSOLUTE & UNBREAKABLE)**
+#### **## VII. 终极输出格式铁律 (ABSOLUTE & UNBREAKABLE)**
 
-**你现在处于【线下故事叙事模式】。你的任务是像一个导演一样，通过组合不同的“镜头”（区块）来完成一次回复。**
+**你现在处于【线下故事叙事模式】。你的任务是像一个导演一样，通过组合不同的“镜头”（区块）来完成一次回复。你必须严格遵守以下两种格式的组合规则。**
+
+**格式一：【内联片段 (Inline Snippet)】- 用于在单条消息内混合内容**
+
+*   **用途:** 当你想在**同一条消息气泡内**同时包含对话和自定义 HTML 卡片时，你必须使用此格式。这能将一段 HTML 片段无缝插入到对话的**任何位置**（开头、中间、结尾）。
+*   **格式规则:**
+    1.  将你的 **对话内容** 和 **HTML 片段** 全部放在一个 \`<block type="text" ...>\` 块内。
+    2.  使用 \`<snippet>...</snippet>\` 标签将需要渲染为 HTML 的部分包裹起来。
+*   **正确范例 (混合内容):**
+    // *** 第一次转义修复 ***
+    \`\`\`xml
+    <block type="text" sender="张三">我发现了一个有趣的东西：<snippet>
+    <div style="background:#f7f7f7; padding:10px; border-radius:8px; width: 210px;">
+        这是一个单气泡内的 HTML 卡片。
+    </div>
+    </snippet>这是卡片之后的对话。</block>
+    \`\`\`
+    *(结果：生成一个气泡，内容是“我发现了一个有趣的东西：[HTML 卡片] 这是卡片之后的对话。”)*
+
+**格式二：【多区块组合 (Multiple Blocks)】- 用于生成多条独立消息**
 
 1.  **【核心概念：区块组合】**
     *   你的每一次回复，都由一个或多个 \`<block>\` 标签组成。
@@ -7352,6 +7422,7 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     *(原因: 线下模式绝对禁止使用\`sender\`属性)*
 
 *   **【【【唯一且绝对正确的格式范例】】】:**
+    // *** 第二次（之前遗漏的）转义修复 ***
     \`\`\`
     <block type="text">
     钱唐猛地放下手机，抬手正想叫服务生清理桌上的烟灰缸...
@@ -7830,7 +7901,12 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
         }
 
         function initializeFromStorage(chatId) {
-            chatState.messages = loadFromLocalStorage(`conversation_${chatId}`, []);
+            const fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+            const messagesToLoad = 40;
+
+            // 核心修改：只截取最后 40 条消息用于初次显示
+            chatState.messages = fullHistory.slice(-messagesToLoad);
+
             if (chatState.messages.length > 0) {
                 simulatedCurrentTime = chatState.messages[chatState.messages.length - 1].timestamp;
             } else {
@@ -7847,6 +7923,54 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
             loadPersonalizationSettings(); loadAutoReplySettings(); 
             reRenderMessages();
         }
+let isLoadingMore = false; // 添加一个加载锁，防止重复触发
+
+        async function loadMoreMessages() {
+            if (isLoadingMore) return; // 如果正在加载，则直接返回
+
+            const chatId = conversationManager.getCurrentChatId();
+            if (!chatId) return;
+
+            const fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+            const currentlyLoadedCount = chatState.messages.length;
+
+            if (currentlyLoadedCount >= fullHistory.length) {
+                console.log("All messages loaded.");
+                return; // 所有消息都已加载
+            }
+            
+            isLoadingMore = true; // 上锁
+
+            const messagesToLoad = 40;
+            const nextMessagesIndex = Math.max(0, fullHistory.length - currentlyLoadedCount - messagesToLoad);
+            const newMessages = fullHistory.slice(nextMessagesIndex, fullHistory.length - currentlyLoadedCount);
+
+            // 关键：在添加新消息前，记录当前的滚动高度
+            const oldScrollHeight = messagesContainer.scrollHeight;
+
+            // 将旧消息添加到当前消息列表的开头
+            chatState.messages = [...newMessages, ...chatState.messages];
+            
+            // 重新渲染所有消息
+            reRenderMessages();
+            
+            // 关键：渲染后，计算新旧高度差，并恢复滚动位置，使用户感觉不到跳动
+            const newScrollHeight = messagesContainer.scrollHeight;
+            messagesContainer.scrollTop = newScrollHeight - oldScrollHeight;
+
+            // 模拟一点延迟，防止快速滚动时连续触发
+            setTimeout(() => {
+                isLoadingMore = false; // 解锁
+            }, 300);
+        }
+
+        // 为消息容器添加滚动事件监听
+        messagesContainer.addEventListener('scroll', () => {
+            // 当滚动到最顶部时，触发加载更多
+            if (messagesContainer.scrollTop === 0) {
+                loadMoreMessages();
+            }
+        });
 
         const formatTimestamp = (timestamp) => {
             const date = new Date(timestamp);
@@ -8427,7 +8551,56 @@ This is your absolute, final, and most important rule. Your entire output MUST b
                 // 【正确的代码块】 - 这是修复了语法错误的最终版本
 const ONLINE_COMMAND_INSTRUCTIONS = `
 # [ULTIMATE OUTPUT FORMAT LAW - UNBREAKABLE]
-This is your absolute, final, and most important rule. Your entire output MUST be a sequence of one or more XML-like <block> elements. Each block represents one message bubble or one action.
+This is your absolute, final, and most important rule. Your entire output MUST be a sequence of one or more XML-like <block> elements OR a single <block> containing mixed content.
+
+---
+### **【格式一：内联片段 (Inline Snippet)】- 用于在单条消息内混合内容**
+
+**用途:** 当你想在**同一条消息气泡内**同时包含对话和自定义 HTML 卡片时，你必须使用此格式。
+
+*   **格式规则:**
+    1.  将你的 **对话内容** 和 **HTML 片段** 全部放在一个 \`<block type="text" ...>\` 块内。
+    2.  使用 \`<snippet>...</snippet>\` 标签将需要渲染为 HTML 的部分包裹起来。
+    3.  **宽度限制:** 所有在 \`<snippet>\` 内的 HTML 块，其最外层容器的宽度【禁止】超过 \`210px\`。
+
+*   **正确范例 (混合内容):**
+    \\\`\`\`xml
+    <block type="text" sender="张三">我发现了一个有趣的东西：<snippet>
+    <div style="background:#f7f7f7; padding:10px; border-radius:8px; width: 210px;">
+        这是一个单气泡内的 HTML 卡片。
+    </div>
+    </snippet>这是卡片之后的对话。</block>
+    \\\`\`\`
+
+---
+### **【格式二：记忆锚点 (Memory Anchor)】- 用于模拟线下描写**
+
+**用途:** 当你要生成一个**只有一个 \`<div>\` 包裹着一段纯文本**，用于在“线上模式”下模拟线下描写的视觉效果时，你【必须】遵守此规则以避免失忆。
+
+*   **格式规则:**
+    *   在最外层的 \`<div>\` 标签上，添加一个固定的属性：\`data-ai-log-as-text="true"\`。
+
+*   **正确示例 (AI会记住这个动作):**
+    \\\`\`\`html
+    <div style="padding: 10px; border-left: 3px solid #ccc; color: #888; font-style: italic; width: 210px;" data-ai-log-as-text="true">
+    他缓缓走到窗边，指尖轻轻拂过冰冷的玻璃，看着窗外无声坠落的雨滴。
+    </div>
+    \\\`\`\`
+
+*   **错误示例 (AI会失忆):**
+    \\\`\`\`html
+    <div style="padding: 10px; border-left: 3px solid #ccc; color: #888; font-style: italic; width: 210px;">
+    他缓缓走到窗边，指尖轻轻拂过冰冷的玻璃，看着窗外无声坠落的雨滴。
+    </div>
+    \\\`\`\`
+    *(错误原因：缺少 \`data-ai-log-as-text="true"\`，系统将无法记录这个动作，你下一轮可能会重复它。)*
+
+*   **补充说明:** 对于那些结构复杂的HTML代码块（比如带图片、多个标签的小剧场），你**【不需要】**添加此属性。
+
+---
+### **【格式三：多区块组合 (Multiple Blocks)】- 用于生成多条独立消息**
+
+
 
 **THE UNIVERSAL BLOCK STRUCTURE:**
 <block type="..." sender="...">...</block>
@@ -11095,7 +11268,19 @@ You were receiving a video call from {{user}}, but they hung up before you could
 const reRenderMessages = () => {
     // 1. 清空容器
     messagesContainer.innerHTML = '';
+
+    // --- 新增：检查是否还有更多消息可加载 ---
+    const chatId = conversationManager.getCurrentChatId();
+    if (chatId) {
+        const fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+        if (chatState.messages.length < fullHistory.length) {
+            // 如果当前显示的消息数小于总数，则在顶部添加“加载更多”的提示
+            messagesContainer.innerHTML = '<div style="text-align: center; color: #aaa; font-size: 12px; padding: 10px 0;">向上滚动加载更多记录</div>';
+        }
+    }
+
     const TIME_GAP = 3 * 60 * 1000;
+// ... (函数剩余部分)
 
     // 2. 确保消息按时间排序
     chatState.messages.sort((a, b) => a.timestamp - b.timestamp);
@@ -14461,9 +14646,17 @@ const isAuthor = post.userName === currentPersonaName;
             
             const listContainer = document.getElementById('dynamics-char-list');
             listContainer.innerHTML = '';
-            const characters = getAllUniqueCharacters(); // 这个函数现在在全局，可以安全调用
+
+            // --- 从这里开始是核心修改 ---
+            const allCharacters = getAllUniqueCharacters(); // 1. 先获取所有实体
+            const userPersonaNames = userPersonas.map(p => p.name); // 2. 获取您所有用户人设的名称列表
+            
+            // 3. 过滤掉 '{{user}}' 和所有用户人设名称
+            const characters = allCharacters.filter(char => char !== '{{user}}' && !userPersonaNames.includes(char));
+            // --- 核心修改结束 ---
 
             if (characters.length === 0) {
+//... (函数剩余部分)
                 listContainer.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">没有可以设置动态的角色</p>';
                 return;
             }
@@ -14964,7 +15157,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 iconUrls: {},
                 globalChatBgUrl: '',
                 homeBgUrl: '',
-                regexReplacements: []
+                regexReplacements: [],
+                isFrameHidden: false // <-- 新增这一行，默认不隐藏
             });
             savedFonts = appearanceSettings.savedFonts || [];
             activeFontName = appearanceSettings.activeFontName || '默认';
@@ -14976,8 +15170,14 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         }
         
         function applySettings() {
+    // --- 从这里开始插入新代码 ---
+    // 应用框架显示/隐藏状态
+    document.body.classList.toggle('frame-hidden', appearanceSettings.isFrameHidden);
+    // --- 新代码到此结束 ---
+
     const screenElement = document.querySelector('.screen');
     const fontSize = appearanceSettings.globalFontSize;
+// ...函数剩余部分
     if (fontSize && !isNaN(fontSize)) {
         screenElement.style.fontSize = `${fontSize}px`;
     } else {
@@ -15036,6 +15236,17 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         function renderPage() {
             loadSettings();
             document.getElementById('global-font-size').value = appearanceSettings.globalFontSize || '';
+
+            // --- 从这里开始插入新代码 ---
+            const frameToggle = document.getElementById('toggle-phone-frame');
+            if (frameToggle) {
+                // 如果 isFrameHidden 是 true (隐藏), 开关应为 OFF (unchecked).
+                // 如果 isFrameHidden 是 false (显示), 开关应为 ON (checked).
+                frameToggle.checked = !appearanceSettings.isFrameHidden;
+            }
+            // --- 新代码到此结束 ---
+
+// ...函数剩余部分
             
             const fontSelect = document.getElementById('global-font-select');
             fontSelect.innerHTML = '<option value="默认">默认字体</option>';
@@ -15244,7 +15455,21 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         function init() {
             loadSettings();
             applySettings();
+
+            // --- 从这里开始插入新代码 ---
+            const frameToggle = document.getElementById('toggle-phone-frame');
+            if (frameToggle) {
+                frameToggle.addEventListener('change', () => {
+                    // 开关的标签是“显示”，所以如果它被勾选，isFrameHidden 应该是 false
+                    appearanceSettings.isFrameHidden = !frameToggle.checked;
+                    saveSettings();
+                    applySettings();
+                });
+            }
+            // --- 新代码到此结束 ---
+
              // START: 新增正则替换的事件监听
+// ...
             document.getElementById('regex-add-btn').addEventListener('click', () => {
                 const name = document.getElementById('regex-name').value.trim();
                 const pattern = document.getElementById('regex-pattern').value.trim();
