@@ -241,7 +241,7 @@
         line-height: 1.5; word-wrap: break-word; position: relative; 
     }
     #page-conversation .message.text, #page-conversation .message.voice { 
-    max-width: 250px;
+    max-width: 230px;
     padding: 10px 18px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
     width: -moz-fit-content; width: fit-content;
     min-width: 30px;
@@ -2833,12 +2833,12 @@ input:checked + .slider:before {
 #page-conversation .message.pay_for_me,
 #page-conversation .message.photo-description,
 #page-conversation .message.video {
-    width: 250px; /* 强制所有卡片宽度为250px */
-    max-width: 250px; /* 确保最大宽度也是250px */
+    width: 200px; /* 强制所有卡片宽度为230px */
+    max-width: 200px; /* 确保最大宽度也是230px */
     /* 移除任何可能导致收缩的fit-content行为 */
     width: -moz-initial !important;
     width: initial !important;
-    width: 250px !important; /* 使用 !important 给予最高优先级，杜绝后患 */
+    width: 200px !important; /* 使用 !important 给予最高优先级，杜绝后患 */
 }
 
 /* --- END: 修正所有卡片消息的宽度 --- */
@@ -4811,6 +4811,7 @@ input:checked + .slider:before {
                             <div class="form-group" style="flex-direction: row; gap: 10px; padding-bottom: 15px;">
                                 <button id="export-chat-btn" class="modal-button secondary" style="margin: 0;">导出聊天记录</button>
                                 <button id="import-chat-btn" class="modal-button secondary" style="margin: 0;">导入聊天记录</button>
+                                <button id="merge-import-chat-btn" class="modal-button primary" style="margin: 0;">合并导入记录</button>
                                 <button id="view-history-branches-btn" class="modal-button secondary" style="margin: 0;">回溯历史</button>
                             </div>
                         </div>
@@ -7527,6 +7528,7 @@ const conversationManager = (function() {
         const getDefaultFontSetting = () => ({ fontFamily: '默认', customFontValue: '', textColor: 'default' });
         
         let chatState = { chatId: '', chatName: '', messages: [] }, contactInfo = { isGroup: false, avatarUrl: '' }, relationship = { myStatus: 'normal', contactStatusToMe: 'normal', groupStatus: 'active' }, videoAnimations = {}, currentReplyContext = null, autoReplySettings = { enabled: false, message: '' }, simulatedCurrentTime = Date.now();
+        let fullMessageHistory = []; // <-- 新增：这个数组将永远持有全部的聊天记录
 // 【【【新增代码从这里开始】】】
 let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
 // 【【【新增代码到这里结束】】】        
@@ -7882,10 +7884,14 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
 
         function saveConversation() {
             if (!chatState.chatId) return;
-            saveToLocalStorage(`conversation_${chatState.chatId}`, chatState.messages);
+            // **核心修复：永远只保存包含全部历史记录的 fullMessageHistory 数组！**
+            saveToLocalStorage(`conversation_${chatState.chatId}`, fullMessageHistory);
+            
             const chatInList = chatList.find(c => c.id === chatState.chatId);
             if (chatInList) {
+                // 读取 lastMsg 仍然可以从 chatState.messages，因为它总是最新的
                 const lastMsg = [...chatState.messages].filter(m => m.type !== 'time_divider' && m.side !== 'system').pop();
+// ... (函数剩余部分)
                 if (lastMsg) {
                     let lastMessageText = lastMsg.text;
                     if(lastMsg.type !== 'text') { const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'transfer': '[转账]', 'red_packet': '[红包]', 'photo-description': '[图文]', 'video': '[视频]', 'location': '[位置]', 'gift': '[礼物]', 'pay_for_me': '[代付]', 'call_summary': '[视频通话]' }; lastMessageText = typeMap[lastMsg.type] || '[消息]'; }
@@ -7901,11 +7907,12 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
         }
 
         function initializeFromStorage(chatId) {
-            const fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+            // 1. 将完整的历史记录加载到我们新的“保险柜”数组中
+            fullMessageHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
             const messagesToLoad = 40;
 
-            // 核心修改：只截取最后 40 条消息用于初次显示
-            chatState.messages = fullHistory.slice(-messagesToLoad);
+            // 2. 只截取最后40条消息用于初次显示，放入旧的数组
+            chatState.messages = fullMessageHistory.slice(-messagesToLoad);
 
             if (chatState.messages.length > 0) {
                 simulatedCurrentTime = chatState.messages[chatState.messages.length - 1].timestamp;
@@ -7913,7 +7920,8 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                 simulatedCurrentTime = timeManager.getCurrentTimestamp();
             }
             contactInfo.avatarUrl = loadFromLocalStorage(`chat_avatar_${chatId}`, null) || generateDefaultAvatar(chatState.chatName);
-            chatState.messages.forEach(msg => { if (msg.side === 'system' && msg.type !== 'time_divider') processSystemMessageForState(msg.text); });
+            // 确保状态检查是在完整的历史上进行的
+            fullMessageHistory.forEach(msg => { if (msg.side === 'system' && msg.type !== 'time_divider') processSystemMessageForState(msg.text); });
             const savedBg = loadFromLocalStorage(`chat_bg_${chatState.chatId}`, null);
             if (savedBg) {
                 chatContent.style.backgroundImage = `url('${savedBg}')`;
@@ -7921,7 +7929,7 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                 chatContent.style.backgroundImage = '';
             }
             loadPersonalizationSettings(); loadAutoReplySettings(); 
-            reRenderMessages();
+            reRenderMessages(true);
         }
 let isLoadingMore = false; // 添加一个加载锁，防止重复触发
 
@@ -7931,12 +7939,15 @@ let isLoadingMore = false; // 添加一个加载锁，防止重复触发
             const chatId = conversationManager.getCurrentChatId();
             if (!chatId) return;
 
-            const fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+            // **核心修改：直接使用内存中的 fullMessageHistory，不再读取硬盘**
+            const fullHistory = fullMessageHistory;
+// ... (函数剩余部分)
             const currentlyLoadedCount = chatState.messages.length;
 
             if (currentlyLoadedCount >= fullHistory.length) {
-                console.log("All messages loaded.");
-                return; // 所有消息都已加载
+                if (triggerEl) triggerEl.textContent = '已加载全部记录';
+                setTimeout(() => { if (triggerEl) triggerEl.remove(); }, 2000);
+                return;
             }
             
             isLoadingMore = true; // 上锁
@@ -7945,18 +7956,29 @@ let isLoadingMore = false; // 添加一个加载锁，防止重复触发
             const nextMessagesIndex = Math.max(0, fullHistory.length - currentlyLoadedCount - messagesToLoad);
             const newMessages = fullHistory.slice(nextMessagesIndex, fullHistory.length - currentlyLoadedCount);
 
-            // 关键：在添加新消息前，记录当前的滚动高度
+            // 关键：在添加新消息前，记录当前的滚动高度和第一个可见消息的ID
             const oldScrollHeight = messagesContainer.scrollHeight;
+            const firstVisibleMessage = messagesContainer.querySelector('.message-wrapper');
+            const firstVisibleMessageId = firstVisibleMessage ? firstVisibleMessage.dataset.messageId : null;
 
             // 将旧消息添加到当前消息列表的开头
-            chatState.messages = [...newMessages, ...chatState.messages];
+            chatState.messages.unshift(...newMessages);
             
-            // 重新渲染所有消息
-            reRenderMessages();
+            // 重新渲染所有消息，并告知这不是初次加载
+            reRenderMessages(false);
             
-            // 关键：渲染后，计算新旧高度差，并恢复滚动位置，使用户感觉不到跳动
-            const newScrollHeight = messagesContainer.scrollHeight;
-            messagesContainer.scrollTop = newScrollHeight - oldScrollHeight;
+            // 关键：渲染后，尝试恢复滚动到之前的位置，让用户感觉不到跳动
+            if (firstVisibleMessageId) {
+                const newFirstMessageEl = messagesContainer.querySelector(`[data-message-id="${firstVisibleMessageId}"]`);
+                if (newFirstMessageEl) {
+                    newFirstMessageEl.scrollIntoView({ block: 'start' });
+                }
+            } else {
+                 // 如果之前没有消息，就用旧的高度差方法作为备用
+                const newScrollHeight = messagesContainer.scrollHeight;
+                messagesContainer.scrollTop = newScrollHeight - oldScrollHeight;
+            }
+
 
             // 模拟一点延迟，防止快速滚动时连续触发
             setTimeout(() => {
@@ -10494,9 +10516,18 @@ You were receiving a video call from {{user}}, but they hung up before you could
 
             // 更新数据数组
             const existingIndex = chatState.messages.findIndex(m => m.id === msgData.id);
+            // **核心修改：同时检查并更新两个数组**
+            const fullHistoryIndex = fullMessageHistory.findIndex(m => m.id === msgData.id);
+
             if (existingIndex > -1) {
-                // 更新数据
+                // 更新“显示用”数组
                 chatState.messages[existingIndex] = { ...chatState.messages[existingIndex], ...msgData };
+                
+                // 同时更新“完整历史”数组
+                if (fullHistoryIndex > -1) {
+                    fullMessageHistory[fullHistoryIndex] = { ...fullMessageHistory[fullHistoryIndex], ...msgData };
+                }
+
 
                 // 【核心性能修正】直接在DOM中找到旧消息并替换它
                 const oldWrapper = messagesContainer.querySelector(`[data-message-id="${msgData.id}"]`);
@@ -10531,8 +10562,10 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 }
                 // 直接向DOM追加新消息
                 addMessageToDOM(msgData);
-                // 向数据数组追加新消息
+                // 向“显示用”数组追加新消息
                 chatState.messages.push(msgData);
+                // **同时向“完整历史”数组追加新消息**
+                fullMessageHistory.push(msgData);
             }
             
             // 确保滚动到底部
@@ -11265,36 +11298,46 @@ You were receiving a video call from {{user}}, but they hung up before you could
             bannerTimeout = setTimeout(closeBanner, 5000);
         }
 
-const reRenderMessages = () => {
+const reRenderMessages = (isInitialLoad = false) => {
     // 1. 清空容器
     messagesContainer.innerHTML = '';
-
-    // --- 新增：检查是否还有更多消息可加载 ---
     const chatId = conversationManager.getCurrentChatId();
+
+    // ** 全新、更可靠的“加载更多”提示逻辑 **
     if (chatId) {
         const fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
         if (chatState.messages.length < fullHistory.length) {
-            // 如果当前显示的消息数小于总数，则在顶部添加“加载更多”的提示
-            messagesContainer.innerHTML = '<div style="text-align: center; color: #aaa; font-size: 12px; padding: 10px 0;">向上滚动加载更多记录</div>';
+            // 只有当还有未加载的消息时，才创建提示元素
+            const loadMoreDiv = document.createElement('div');
+            loadMoreDiv.id = 'load-more-trigger'; // 给它一个ID方便我们操作
+            loadMoreDiv.style.textAlign = 'center';
+            loadMoreDiv.style.color = '#aaa';
+            loadMoreDiv.style.fontSize = '12px';
+            loadMoreDiv.style.padding = '10px 0';
+            loadMoreDiv.style.cursor = 'pointer'; // 让它看起来可以点击
+            loadMoreDiv.textContent = '点击或向上滚动加载更早的记录';
+            
+            // 为它绑定一个独立的点击事件，解决无法滚动的问题
+            loadMoreDiv.onclick = () => {
+                loadMoreMessages();
+            };
+            
+            messagesContainer.appendChild(loadMoreDiv);
         }
     }
 
     const TIME_GAP = 3 * 60 * 1000;
-// ... (函数剩余部分)
 
-    // 2. 确保消息按时间排序
+    // 2. 确保消息按时间排序 (这部分不变)
     chatState.messages.sort((a, b) => a.timestamp - b.timestamp);
 
     let lastMessageTimestamp = 0;
 
     // 3. 循环遍历所有历史消息并一次性渲染
     for (const msg of chatState.messages) {
-        // 跳过我们之前为了排序而添加的伪时间分割线
         if (msg.type === 'time_divider') {
             continue;
         }
-
-        // 检查并插入真实的时间分割线
         if (lastMessageTimestamp === 0 || (msg.timestamp - lastMessageTimestamp > TIME_GAP)) {
             addMessageToDOM({
                 id: `time-render-${msg.timestamp}`,
@@ -11303,15 +11346,16 @@ const reRenderMessages = () => {
                 timestamp: msg.timestamp
             });
         }
-        
-        // 渲染消息本身
         addMessageToDOM(msg);
-        
         lastMessageTimestamp = msg.timestamp;
     }
 
-    // 4. 渲染完成后，滚动到底部
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    // ** 全新的滚动逻辑 **
+    if (isInitialLoad) {
+        // 如果是初次加载，无条件滚动到底部
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    // 如果是加载更多，滚动位置的恢复将在 loadMoreMessages 函数中处理
 };
 // 修改后 (最终正确版)
 async function handleSendMessageAttempt(type, text, extraData = {}) {
@@ -16449,18 +16493,37 @@ async function handleRemoveMember() {
         const chatId = conversationManager.getCurrentChatId(); 
         const chat = chatList.find(c => c.id === chatId); 
         if (!chat) { await conversationManager.customAlert('无法确定当前聊天。'); return; } 
-        const messages = loadFromLocalStorage(`conversation_${chatId}`, []); 
-        if (messages.length === 0) { await conversationManager.customAlert('没有聊天记录可导出。'); return; } 
-        try { 
-            const portableMessages = await conversationManager.makeDataPortable(messages);
-            const jsonString = JSON.stringify(portableMessages, null, 2); 
+        
+        // 1. 获取主线消息
+        const mainMessages = loadFromLocalStorage(`conversation_${chatId}`, []); 
+        // 2. 获取回溯历史分支
+        const branches = loadFromLocalStorage(`chat_branches_${chatId}`, []);
+
+        if (mainMessages.length === 0 && branches.length === 0) { 
+            await conversationManager.customAlert('没有聊天记录或历史分支可导出。'); 
+            return; 
+        } 
+        
+        try {
+            // 3. 创建一个结构化的备份对象
+            let backupData = {
+                type: "RyePhoneChatBackup", // 加上类型标记，方便导入时识别
+                version: 1,
+                chatId: chatId,
+                main_conversation: mainMessages,
+                branches: branches
+            };
+
+            // 4. 对整个备份对象进行图片数据处理
+            const portableBackup = await conversationManager.makeDataPortable(backupData);
+            const jsonString = JSON.stringify(portableBackup, null, 2); 
             
             const now = new Date();
             const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
             const filename = `聊天记录_${sanitizeFilename(chat.name)}_${timestamp}.json`;
 
             downloadHelper(jsonString, filename, 'application/json');
-            await conversationManager.customAlert('聊天记录已开始导出！'); 
+            await conversationManager.customAlert('包含回溯历史的聊天记录已开始导出！'); 
         } catch (error) { 
             await conversationManager.customAlert('导出失败: ' + error.message); 
         } 
@@ -16474,15 +16537,41 @@ async function handleRemoveMember() {
             const reader = new FileReader(); 
             reader.onload = async (event) => { 
                 try { 
-                    const importedMessages = JSON.parse(event.target.result); 
-                    if (!Array.isArray(importedMessages)) { throw new Error('文件格式不正确，需要是消息数组。'); } 
-                    const confirmed = await conversationManager.customConfirm('这将覆盖当前对话的所有聊天记录，确定要导入吗？'); 
-                    if (confirmed) {
-                        const rehydratedMessages = await rehydrateDataFromPortable(importedMessages);
-                        saveToLocalStorage(`conversation_${chatId}`, rehydratedMessages); 
-                        await conversationManager.customAlert('导入成功！返回聊天页面即可看到更新。'); 
-                        conversationManager.open(chatId); 
-                    } 
+                    const importedData = JSON.parse(event.target.result); 
+                    
+                    const confirmed = await conversationManager.customConfirm('这将覆盖当前对话的所有聊天记录（包括回溯历史），确定要导入吗？'); 
+                    if (!confirmed) return;
+
+                    // 检查是新格式还是旧格式
+                    if (importedData.type === "RyePhoneChatBackup" && importedData.main_conversation) {
+                        // **新格式处理逻辑**
+                        const rehydratedData = await rehydrateDataFromPortable(importedData);
+                        
+                        // 1. 覆盖主线聊天记录
+                        saveToLocalStorage(`conversation_${chatId}`, rehydratedData.main_conversation || []);
+                        
+                        // 2. 覆盖回溯历史分支
+                        saveToLocalStorage(`chat_branches_${chatId}`, rehydratedData.branches || []);
+                        
+                        await conversationManager.customAlert('包含回溯历史的聊天记录已导入成功！');
+                    } else if (Array.isArray(importedData)) {
+                        // **旧格式兼容逻辑**
+                        const rehydratedMessages = await rehydrateDataFromPortable(importedData);
+                        
+                        // 1. 只覆盖主线聊天记录
+                        saveToLocalStorage(`conversation_${chatId}`, rehydratedMessages);
+                        
+                        // 2. 清空旧的回溯历史，因为旧备份里没有
+                        saveToLocalStorage(`chat_branches_${chatId}`, []); 
+                        
+                        await conversationManager.customAlert('（旧版）聊天记录已导入成功！');
+                    } else {
+                        throw new Error('文件格式不正确，无法识别。');
+                    }
+
+                    // 统一的收尾操作
+                    conversationManager.open(chatId); 
+
                 } catch (error) { 
                     await conversationManager.customAlert('导入失败: ' + error.message); 
                 } 
@@ -16490,6 +16579,55 @@ async function handleRemoveMember() {
             reader.readAsText(file);
         });
     });
+
+    // ******** 从这里开始插入全新的代码块 ********
+    const mergeImportChatBtn = document.getElementById('merge-import-chat-btn');
+    if (mergeImportChatBtn) {
+        mergeImportChatBtn.addEventListener('click', () => {
+            const chatId = conversationManager.getCurrentChatId();
+            if (!chatId) {
+                conversationManager.customAlert('无法确定当前聊天。');
+                return;
+            }
+
+            triggerFileInput(file => {
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    try {
+                        const importedMessages = JSON.parse(event.target.result);
+                        if (!Array.isArray(importedMessages)) {
+                            throw new Error('文件格式不正确，需要是消息数组。');
+                        }
+
+                        const confirmed = await conversationManager.customConfirm('这将把备份文件中的消息合并到当前聊天记录之前，确定要合并吗？');
+                        if (!confirmed) return;
+                        
+                        // 1. 读取现有的新消息
+                        const existingMessages = loadFromLocalStorage(`conversation_${chatId}`, []);
+                        
+                        // 2. 将新旧消息合并
+                        const mergedMessages = [...importedMessages, ...existingMessages];
+                        
+                        // 3. 去重并排序，确保万无一失
+                        const uniqueMessages = Array.from(new Map(mergedMessages.map(item => [item.id || item.timestamp, item])).values());
+                        uniqueMessages.sort((a, b) => a.timestamp - b.timestamp);
+                        
+                        // 4. 处理图片并保存
+                        const finalMergedMessages = await rehydrateDataFromPortable(uniqueMessages);
+                        saveToLocalStorage(`conversation_${chatId}`, finalMergedMessages);
+                        
+                        await conversationManager.customAlert('合并导入成功！即将刷新聊天界面。');
+                        conversationManager.open(chatId);
+
+                    } catch (error) {
+                        await conversationManager.customAlert('合并失败: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            });
+        });
+    }
+    // ******** 新代码块到此结束 ********
 
     document.getElementById('add-member-btn').addEventListener('click', handleAddMember);
     document.getElementById('remove-member-btn').addEventListener('click', handleRemoveMember);
