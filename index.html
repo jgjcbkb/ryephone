@@ -108,7 +108,6 @@
     .back-btn svg { width: 24px; height: 24px; }
     .app-header h1 { font-size: 1.2rem; margin: 0; flex-grow: 1; text-align: center; }
     #page-home { justify-content: center; align-items: center; flex-direction: row; flex-wrap: wrap; gap: 20px; padding: 20px; padding-top: 30px; }
-    
     .home-icon-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100px; height: 100px; cursor: pointer; text-decoration: none; }
     .home-icon-btn .icon-bg { width: 60px; height: 60px; border-radius: 15px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     .home-icon-btn svg { width: 32px; height: 32px; fill: white; }
@@ -11935,8 +11934,15 @@ const recallMessage = async (messageId) => {
         replyTo: originalMsg.replyTo, 
         timestamp: timeManager.getCurrentTimestamp()
     };
-    // 更新数据数组
-    chatState.messages.splice(messageIndex, 1, recallNotice); 
+    // ===== 从这里开始复制 =====
+            // --- 核心修复：同时在两个数组中执行替换操作 ---
+            chatState.messages.splice(messageIndex, 1, recallNotice); 
+            const fullHistoryIndex = fullMessageHistory.findIndex(m => m.id === messageId);
+            if (fullHistoryIndex > -1) {
+                fullMessageHistory.splice(fullHistoryIndex, 1, recallNotice);
+            }
+            // --- 修复结束 ---
+// ===== 到这里结束复制 =====
     
     // 如果找到了对应的DOM元素，就直接替换它，避免重绘
     if (messageWrapper) {
@@ -11977,66 +11983,83 @@ const showContextMenu = (event, messageId) => {
             case 'regenerate_from':
                 regenerateFromMessage(messageId);
                 break;
-            case 'edit':
-                switch (msgToActOn.type) {
-                    case 'text':
-                    case 'voice':
-                    case 'photo-description':
-                    case 'video':
-                    case 'red_packet':
-                    case 'gift':
-                    case 'pay_for_me':
-                        const newText = await showContentInputModal({
-                            title: '编辑内容',
-                            value: msgToActOn.text,
-                            isTextarea: true
+            // ===== 从这里开始复制，一直复制到最下面的 break; =====
+        case 'edit':
+            switch (msgToActOn.type) {
+                case 'text':
+                case 'voice':
+                case 'photo-description':
+                case 'video':
+                case 'red_packet':
+                case 'gift':
+                case 'pay_for_me':
+                    const newText = await showContentInputModal({
+                        title: '编辑内容',
+                        value: msgToActOn.text,
+                        isTextarea: true
+                    });
+                    if (newText !== null) {
+                        let processedText = newText.trim();
+                        // --- 核心修复：同时更新两个数组中的消息 ---
+                        msgToActOn.text = processedText;
+                        const msgInFullHistory = fullMessageHistory.find(m => m.id === msgToActOn.id);
+                        if (msgInFullHistory) msgInFullHistory.text = processedText;
+                        // --- 修复结束 ---
+                        reRenderMessages();
+                        saveConversation();
+                    }
+                    break;
+
+                case 'location':
+                    try {
+                        const data = JSON.parse(msgToActOn.text);
+                        const result = await conversationManager.showCustomModal({
+                            title: '编辑位置',
+                            showCloseButton: true,
+                            form: [
+                                { id: 'loc-title', label: '位置名称', value: data.title || '' },
+                                { id: 'loc-addr', label: '详细地址', value: data.address || '' }
+                            ],
+                            buttons: [{ text: '保存', value: 'save', class: 'primary' }]
                         });
-                        if (newText !== null) {
-                            let processedText = newText.trim();
 
-                            // START: 插入正则替换逻辑 (与发送函数中的逻辑完全相同)
-                            // 此处的正则处理逻辑已被删除
-                            // END: 插入正则替换逻辑
-
-                            msgToActOn.text = processedText; // 直接使用用户编辑后的原始文本
+                        if (result && result.value === 'save') {
+                            const modalBox = result.target.closest('.modal-box');
+                            const newTitle = modalBox.querySelector('#loc-title').value;
+                            const newAddress = modalBox.querySelector('#loc-addr').value;
+                            const newLocationText = JSON.stringify({ title: newTitle, address: newAddress });
+                            // --- 核心修复：同时更新两个数组中的消息 ---
+                            msgToActOn.text = newLocationText;
+                            const msgInFullHistory = fullMessageHistory.find(m => m.id === msgToActOn.id);
+                            if (msgInFullHistory) msgInFullHistory.text = newLocationText;
+                            // --- 修复结束 ---
+                            reRenderMessages();
+                            saveConversation();
+                        }
+                    } catch (e) {
+                        await customAlert('编辑位置信息失败，数据格式错误。');
+                    }
+                    break;
+                    
+                default:
+                    await customAlert('此类型的消息不支持编辑。');
+                    break;
+            }
+            break;
+// ===== 到这里结束复制 =====
+            case 'multi-select': enterMultiSelectMode(messageId); break;
+            // ===== 从这里开始复制 =====
+                    case 'delete':
+                        if (await customConfirm('确定要删除这条消息吗？')) {
+                            // --- 核心修复：同时从两个数组中删除 ---
+                            chatState.messages = chatState.messages.filter(m => m.id !== messageId);
+                            fullMessageHistory = fullMessageHistory.filter(m => m.id !== messageId);
+                            // --- 修复结束 ---
                             reRenderMessages();
                             saveConversation();
                         }
                         break;
-
-                    case 'location':
-                        try {
-                            const data = JSON.parse(msgToActOn.text);
-                            const result = await conversationManager.showCustomModal({
-                                title: '编辑位置',
-                                showCloseButton: true,
-                                form: [
-                                    { id: 'loc-title', label: '位置名称', value: data.title || '' },
-                                    { id: 'loc-addr', label: '详细地址', value: data.address || '' }
-                                ],
-                                buttons: [{ text: '保存', value: 'save', class: 'primary' }]
-                            });
-
-                            if (result && result.value === 'save') {
-                                const modalBox = result.target.closest('.modal-box');
-                                const newTitle = modalBox.querySelector('#loc-title').value;
-                                const newAddress = modalBox.querySelector('#loc-addr').value;
-                                msgToActOn.text = JSON.stringify({ title: newTitle, address: newAddress });
-                                reRenderMessages();
-                                saveConversation();
-                            }
-                        } catch (e) {
-                            await customAlert('编辑位置信息失败，数据格式错误。');
-                        }
-                        break;
-                        
-                    default:
-                        await customAlert('此类型的消息不支持编辑。');
-                        break;
-                }
-                break;
-            case 'multi-select': enterMultiSelectMode(messageId); break;
-            case 'delete': if (await customConfirm('确定要删除这条消息吗？')) { chatState.messages = chatState.messages.filter(m => m.id !== messageId); reRenderMessages(); saveConversation(); } break;
+// ===== 到这里结束复制 =====
              case 'insert':
                     await showInsertMessageModal(messageId);
                     break;
@@ -12045,90 +12068,100 @@ const showContextMenu = (event, messageId) => {
         };
     messageContextMenu.addEventListener('click', menuClickHandler, { once: true });
 };
-async function showInsertMessageModal(targetMessageId) {
-            const characters = getCharactersInCurrentChat();
-            const senderOptions = characters.map(name => `<option value="${name}">${name}</option>`).join('');
+// ===== 从这里开始，完整复制下面所有的代码 =====
 
-            const modalHtml = `
-                <div style="text-align: left; display: flex; flex-direction: column; gap: 15px;">
-                    <div class="form-group" style="margin:0;">
-                        <label>发送方:</label>
-                        <select id="insert-sender" class="modal-input modal-select">${senderOptions}</select>
+    async function showInsertMessageModal(targetMessageId) {
+        const characters = getCharactersInCurrentChat();
+        const senderOptions = characters.map(name => `<option value="${name}">${name}</option>`).join('');
+
+        const modalHtml = `
+            <div style="text-align: left; display: flex; flex-direction: column; gap: 15px;">
+                <div class="form-group" style="margin:0;">
+                    <label>发送方:</label>
+                    <select id="insert-sender" class="modal-input modal-select">${senderOptions}</select>
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label>插入位置:</label>
+                    <div style="display:flex; gap: 20px; padding-top: 5px;">
+                        <label><input type="radio" name="insert-position" value="before"> 之前</label>
+                        <label><input type="radio" name="insert-position" value="after" checked> 之后</label>
                     </div>
-                    <div class="form-group" style="margin:0;">
-                        <label>插入位置:</label>
-                        <div style="display:flex; gap: 20px; padding-top: 5px;">
-                            <label><input type="radio" name="insert-position" value="before"> 之前</label>
-                            <label><input type="radio" name="insert-position" value="after" checked> 之后</label>
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin:0;">
-                        <label>消息内容:</label>
-                        <textarea id="insert-content" class="modal-textarea" placeholder="输入要插入的消息..."></textarea>
-                    </div>
-                </div>`;
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label>消息内容:</label>
+                    <textarea id="insert-content" class="modal-textarea" placeholder="输入要插入的消息..."></textarea>
+                </div>
+            </div>`;
 
-            const result = await showCustomModal({
-                title: '插入消息',
-                html: modalHtml,
-                showCloseButton: true,
-                buttons: [
-                    { text: '取消', value: 'cancel', class: 'secondary' },
-                    { text: '插入', value: 'insert', class: 'primary' }
-                ]
-            });
+        const result = await showCustomModal({
+            title: '插入消息',
+            html: modalHtml,
+            showCloseButton: true,
+            buttons: [
+                { text: '取消', value: 'cancel', class: 'secondary' },
+                { text: '插入', value: 'insert', class: 'primary' }
+            ]
+        });
 
-            if (result && result.value === 'insert') {
-                const modalBox = result.target.closest('.modal-box');
-                const sender = modalBox.querySelector('#insert-sender').value;
-                const position = modalBox.querySelector('input[name="insert-position"]:checked').value;
-                const content = modalBox.querySelector('#insert-content').value.trim();
+        if (result && result.value === 'insert') {
+            const modalBox = result.target.closest('.modal-box');
+            const sender = modalBox.querySelector('#insert-sender').value;
+            const position = modalBox.querySelector('input[name="insert-position"]:checked').value;
+            const content = modalBox.querySelector('#insert-content').value.trim();
 
-                if (!content) {
-                    await customAlert('消息内容不能为空！');
-                    return;
-                }
-
-                const targetMessageIndex = chatState.messages.findIndex(m => m.id === targetMessageId);
-                if (targetMessageIndex === -1) {
-                    await customAlert('错误：找不到目标消息。');
-                    return;
-                }
-
-                const targetMessage = chatState.messages[targetMessageIndex];
-                let newTimestamp;
-
-                if (position === 'before') {
-                    newTimestamp = targetMessage.timestamp - 1;
-                } else { 
-                    const nextMessage = chatState.messages[targetMessageIndex + 1];
-                    if (nextMessage) {
-                        newTimestamp = Math.floor((targetMessage.timestamp + nextMessage.timestamp) / 2);
-                    } else {
-                        newTimestamp = targetMessage.timestamp + 1;
-                    }
-                }
-                
-                const newMessage = {
-                    id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    type: 'text',
-                    text: content,
-                    side: sender === '{{user}}' ? 'sent' : 'received',
-                    timestamp: newTimestamp
-                };
-
-                if (contactInfo.isGroup && newMessage.side === 'received') {
-                    newMessage.sender = sender;
-                }
-
-                chatState.messages.push(newMessage);
-                chatState.messages.sort((a, b) => a.timestamp - b.timestamp);
-
-                reRenderMessages();
-                saveConversation();
-                await customAlert('消息已成功插入！');
+            if (!content) {
+                await customAlert('消息内容不能为空！');
+                return;
             }
+
+            const targetMessageIndex = chatState.messages.findIndex(m => m.id === targetMessageId);
+            if (targetMessageIndex === -1) {
+                await customAlert('错误：找不到目标消息。');
+                return;
+            }
+
+            const targetMessage = chatState.messages[targetMessageIndex];
+            let newTimestamp;
+
+            if (position === 'before') {
+                newTimestamp = targetMessage.timestamp - 1;
+            } else { 
+                const nextMessage = chatState.messages[targetMessageIndex + 1];
+                if (nextMessage) {
+                    newTimestamp = Math.floor((targetMessage.timestamp + nextMessage.timestamp) / 2);
+                } else {
+                    newTimestamp = targetMessage.timestamp + 1;
+                }
+            }
+            
+            const newMessage = {
+                id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                type: 'text',
+                text: content,
+                side: sender === '{{user}}' ? 'sent' : 'received',
+                timestamp: newTimestamp
+            };
+
+            if (contactInfo.isGroup && newMessage.side === 'received') {
+                newMessage.sender = sender;
+            }
+
+            // --- 核心修复：在这里同时操作两个“账本” ---
+            chatState.messages.push(newMessage);
+            fullMessageHistory.push(newMessage); // 把新消息也添加到“保险柜”里
+
+            // 同时对两个“账本”进行排序，确保时间线正确
+            chatState.messages.sort((a, b) => a.timestamp - b.timestamp);
+            fullMessageHistory.sort((a, b) => a.timestamp - b.timestamp);
+            // --- 修复结束 ---
+
+            reRenderMessages();
+            saveConversation();
+            await customAlert('消息已成功插入！');
         }
+    }
+    
+// ===== 到这里结束复制 =====
         
 function handleRecallByAI(senderName) {
             // 从后往前遍历，找到并删除那条 [recall] 指令消息
@@ -13204,7 +13237,20 @@ messagesContainer.addEventListener('click', async (e) => {
 });
 messagesContainer.addEventListener('dblclick', (e) => { if (isMultiSelectMode) return; const wrapper = e.target.closest('.message-wrapper'); if (!wrapper) return; const messageId = wrapper.dataset.messageId; const message = chatState.messages.find(m => m.id === messageId); if (!message || message.side === 'system' || message.type === 'red_packet') return; e.preventDefault(); showContextMenu(e, messageId); });
 multiSelectCancelBtn.addEventListener('click', exitMultiSelectMode);
-multiSelectDeleteBtn.addEventListener('click', async () => { if(selectedMessageIds.length === 0) return; if (await customConfirm('确定要删除选中的 ' + selectedMessageIds.length + ' 条消息吗？')) { chatState.messages = chatState.messages.filter(m => !selectedMessageIds.includes(m.id)); exitMultiSelectMode(); reRenderMessages(); saveConversation(); } });
+// ===== 从这里开始复制 =====
+    multiSelectDeleteBtn.addEventListener('click', async () => { 
+        if(selectedMessageIds.length === 0) return; 
+        if (await customConfirm('确定要删除选中的 ' + selectedMessageIds.length + ' 条消息吗？')) { 
+            // --- 核心修复：同时从两个数组中删除 ---
+            chatState.messages = chatState.messages.filter(m => !selectedMessageIds.includes(m.id));
+            fullMessageHistory = fullMessageHistory.filter(m => !selectedMessageIds.includes(m.id));
+            // --- 修复结束 ---
+            exitMultiSelectMode(); 
+            reRenderMessages(); 
+            saveConversation(); 
+        } 
+    });
+// ===== 到这里结束复制 =====
 document.addEventListener('click', (e) => { if (messageContextMenu && !messageContextMenu.contains(e.target)) { hideContextMenu(); } });
 
 document.getElementById('delete-contact-btn').addEventListener('click', async () => {
