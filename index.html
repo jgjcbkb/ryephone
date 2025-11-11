@@ -108,6 +108,7 @@
     .back-btn svg { width: 24px; height: 24px; }
     .app-header h1 { font-size: 1.2rem; margin: 0; flex-grow: 1; text-align: center; }
     #page-home { justify-content: center; align-items: center; flex-direction: row; flex-wrap: wrap; gap: 20px; padding: 20px; padding-top: 30px; }
+    
     .home-icon-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100px; height: 100px; cursor: pointer; text-decoration: none; }
     .home-icon-btn .icon-bg { width: 60px; height: 60px; border-radius: 15px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
     .home-icon-btn svg { width: 32px; height: 32px; fill: white; }
@@ -7931,59 +7932,98 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
             loadPersonalizationSettings(); loadAutoReplySettings(); 
             reRenderMessages(true);
         }
-let isLoadingMore = false; // 添加一个加载锁，防止重复触发
-
+let isLoadingMore = false;
         async function loadMoreMessages() {
-            if (isLoadingMore) return; // 如果正在加载，则直接返回
+            if (isLoadingMore) return;
+            isLoadingMore = true;
 
-            const chatId = conversationManager.getCurrentChatId();
-            if (!chatId) return;
+            const triggerEl = document.getElementById('load-more-trigger');
+            if(triggerEl) triggerEl.textContent = '正在加载...';
 
-            // **核心修改：直接使用内存中的 fullMessageHistory，不再读取硬盘**
-            const fullHistory = fullMessageHistory;
-// ... (函数剩余部分)
-            const currentlyLoadedCount = chatState.messages.length;
+            try {
+                const chatId = conversationManager.getCurrentChatId();
+                if (!chatId) return;
 
-            if (currentlyLoadedCount >= fullHistory.length) {
-                if (triggerEl) triggerEl.textContent = '已加载全部记录';
-                setTimeout(() => { if (triggerEl) triggerEl.remove(); }, 2000);
-                return;
-            }
-            
-            isLoadingMore = true; // 上锁
-
-            const messagesToLoad = 40;
-            const nextMessagesIndex = Math.max(0, fullHistory.length - currentlyLoadedCount - messagesToLoad);
-            const newMessages = fullHistory.slice(nextMessagesIndex, fullHistory.length - currentlyLoadedCount);
-
-            // 关键：在添加新消息前，记录当前的滚动高度和第一个可见消息的ID
-            const oldScrollHeight = messagesContainer.scrollHeight;
-            const firstVisibleMessage = messagesContainer.querySelector('.message-wrapper');
-            const firstVisibleMessageId = firstVisibleMessage ? firstVisibleMessage.dataset.messageId : null;
-
-            // 将旧消息添加到当前消息列表的开头
-            chatState.messages.unshift(...newMessages);
-            
-            // 重新渲染所有消息，并告知这不是初次加载
-            reRenderMessages(false);
-            
-            // 关键：渲染后，尝试恢复滚动到之前的位置，让用户感觉不到跳动
-            if (firstVisibleMessageId) {
-                const newFirstMessageEl = messagesContainer.querySelector(`[data-message-id="${firstVisibleMessageId}"]`);
-                if (newFirstMessageEl) {
-                    newFirstMessageEl.scrollIntoView({ block: 'start' });
+                const currentlyLoadedCount = chatState.messages.length;
+                if (currentlyLoadedCount >= fullMessageHistory.length) {
+                    if (triggerEl) {
+                        triggerEl.textContent = '已加载全部记录';
+                        setTimeout(() => triggerEl.remove(), 2000);
+                    }
+                    return;
                 }
-            } else {
-                 // 如果之前没有消息，就用旧的高度差方法作为备用
+                
+                // 1. 计算需要加载的新消息
+                const messagesToLoad = 40;
+                const nextMessagesIndex = Math.max(0, fullMessageHistory.length - currentlyLoadedCount - messagesToLoad);
+                const newMessages = fullMessageHistory.slice(nextMessagesIndex, fullMessageHistory.length - currentlyLoadedCount);
+
+                if (newMessages.length === 0) {
+                     if (triggerEl) triggerEl.remove();
+                     return;
+                }
+
+                // 2. 记录当前滚动位置
+                const oldScrollHeight = messagesContainer.scrollHeight;
+
+                // 3. 将新消息添加到内存中的数组的开头
+                chatState.messages.unshift(...newMessages);
+                
+                // 4. 使用 DocumentFragment 高效地创建新元素
+                const fragment = document.createDocumentFragment();
+                let lastTimestamp = newMessages[0].timestamp;
+
+                for (let i = 0; i < newMessages.length; i++) {
+                    const msg = newMessages[i];
+                    // 检查是否需要时间分割线
+                    if (i > 0 && (msg.timestamp - lastTimestamp) > (3 * 60 * 1000)) {
+                         fragment.appendChild(createMessageElement({
+                            id: `time-render-${msg.timestamp}`,
+                            type: 'time_divider',
+                            text: formatTimestamp(msg.timestamp),
+                            timestamp: msg.timestamp
+                        }));
+                    }
+                    fragment.appendChild(createMessageElement(msg));
+                    lastTimestamp = msg.timestamp;
+                }
+                
+                // 检查新旧消息块之间是否需要时间分割线
+                const firstOldMessage = messagesContainer.querySelector('.message-wrapper');
+                if (firstOldMessage) {
+                    const firstOldMessageData = chatState.messages[newMessages.length]; // 因为我们刚 unshift 进去
+                    if (firstOldMessageData && (firstOldMessageData.timestamp - lastTimestamp) > (3 * 60 * 1000)) {
+                        fragment.appendChild(createMessageElement({
+                            id: `time-render-${firstOldMessageData.timestamp}`,
+                            type: 'time_divider',
+                            text: formatTimestamp(firstOldMessageData.timestamp),
+                            timestamp: firstOldMessageData.timestamp
+                        }));
+                    }
+                }
+                
+                // 5. 一次性将所有新元素插入到 DOM 的最前面
+                if (triggerEl) {
+                    messagesContainer.insertBefore(fragment, triggerEl.nextSibling);
+                } else {
+                    messagesContainer.prepend(fragment);
+                }
+
+                // 6. 恢复滚动位置，让用户感觉不到页面跳动
                 const newScrollHeight = messagesContainer.scrollHeight;
                 messagesContainer.scrollTop = newScrollHeight - oldScrollHeight;
+
+                if (triggerEl && chatState.messages.length >= fullMessageHistory.length) {
+                    triggerEl.textContent = '已加载全部记录';
+                    setTimeout(() => triggerEl.remove(), 2000);
+                } else if(triggerEl) {
+                    triggerEl.textContent = '点击或向上滚动加载更早的记录';
+                }
+
+            } finally {
+                // 确保无论成功还是失败都解锁
+                isLoadingMore = false;
             }
-
-
-            // 模拟一点延迟，防止快速滚动时连续触发
-            setTimeout(() => {
-                isLoadingMore = false; // 解锁
-            }, 300);
         }
 
         // 为消息容器添加滚动事件监听
@@ -10928,7 +10968,253 @@ You were receiving a video call from {{user}}, but they hung up before you could
             
             return closeUI;
         }
-        
+        // 【【【 在这里粘贴下面的新代码块 】】】
+
+        function createMessageElement(msg) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `message-wrapper`;
+            wrapper.dataset.messageId = msg.id;
+            
+            if (msg.type === 'time_divider') {
+                wrapper.classList.add('time-divider-wrapper');
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'time-divider';
+                timeDiv.textContent = msg.text;
+                wrapper.appendChild(timeDiv);
+            } else if (msg.side === 'system') {
+                wrapper.classList.add('system-notice-wrapper');
+                const systemDiv = document.createElement('div');
+                systemDiv.className = 'system-notice';
+                
+                if (msg.isFriendRequest || msg.isJoinRequest) {
+                    const btnClass = msg.isFriendRequest ? 'friend-request-btn' : 'join-request-btn';
+                    systemDiv.innerHTML = `
+                        <span>${msg.text}</span>
+                        <div style="margin-top: 8px; display: flex; justify-content: center; gap: 15px;">
+                            <button class="${btnClass} accept" data-sender="${msg.senderName}">同意</button>
+                            <button class="${btnClass} reject" data-sender="${msg.senderName}">拒绝</button>
+                        </div>
+                        <style>
+                            .friend-request-btn, .join-request-btn { padding: 4px 12px; border-radius: 6px; border: 1px solid; cursor: pointer; font-weight: 500; }
+                            .friend-request-btn.accept, .join-request-btn.accept { color: var(--primary-color); border-color: var(--primary-color); background: #e8f5e9; }
+                            .friend-request-btn.reject, .join-request-btn.reject { color: #888; border-color: #ddd; background: #f5f5f5; }
+                        </style>
+                    `;
+                    msg.isFriendRequest = false; 
+                    msg.isJoinRequest = false;
+                } else {
+                    systemDiv.textContent = msg.text;
+                    if (msg.isRecallNotice) {
+                        systemDiv.classList.add('clickable-recall');
+                        const hint = msg.recallSide === 'my' ? ' (点击重新编辑)' : ' (点击查看)';
+                        systemDiv.textContent += hint;
+                    } else if (msg.isBlacklistNotice) {
+                        systemDiv.classList.add('clickable-blacklist-notice');
+                        systemDiv.style.cursor = 'pointer';
+                        systemDiv.style.color = 'var(--accent-green)';
+                        systemDiv.textContent += ' (点击解除)';
+                    }
+                }
+                wrapper.appendChild(systemDiv);
+            } else {
+                wrapper.classList.add(msg.side);
+                
+                const contentRow = document.createElement('div');
+                contentRow.className = 'message-content-row';
+
+                const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                const avatarMode = chatInfo.avatarMode || 'all';
+                let shouldShowAvatar = false;
+                if (msg.side === 'sent' && (avatarMode === 'all' || avatarMode === 'me')) shouldShowAvatar = true;
+                if (msg.side === 'received' && (avatarMode === 'all' || avatarMode === 'contact')) shouldShowAvatar = true;
+
+                if (shouldShowAvatar) {
+                    const avatarDiv = document.createElement('div');
+                    avatarDiv.className = 'message-avatar';
+
+                    let avatarUrlKey = contactInfo.avatarUrl;
+                    if (msg.side === 'sent') {
+                        const chatSpecificUserAvatar = loadFromLocalStorage(`chat_user_avatar_${chatState.chatId}`, null);
+                        if (chatSpecificUserAvatar) {
+                            avatarUrlKey = chatSpecificUserAvatar;
+                        } else {
+                            const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                            const selectedPersonaName = chatInfo.userPersonaName;
+                            if (selectedPersonaName && selectedPersonaName !== '无') {
+                                const selectedPersona = userPersonas.find(p => p.name === selectedPersonaName);
+                                if (selectedPersona && selectedPersona.avatar) {
+                                    avatarUrlKey = selectedPersona.avatar;
+                                } else {
+                                    avatarUrlKey = myAvatar;
+                                }
+                            } else {
+                                avatarUrlKey = myAvatar;
+                            }
+                        }
+                    }
+                    setImageSrc(avatarDiv, avatarUrlKey);
+                    contentRow.appendChild(avatarDiv);
+                }
+                
+                const mainContentAndNameWrapper = document.createElement('div');
+                mainContentAndNameWrapper.style.display = 'flex';
+                mainContentAndNameWrapper.style.flexDirection = 'column';
+                if (msg.side === 'sent') {
+                    mainContentAndNameWrapper.style.alignItems = 'flex-end';
+                }
+
+                const chatInfoForDisplay = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                const isGroupOfflineMode = contactInfo.isGroup && chatInfoForDisplay.mode === 'offline';
+
+                if (contactInfo.isGroup && msg.side === 'received' && msg.sender && !isGroupOfflineMode) {
+                    const senderNameDiv = document.createElement('div');
+                    senderNameDiv.className = 'group-sender-name';
+                    senderNameDiv.textContent = msg.sender;
+                    mainContentAndNameWrapper.appendChild(senderNameDiv);
+                }
+
+                const mainContentWrapper = document.createElement('div');
+                mainContentWrapper.className = 'message-main-content';
+                
+                const div = document.createElement('div');
+                div.classList.add('message', msg.side, msg.type);
+                
+                const settingsKey = getSettingsKeyForMessage(msg);
+                const bubbleStyle = bubbleSettings[settingsKey] || getDefaultBubbleSetting();
+                
+                if (bubbleStyle !== '默认') {
+                    applyCustomBubbleStyle(mainContentWrapper, msg, bubbleStyle);
+                }
+                mainContentWrapper.dataset.bubbleStyle = bubbleStyle;
+                div.dataset.bubbleStyle = bubbleStyle; 
+
+                if (msg.type === 'red_packet') { let statusText = ''; let isFinished = false; if (msg.packetData) { const isDepleted = msg.packetData.remainingPortions === 0; const isExpired = msg.packetData.status === 'expired'; if (isDepleted) { statusText = '已领取'; isFinished = true; } else if (isExpired) { statusText = '已过期'; isFinished = true; } } if(isFinished) div.classList.add('claimed'); div.innerHTML = `<div class="red-packet-container"><div class="red-packet-header"><div class="red-packet-decoration"></div><div class="red-packet-text-content"><span class="red-packet-title">${msg.text}</span>${statusText ? `<span class="red-packet-status-text">${statusText}</span>` : ''}</div></div><div class="red-packet-footer">红包</div></div>`; } 
+                else if (msg.type === 'transfer') { let statusText = ''; let isFinished = false; const amount = parseFloat(msg.text).toFixed(2); const note = msg.recipient ? `转账给 ${msg.recipient}` : '转账'; switch(msg.transferStatus) { case 'collected': statusText = '已收款'; isFinished = true; break; case 'returned': statusText = '已退回'; isFinished = true; break; case 'expired': statusText = '已过期'; isFinished = true; break; default: statusText = msg.side === 'sent' ? '等待对方收款' : '请你收款'; break; } div.innerHTML = `<div class="transfer-header"><img src="https://i.postimg.cc/WtRBPhBG/IMG-0030.png" class="transfer-icon"><div class="transfer-text"><div class="transfer-amount">¥ ${amount}</div><div class="transfer-status">${statusText}</div></div></div><div class="transfer-footer">${note}</div>`; if (isFinished) { div.classList.add('finished'); } } 
+                else if (msg.type === 'call_summary') { div.innerHTML = `<svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"></path></svg><span>${msg.text}</span>`; }
+                else if (msg.type === 'text') {
+                    const applyRegexAndRender = (rawText) => {
+                        const chatId = conversationManager.getCurrentChatId();
+                        if (!chatId) return escapeHtml(rawText).replace(/\n/g, '<br>');
+
+                        const info = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                        const enabledRegexNames = info.enabledRegexes || [];
+                        let processedText = rawText;
+                        let hasBeenReplaced = false;
+
+                        if (enabledRegexNames.length > 0) {
+                            const globalRules = appearanceSettings.regexReplacements || [];
+                            for (const ruleName of enabledRegexNames) {
+                                const rule = globalRules.find(r => r.name === ruleName && r.enabled);
+                                if (rule && rule.pattern) {
+                                    try {
+                                        const regex = new RegExp(rule.pattern, rule.flags || 'g');
+                                        const textBefore = processedText;
+                                        processedText = processedText.replace(regex, rule.template || '');
+                                        if (textBefore !== processedText) {
+                                            hasBeenReplaced = true;
+                                        }
+                                    } catch (e) {
+                                        console.error(`正则规则 "${rule.name}" 在渲染时无效或执行出错:`, e);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (hasBeenReplaced) {
+                            return processedText;
+                        } else {
+                            let safeText = escapeHtml(rawText);
+                            let formattedText = simpleMarkdownToHtml(safeText);
+                            return formattedText.replace(/\n/g, '<br>');
+                        }
+                    };
+
+                    const trimmedText = msg.text.trim();
+                    const isGeneratedHtmlBlock = trimmedText.startsWith('<div') || trimmedText.startsWith('<snippet>');
+
+                    if (isGeneratedHtmlBlock) {
+                        div.innerHTML = msg.text.replace('<snippet>', '').replace('</snippet>', '');
+                    } else if (trimmedText.includes('<snippet>')) {
+                        const parts = trimmedText.split(/<snippet>([\s\S]*?)<\/snippet>/);
+                        let finalHtml = '';
+                        
+                        for (let i = 0; i < parts.length; i++) {
+                            const part = parts[i];
+                            if (!part) continue;
+
+                            if (i % 2 === 0) {
+                                const safeHtmlText = applyRegexAndRender(part.trim());
+                                if (safeHtmlText) {
+                                    finalHtml += `<div style="white-space: pre-wrap; word-wrap: break-word;">${safeHtmlText}</div>`;
+                                }
+                            } else {
+                                finalHtml += part;
+                            }
+                        }
+                        if (msg.replyTo) {
+                             const originalMsg = chatState.messages.find(m => m.id === msg.replyTo);
+                             let previewHTML = '';
+                             if (originalMsg) {
+                                 const senderName = originalMsg.side === 'sent' ? '{{user}}' : (originalMsg.sender || chatState.chatName);
+                                 let contentPreview = originalMsg.text || `[${originalMsg.type}]`;
+                                 previewHTML = `<div class="quoted-message-preview"><span class="quoted-sender">${escapeHtml(senderName)}</span><span class="quoted-text">${escapeHtml(contentPreview)}</span></div>`;
+                             }
+                             div.innerHTML = `${previewHTML}${finalHtml}`;
+                        } else {
+                             div.innerHTML = finalHtml;
+                        }
+
+                    } else if (msg.replyTo) {
+                        const originalMsg = chatState.messages.find(m => m.id === msg.replyTo);
+                        let previewHTML = '';
+                        if (originalMsg) {
+                            const senderName = originalMsg.side === 'sent' ? '{{user}}' : (originalMsg.sender || chatState.chatName);
+                            let contentPreview = '';
+                            switch(originalMsg.type) {
+                                case 'text': contentPreview = originalMsg.text; break;
+                                case 'photo': contentPreview = '[图片]'; break;
+                                default: contentPreview = `[${originalMsg.type}]`;
+                            }
+                            previewHTML = `<div class="quoted-message-preview"><span class="quoted-sender">${escapeHtml(senderName)}</span><span class="quoted-text">${escapeHtml(contentPreview)}</span></div>`;
+                        } else {
+                            previewHTML = `<div class="quoted-message-preview"><span class="quoted-text">[原始消息已不存在]</span></div>`;
+                        }
+                        div.innerHTML = `${previewHTML}<div>${applyRegexAndRender(msg.text)}</div>`;
+                    } else {
+                        let processedHtml = applyRegexAndRender(msg.text);
+                        processedHtml = processedHtml.replace(/@(\S+)(?![^<]*>|[^<>]*<\/)/g, (match, name) => {
+                            return `<span class="mention">@${escapeHtml(name)}</span>`;
+                        });
+                        div.innerHTML = processedHtml;
+                    }
+                }
+                else if (msg.type === 'location') { try { const data = JSON.parse(msg.text); div.innerHTML = `<div class="location-text"><div class="title">${data.title}</div><div class="address">${data.address}</div></div><div class="card-map-area"><div class="card-pin-icon"></div></div>`; } catch (e) { div.textContent = '[位置消息格式错误]'; } }
+                else if (msg.type === 'gift') { let statusText = ''; const isFinished = msg.giftStatus === 'finished'; const isExpired = msg.giftStatus === 'expired'; if (isFinished) { statusText = '已领取'; } else if (isExpired) { statusText = '已过期'; } div.innerHTML = `<div class="gift-bubble ${isFinished || isExpired ? 'finished' : ''}"><div class="gift-content"><div class="gift-icon"></div><div class="gift-text"><div class="gift-name">${msg.text}</div>${statusText ? `<div class="gift-status">${statusText}</div>` : ''}</div></div><div class="gift-footer">礼物</div></div>`; }
+                else if (msg.type === 'pay_for_me') { const isPaid = msg.payStatus === 'paid'; div.classList.toggle('paid', isPaid); div.classList.add(`pay-for-me-${msg.itemType}`); const iconHtmlMap = { 'plane': `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`, 'train': `<img src="https://i.postimg.cc/Jz3MpMyh/IMG-0044.png" alt="高铁">`, 'ship': `<img src="https://i.postimg.cc/1z9PT26r/IMG-0043.png" alt="轮船">`, 'takeout': `<img src="https://i.postimg.cc/wMV55hCm/IMG-0001.png" alt="外卖">`, 'shopping': `<img src="https://i.postimg.cc/nVY1tJXt/IMG-9999.png" alt="购物">`, }; let iconHtml, footerText; if (msg.itemType === 'travel') { iconHtml = iconHtmlMap[msg.details.type] || ''; footerText = '出行代付'; } else if (msg.itemType === 'takeout') { iconHtml = iconHtmlMap.takeout; footerText = '外卖代付'; } else { iconHtml = iconHtmlMap.shopping; footerText = '购物代付'; } let detailsHtml = ''; if (msg.itemType === 'travel' && msg.details) { detailsHtml = `<div class="pay-for-me-details-travel"><div class="travel-info-row"><strong>从</strong><span>${msg.details.from || 'N/A'}</span></div><div class="travel-info-row"><strong>到</strong><span>${msg.details.to || 'N/A'}</span></div>${msg.details.time ? `<div class="travel-info-row"><strong>时间</strong><span>${msg.details.time}</span></div>` : ''}${msg.details.duration ? `<div class="travel-info-row"><strong>用时</strong><span>${msg.details.duration}</span></div>` : ''}</div>`; } else if (msg.itemType === 'takeout' && msg.details && msg.details.reviews) { detailsHtml = '<div class="pay-for-me-details-takeout">' + msg.details.reviews.map(r => `<div class="takeout-review">“${r.trim()}”</div>`).join('') + '</div>'; } else if (msg.itemType === 'shopping' && msg.details && msg.details.description) { detailsHtml = `<div class="pay-for-me-details-shopping">${msg.details.description.replace(/\\n/g, '<br>')}</div>`; } const statusText = isPaid ? '已代付' : (msg.side === 'sent' ? '等待对方代付' : '请为我代付'); div.innerHTML = `<div class="pay-for-me-header"><div class="pay-for-me-icon">${iconHtml}</div><div class="pay-for-me-text"><div class="title">${msg.text}</div><div class="amount">¥ ${msg.details.amount || '0.00'}</div></div></div>${detailsHtml ? `<div class="pay-for-me-details-container">${detailsHtml}</div>` : ''}<div class="pay-for-me-footer"><span>${footerText}</span><span class="status">${statusText}</span></div>`;}
+                else { switch(msg.type) { case 'photo': const urlOrKey = msg.text; const isSticker = typeof urlOrKey === 'string' && !urlOrKey.startsWith('indexeddb:') && stickers.some(sticker => sticker.url === urlOrKey); if (isSticker) { div.dataset.isSticker = "true"; } const img = document.createElement('img'); img.alt = "photo"; setImageSrc(img, urlOrKey); div.appendChild(img); break; case 'photo-description': const descriptionTextContent = msg.text.trim(); if (descriptionTextContent) { const textContentDiv = document.createElement('div'); textContentDiv.className = 'text-overlay-content'; textContentDiv.textContent = descriptionTextContent; div.appendChild(textContentDiv); } else { div.textContent = `[图片描述卡片，无内容]`; } break; case 'voice': const duration = Math.max(1, Math.ceil(msg.text.length / 5)); div.innerHTML = `<details class="voice-details"><summary><div class="voice-icon"></div><div class="voice-duration">${duration}"</div></summary><div class="voice-content">${msg.text}</div></details>`; break; case 'video': const videoId = `video-${msg.id}`; div.innerHTML = `<div class="message-video-description" id="${videoId}" data-text="${msg.text}"><div class="video-thumbnail"><div class="video-text-container"></div><div class="spacer"></div><div class="video-progress-area"><div class="video-progress-bar-container"><div class="video-progress-bar-fill"></div></div><div class="moving-decoration"></div></div></div><div class="play-button-overlay"><div class="play-icon"></div></div></div>`; break; } }
+
+                if (['text', 'voice'].includes(msg.type)) {
+                     const userFontSettings = fontSettings[settingsKey]; if (userFontSettings) { const fontCss = getFontFamilyCss(userFontSettings); const innerTextElements = div.querySelectorAll('.reply-text, .single-line-text, .quoted-sender, .quoted-text, .voice-details'); innerTextElements.forEach(el => { if (fontCss !== 'inherit') el.style.fontFamily = fontCss; }); const textColor = userFontSettings.textColor; if (textColor && textColor !== 'default') { div.style.color = textColor + ' !important'; } }
+                }
+
+                if (msg.type === 'text' && msg.text === '邀请你进行视频通话') { div.classList.add('clickable-call-invite'); div.addEventListener('click', () => showCallingUI({ mode: 'incoming', callerName: msg.sender || chatState.chatName, avatarUrl: contactInfo.avatarUrl, onAccept: () => { addMessage({ type: 'system', side: 'system', text: '你接通了通话。'}); }, onDecline: () => { addMessage({ type: 'system', side: 'system', text: '你拒接了通话。'}); } })); }
+                
+                if (msg.showFailIcon) { 
+                    const failIcon = document.createElement('div'); 
+                    failIcon.className = 'fail-icon'; 
+                    failIcon.textContent = '!'; 
+                    contentRow.appendChild(failIcon); 
+                } 
+                
+                mainContentWrapper.appendChild(div);
+                mainContentAndNameWrapper.appendChild(mainContentWrapper);
+                contentRow.appendChild(mainContentAndNameWrapper);
+                wrapper.appendChild(contentRow);
+            }
+            return wrapper;
+        }
+
+        // 【【【 新代码块结束 】】】
         const addMessageToDOM = (msg) => {
     // 【【【上面那整个 <style> 处理代码块已被彻底删除】】】
 
