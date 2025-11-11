@@ -4181,6 +4181,40 @@ input:checked + .slider:before {
     background: rgba(255, 255, 255, 0.2);
 }
 /* --- END: 新增群聊账户切换按钮样式 --- */
+/* --- 新增：手机框架隐藏模式样式 (V3 - 修复内容圆角) --- */
+        body.frame-hidden .phone {
+            width: 100vw;
+            height: 100vh;
+            max-width: none;
+            max-height: none;
+        }
+
+        body.frame-hidden .screen {
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        body.frame-hidden .screen::before {
+            display: none;
+        }
+        
+        /* ** 新增的核心修复：移除内部App容器的圆角 ** */
+        body.frame-hidden .app-container {
+            border-radius: 0;
+        }
+
+        /* 核心修复：隐藏状态栏和刘海 */
+        body.frame-hidden .status-bar {
+            display: none;
+        }
+
+        /* 核心修复：移除因隐藏状态栏而产生的多余顶部内边距 */
+        body.frame-hidden .page {
+            padding-top: 0 !important;
+        }
+        /* --- 新增样式结束 --- */
+        
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -4778,6 +4812,7 @@ input:checked + .slider:before {
                             <div class="form-group" style="flex-direction: row; gap: 10px; padding-bottom: 15px;">
                                 <button id="export-chat-btn" class="modal-button secondary" style="margin: 0;">导出聊天记录</button>
                                 <button id="import-chat-btn" class="modal-button secondary" style="margin: 0;">导入聊天记录</button>
+                                <button id="view-history-branches-btn" class="modal-button secondary" style="margin: 0;">回溯历史</button>
                             </div>
                         </div>
                         <div class="form-section danger-zone">
@@ -4837,6 +4872,24 @@ input:checked + .slider:before {
                                 </div>
                                 <p class="form-hint">从下拉菜单中选择一个已保存的字体以应用，或添加新字体。</p>
                             </div>
+                        </div>
+                         <!-- ******** 从这里开始插入新代码 ******** -->
+                        <div class="form-section">
+                            <h3>手机框架</h3>
+                            <div class="form-group-toggle">
+                                <label for="toggle-phone-frame" class="toggle-label">显示手机外壳与边框</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-phone-frame">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <!-- ******** 新代码到此结束 ******** -->
+
+                        <div class="form-section">
+                            <h3>主页图标</h3>
+                            <div id="home-icon-settings-container"></div>
+                            <p class="form-hint" style="padding: 0 15px 15px;">为指定功能设置图标。留空以使用默认图标。</p>
                         </div>
                         <div class="form-section">
                             <h3>主页图标</h3>
@@ -7829,7 +7882,12 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
         }
 
         function initializeFromStorage(chatId) {
-            chatState.messages = loadFromLocalStorage(`conversation_${chatId}`, []);
+            const fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+            const messagesToLoad = 40;
+
+            // 核心修改：只截取最后 40 条消息用于初次显示
+            chatState.messages = fullHistory.slice(-messagesToLoad);
+
             if (chatState.messages.length > 0) {
                 simulatedCurrentTime = chatState.messages[chatState.messages.length - 1].timestamp;
             } else {
@@ -7846,6 +7904,54 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
             loadPersonalizationSettings(); loadAutoReplySettings(); 
             reRenderMessages();
         }
+let isLoadingMore = false; // 添加一个加载锁，防止重复触发
+
+        async function loadMoreMessages() {
+            if (isLoadingMore) return; // 如果正在加载，则直接返回
+
+            const chatId = conversationManager.getCurrentChatId();
+            if (!chatId) return;
+
+            const fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+            const currentlyLoadedCount = chatState.messages.length;
+
+            if (currentlyLoadedCount >= fullHistory.length) {
+                console.log("All messages loaded.");
+                return; // 所有消息都已加载
+            }
+            
+            isLoadingMore = true; // 上锁
+
+            const messagesToLoad = 40;
+            const nextMessagesIndex = Math.max(0, fullHistory.length - currentlyLoadedCount - messagesToLoad);
+            const newMessages = fullHistory.slice(nextMessagesIndex, fullHistory.length - currentlyLoadedCount);
+
+            // 关键：在添加新消息前，记录当前的滚动高度
+            const oldScrollHeight = messagesContainer.scrollHeight;
+
+            // 将旧消息添加到当前消息列表的开头
+            chatState.messages = [...newMessages, ...chatState.messages];
+            
+            // 重新渲染所有消息
+            reRenderMessages();
+            
+            // 关键：渲染后，计算新旧高度差，并恢复滚动位置，使用户感觉不到跳动
+            const newScrollHeight = messagesContainer.scrollHeight;
+            messagesContainer.scrollTop = newScrollHeight - oldScrollHeight;
+
+            // 模拟一点延迟，防止快速滚动时连续触发
+            setTimeout(() => {
+                isLoadingMore = false; // 解锁
+            }, 300);
+        }
+
+        // 为消息容器添加滚动事件监听
+        messagesContainer.addEventListener('scroll', () => {
+            // 当滚动到最顶部时，触发加载更多
+            if (messagesContainer.scrollTop === 0) {
+                loadMoreMessages();
+            }
+        });
 
         const formatTimestamp = (timestamp) => {
             const date = new Date(timestamp);
@@ -9649,6 +9755,74 @@ Okay, that's all the context and rules. Now, generate your full response.
 
             // --- END: NEW AND CORRECT REGENERATE LOGIC (Performance Optimized) ---
         }
+        async function regenerateFromMessage(messageId) {
+            const clickedIndex = chatState.messages.findIndex(m => m.id === messageId);
+            if (clickedIndex === -1) {
+                await customAlert('错误：找不到目标消息。');
+                return;
+            }
+
+            const clickedMessage = chatState.messages[clickedIndex];
+            
+            let spliceIndex;
+            let branchPointId;
+            let branchMessages;
+
+            if (clickedMessage.side === 'sent') {
+                // 如果点击的是【用户自己】的消息，则意图是重新生成AI对【这条消息】的回复。
+                // 因此，删除这条消息之后的所有内容。
+                spliceIndex = clickedIndex + 1;
+                branchPointId = clickedMessage.id;
+            } else { // side === 'received'
+                // 如果点击的是【AI】的消息，则意图是保留这条消息之前的所有内容（包括同一轮的其他AI消息），
+                // 并从【这条消息】开始重新生成。
+                // 因此，删除这条消息及之后的所有内容。
+                spliceIndex = clickedIndex;
+                branchPointId = clickedIndex > 0 ? chatState.messages[clickedIndex - 1].id : 'root';
+            }
+
+            // 检查是否有内容可供分支和删除
+            if (spliceIndex >= chatState.messages.length) {
+                 await customAlert('这是最后一条消息，无需从此重新生成。');
+                 return;
+            }
+            
+            // **核心逻辑：保存即将被覆盖的当前时间线**
+            // 我们将从 spliceIndex 开始的整个“尾巴”保存为一个分支。
+            const messagesToBranch = chatState.messages.slice(spliceIndex);
+            
+            if (messagesToBranch.length > 0) {
+                const chatId = conversationManager.getCurrentChatId();
+                const branchHistoryKey = `chat_branches_${chatId}`;
+                let branches = loadFromLocalStorage(branchHistoryKey, []);
+
+                // 使用即将被截断的主线作为新分支的完整内容快照
+                const fullConversationToBranch = [...chatState.messages]; 
+                
+                const lastMessage = fullConversationToBranch[fullConversationToBranch.length - 1];
+                const previewText = lastMessage ? (lastMessage.text || `[${lastMessage.type}]`).substring(0, 20) + '...' : '空分支';
+
+                const newBranch = {
+                    id: `branch_${Date.now()}`,
+                    branchedFromId: branchPointId,
+                    timestamp: Date.now(),
+                    messages: fullConversationToBranch, // 保存完整的对话快照
+                    preview: previewText
+                };
+                branches.unshift(newBranch);
+                if (branches.length > 20) { branches = branches.slice(0, 20); }
+                saveToLocalStorage(branchHistoryKey, branches);
+                console.log(`Saved a new branch from current timeline, forked from ${branchPointId}.`);
+            }
+
+            // **执行删除操作**
+            chatState.messages.splice(spliceIndex);
+
+            // **触发AI**
+            reRenderMessages();
+            saveConversation();
+            triggerAIContinuation(true);
+        }
         async function handleOutgoingCallAttempt(callId) {
             // 这个函数现在只负责请求API，不再处理UI和错误弹窗
             try {
@@ -11026,7 +11200,19 @@ You were receiving a video call from {{user}}, but they hung up before you could
 const reRenderMessages = () => {
     // 1. 清空容器
     messagesContainer.innerHTML = '';
+
+    // --- 新增：检查是否还有更多消息可加载 ---
+    const chatId = conversationManager.getCurrentChatId();
+    if (chatId) {
+        const fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+        if (chatState.messages.length < fullHistory.length) {
+            // 如果当前显示的消息数小于总数，则在顶部添加“加载更多”的提示
+            messagesContainer.innerHTML = '<div style="text-align: center; color: #aaa; font-size: 12px; padding: 10px 0;">向上滚动加载更多记录</div>';
+        }
+    }
+
     const TIME_GAP = 3 * 60 * 1000;
+// ... (函数剩余部分)
 
     // 2. 确保消息按时间排序
     chatState.messages.sort((a, b) => a.timestamp - b.timestamp);
@@ -11374,9 +11560,9 @@ const showContextMenu = (event, messageId) => {
             hideContextMenu(); const message = chatState.messages.find(m => m.id === messageId); if (!message) return;
             let menuItems = [];
             if (message.side === 'sent') { 
-                menuItems = [ { label: '引用', action: 'quote' }, { label: '撤回', action: 'recall' }, { label: '编辑', action: 'edit' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
+                menuItems = [ { label: '引用', action: 'quote' }, { label: '撤回', action: 'recall' }, { label: '编辑', action: 'edit' }, { label: '从此处重新生成', action: 'regenerate_from' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
             } else { 
-                menuItems = [ { label: '引用', action: 'quote' }, { label: '编辑', action: 'edit' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
+                menuItems = [ { label: '引用', action: 'quote' }, { label: '编辑', action: 'edit' }, { label: '从此处重新生成', action: 'regenerate_from' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
                 if (contactInfo.isGroup) { menuItems.unshift({ label: '@ Ta', action: 'at' }); } 
             }
             messageContextMenu.innerHTML = ''; menuItems.forEach(item => { const div = document.createElement('div'); div.className = 'context-menu-item'; div.textContent = item.label; div.dataset.action = item.action; messageContextMenu.appendChild(div); });
@@ -11390,6 +11576,9 @@ const showContextMenu = (event, messageId) => {
         switch(action) {
             case 'quote': startReply(messageId); break;
             case 'recall': recallMessage(messageId); break;
+            case 'regenerate_from':
+                regenerateFromMessage(messageId);
+                break;
             case 'edit':
                 switch (msgToActOn.type) {
                     case 'text':
@@ -12041,7 +12230,15 @@ elements.userPersonaSelect.innerHTML = '<option value="无">无</option>';
                 disbandBtn.textContent = (relationship.groupStatus === 'disbanded') ? '恢复群聊' : '解散群聊';
                 disbandBtn.classList.toggle('danger', relationship.groupStatus !== 'disbanded');
             }
-            
+            // --- 新增：为回溯历史按钮绑定事件 ---
+            const viewBranchesBtn = document.getElementById('view-history-branches-btn');
+            // 先移除旧的监听器，防止重复绑定
+            const newBtn = viewBranchesBtn.cloneNode(true);
+            viewBranchesBtn.parentNode.replaceChild(newBtn, viewBranchesBtn);
+            // 在新的克隆按钮上添加事件
+            newBtn.addEventListener('click', () => {
+                showBranchHistoryModal(chatState.chatId);
+            });
             navigateTo('chat-info');
         }
 function enterMultiSelectMode(initialMessageId) { 
@@ -12705,7 +12902,215 @@ async function handleProactiveAIMessage(targetChatId, senderName, line) {
                 }
             }
         }
+async function showBranchHistoryModal(chatId) {
+            const branchHistoryKey = `chat_branches_${chatId}`;
+            let branches = loadFromLocalStorage(branchHistoryKey, []);
 
+            // **1. 新增：自动清理7天前未命名的分支**
+            const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            const cleanedBranches = branches.filter(branch => {
+                // 如果分支有名字，就保留
+                if (branch.name) {
+                    return true;
+                }
+                // 如果分支没有名字，但时间戳在7天内，也保留
+                if (branch.timestamp > sevenDaysAgo) {
+                    return true;
+                }
+                // 其他情况（没有名字且超过7天）将被过滤掉
+                return false;
+            });
+
+            // 如果清理后数量有变化，则更新存储
+            if (cleanedBranches.length !== branches.length) {
+                branches = cleanedBranches;
+                saveToLocalStorage(branchHistoryKey, branches);
+            }
+
+            if (branches.length === 0) {
+                await customAlert('当前聊天没有可回溯的历史分支。');
+                return;
+            }
+
+            const branchesHtml = branches.map(branch => {
+                // **2. 新增：优先显示命名，否则显示时间**
+                const displayName = branch.name ? escapeHtml(branch.name) : new Date(branch.timestamp).toLocaleString();
+                const previewText = branch.preview || '(无预览)';
+                return `
+                    <div style="padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 500;">${displayName}</div>
+                            <div style="font-size: 13px; color: #888;">${previewText}</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button class="modal-button secondary" data-action="view" data-branch-id="${branch.id}" style="padding: 5px 10px; font-size: 13px;">查看</button>
+                            <button class="modal-button secondary" data-action="rename" data-branch-id="${branch.id}" style="padding: 5px 10px; font-size: 13px;">命名</button>
+                            <button class="modal-button danger" data-action="delete" data-branch-id="${branch.id}" style="padding: 5px 10px; font-size: 13px;">删除</button>
+                            <button class="modal-button primary" data-action="restore" data-branch-id="${branch.id}" style="padding: 5px 10px; font-size: 13px;">恢复</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const result = await showCustomModal({
+                title: '回溯历史',
+                html: `<p style="font-size: 13px; color: #888; text-align: center; margin: -10px 0 15px 0; padding: 0 15px;">未命名的分支将在7天后自动清理。</p><div style="max-height: 60vh; overflow-y: auto;">${branchesHtml}</div>`,
+                showCloseButton: true,
+                onRender: (modalDOM, closeModal) => {
+
+                    modalDOM.addEventListener('click', async (e) => {
+                        const button = e.target.closest('button[data-action]');
+                        if (!button) return;
+
+                        const action = button.dataset.action;
+                        const branchId = button.dataset.branchId;
+
+                        if (action === 'view') {
+                            viewBranchDetail(chatId, branchId);
+                        } else if (action === 'restore') {
+                            closeModal(); 
+                            await restoreBranch(chatId, branchId);
+                        } else if (action === 'delete') {
+                            await deleteBranch(chatId, branchId, closeModal);
+                        } else if (action === 'rename') {
+                            // **4. 新增：处理命名按钮点击**
+                            await renameBranch(chatId, branchId, closeModal);
+                        }
+                    });
+                }
+            });
+        }
+
+        async function viewBranchDetail(chatId, branchId) {
+            const branches = loadFromLocalStorage(`chat_branches_${chatId}`, []);
+            const branch = branches.find(b => b.id === branchId);
+            if (!branch) return;
+
+            const messagesHtml = branch.messages.map(msg => {
+                const sender = msg.side === 'sent' ? '你' : (msg.sender || chatState.chatName);
+                const content = escapeHtml(msg.text || `[${msg.type}]`);
+                return `<div style="margin-bottom: 8px;"><strong style="color: ${msg.side === 'sent' ? '#28a745' : '#333'}">${sender}:</strong> ${content}</div>`;
+            }).join('');
+
+            await showCustomModal({
+                title: '分支详情',
+                html: `<div style="max-height: 50vh; overflow-y: auto; text-align: left; background: #f9f9f9; border-radius: 8px; padding: 10px;">${messagesHtml}</div>`,
+                showCloseButton: true,
+                buttons: [{ text: '关闭', value: 'close', class: 'secondary' }]
+            });
+        }
+        
+        async function restoreBranch(chatId, branchId) {
+            const confirmed = await customConfirm('恢复此分支将覆盖当前时间线，而当前时间线将被存为一个新的分支。确定要恢复吗？');
+            if (!confirmed) return;
+
+            const branchHistoryKey = `chat_branches_${chatId}`;
+            let branches = loadFromLocalStorage(branchHistoryKey, []);
+            const branchToRestoreIndex = branches.findIndex(b => b.id === branchId);
+            if (branchToRestoreIndex === -1) {
+                await customAlert('恢复失败：找不到该历史分支。');
+                return;
+            }
+
+            const branchToRestore = branches[branchToRestoreIndex];
+            const mainConversationKey = `conversation_${chatId}`;
+            let currentMainMessages = loadFromLocalStorage(mainConversationKey, []);
+
+            // **1. 自动保存当前时间线为一个新分支 (避免数据丢失)**
+            if (currentMainMessages.length > 0) {
+                // --- 新增：提前生成预览文本 ---
+                const lastMessage = currentMainMessages[currentMainMessages.length - 1];
+                const previewText = lastMessage ? (lastMessage.text || `[${lastMessage.type}]`).substring(0, 20) + '...' : '空分支';
+
+                const newBranchToSave = {
+                    id: `branch_${Date.now()}`,
+                    // 新分支的分叉点，逻辑上是我们要恢复的老分支的分叉点
+                    branchedFromId: branchToRestore.branchedFromId, 
+                    timestamp: Date.now(),
+                    messages: currentMainMessages, // 保存完整的当前对话
+                    preview: previewText // 将预览文本一并存入
+                };
+                branches.unshift(newBranchToSave); // 存入历史
+            }
+
+            // **2. 彻底替换主线**
+            // 直接使用分支的完整消息快照作为新的主线
+            const restoredMessages = branchToRestore.messages;
+            saveToLocalStorage(mainConversationKey, restoredMessages);
+
+            // **3. 清理工作**
+            // 从历史记录中移除已被恢复的分支
+            branches.splice(branches.findIndex(b => b.id === branchId), 1);
+            // 限制分支总数并保存
+            if (branches.length > 20) {
+                branches = branches.slice(0, 20);
+            }
+            saveToLocalStorage(branchHistoryKey, branches);
+
+            await customAlert('历史分支已成功恢复！即将刷新聊天界面。');
+            
+            // 重新打开聊天以加载全新的主线
+            open(chatId);
+        }
+        async function renameBranch(chatId, branchId, closeModalCallback) {
+            const branchHistoryKey = `chat_branches_${chatId}`;
+            let branches = loadFromLocalStorage(branchHistoryKey, []);
+            const branch = branches.find(b => b.id === branchId);
+            if (!branch) {
+                await customAlert('错误：找不到该分支。');
+                return;
+            }
+            
+            const newName = await showContentInputModal({
+                title: '命名分支',
+                placeholder: '输入一个方便记忆的名称...',
+                value: branch.name || ''
+            });
+
+            // 如果用户点击了取消，newName会是null
+            if (newName !== null) {
+                const trimmedName = newName.trim();
+                
+                if (trimmedName) {
+                    branch.name = trimmedName; // 更新或添加名称
+                } else {
+                    delete branch.name; // 如果输入为空，则删除名称属性
+                }
+                
+                saveToLocalStorage(branchHistoryKey, branches);
+                await customAlert('命名已更新！');
+                
+                // 关闭并重新打开列表以刷新显示
+                if (closeModalCallback) closeModalCallback();
+                setTimeout(() => showBranchHistoryModal(chatId), 100);
+            }
+        }
+        async function deleteBranch(chatId, branchId, closeModalCallback) {
+            const confirmed = await customConfirm('确定要永久删除这个历史分支吗？此操作不可恢复。');
+            if (!confirmed) return;
+
+            const branchHistoryKey = `chat_branches_${chatId}`;
+            let branches = loadFromLocalStorage(branchHistoryKey, []);
+            const branchIndex = branches.findIndex(b => b.id === branchId);
+
+            if (branchIndex !== -1) {
+                branches.splice(branchIndex, 1);
+                saveToLocalStorage(branchHistoryKey, branches);
+                await customAlert('分支已删除。');
+                
+                // 关闭旧的模态框
+                if(closeModalCallback) closeModalCallback();
+                
+                // 重新打开模态框以刷新列表
+                // 使用 setTimeout 确保旧的模态框完全关闭后再打开新的
+                setTimeout(() => {
+                    showBranchHistoryModal(chatId);
+                }, 100);
+
+            } else {
+                await customAlert('删除失败：找不到该分支。');
+            }
+        }
         return { open, getCurrentChatId, updateHeaderTitle, reRenderMessages, injectCustomBubbleStyles: publicInjectCustomBubbleStyles, showCustomModal, addMessage, renderGroupMemberList, handleSendMessageAttempt, showContentInputModal, regenerateLastResponse, customConfirm, makeDataPortable, prepareApiPayload, customAlert, handleProactiveAIMessage, processAIResponseLine, executeBackgroundUpdatesAndCleanText, showBubbleSettingsModal };
 })();
 async function showGroupPersonaEditor(persona = {}, isEditing = false) {
@@ -14173,9 +14578,17 @@ const isAuthor = post.userName === currentPersonaName;
             
             const listContainer = document.getElementById('dynamics-char-list');
             listContainer.innerHTML = '';
-            const characters = getAllUniqueCharacters(); // 这个函数现在在全局，可以安全调用
+
+            // --- 从这里开始是核心修改 ---
+            const allCharacters = getAllUniqueCharacters(); // 1. 先获取所有实体
+            const userPersonaNames = userPersonas.map(p => p.name); // 2. 获取您所有用户人设的名称列表
+            
+            // 3. 过滤掉 '{{user}}' 和所有用户人设名称
+            const characters = allCharacters.filter(char => char !== '{{user}}' && !userPersonaNames.includes(char));
+            // --- 核心修改结束 ---
 
             if (characters.length === 0) {
+//... (函数剩余部分)
                 listContainer.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">没有可以设置动态的角色</p>';
                 return;
             }
@@ -14676,7 +15089,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 iconUrls: {},
                 globalChatBgUrl: '',
                 homeBgUrl: '',
-                regexReplacements: []
+                regexReplacements: [],
+                isFrameHidden: false // <-- 新增这一行，默认不隐藏
             });
             savedFonts = appearanceSettings.savedFonts || [];
             activeFontName = appearanceSettings.activeFontName || '默认';
@@ -14688,8 +15102,14 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         }
         
         function applySettings() {
+    // --- 从这里开始插入新代码 ---
+    // 应用框架显示/隐藏状态
+    document.body.classList.toggle('frame-hidden', appearanceSettings.isFrameHidden);
+    // --- 新代码到此结束 ---
+
     const screenElement = document.querySelector('.screen');
     const fontSize = appearanceSettings.globalFontSize;
+// ...函数剩余部分
     if (fontSize && !isNaN(fontSize)) {
         screenElement.style.fontSize = `${fontSize}px`;
     } else {
@@ -14748,6 +15168,17 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         function renderPage() {
             loadSettings();
             document.getElementById('global-font-size').value = appearanceSettings.globalFontSize || '';
+
+            // --- 从这里开始插入新代码 ---
+            const frameToggle = document.getElementById('toggle-phone-frame');
+            if (frameToggle) {
+                // 如果 isFrameHidden 是 true (隐藏), 开关应为 OFF (unchecked).
+                // 如果 isFrameHidden 是 false (显示), 开关应为 ON (checked).
+                frameToggle.checked = !appearanceSettings.isFrameHidden;
+            }
+            // --- 新代码到此结束 ---
+
+// ...函数剩余部分
             
             const fontSelect = document.getElementById('global-font-select');
             fontSelect.innerHTML = '<option value="默认">默认字体</option>';
@@ -14956,7 +15387,21 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         function init() {
             loadSettings();
             applySettings();
+
+            // --- 从这里开始插入新代码 ---
+            const frameToggle = document.getElementById('toggle-phone-frame');
+            if (frameToggle) {
+                frameToggle.addEventListener('change', () => {
+                    // 开关的标签是“显示”，所以如果它被勾选，isFrameHidden 应该是 false
+                    appearanceSettings.isFrameHidden = !frameToggle.checked;
+                    saveSettings();
+                    applySettings();
+                });
+            }
+            // --- 新代码到此结束 ---
+
              // START: 新增正则替换的事件监听
+// ...
             document.getElementById('regex-add-btn').addEventListener('click', () => {
                 const name = document.getElementById('regex-name').value.trim();
                 const pattern = document.getElementById('regex-pattern').value.trim();
@@ -15989,6 +16434,7 @@ async function handleRemoveMember() {
             saveToLocalStorage(`conversation_${chatId}`, []);
             conversationManager.open(chatId);
             navigateTo('chat-info');
+            
             alert('聊天记录已清空。');
         }
     });
@@ -18290,6 +18736,7 @@ function renderDisplay() {
             const balance = isUncountable ? 0 : parseFloat(balanceContent); // 如果不可数，内部计算按0处理，避免NaN
             const isNegative = balance < 0;
             const balanceDisplayValue = isUncountable ? "不可计数" : balance.toLocaleString("en-US", { minimumFractionDigits: 2 });
+            const balanceTitleAttribute = isUncountable ? 'title="总资产已超过百亿，无法精确统计"' : ''; // <--- 新增的这一行
             
             let sourcesHTML = '';
             accountNode.querySelectorAll('sources source').forEach(source => {
@@ -18666,84 +19113,41 @@ async function handleAccountReset() {
 
 **[ULTIMATE, UNBREAKABLE FINANCIAL LAW]**
 
-**1. WEALTH ASSESSMENT (MANDATORY FIRST STEP):** Analyze the character's persona.
-    *   If the persona describes **immense wealth** (e.g., "首富", "财阀", "顶级富豪"): Follow the **"WEALTHY CHARACTER"** rules.
-    *   Otherwise: Follow the **"NORMAL CHARACTER"** rule.
+**1. WEALTH ASSESSMENT (MANDATORY FIRST STEP):** Analyze the character's persona and classify them into one of three tiers.
+    *   **TIER 1: SUPER-WEALTHY (百亿级 - RARE):** If the persona explicitly mentions extreme wealth like "百亿富豪", "全球首富", "财阀继承人". Follow the **"SUPER-WEALTHY"** rules. This is a very rare case.
+    *   **TIER 2: WEALTHY (富裕级 - COMMON):** If the persona describes general wealth, such as "总裁", "董事长", "富二代", "家境优渥". Follow the **"WEALTHY"** rules.
+    *   **TIER 3: NORMAL (普通级):** All other characters. Follow the **"NORMAL"** rule.
 
-**2. "WEALTHY CHARACTER" FINANCIAL MODEL (ABSOLUTE & UNBREAKABLE RULE):**
-    You MUST adopt the following Hybrid Balance model to portray wealth realistically:
+**2. "SUPER-WEALTHY" FINANCIAL MODEL (Over 10 Billion - STRICTLY FOLLOW):**
+    You MUST adopt the following model to portray unimaginable wealth:
+    *   **A. Bank Card (银行卡):** This account **MUST** use the exact text **"不可计数"**. It represents your core, immeasurable wealth (this implies your total assets exceed 10 billion).
+    *   **B. ALL OTHER Sources (支付宝, 微信钱包, 基金, 股票, 其他):** These accounts **MUST** have a specific, very large, but believable numerical value (e.g., "87654321.09"). They are your high-liquidity assets.
+    *   **C. Total Balance (\`<balance>\`):** Because your Bank Card is "不可计数", your total balance **MUST** also be the exact text **"不可计数"**.
+    *   **D. Transactions:** Your generated transactions **MUST be a mix of extreme luxury and high-quality daily life**. (e.g., purchasing a yacht, donating to charity, but also dining at expensive restaurants or buying designer clothes). Every transaction MUST have a numerical amount.
 
-    *   **A. Daily Spending Wallets (支付宝, 微信钱包):**
-        *   These two accounts **MUST** have a specific, large, but believable numerical value (e.g., "123456.78"). They represent your readily available cash for daily (luxury) spending.
-        *   **You are STRICTLY FORBIDDEN from setting these two sources to "不可计数".**
+**3. "WEALTHY" FINANCIAL MODEL (Rich but Countable - STRICTLY FOLLOW):**
+    *   **A. ALL ACCOUNTS ARE NUMERICAL:** You are **STRICTLY FORBIDDEN** from using "不可计数" for this tier. Every single source (\`支付宝\`, \`微信钱包\`, \`银行卡\`, etc.) and the total \`<balance>\` **MUST** have a specific, large numerical value.
+    *   **B. CALCULATION ACCURACY:** The final total balance MUST be the precise sum of all source amounts.
+    *   **C. Transactions:** Your transactions should reflect a high-end lifestyle (luxury goods, fine dining, investments), but perhaps on a smaller scale than the super-wealthy tier. Every transaction MUST have a numerical amount.
 
-    *   **B. Primary & Investment Assets (银行卡, 基金, 股票, 其他):**
-        *   These accounts represent your vast, underlying wealth. To reflect this, they **MUST** use the exact text **"不可计数"**.
-        *   This signifies that their value is too large or complex to be easily quantified.
-
-    *   **C. Total Balance (\`<balance>\`):**
-        *   Because at least one of your primary assets is "不可计数", your total balance **MUST** also be set to the exact text **"不可计数"**.
-
-    *   **D. Transactions & Amounts (ABSOLUTE LAW - REALISM OVER EVERYTHING):**
-        *   Every single transaction item (\`<item>\`) **MUST ALWAYS** have a specific, numerical \`amount\` attribute. **You are STRICTLY FORBIDDEN from using "不可计数" for an individual transaction.**
-        *   **CRITICAL BEHAVIORAL SHIFT:** Your generated transactions **MUST be a realistic mix** of both **(A) high-value luxury/investment spending** and **(B) high-quality daily life consumption**. A wealthy person still lives a daily life.
-        *   **You MUST include both types of transactions.** Do not generate only one type.
-
-        *   **(A) Luxury & Investment Examples (Large amounts):**
-            *   Buying art, yachts, high-end dining, charity donations, company investments, luxury cars, real estate.
-
-        *   **(B) High-Quality Daily Life Examples (Smaller, frequent amounts):**
-            *   Dining at high-end but not Michelin-star restaurants.
-            *   Purchasing from designer clothing stores.
-            *   Specialty coffee shop visits.
-            *   Premium ride-hailing services (e.g., Uber Black).
-            *   High-end grocery shopping.
-            *   Gifts for friends or partners.
-
-        *   **The transaction amounts MUST be appropriately scaled** to reflect both the action and your wealthy persona. A coffee should not cost thousands, but it can be more expensive than average.
-
-**3. "NORMAL CHARACTER" RULE:**
+**4. "NORMAL" RULE (For Normal Characters):**
     *   **CALCULATION ACCURACY:** All numbers must be realistic. The final balance MUST be the precise sum of the starting balance and all new transactions. The sum of all source amounts MUST equal the final balance.
-
-    *   **[NEW & CRITICAL] Negative Balance Storytelling Mandate:**
-        If you decide that a source (like "支付宝" or "微信钱包") should have a negative balance, you are REQUIRED to generate a new transaction that logically explains this debt. You MUST choose an appropriate scenario from the library below.
-
+    *   **Negative Balance Storytelling Mandate:** If a source becomes negative, you MUST generate a new transaction that logically explains this debt (e.g., repaying a loan, an automatic bill payment exceeding the balance). You MUST choose a scenario from the library below.
         **DEBT SCENARIO LIBRARY:**
-
-        -   **If "支付宝" becomes negative:** This is caused by an automatic payment for a "花呗" (Huabei) or "借呗" (Jiebei) bill that exceeded the available balance.
-            -   **Required Transaction Example:**
-                \`<item description="花呗账单分期还款" amount="-1500.00" type="支" source="支付宝"><time>09:15</time></item>\`
-
-        -   **If "微信钱包" becomes negative:** This can be caused by repaying a friend, or an automatic payment for a "Pay-Later" service.
-            -   **Required Transaction Example 1 (Repaying a friend):**
-                \`<item description="归还好友'张三'借款" amount="-2000.00" type="支" source="微信钱包"><time>14:30</time></item>\`
-            -   **Required Transaction Example 2 (Pay-Later Service):**
-                \`<item description="多多先用后付账单还款" amount="-500.00" type="支" source="微信钱包"><time>20:00</time></item>\`
-
-        -   **If "股票" or "基金" value drops significantly:** This is caused by a market downturn. The transaction should reflect a loss in value, not a spending event.
-            -   **Required Transaction Example:**
-                \`<item description="股市震荡，基金资产缩水" amount="-10000.00" type="他" source="基金"><time>10:00</time></item>\`
-
-        -   **For any other negative balance scenario:** You can create a transaction for a large, necessary expense like rent or a medical bill.
-            -   **Required Transaction Example:**
-                \`<item description="支付本月房租" amount="-3500.00" type="支" source="银行卡"><time>12:00</time></item>\`
-
-        **You are forbidden from creating a negative balance without a corresponding explanatory transaction from this library.**
+        -   支付宝 negative -> 花呗/借呗还款. Example: \`<item description="花呗账单分期还款" amount="-1500.00" type="支" source="支付宝"><time>09:15</time></item>\`
+        -   微信钱包 negative -> 归还好友借款 or 多多先用后付. Example: \`<item description="归还好友'张三'借款" amount="-2000.00" type="支" source="微信钱包"><time>14:30</time></item>\`
+        -   股票/基金 drop -> 股市震荡. Example: \`<item description="股市震荡，基金资产缩水" amount="-10000.00" type="他" source="基金"><time>10:00</time></item>\`
+        -   Other -> 大额支出如房租/医疗. Example: \`<item description="支付本月房租" amount="-3500.00" type="支" source="银行卡"><time>12:00</time></item>\`
+        **You are forbidden from creating a negative balance without a corresponding explanatory transaction.**
 
 ---
 
 **[TASK INSTRUCTIONS]**
 
-1.  **Assess Wealth Level.**
-2.  **Generate Transactions:** Create at least TEN new transactions that are **appropriate for the character's wealth level**, and **ensure every single one has a numerical amount.**
-
-    **CRITICAL BEHAVIORAL RULE: NO INTERNAL TRANSFERS**
-    You are **STRICTLY FORBIDDEN** from generating internal fund transfers between your own accounts.
-    - **FORBIDDEN EXAMPLES:** "银行卡转入支付宝", "微信钱包提现至银行卡", "从支付宝转出".
-    - **REASON:** These are not real-world consumption or income events and are considered invalid data.
-    - **REQUIREMENT:** All generated transactions MUST be for actual purchases, services received, income (like salary or investment returns), or social interactions (like sending a red packet).
-
-3.  **Update Balances:** Update the \`<balance>\` and all \`<source>\` amounts according to the chosen wealth model.
+1.  **Assess Wealth Tier.**
+2.  **Generate Transactions:** Create at least TEN new transactions appropriate for the character's wealth tier. Every transaction MUST have a numerical amount.
+    **CRITICAL RULE: NO INTERNAL TRANSFERS.** You are **FORBIDDEN** from generating transfers between your own accounts (e.g., "银行卡转入支付宝"). All transactions must be for actual consumption, income, or social interactions.
+3.  **Update Balances:** Update the \`<balance>\` and all \`<source>\` amounts according to the rules for the chosen wealth tier.
 4.  **Language:** Simplified Chinese.
 
 **CURRENT ACCOUNT DATA (FOR REFERENCE ONLY):**
@@ -18757,14 +19161,14 @@ ${currentAccountData.replace('[账户]', '').trim()}
 
 [BALANCE_SOURCES]
 <account>
-    <balance>不可计数</balance>  <!-- For wealthy characters, this must be "不可计数" -->
+    <balance>[Your Calculated Balance OR "不可计数"]</balance>
     <sources>
-        <source name="支付宝" amount="[A LARGE, SPECIFIC NUMBER]" />
-        <source name="微信钱包" amount="[A LARGE, SPECIFIC NUMBER]" />
-        <source name="银行卡" amount="不可计数" />
-        <source name="基金" amount="不可计数" />
-        <source name="股票" amount="不可计数" />
-        <source name="其他" amount="不可计数" />
+        <source name="支付宝" amount="[A Specific Number]" />
+        <source name="微信钱包" amount="[A Specific Number]" />
+        <source name="银行卡" amount="[A Specific Number OR '不可计数']" />
+        <source name="基金" amount="[A Specific Number]" />
+        <source name="股票" amount="[A Specific Number]" />
+        <source name="其他" amount="[A Specific Number]" />
     </sources>
 </account>
 [/BALANCE_SOURCES]
@@ -18772,7 +19176,7 @@ ${currentAccountData.replace('[账户]', '').trim()}
 [NEW_TRANSACTIONS]
 <entry>
     <date>${new Date().toISOString().slice(0, 10)}</date>
-    <!-- MUST INCLUDE AT LEAST TEN REALISTIC, LUXURY-LEVEL <item> TAGS HERE. EACH <item> MUST HAVE A NUMERICAL AMOUNT. -->
+    <!-- MUST INCLUDE AT LEAST TEN REALISTIC <item> TAGS HERE. EACH <item> MUST HAVE A NUMERICAL AMOUNT. -->
 </entry>
 [/NEW_TRANSACTIONS]
 
@@ -18883,7 +19287,7 @@ Your optional message to the user about the update.
                                 <button class="toggle-visibility" id="toggleVisibilityBtn">[隐藏]</button>
                             </div>
                         </div>
-                        <div class="balance-amount ${isNegative ? 'negative' : ''}" id="balanceDisplay" data-balance="${balance}">
+                        <div class="balance-amount ${isNegative ? 'negative' : ''}" id="balanceDisplay" data-balance="${balance}" ${balanceTitleAttribute}>
                             ${balanceDisplayValue}
                         </div>
                         <div class="balance-sources">${sourcesHTML}</div>
