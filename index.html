@@ -4214,6 +4214,54 @@ input:checked + .slider:before {
             padding-top: 0 !important;
         }
         /* --- 新增样式结束 --- */
+        /* --- START: STICKER SIZE FIX (ULTIMATE & FINAL) --- */
+
+/* 1. Rule for Stickers INSIDE the main chat conversation page */
+#page-conversation .message[data-is-sticker="true"] {
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important; 
+    overflow: visible !important; 
+    
+    /* CRITICAL FIX: Set a maximum size for the sticker container */
+    max-width: 80px;  
+    max-height: 80px; 
+}
+
+#page-conversation .message[data-is-sticker="true"] img {
+    /* The image inside will fit within the container */
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 0 !important;
+}
+
+/* 2. Rule for Stickers INSIDE the Moments comments section */
+#tab-content-moments .comment-content-text img {
+    /* Set a specific, smaller size for comment stickers */
+    max-width: 60px;
+    max-height: 60px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* --- END: STICKER SIZE FIX (ULTIMATE & FINAL) --- */
+/* --- START: STICKER POINTER FIX (ULTIMATE & FINAL) --- */
+
+/* 
+ * This is the ultimate override rule.
+ * It says: "For any message bubble that is marked as a sticker,
+ * forcefully remove its ::before and ::after pseudo-elements (which create the pointers)."
+ * The !important ensures this rule has the highest priority and cannot be overridden by other styles.
+*/
+#page-conversation .message[data-is-sticker="true"]::before,
+#page-conversation .message[data-is-sticker="true"]::after {
+    display: none !important;
+}
+
+/* --- END: STICKER POINTER FIX (ULTIMATE & FINAL) --- */
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -4359,15 +4407,25 @@ input:checked + .slider:before {
                                         </div>
                                     </div>
                                     <div class="modal-overlay" id="comment-modal-overlay">
-                                        <div class="modal-box" id="comment-modal">
-                                            <h3 class="modal-title" id="comment-modal-title">评论</h3>
-                                            <textarea class="modal-input" id="comment-input" placeholder="输入评论..."></textarea>
-                                            <div class="modal-buttons">
-                                                <button class="modal-button secondary" id="cancel-comment-btn">取消</button>
-                                                <button class="modal-button primary" id="send-comment-btn">发送</button>
-                                            </div>
-                                        </div>
-                                    </div>
+                    <div class="modal-box" id="comment-modal">
+                        <h3 class="modal-title" id="comment-modal-title">评论</h3>
+                        
+                        <!-- 【【【核心修改在这里】】】 -->
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 24px;">
+                            <textarea class="modal-input" id="comment-input" placeholder="输入评论..." style="margin-bottom: 0; flex-grow: 1; resize: vertical; min-height: 44px;"></textarea>
+                            
+                            <!-- 按钮现在有了更美观的样式 -->
+                            <button id="moments-comment-sticker-btn" style="background-color: #f0f0f0; border: none; width: 44px; height: 44px; border-radius: 8px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s;">
+                                <img src="https://i.postimg.cc/qMXdv4V5/IMG-9900.png" style="width: 30px; height: 30px; display: block;">
+                            </button>
+                        </div>
+
+                        <div class="modal-buttons">
+                            <button class="modal-button secondary" id="cancel-comment-btn">取消</button>
+                            <button class="modal-button primary" id="send-comment-btn">发送</button>
+                        </div>
+                    </div>
+                </div>
                                     <div class="modal-overlay" id="privacy-modal-overlay">
                                         <div class="privacy-modal-wrapper">
                                             <div class="privacy-modal">
@@ -5045,15 +5103,25 @@ input:checked + .slider:before {
                             </div>
                         </div>
                         <div class="modal-overlay" id="comment-modal-overlay">
-                            <div class="modal-box" id="comment-modal">
-                                <h3 class="modal-title" id="comment-modal-title">评论</h3>
-                                <textarea class="modal-input" id="comment-input" placeholder="输入评论..."></textarea>
-                                <div class="modal-buttons">
-                                    <button class="modal-button secondary" id="cancel-comment-btn">取消</button>
-                                    <button class="modal-button primary" id="send-comment-btn">发送</button>
-                                </div>
-                            </div>
+                    <div class="modal-box" id="comment-modal">
+                        <h3 class="modal-title" id="comment-modal-title">评论</h3>
+                        
+                        <!-- 【【【核心修改在这里】】】 -->
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 24px;">
+                            <textarea class="modal-input" id="comment-input" placeholder="输入评论..." style="margin-bottom: 0; flex-grow: 1; resize: vertical; min-height: 44px;"></textarea>
+                            
+                            <!-- 按钮现在有了更美观的样式 -->
+                            <button id="moments-comment-sticker-btn" style="background-color: #f0f0f0; border: none; width: 44px; height: 44px; border-radius: 8px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s;">
+                                <img src="https://i.postimg.cc/qMXdv4V5/IMG-9900.png" style="width: 30px; height: 30px; display: block;">
+                            </button>
                         </div>
+
+                        <div class="modal-buttons">
+                            <button class="modal-button secondary" id="cancel-comment-btn">取消</button>
+                            <button class="modal-button primary" id="send-comment-btn">发送</button>
+                        </div>
+                    </div>
+                </div>
                         <div class="modal-overlay" id="privacy-modal-overlay">
                             <div class="privacy-modal-wrapper">
                                 <div class="privacy-modal">
@@ -5573,7 +5641,7 @@ input:checked + .slider:before {
         }
 
     async function triggerProactiveAI(chatId, senderName, actionType) {
-    console.log(`%c[ULTIMATE DIAGNOSIS]`, 'color: red; font-weight: bold; font-size: 14px;', `
+        console.log(`%c[ULTIMATE DIAGNOSIS]`, 'color: red; font-weight: bold; font-size: 14px;', `
 --------------------------------------------------
   Function triggerProactiveAI CALLED
 --------------------------------------------------
@@ -5582,10 +5650,14 @@ input:checked + .slider:before {
   Sender Name: ${senderName}
   Target Chat ID: ${chatId || 'null (Not a direct message action)'}
 --------------------------------------------------`);
-    let aiResponse;
-    try {
-        let profileIndex = null;
-        let targetChatId = chatId;
+        let aiResponse;
+        try {
+            let stickerNames = 'No stickers available';
+            if (stickers && stickers.length > 0) {
+                stickerNames = stickers.map(s => `"${s.name}"`).join(', ');
+            }
+            let profileIndex = null;
+            let targetChatId = chatId;
         
         // 1. 检查角色是否为 NPC 或 群聊主角
         const isNpc = npcList.includes(senderName); 
@@ -6410,8 +6482,16 @@ Based on the posts above, your persona, and your relationship with the authors, 
      *   **Format:** \`[like_moment: post_id_here]\`
    *   **TO COMMENT or REPLY:** For when you have something to say. Your comment must match your persona.
      *   **CRITICAL:** NO SELF-TALKING. Do not comment on your own posts.
-     *   **To comment on a post:** \`[comment_moment: {"postId":"post_id_here", "content":"Your thoughtful, in-character comment."}]\`
-     *   **To reply to a comment:** \`[comment_moment: {"postId":"post_id_here", "content":"Your reply.", "replyTo":"username_here"}]\`
+     *   **YOUR OPTIONS FOR "content":** You have TWO choices for the comment's content:
+         1.  **A line of text:** For expressing complex thoughts, opinions, or questions.
+         2.  **A sticker command:** For simple, direct emotional reactions (e.g., approval, laughter, surprise). The format MUST be \`[sticker:Sticker Name]\`.
+     *   **AVAILABLE STICKERS:** [${stickerNames}]
+     *   **HOW TO CHOOSE:** If your reaction is simple like "Cool!" or "Haha", a sticker is better. If you have more to say, use text.
+
+     *   **FORMATS:**
+         *   **To comment on a post (with text):** \`[comment_moment: {"postId":"post_id_here", "content":"Your thoughtful, in-character comment."}]\`
+         *   **To comment on a post (with a sticker):** \`[comment_moment: {"postId":"post_id_here", "content":"[sticker:开心]"}]\`
+         *   **To reply to a comment (with text):** \`[comment_moment: {"postId":"post_id_here", "content":"Your reply.", "replyTo":"username_here"}]\`
 
 **2. PRIVATE MESSAGE IMPULSE (Use Sparingly)**
    *   **Use Case:** Only when a post makes you want to start a **private, one-on-one conversation** that is not suitable for a public comment section.
@@ -6573,7 +6653,7 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                 }
 
                 const cleanedResponse = aiResponse.trim();
-                const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message):\s*([\s\S]+?)\]/g;
+                const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message):\s*({[\s\S]*?})\]/g;
                 let match;
                 let commandsFound = 0;
 
@@ -6587,12 +6667,34 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                     if (command === 'like_moment') {
                         momentsManager.handleInteractionFromAI(senderName, 'like', { postId: value.trim() });
                     } else if (command === 'comment_moment') {
-                        try {
-                            const commentData = JSON.parse(value);
+                    try {
+                        // 【【【最终修复：使用更强大的正则表达式，能处理所有情况】】】
+                        const postIdMatch = value.match(/"postId"\s*:\s*"([^"]+)"/);
+                        
+                        // 这个新的正则表达式可以捕获 "content":"..." 中间的所有内容，直到遇到下一个引号或右花括号
+                        const contentMatch = value.match(/"content"\s*:\s*"((?:\\"|[^"])*)"/);
+                        
+                        const replyToMatch = value.match(/"replyTo"\s*:\s*"([^"]+)"/);
+
+                        if (postIdMatch && postIdMatch[1] && contentMatch && contentMatch[1]) {
+                            const commentData = {
+                                postId: postIdMatch[1],
+                                // 关键：对提取出的内容进行一次JSON字符串的反转义，
+                                // 这样 "无语？\\n[sticker:..]" 就会变回 "无语？\n[sticker:..]"
+                                content: JSON.parse(`"${contentMatch[1]}"`)
+                            };
+                            
+                            if (replyToMatch && replyToMatch[1]) {
+                                commentData.replyTo = replyToMatch[1];
+                            }
+
                             momentsManager.handleInteractionFromAI(senderName, 'comment', commentData);
-                        } catch (e) {
-                            console.error(`[诊断日志] 角色 "${senderName}": 解析评论指令失败`, e, value);
+                        } else {
+                            throw new Error("AI returned a comment with invalid or missing postId/content fields.");
                         }
+                    } catch (e) {
+                        console.error(`[诊断日志] 角色 "${senderName}": 解析评论指令失败`, e, value);
+                    }
                     } else if (command === 'post_moment') {
                         try {
                             const jsonString = value.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -11354,57 +11456,81 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 else if (msg.type === 'transfer') { let statusText = ''; let isFinished = false; const amount = parseFloat(msg.text).toFixed(2); const note = msg.recipient ? `转账给 ${msg.recipient}` : '转账'; switch(msg.transferStatus) { case 'collected': statusText = '已收款'; isFinished = true; break; case 'returned': statusText = '已退回'; isFinished = true; break; case 'expired': statusText = '已过期'; isFinished = true; break; statusText = msg.side === 'sent' ? '等待对方收款' : '请你收款'; break; } div.innerHTML = `<div class="transfer-header"><img src="https://i.postimg.cc/WtRBPhBG/IMG-0030.png" class="transfer-icon"><div class="transfer-text"><div class="transfer-amount">¥ ${amount}</div><div class="transfer-status">${statusText}</div></div></div><div class="transfer-footer">${note}</div>`; if (isFinished) { div.classList.add('finished'); } } 
                 else if (msg.type === 'call_summary') { div.innerHTML = `<svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"></path></svg><span>${msg.text}</span>`; }
                 else if (msg.type === 'text') {
-                    // 新增：定义一个辅助函数，用于应用正则并返回安全的HTML
-                    const applyRegexAndRender = (rawText) => {
-                        const chatId = conversationManager.getCurrentChatId();
-                        if (!chatId) return escapeHtml(rawText).replace(/\n/g, '<br>');
+                // 【【【【【【 全新的、绝对优先的表情包处理逻辑从这里开始 】】】】】】
+                const stickerMatch = msg.text.match(/^\[sticker:([^\]]+)\]$/);
+                if (stickerMatch) {
+                    const stickerName = stickerMatch[1];
+                    const sticker = stickers.find(s => s.name === stickerName);
+                    if (sticker) {
+                        // 如果是表情包，就直接把它渲染成一个图片，然后结束这个 case 的所有逻辑
+                        div.dataset.isSticker = "true";
+                        const img = document.createElement('img');
+                        img.alt = stickerName;
+                        setImageSrc(img, sticker.url);
+                        div.appendChild(img);
+                        // 关键：在这里 return，不再执行下面的任何文本处理逻辑
+                        mainContentWrapper.appendChild(div);
+                        mainContentAndNameWrapper.appendChild(mainContentWrapper);
+                        contentRow.appendChild(mainContentAndNameWrapper);
+                        wrapper.appendChild(contentRow);
+                        messagesContainer.appendChild(wrapper);
+                        return; // 提前结束 addMessageToDOM 函数
+                    }
+                }
+                // 【【【【【【 表情包处理逻辑到这里结束，如果不是表情包，代码会继续往下执行 】】】】】】
+                
+                // 新增：定义一个辅助函数，用于应用正则并返回安全的HTML
+                const applyRegexAndRender = (rawText) => {
+                    const chatId = conversationManager.getCurrentChatId();
+                    if (!chatId) return escapeHtml(rawText).replace(/\n/g, '<br>');
 
-                        const info = loadFromLocalStorage(`chat_info_${chatId}`, {});
-                        const enabledRegexNames = info.enabledRegexes || [];
-                        let processedText = rawText;
-                        let hasBeenReplaced = false; // 新增标志，用于判断是否发生过替换
+                    const info = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                    const enabledRegexNames = info.enabledRegexes || [];
+                    let processedText = rawText;
+                    let hasBeenReplaced = false; // 新增标志，用于判断是否发生过替换
 
-                        if (enabledRegexNames.length > 0) {
-                            const globalRules = appearanceSettings.regexReplacements || [];
-                            // 遍历所有启用的规则
-                            for (const ruleName of enabledRegexNames) {
-                                const rule = globalRules.find(r => r.name === ruleName && r.enabled);
-                                if (rule && rule.pattern) {
-                                    try {
-                                        const regex = new RegExp(rule.pattern, rule.flags || 'g');
-                                        const textBefore = processedText;
-                                        // 关键修正：直接在文本上进行替换，不预先转义
-                                        processedText = processedText.replace(regex, rule.template || '');
-                                        
-                                        // 如果文本发生了变化，说明规则匹配成功
-                                        if (textBefore !== processedText) {
-                                            hasBeenReplaced = true;
-                                        }
-                                        // 关键修正：移除这里的 break; 语句，以允许链式处理
-                                    } catch (e) {
-                                        console.error(`正则规则 "${rule.name}" 在渲染时无效或执行出错:`, e);
+                    if (enabledRegexNames.length > 0) {
+                        const globalRules = appearanceSettings.regexReplacements || [];
+                        // 遍历所有启用的规则
+                        for (const ruleName of enabledRegexNames) {
+                            const rule = globalRules.find(r => r.name === ruleName && r.enabled);
+                            if (rule && rule.pattern) {
+                                try {
+                                    const regex = new RegExp(rule.pattern, rule.flags || 'g');
+                                    const textBefore = processedText;
+                                    // 关键修正：直接在文本上进行替换，不预先转义
+                                    processedText = processedText.replace(regex, rule.template || '');
+                                    
+                                    // 如果文本发生了变化，说明规则匹配成功
+                                    if (textBefore !== processedText) {
+                                        hasBeenReplaced = true;
                                     }
+                                    // 关键修正：移除这里的 break; 语句，以允许链式处理
+                                } catch (e) {
+                                    console.error(`正则规则 "${rule.name}" 在渲染时无效或执行出错:`, e);
                                 }
                             }
                         }
-                        
-                        // 如果没有任何替换发生，说明是纯文本
-                        if (hasBeenReplaced) {
-                            // 如果发生了替换，我们相信结果已经是HTML，直接返回
-                            return processedText;
-                        } else {
-                            // --- 【核心修正】在这里加入斜体/加粗处理 ---
-                            // 1. 先对原始文本进行HTML转义，防止XSS攻击
-                            let safeText = escapeHtml(rawText);
-                            // 2. 在转义后的安全文本上，应用我们的简单格式化
-                            let formattedText = simpleMarkdownToHtml(safeText);
-                            // 3. 最后再处理换行符
-                            return formattedText.replace(/\n/g, '<br>');
-                            // --- 修正结束 ---
-                        }
-                    };
+                    }
+                    
+                    // 如果没有任何替换发生，说明是纯文本
+                    if (hasBeenReplaced) {
+                        // 如果发生了替换，我们相信结果已经是HTML，直接返回
+                        return processedText;
+                    } else {
+                        // --- 【核心修正】在这里加入斜体/加粗处理 ---
+                        // 1. 先对原始文本进行HTML转义，防止XSS攻击
+                        let safeText = escapeHtml(rawText);
+                        // 2. 在转义后的安全文本上，应用我们的简单格式化
+                        let formattedText = simpleMarkdownToHtml(safeText);
+                        // 3. 最后再处理换行符
+                        return formattedText.replace(/\n/g, '<br>');
+                        // --- 修正结束 ---
+                    }
+                };
 
-                    const trimmedText = msg.text.trim();
+                const trimmedText = msg.text.trim();
+                // ... (后续的 if/else 判断保持不变)
                     // AI生成的HTML卡片（如<snippet>包裹的内容）仍然直接渲染
                     const isGeneratedHtmlBlock = trimmedText.startsWith('<div') || trimmedText.startsWith('<snippet>');
 
@@ -12996,7 +13122,30 @@ footerVoiceBtn.addEventListener('click', async () => {
     const text = await showContentInputModal({title: '语音转文字', placeholder: '输入要转为语音的文字', isTextarea: true});
     if (text) await handleSendMessageAttempt('voice', text);
 });
-footerStickerBtn.addEventListener('click', () => stickerManager.openPanel());
+footerStickerBtn.addEventListener('click', () => {
+    stickerManager.openPanel((stickerName) => {
+        // 这个回调函数会在用户选择表情包后执行
+        // 1. 获取主聊天输入框
+        const inputEl = document.getElementById('footer-message-input');
+        
+        // 2. 获取当前光标位置，以便在正确的地方插入
+        const start = inputEl.selectionStart;
+        const end = inputEl.selectionEnd;
+        const text = inputEl.value;
+        const stickerText = `[sticker:${stickerName}]`;
+        
+        // 3. 构建新的输入框内容
+        inputEl.value = text.substring(0, start) + stickerText + text.substring(end);
+        
+        // 4. 将光标移动到插入内容的末尾，并重新聚焦，方便继续输入
+        inputEl.focus();
+        const newCursorPosition = start + stickerText.length;
+        inputEl.setSelectionRange(newCursorPosition, newCursorPosition);
+
+        // 5. 手动触发一次input事件，确保“发送”按钮能正常显示出来
+        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+});
 dynamicDecorationBtn.addEventListener('click', triggerAIContinuation);
 
 headerMoreBtn.addEventListener('click', async () => { 
@@ -14135,19 +14284,29 @@ const momentsManager = (function() {
         }
         
         function renderFeed() {
-            feedData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-            feedContainer.innerHTML = '';
-            feedData.forEach(post => {
+        feedData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        feedContainer.innerHTML = '';
+
+        // 【【【全新的、带有“加载更多”逻辑的渲染系统】】】
+
+        let currentlyRenderedCount = 0;
+        const POSTS_PER_PAGE = 13; // 每次加载13条
+
+        // 1. 定义一个函数，专门用来渲染一批帖子
+        const renderMorePosts = () => {
+            const postsToRender = feedData.slice(currentlyRenderedCount, currentlyRenderedCount + POSTS_PER_PAGE);
+            
+            postsToRender.forEach(post => {
+                // 检查隐私，这部分逻辑保持不变
                 if (post.privacy.type === 'exclude' && post.privacy.list.includes(currentPersonaName)) {
                     return;
                 }
 
+                // --- 这里是您原来就有的、渲染单个帖子的完整代码，我们直接把它搬进来 ---
                 const postCard = document.createElement('div');
                 postCard.className = 'post-card';
                 postCard.id = post.id;
                 
-                
-                // **核心修改：重构 post-header 和 post-options 的 HTML 结构**
                 postCard.innerHTML = `
                     <div class="post-header">
                         <div class="post-avatar" id="avatar-${post.id}"></div>
@@ -14158,9 +14317,7 @@ const momentsManager = (function() {
                             ${formatTimeAgo(post.timestamp)}
                         </div>
                         <div class="post-options">
-                            <!-- 编辑和删除按钮将在这里动态添加 -->
                             <div class="post-options-main-actions"></div>
-                            <!-- 可见范围按钮将在这里动态添加 -->
                         </div>
                     </div>
                     <div class="post-body"></div>
@@ -14177,15 +14334,12 @@ const momentsManager = (function() {
                 `;
                 
                 const postBody = postCard.querySelector('.post-body');
-
-                // 正常渲染所有可见帖子的内容
                 if (post.text && post.text.trim() !== '') {
                     const textDiv = document.createElement('div');
                     textDiv.className = 'post-content-text';
                     textDiv.textContent = post.text;
                     postBody.appendChild(textDiv);
                 }
-                
                 switch (post.type) {
                     case 'photo':
                         if (post.image) {
@@ -14220,61 +14374,45 @@ const momentsManager = (function() {
                             const statementDiv = document.createElement('div');
                             statementDiv.style.marginTop = '12px';
                             const html = post.content.split('\n').map(p => `<p class="statement-paragraph">${p.trim()}</p>`).join('');
-                            statementDiv.innerHTML = `<div class="message statement"><div class="statement-inner-frame"><div class="statement-title">声 明</div><div class="statement-content">${html}</div><div class="statement-details"><span class="statement-name">${post.signer || ''}</span><span class="statement-date">${post.date || ''}</span></div></div></div>`;
+                            statementDiv.innerHTML = `<div class="message statement"><div class="statement-inner-frame"><div class="statement-title">声 明</div><div class="statement-content">${html}</div><div class="details-wrapper"><div class="statement-details"><span class="statement-name">${post.signer || ''}</span><span class="statement-date">${post.date || ''}</span></div></div></div></div>`;
                             postBody.appendChild(statementDiv);
                         }
                         break;
                 }
-                
-const isAuthor = post.userName === currentPersonaName;
+                const isAuthor = post.userName === currentPersonaName;
                 const isPrivatePost = post.privacy.type === 'private';
-
-                // 全新逻辑：
-                // 1. 如果这是一个私密帖子 (isPrivatePost 为 true)
-                // 2. 并且，当前查看者不是作者本人 (!isAuthor 为 true)
-                // 那么，就禁用互动按钮。
                 if (isPrivatePost && !isAuthor) {
                     const footer = postCard.querySelector('.post-footer');
                     if (footer) {
                         const actionsButton = footer.querySelector('.actions-btn-container');
                         if (actionsButton) {
-                            // 禁用按钮的点击事件，并改变外观提示用户不可用
                             actionsButton.style.pointerEvents = 'none';
                             actionsButton.style.opacity = '0.5';
-                            actionsButton.title = '私密动态无法互动'; // 增加悬停提示
+                            actionsButton.title = '私密动态无法互动';
                         }
                     }
                 }
-
-                // 如果是作者本人查看自己的私密贴，则不会进入上面的 if 语句，
-                // 互动按钮会保持正常可用状态。
-
-                
                 const postOptionsDiv = postCard.querySelector('.post-options');
                 const mainActionsWrapper = postCard.querySelector('.post-options-main-actions');
-
                 const editBtn = document.createElement('button');
                 editBtn.className = 'privacy-icon';
                 editBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.13,5.12L18.88,8.87M3,17.25V21H6.75L17.81,9.94L14.06,6.19L3,17.25Z" /></svg> 编辑`;
                 editBtn.style.color = 'var(--moments-link-color)';
                 editBtn.addEventListener('click', () => editPost(post.id));
                 mainActionsWrapper.appendChild(editBtn);
-
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'delete-post-btn';
                 deleteBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg> 删除`;
                 deleteBtn.addEventListener('click', () => deletePost(post.id));
                 mainActionsWrapper.appendChild(deleteBtn);
-                
                 const privacyButton = document.createElement('button');
                 privacyButton.className = 'privacy-icon';
-                
                 if (post.privacy.type !== 'public') {
                     privacyButton.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z" /></svg> ${getPrivacyDescription(post.privacy, true)}`;
                 } else {
                     privacyButton.innerHTML = '&nbsp;';
                     privacyButton.style.opacity = '0';
-                    privacyButton.style.cursor = 'pointer';
+                    privacyButton.style.cursor = 'default';
                 }
                 privacyButton.addEventListener('click', () => showPrivacyDetailsModal(post.privacy, post.id));
                 postOptionsDiv.appendChild(privacyButton);
@@ -14285,9 +14423,27 @@ const isAuthor = post.userName === currentPersonaName;
                 const avatarUrl = getSpecificAvatarUrl(post.userName);
                 setImageSrc(avatarEl, avatarUrl);
 
-                updatePostInteractions(post.id); 
+                updatePostInteractions(post.id);
+                // --- 单个帖子渲染代码结束 ---
             });
-        }
+            
+            currentlyRenderedCount += postsToRender.length;
+        };
+
+        // 2. 移除旧的滚动监听器，防止重复绑定
+        feedContainer.onscroll = null;
+
+        // 3. 创建一个新的滚动监听器
+        feedContainer.onscroll = () => {
+            // 当滚动条接近底部时，并且还有未渲染的帖子时
+            if ((feedContainer.scrollTop + feedContainer.clientHeight >= feedContainer.scrollHeight - 200) && (currentlyRenderedCount < feedData.length)) {
+                renderMorePosts(); // 加载并渲染下一批
+            }
+        };
+        
+        // 4. 初始时，先渲染第一批（13条）
+        renderMorePosts();
+    }
         
         function updateUserPersonaSelector() {
             const selector = appRoot.querySelector('#moments-user-persona-select');
@@ -14328,7 +14484,28 @@ const isAuthor = post.userName === currentPersonaName;
 
         function showPrivacyDetailsModal(postPrivacy, postId) { let description = '', listHtml = ''; const { type, list } = postPrivacy; if (type === 'public') description = '全部可见'; else if (type === 'private') description = '仅自己可见'; else if (type === 'include') { description = '仅以下用户可见:'; listHtml = `<div class="list-items-container">${list.map(name => `<span class="list-item">${name}</span>`).join('')}</div>`; } else if (type === 'exclude') { description = '不给以下用户看:'; listHtml = `<div class="list-items-container">${list.map(name => `<span class="list-item">${name}</span>`).join('')}</div>`; } currentPrivacyDisplay.innerHTML = `<strong>当前可见范围: </strong><span class="privacy-value">${description}</span>${listHtml}`; privacyDetailsModalOverlay.classList.add('visible'); modifyPrivacyBtn.onclick = () => { privacyDetailsModalOverlay.classList.remove('visible'); showPrivacySelectionModal(postPrivacy, (newPrivacy) => { const post = feedData.find(p => p.id === postId); if (post) { post.privacy = newPrivacy; saveFeed(); renderFeed(); } }); }; closePrivacyDetailsBtn.onclick = () => privacyDetailsModalOverlay.classList.remove('visible'); privacyDetailsModalOverlay.onclick = (e) => { if (e.target === privacyDetailsModalOverlay) privacyDetailsModalOverlay.classList.remove('visible'); }; }
         
-        function updatePostInteractions(postId) { const postData = feedData.find(p => p.id === postId); const postEl = appRoot.querySelector(`#${postId}`); if (!postData || !postEl) return; const reactionsList = postEl.querySelector('.reactions-list'); const commentsList = postEl.querySelector('.comments-list'); const interactionsSection = postEl.querySelector('.interactions-section'); const likers = postData.reactions['点赞'] || []; reactionsList.innerHTML = likers.length > 0 ? `<span class="reaction-item"><span class="reaction-icon"></span>点赞 ${likers.length > 3 ? `${likers.length}人` : likers.join(', ')}</span>` : ''; commentsList.innerHTML = postData.comments.map(c => `<div class="comment-item" data-user="${c.user}" data-comment-id="${c.id || ''}"><div class="comment-text-container"><span class="comment-meta"><span class="commenter-name">${c.user}</span>${c.replyTo ? ` 回复 <span class="reply-to-name">${c.replyTo}</span>` : ''}:</span><span class="comment-content-text">${c.text}</span></div><button class="edit-comment-btn" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:13px;margin-left:auto;padding:0 8px;">编辑</button><button class="delete-comment-btn" title="删除评论">×</button></div>`).join(''); commentsList.querySelectorAll('.delete-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); deleteComment(postId, e.target.closest('.comment-item').dataset.commentId); })); commentsList.querySelectorAll('.edit-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); editComment(postId, e.target.closest('.comment-item').dataset.commentId); })); interactionsSection.style.display = (reactionsList.innerHTML.trim() || commentsList.innerHTML.trim()) ? 'block' : 'none'; }
+        function updatePostInteractions(postId) { const postData = feedData.find(p => p.id === postId); const postEl = appRoot.querySelector(`#${postId}`); if (!postData || !postEl) return; const reactionsList = postEl.querySelector('.reactions-list'); const commentsList = postEl.querySelector('.comments-list'); const interactionsSection = postEl.querySelector('.interactions-section'); const likers = postData.reactions['点赞'] || []; reactionsList.innerHTML = likers.length > 0 ? `<span class="reaction-item"><span class="reaction-icon"></span>点赞 ${likers.length > 3 ? `${likers.length}人` : likers.join(', ')}</span>` : ''; commentsList.innerHTML = postData.comments.map(c => {
+    let contentHtml = '';
+    const stickerMatch = c.text.match(/^\[sticker:([^\]]+)\]$/);
+    
+    if (stickerMatch) {
+        // अगर यह एक स्टिकर कमांड है
+        const stickerName = stickerMatch[1];
+        const sticker = stickers.find(s => s.name === stickerName);
+        if (sticker) {
+            // अगर स्टिकर मिल जाता है, तो एक इमेज टैग बनाएं
+            contentHtml = `<img src="${sticker.url}" alt="${stickerName}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+        } else {
+            // अगर स्टिकर नहीं मिलता है, तो मूल टेक्स्ट दिखाएं (एक सुरक्षा उपाय के रूप में)
+            contentHtml = escapeHtml(c.text);
+        }
+    } else {
+        // अगर यह सामान्य टेक्स्ट है, तो इसे सुरक्षित करें और दिखाएं
+        contentHtml = escapeHtml(c.text);
+    }
+
+    return `<div class="comment-item" data-user="${c.user}" data-comment-id="${c.id || ''}"><div class="comment-text-container"><span class="comment-meta"><span class="commenter-name">${c.user}</span>${c.replyTo ? ` 回复 <span class="reply-to-name">${c.replyTo}</span>` : ''}:</span><span class="comment-content-text">${contentHtml}</span></div><button class="edit-comment-btn" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:13px;margin-left:auto;padding:0 8px;">编辑</button><button class="delete-comment-btn" title="删除评论">×</button></div>`;
+}).join(''); commentsList.querySelectorAll('.delete-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); deleteComment(postId, e.target.closest('.comment-item').dataset.commentId); })); commentsList.querySelectorAll('.edit-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); editComment(postId, e.target.closest('.comment-item').dataset.commentId); })); interactionsSection.style.display = (reactionsList.innerHTML.trim() || commentsList.innerHTML.trim()) ? 'block' : 'none'; }
         
         function showFullListModal(title, items) { 
             fullListModalTitle.textContent = title; 
@@ -14638,7 +14815,9 @@ const isAuthor = post.userName === currentPersonaName;
             }, stepDurationMs);
         }
         
-        function saveFeed() { saveToLocalStorage('moments_feed_data', feedData); }
+        function saveFeed() { 
+            saveToLocalStorage('moments_feed_data', feedData); 
+        }
         function loadFeed() { feedData = loadFromLocalStorage('moments_feed_data', []); }
         
         function createPostFromAI(senderName, data) {
@@ -14835,7 +15014,29 @@ const isAuthor = post.userName === currentPersonaName;
                 backBtnInMoments.style.display = 'none';
             }
 
-            checkMomentsUpdates(); // <--- 新增这一行
+            // 【【【 在这里粘贴下面的新代码块 】】】
+const momentsCommentStickerBtn = appRoot.querySelector('#moments-comment-sticker-btn');
+if (momentsCommentStickerBtn) {
+    momentsCommentStickerBtn.addEventListener('click', () => {
+        // 调用改造后的 openPanel，并传入一个回调函数
+        stickerManager.openPanel((stickerName) => {
+            // 这个回调会在用户选择表情包后执行
+            const commentInputEl = document.getElementById('comment-input');
+            // 将表情包指令插入到当前光标位置
+            const start = commentInputEl.selectionStart;
+            const end = commentInputEl.selectionEnd;
+            const text = commentInputEl.value;
+            const stickerText = `[sticker:${stickerName}]`;
+            commentInputEl.value = text.substring(0, start) + stickerText + text.substring(end);
+            // 将光标移动到插入内容的末尾
+            commentInputEl.focus();
+            commentInputEl.setSelectionRange(start + stickerText.length, start + stickerText.length);
+        });
+    });
+}
+// 【【【 新代码块到此结束 】】】
+
+checkMomentsUpdates(); // <--- 新增这一行
         }
         
         return { init, refreshData, createPostFromAI, getRecentMomentsForAI, handleInteractionFromAI };
@@ -14868,7 +15069,7 @@ const isAuthor = post.userName === currentPersonaName;
                 : `<p style="grid-column: 1 / -1; text-align: center; color: #888;">没有找到表情包</p>`;
         }
         
-        async function openPanel() {
+        async function openPanel(onSelectCallback = null) {
             while (true) {
                 loadStickers();
                 isManageMode = false;
@@ -14892,12 +15093,18 @@ const isAuthor = post.userName === currentPersonaName;
                         searchInput.addEventListener('input', (e) => renderPanel(modalDOM, e.target.value));
                         
                         gridContainer.addEventListener('click', (e) => {
-                            const item = e.target.closest('.sticker-item');
-                            if (item) {
-                                conversationManager.handleSendMessageAttempt('photo', item.dataset.url);
-                                closeModal({value: 'close'});
-                            }
-                        });
+                    const item = e.target.closest('.sticker-item');
+                    if (item) {
+                        if (onSelectCallback) {
+                            // 如果有回调，就执行回调并传递表情包名字
+                            onSelectCallback(item.dataset.name);
+                        } else {
+                            // 否则，执行默认的发送聊天消息逻辑
+                            conversationManager.handleSendMessageAttempt('photo', item.dataset.url);
+                        }
+                        closeModal({value: 'close'});
+                    }
+                });
                         
                         renderPanel(modalDOM);
                     }
