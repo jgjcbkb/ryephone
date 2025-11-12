@@ -14499,27 +14499,28 @@ const momentsManager = (function() {
         function showPrivacyDetailsModal(postPrivacy, postId) { let description = '', listHtml = ''; const { type, list } = postPrivacy; if (type === 'public') description = '全部可见'; else if (type === 'private') description = '仅自己可见'; else if (type === 'include') { description = '仅以下用户可见:'; listHtml = `<div class="list-items-container">${list.map(name => `<span class="list-item">${name}</span>`).join('')}</div>`; } else if (type === 'exclude') { description = '不给以下用户看:'; listHtml = `<div class="list-items-container">${list.map(name => `<span class="list-item">${name}</span>`).join('')}</div>`; } currentPrivacyDisplay.innerHTML = `<strong>当前可见范围: </strong><span class="privacy-value">${description}</span>${listHtml}`; privacyDetailsModalOverlay.classList.add('visible'); modifyPrivacyBtn.onclick = () => { privacyDetailsModalOverlay.classList.remove('visible'); showPrivacySelectionModal(postPrivacy, (newPrivacy) => { const post = feedData.find(p => p.id === postId); if (post) { post.privacy = newPrivacy; saveFeed(); renderFeed(); } }); }; closePrivacyDetailsBtn.onclick = () => privacyDetailsModalOverlay.classList.remove('visible'); privacyDetailsModalOverlay.onclick = (e) => { if (e.target === privacyDetailsModalOverlay) privacyDetailsModalOverlay.classList.remove('visible'); }; }
         
         function updatePostInteractions(postId) { const postData = feedData.find(p => p.id === postId); const postEl = appRoot.querySelector(`#${postId}`); if (!postData || !postEl) return; const reactionsList = postEl.querySelector('.reactions-list'); const commentsList = postEl.querySelector('.comments-list'); const interactionsSection = postEl.querySelector('.interactions-section'); const likers = postData.reactions['点赞'] || []; reactionsList.innerHTML = likers.length > 0 ? `<span class="reaction-item"><span class="reaction-icon"></span>点赞 ${likers.length > 3 ? `${likers.length}人` : likers.join(', ')}</span>` : ''; commentsList.innerHTML = postData.comments.map(c => {
-    let contentHtml = '';
-    const stickerMatch = c.text.match(/^\[sticker:([^\]]+)\]$/);
-    
-    if (stickerMatch) {
-        // अगर यह एक स्टिकर कमांड है
-        const stickerName = stickerMatch[1];
-        const sticker = stickers.find(s => s.name === stickerName);
-        if (sticker) {
-            // अगर स्टिकर मिल जाता है, तो एक इमेज टैग बनाएं
-            contentHtml = `<img src="${sticker.url}" alt="${stickerName}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
-        } else {
-            // अगर स्टिकर नहीं मिलता है, तो मूल टेक्स्ट दिखाएं (एक सुरक्षा उपाय के रूप में)
-            contentHtml = escapeHtml(c.text);
-        }
-    } else {
-        // अगर यह सामान्य टेक्स्ट है, तो इसे सुरक्षित करें और दिखाएं
-        contentHtml = escapeHtml(c.text);
-    }
+            // 【【【核心修复：全新的、支持混合内容的渲染逻辑】】】
+            
+            // 1. 首先，对整个评论文本进行HTML转义，确保所有内容（包括用户可能输入的恶意代码）都是安全的
+            let safeText = escapeHtml(c.text);
 
-    return `<div class="comment-item" data-user="${c.user}" data-comment-id="${c.id || ''}"><div class="comment-text-container"><span class="comment-meta"><span class="commenter-name">${c.user}</span>${c.replyTo ? ` 回复 <span class="reply-to-name">${c.replyTo}</span>` : ''}:</span><span class="comment-content-text">${contentHtml}</span></div><button class="edit-comment-btn" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:13px;margin-left:auto;padding:0 8px;">编辑</button><button class="delete-comment-btn" title="删除评论">×</button></div>`;
-}).join(''); commentsList.querySelectorAll('.delete-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); deleteComment(postId, e.target.closest('.comment-item').dataset.commentId); })); commentsList.querySelectorAll('.edit-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); editComment(postId, e.target.closest('.comment-item').dataset.commentId); })); interactionsSection.style.display = (reactionsList.innerHTML.trim() || commentsList.innerHTML.trim()) ? 'block' : 'none'; }
+            // 2. 然后，在这个绝对安全的文本上，使用正则表达式查找并替换所有的表情包指令
+            //    /g 标志确保会替换所有匹配项，而不是只替换第一个
+            const contentHtml = safeText.replace(/\[sticker:([^\]]+)\]/g, (match, stickerName) => {
+                // 查找这个表情包是否存在
+                const sticker = stickers.find(s => s.name === stickerName);
+                if (sticker) {
+                    // 如果找到了，就返回一个 <img> 标签的HTML字符串来替换掉 [sticker:名字]
+                    return `<img src="${sticker.url}" alt="${stickerName}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+                } else {
+                    // 如果因为某些原因没找到这个表情包，就把原始的指令文本返回，避免内容丢失
+                    return match;
+                }
+            });
+
+            // 3. 返回最终的、已经包含了图片和安全文本的完整HTML
+            return `<div class="comment-item" data-user="${c.user}" data-comment-id="${c.id || ''}"><div class="comment-text-container"><span class="comment-meta"><span class="commenter-name">${c.user}</span>${c.replyTo ? ` 回复 <span class="reply-to-name">${c.replyTo}</span>` : ''}:</span><span class="comment-content-text">${contentHtml}</span></div><button class="edit-comment-btn" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:13px;margin-left:auto;padding:0 8px;">编辑</button><button class="delete-comment-btn" title="删除评论">×</button></div>`;
+        }).join(''); commentsList.querySelectorAll('.delete-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); deleteComment(postId, e.target.closest('.comment-item').dataset.commentId); })); commentsList.querySelectorAll('.edit-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); editComment(postId, e.target.closest('.comment-item').dataset.commentId); })); interactionsSection.style.display = (reactionsList.innerHTML.trim() || commentsList.innerHTML.trim()) ? 'block' : 'none'; }
         
         function showFullListModal(title, items) { 
             fullListModalTitle.textContent = title; 
