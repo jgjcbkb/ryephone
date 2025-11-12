@@ -4262,6 +4262,20 @@ input:checked + .slider:before {
 }
 
 /* --- END: STICKER POINTER FIX (ULTIMATE & FINAL) --- */
+/* --- START: MOMENTS ACTION PANEL CLICK FIX --- */
+
+/* 
+ * 这条规则的作用是：
+ * 让点赞/评论按钮内部的所有子元素（图标和文字）对鼠标点击“隐形”。
+ * 这样，无论您点击按钮的哪个位置，点击事件都会“穿透”图标和文字，
+ * 确保总是作用在整个按钮本身上，从而解决“点击死区”问题。
+*/
+#tab-content-moments .actions-panel .reaction-btn *,
+#tab-content-moments .actions-panel .comment-action-btn * {
+    pointer-events: none;
+}
+
+/* --- END: MOMENTS ACTION PANEL CLICK FIX --- */
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
