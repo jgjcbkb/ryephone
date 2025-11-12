@@ -4698,7 +4698,7 @@ input:checked + .slider:before {
     <p class="form-hint">约束AI在进行小说式叙事时，回复的最小和最大字数范围。</p>
 </div>
                             <div class="form-group"><label for="chat-api-config">对话配置</label><select id="chat-api-config"></select><p class="form-hint">为此对话指定特定的API配置。</p></div>
-                            <div class="form-group"><label for="chat-memory-length">上下文记忆条数</label><input type="number" id="chat-memory-length" min="0" value="20"><p class="form-hint">发送给API的最近消息数量，0为不限制。</p></div>
+                            <div class="form-group"><label for="chat-memory-length">上下文记忆条数</label><input type="number" id="chat-memory-length" min="0" value="100"><p class="form-hint">发送给API的最近消息数量，0为不限制。</p></div>
                         </div>
                         <div id="worldbook-mount-section" class="form-section">
                             <h3>挂载世界书</h3>
@@ -9598,7 +9598,7 @@ if (associatedNpcNames.length > 0) {
                 const backgroundTaskPrompt = await triggerBackgroundDataUpdate(combinedUserTextForBgTask, chatState.chatName, originatingChatId);
                 finalSystemPrompt += backgroundTaskPrompt;
                 // --- 修复结束 ---
-                const memoryLength = parseInt(chatInfo.memoryLength || 20, 10); // 这里 memoryLength 现在代表“轮次”
+                const memoryLength = parseInt(chatInfo.memoryLength || 100, 10); // 这里 memoryLength 现在代表“轮次”
                 
                 let recentMessages;
                 if (memoryLength > 0) {
@@ -12471,7 +12471,7 @@ function openChatInfoPage() {
             document.getElementById('chat-name-edit').value = currentChat.name || '';
             document.getElementById('chat-remark').value = info.remark || '';
             document.getElementById('my-persona').value = info.myPersona || '';
-            document.getElementById('chat-memory-length').value = info.memoryLength || 20;
+            document.getElementById('chat-memory-length').value = info.memoryLength || 100;
             document.getElementById('chat-preamble').value = info.preamble || '';
 
 // 【【【在这里添加下面这行新代码】】】
@@ -15069,8 +15069,8 @@ const isAuthor = post.userName === currentPersonaName;
         async function showCharacterDynamicsModal(charName) {
             const charSettings = settings.perCharacter[charName] || {};
             
-            const msgSettings = charSettings.message || { enabled: false, probability: 10, interval: 5 };
-            const momentsSettings = charSettings.moments || { enabled: false, probability: 20, interval: 10 };
+            const msgSettings = charSettings.message || { enabled: false, probability: 40, interval: 60 };
+        const momentsSettings = charSettings.moments || { enabled: false, probability: 40, interval: 60 };
 
             const modalHtml = `<div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 50vh; overflow-y: auto; padding: 5px 15px 15px; margin: 0 -15px;">
                 <h4>主动发消息</h4>
@@ -15116,21 +15116,21 @@ const isAuthor = post.userName === currentPersonaName;
             const charListHtml = characters.map(name => `<label class="inline-label"><input type="checkbox" class="bulk-char-select" value="${name}"> ${name}</label>`).join('');
             
             const modalHtml = `<div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 60vh; overflow-y: auto; padding: 5px 15px 15px; margin: 0 -15px;">
-                <div style="max-height: 120px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px; flex-shrink: 0;">
-                    <label class="inline-label"><input type="checkbox" id="bulk-select-all"> <b>全选</b></label>
-                    <hr style="margin: 5px 0; border-color: #eee;">
-                    ${charListHtml}
-                </div>
-                <h4>主动发消息</h4>
-                <label class="inline-label" style="justify-content: space-between;"><span>允许</span><input type="checkbox" id="bulk-msg-enabled" checked></label>
-                <div class="form-group" style="margin:0;"><label>概率 (%)</label><input type="number" id="bulk-msg-probability" class="modal-input" min="0" max="100" value="10"></div>
-                <div class="form-group" style="margin:0;"><label>间隔 (分钟)</label><input type="number" id="bulk-msg-interval" class="modal-input" min="1" value="5"></div>
-                <hr>
-                <h4>朋友圈互动</h4>
-                <label class="inline-label" style="justify-content: space-between;"><span>允许</span><input type="checkbox" id="bulk-moments-enabled" checked></label>
-                <div class="form-group" style="margin:0;"><label>概率 (%)</label><input type="number" id="bulk-moments-probability" class="modal-input" min="0" max="100" value="20"></div>
-                <div class="form-group" style="margin:0;"><label>间隔 (分钟)</label><input type="number" id="bulk-moments-interval" class="modal-input" min="1" value="10"></div>
-            </div>`;
+            <div style="max-height: 120px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px; flex-shrink: 0;">
+                <label class="inline-label"><input type="checkbox" id="bulk-select-all"> <b>全选</b></label>
+                <hr style="margin: 5px 0; border-color: #eee;">
+                ${charListHtml}
+            </div>
+            <h4>主动发消息</h4>
+            <label class="inline-label" style="justify-content: space-between;"><span>允许</span><input type="checkbox" id="bulk-msg-enabled" checked></label>
+            <div class="form-group" style="margin:0;"><label>概率 (%)</label><input type="number" id="bulk-msg-probability" class="modal-input" min="0" max="100" value="40"></div>
+            <div class="form-group" style="margin:0;"><label>间隔 (分钟)</label><input type="number" id="bulk-msg-interval" class="modal-input" min="1" value="60"></div>
+            <hr>
+            <h4>朋友圈互动</h4>
+            <label class="inline-label" style="justify-content: space-between;"><span>允许</span><input type="checkbox" id="bulk-moments-enabled" checked></label>
+            <div class="form-group" style="margin:0;"><label>概率 (%)</label><input type="number" id="bulk-moments-probability" class="modal-input" min="0" max="100" value="40"></div>
+            <div class="form-group" style="margin:0;"><label>间隔 (分钟)</label><input type="number" id="bulk-moments-interval" class="modal-input" min="1" value="60"></div>
+        </div>`;
             
             const result = await conversationManager.showCustomModal({ 
                 title: '批量设置动态', 
@@ -15444,34 +15444,36 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 }
 
                 // --- 1. 检查主动发消息 ---
-                if (charSettings.message && charSettings.message.enabled && charSettings.message.probability > 0) {
-                    const config = charSettings.message;
-                    const messages = loadFromLocalStorage(`conversation_${chat.id}`, []);
-                    // 判断条件：聊天记录为空，或者距离上一条消息的时间超过了设定的间隔
-                    const isChatIdle = messages.length === 0 || (now - (messages[messages.length - 1]?.timestamp || 0) >= config.interval * 60 * 1000);
+            if (charSettings.message && charSettings.message.enabled && charSettings.message.probability > 0) {
+                const config = charSettings.message;
+                const messages = loadFromLocalStorage(`conversation_${chat.id}`, []);
+                // 判断条件：聊天记录为空，或者距离上一条消息的时间（无论谁发的）已经超过了设定的间隔
+                const lastMessageTimestamp = messages.length > 0 ? messages[messages.length - 1].timestamp : 0;
+                const isChatIdle = messages.length === 0 || (now - lastMessageTimestamp >= config.interval * 60 * 1000);
 
-                    if (isChatIdle) {
-                        if (Math.random() * 100 < config.probability) {
-                            console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering proactive message for private character "${charName}".`);
-                            await triggerProactiveAI(chat.id, charName, 'message');
-                            // 注意：单聊的主动消息不更新 lastTick，因为它只在空闲时触发一次
-                        }
+                if (isChatIdle) {
+                    if (Math.random() * 100 < config.probability) {
+                        console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering proactive message for private character "${charName}".`);
+                        await triggerProactiveAI(chat.id, charName, 'message');
+                        // 注意：单聊的主动消息不更新 lastTick，因为它只在空闲时触发一次
                     }
                 }
+            }
 
-                // --- 2. 检查朋友圈互动 ---
-                if (charSettings.moments && charSettings.moments.enabled && charSettings.moments.probability > 0) {
-                    const config = charSettings.moments;
-                    if (!config.lastTick || (now - config.lastTick >= config.interval * 60 * 1000)) {
-                        if (Math.random() * 100 < config.probability) {
-                            const action = Math.random() < 0.2 ? 'post_moment' : 'browse_moments';
-                            console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering moment action (${action}) for private character "${charName}".`);
-                            await triggerProactiveAI(chat.id, charName, action);
-                            config.lastTick = now; // 更新时间戳
-                            settingsChanged = true;
-                        }
+            // --- 2. 检查朋友圈互动 ---
+            if (charSettings.moments && charSettings.moments.enabled && charSettings.moments.probability > 0) {
+                const config = charSettings.moments;
+                // 【【【核心修改：恢复为原始逻辑，只检查自身的冷却时间】】】
+                if (!config.lastTick || (now - config.lastTick >= config.interval * 60 * 1000)) {
+                    if (Math.random() * 100 < config.probability) {
+                        const action = Math.random() < 0.2 ? 'post_moment' : 'browse_moments';
+                        console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering moment action (${action}) for private character "${charName}".`);
+                        await triggerProactiveAI(chat.id, charName, action);
+                        config.lastTick = now; // 更新时间戳
+                        settingsChanged = true;
                     }
                 }
+            }
             }
             // =================================================================
             // 【【【【【【 新增代码块到此结束 】】】】】】
@@ -16166,13 +16168,13 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             alert(`成功导入 ${newCount} 个新NPC，并录入/更新了人设信息！`);
         }
         async function showNpcEditorModal(npcName) {
-            const isEditing = npcList.includes(npcName);
-            const persona = (npcSettings.personas && npcSettings.personas[npcName]) || '';
-            const association = (npcSettings.associations && npcSettings.associations[npcName]) || '';
-            const dynamicSetting = (npcSettings.dynamics && npcSettings.dynamics[npcName]) || { probability: 10, interval: 5 };
+        const isEditing = npcList.includes(npcName);
+        const persona = (npcSettings.personas && npcSettings.personas[npcName]) || '';
+        const association = (npcSettings.associations && npcSettings.associations[npcName]) || '';
+        const dynamicSetting = (npcSettings.dynamics && npcSettings.dynamics[npcName]) || { probability: 40, interval: 60 };
 
-            // 移除了折叠功能，直接显示所有内容
-            const modalHtml = `
+        // 移除了折叠功能，直接显示所有内容
+        const modalHtml = `
                 <div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 65vh; overflow-y: auto; padding-right: 10px;">
                     <div class="form-group" style="margin:0;">
                         <label for="npc-editor-name">名称</label>
@@ -16383,16 +16385,16 @@ async function handleBatchDelete() {
             }
 
             const modalHtml = `<div style="text-align: left; display: flex; flex-direction: column; gap: 15px;">
-                <p>为选中的 ${selectedNpcs.length} 个NPC设置动态：</p>
-                <div class="form-group" style="margin:0;">
-                    <label for="bulk-npc-dynamics-probability">概率 (%)</label>
-                    <input type="number" id="bulk-npc-dynamics-probability" class="modal-input" min="0" max="100" value="10">
-                </div>
-                <div class="form-group" style="margin:0;">
-                    <label for="bulk-npc-dynamics-interval">间隔 (分钟)</label>
-                    <input type="number" id="bulk-npc-dynamics-interval" class="modal-input" min="1" value="5">
-                </div>
-            </div>`;
+    <p>为选中的 ${selectedNpcs.length} 个NPC设置动态：</p>
+    <div class="form-group" style="margin:0;">
+        <label for="bulk-npc-dynamics-probability">概率 (%)</label>
+        <input type="number" id="bulk-npc-dynamics-probability" class="modal-input" min="0" max="100" value="40">
+    </div>
+    <div class="form-group" style="margin:0;">
+        <label for="bulk-npc-dynamics-interval">间隔 (分钟)</label>
+        <input type="number" id="bulk-npc-dynamics-interval" class="modal-input" min="1" value="60">
+    </div>
+</div>`;
 
 
             const result = await conversationManager.showCustomModal({
