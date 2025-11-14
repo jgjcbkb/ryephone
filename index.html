@@ -2032,9 +2032,9 @@ input:checked + .slider:before {
 #tab-content-moments .reaction-item { display: inline-block; margin-right: 8px; color: var(--moments-link-color); font-size: 15px; }
 #tab-content-moments .reactions-list .reaction-icon { display: inline-block; width: 16px; height: 16px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%235d6d94'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E"); background-size: contain; background-position: center; background-repeat: no-repeat; vertical-align: middle; margin-right: 4px; }
 #tab-content-moments .comments-list { max-height: none; overflow-y: visible; }
-#tab-content-moments .comment-item { display: flex; align-items: flex-start; line-height: 1.5; padding: 3px 0; font-size: 15px; white-space: normal; position: relative; }
+#tab-content-moments .comment-item { display: flex; align-items: flex-start; line-height: 1.5; padding: 3px 0; font-size: 15px; white-space: normal; position: relative; border: none !important; }
 #tab-content-moments .comment-item + .comment-item { margin-top: 6px; }
-#tab-content-moments .comment-text-container { flex-grow: 1; display: flex; flex-wrap: wrap; align-items: baseline; overflow: hidden; min-width: 0; }
+#tab-content-moments .comment-text-container { flex-grow: 1; display: flex; flex-wrap: wrap; align-items: baseline; overflow: hidden; min-width: 0; padding-left: 8px; }
 #tab-content-moments .comment-meta { white-space: nowrap; flex-shrink: 0; font-weight: 700; color: var(--moments-link-color); margin-right: 4px; }
 #tab-content-moments .comment-content-text { flex-grow: 1; word-break: break-word; white-space: pre-wrap; color: var(--moments-primary-text); font-weight: normal; min-width: 0; }
 #tab-content-moments .delete-comment-btn { background: none; border: none; font-size: 16px; color: #b0b0b0; cursor: pointer; padding: 0; opacity: 0.6; margin-left: auto; flex-shrink: 0; align-self: center; }
@@ -4276,6 +4276,103 @@ input:checked + .slider:before {
 }
 
 /* --- END: MOMENTS ACTION PANEL CLICK FIX --- */
+/* --- START: NPC关联角色选择框美化 --- */
+#npc-editor-association-list {
+    border: none !important;
+    padding: 0 !important;
+    display: flex;
+    flex-direction: column;
+    gap: 15px; /* 分组之间的间距 */
+}
+
+.association-category h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #555;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+.association-grid {
+    display: grid;
+    /* 核心：自动填充列，每列最小100px，最大1fr (弹性) */
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px; /* 选项之间的间距 */
+}
+
+.association-item {
+    display: flex;
+    align-items: center;
+    background-color: #f7f8fa;
+    border: 1px solid #e5e5ea;
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    overflow: hidden; /* 防止文字溢出 */
+}
+
+.association-item:hover {
+    background-color: #eff0f2;
+    border-color: #d1d1d6;
+}
+
+/* 隐藏原始复选框 */
+.association-item input[type="checkbox"] {
+    display: none;
+}
+
+/* 自定义复选框的“框” */
+.association-item span::before {
+    content: '';
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #c7c7cc;
+    border-radius: 4px;
+    margin-right: 8px;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    background-color: #fff;
+    box-sizing: border-box;
+    vertical-align: middle; /* 垂直对齐 */
+}
+
+/* 选中时的“框”样式 */
+.association-item input:checked + span::before {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    /* SVG 勾号图标 */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z'/%3E%3C/svg%3E");
+    background-size: 80%;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* 选中时整个标签的样式 */
+.association-item input:checked + span {
+    font-weight: 600;
+    color: #111;
+}
+
+.association-item span {
+    font-size: 14px;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* 文字过长时显示省略号 */
+    display: flex; /* 让span内的伪元素和文字对齐 */
+    align-items: center;
+}
+/* --- END: NPC关联角色选择框美化 --- */
+/* --- START: 强制朋友圈评论区内的HTML片段宽度自适应 --- */
+#tab-content-moments .comment-content-text > * {
+    max-width: 100%;
+    height: auto;
+    box-sizing: border-box;
+}
+/* --- END: 强制朋友圈评论区内的HTML片段宽度自适应 --- */
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -5854,7 +5951,7 @@ input:checked + .slider:before {
         const postInstruction = `
 [ULTIMATE DIRECTIVE: HOW TO CREATE A MOMENTS POST]
 
-**YOUR IDENTITY**: You are ${senderName}. ${personaText}. Your posts must perfectly align with your personality.
+**YOUR IDENTITY**: You are ${senderName}. Your posts must perfectly align with your personality.
 
 **LANGUAGE REQUIREMENT (ABSOLUTE)**: You MUST generate all content in **Simplified Chinese (简体中文)**.
 
@@ -6282,13 +6379,28 @@ if (isGroupPersona) {
                 let authorLabel = post.userName;
                 // 添加身份标签
                 if (post.userName === senderName) { authorLabel = `YOU (this is your own post)`; } 
-                else if (post.userName === mainUserName) { authorLabel = `${post.userName} (the user you are interacting with)`; }
+                else if (!isNpc && post.userName === mainUserName) { authorLabel = `${post.userName} (the user you are interacting with)`; }
                 else if (isNpc && npcSettings.associations[senderName] === post.userName) { authorLabel = `${post.userName} (your associated character)`;}
 
                 const commentsPreview = post.comments.filter(c => c.user !== senderName).slice(-3).map(c => {
                     let commenterLabel = c.user;
                     if (c.user === mainUserName) { commenterLabel = `${c.user} (the user)`; }
-                    return `- ${commenterLabel} (replying to ${c.replyTo || 'post'}): "${c.text}"`;
+                    
+                    // --- 核心修改从这里开始 ---
+                    const commentText = c.text.trim();
+                    // 我们现在只检查它是否为HTML代码
+                    const isHtmlOrSnippet = /<[a-z][\s\S]*>/i.test(commentText);
+
+                    // 如果评论是HTML代码
+                    if (isHtmlOrSnippet) {
+                        // 就用一个更精确的占位符替换它
+                        return `- ${commenterLabel} (replying to ${c.replyTo || 'post'}): [一条格式化评论]`;
+                    } else {
+                        // 否则 (无论是纯文本还是表情包指令)，都照常显示给AI
+                        return `- ${commenterLabel} (replying to ${c.replyTo || 'post'}): "${c.text}"`;
+                    }
+                    // --- 核心修改到这里结束 ---
+
                 }).join('\n');
                
                 // --- 根据“知识范围”加载并注入人设 ---
@@ -6368,58 +6480,130 @@ chatHistoryForPrompt = apiPayloadMessages.map(msg => {
             // 我们不再扫描所有群聊，而是只关注当前角色所在的上下文群聊（如果存在），以及其他直接关联的角色
             let extraContext = '';
             
-            // 1. 如果当前角色是NPC，加载其【唯一关联角色】的人设信息
+            // 步骤 1 (无条件执行): 如果当前角色是NPC，【必须】加载其所有关联角色的人设。
             if (isNpc) {
-                const associatedCharName = npcSettings.associations[senderName];
-                if (associatedCharName) {
-                    let associatedPersona = '';
-                    const charChat = chatList.find(c => c.name === associatedCharName && c.type === '私聊');
-                    if(charChat){
-                         const charChatInfo = loadFromLocalStorage(`chat_info_${charChat.id}`, {});
-                         if (charChatInfo.aiPersona) { associatedPersona = charChatInfo.aiPersona; }
-                    }
-                    if(associatedPersona){
-                       extraContext += `\n[Your Associated Character's Persona: ${associatedCharName} - ${associatedPersona}]`;
-                    }
+                // 确保 associations[senderName] 是一个数组，以实现向后兼容
+                let associatedCharNames = npcSettings.associations[senderName] || [];
+                if (typeof associatedCharNames === 'string') {
+                    associatedCharNames = [associatedCharNames];
+                }
+
+                if (associatedCharNames.length > 0) {
+                    extraContext += `\n[Your Associated Characters' Personas]`; // 标题改为复数
+                    
+                    // 遍历所有关联的角色名
+                    associatedCharNames.forEach(associatedCharName => {
+                        let associatedPersona = '';
+
+                        // 1. 检查关联角色是否是一个【用户人设】
+                        const userPersona = userPersonas.find(p => p.name === associatedCharName);
+                        if (userPersona && userPersona.description) {
+                            associatedPersona = userPersona.description;
+                        }
+
+                        // 2. 如果不是，再检查是否是一个【私聊AI角色】
+                        if (!associatedPersona) {
+                            const charChat = chatList.find(c => c.name === associatedCharName && c.type === '私聊');
+                            if (charChat) {
+                                const charChatInfo = loadFromLocalStorage(`chat_info_${charChat.id}`, {});
+                                if (charChatInfo.aiPersona) {
+                                    associatedPersona = charChatInfo.aiPersona;
+                                }
+                            }
+                        }
+
+                        // 3. 如果还不是，再检查是否是【另一个NPC】
+                        if (!associatedPersona) {
+                            if (npcSettings.personas && npcSettings.personas[associatedCharName]) {
+                                associatedPersona = npcSettings.personas[associatedCharName];
+                            }
+                        }
+                        
+                        // 4. 检查是否是一个【群聊主角】
+                        if (!associatedPersona) {
+                            const groupChatSource = chatList.find(chat => {
+                                if (chat.type !== '群聊') return false;
+                                const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+                                return info.groupPersonas && info.groupPersonas.some(p => p.name === associatedCharName);
+                            });
+                            if (groupChatSource) {
+                                const info = loadFromLocalStorage(`chat_info_${groupChatSource.id}`, {});
+                                const personaData = info.groupPersonas.find(p => p.name === associatedCharName);
+                                if (personaData && personaData.description) {
+                                    associatedPersona = personaData.description;
+                                }
+                            }
+                        }
+
+                        // 5. 【【【【【【 核心新增：最后，检查是否是一个【群演人设】 】】】】】
+                        if (!associatedPersona) {
+                            // 遍历所有群聊，查找哪个群的备注里包含了这个关联角色
+                            const ensembleGroupSource = chatList.find(chat => {
+                                if (chat.type !== '群聊') return false;
+                                const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+                                const ensembleNames = (info.remark || '').split(/[,，\s]+/).filter(Boolean);
+                                return ensembleNames.includes(associatedCharName);
+                            });
+
+                            // 如果找到了这个群，就使用这个群的通用群演人设
+                            if (ensembleGroupSource) {
+                                const info = loadFromLocalStorage(`chat_info_${ensembleGroupSource.id}`, {});
+                                if (info.ensemblePersona) {
+                                    associatedPersona = info.ensemblePersona;
+                                }
+                            }
+                        }
+
+                        // 只要从任何来源找到了人设，就将其作为列表项注入
+                        if (associatedPersona) {
+                           extraContext += `\n- ${associatedCharName}: ${associatedPersona}`;
+                        }
+                    });
                 }
             }
             
-            // 2. 检查当前角色的上下文是否是一个群聊
+            // 步骤 2 (有条件执行): 检查是否存在一个共同的聊天上下文 (contextChatId)，如果存在，则加载更丰富的环境信息。
             if (contextChatId) {
                 const contextChat = chatList.find(c => c.id === contextChatId);
+                // 2.1 如果这个上下文是一个群聊
                 if (contextChat && contextChat.type === '群聊') {
-                    // 如果是群聊，就只加载【这个群里】的成员信息
-                    const membersOfContextGroup = loadFromLocalStorage(`chat_members_${contextChatId}`, []);
-                    
-                    if (membersOfContextGroup.length > 0) {
+                    const groupInfo = loadFromLocalStorage(`chat_info_${contextChatId}`, {});
+                    const formalMembers = loadFromLocalStorage(`chat_members_${contextChatId}`, []);
+                    const protagonists = (groupInfo.groupPersonas || []).map(p => p.name);
+                    const ensemble = (groupInfo.remark || '').split(/[,，\s]+/).filter(Boolean);
+                    const allAiActorsInGroup = [...new Set([...formalMembers, ...protagonists, ...ensemble])];
+
+                    if (allAiActorsInGroup.length > 0) {
                         extraContext += `\n\n[Known Associates in Your Current Group ("${contextChat.name}")]`;
-                        membersOfContextGroup.forEach(memberName => {
+                        allAiActorsInGroup.forEach(memberName => {
                             if (knownPersonas.has(memberName)) return; 
                             
                             let persona = '';
                             const isNpcMember = npcList.includes(memberName);
-                            const aiChatMember = chatList.find(c => c.name === memberName && c.type === '私聊');
+                            const protagonistPersona = (groupInfo.groupPersonas || []).find(p => p.name === memberName);
                             
-                            if (aiChatMember) {
-                                const aiChatInfo = loadFromLocalStorage(`chat_info_${aiChatMember.id}`, {});
-                                persona = aiChatInfo.aiPersona || '';
+                            if (protagonistPersona) {
+                                persona = protagonistPersona.description || '';
+                            } else if (ensemble.includes(memberName)) {
+                                persona = groupInfo.ensemblePersona || '';
                             } else if (isNpcMember) {
                                 persona = (npcSettings.personas && npcSettings.personas[memberName]) || '';
+                            } else {
+                                const aiChatMember = chatList.find(c => c.name === memberName && c.type === '私聊');
+                                if (aiChatMember) {
+                                    const aiChatInfo = loadFromLocalStorage(`chat_info_${aiChatMember.id}`, {});
+                                    persona = aiChatInfo.aiPersona || '';
+                                }
                             }
+                            
                             if(persona) {
                                extraContext += `\n- ${memberName}: ${persona}`;
                             }
                         });
                     }
-                    
-                    // 加载这个群的群演人设
-                    const groupInfo = loadFromLocalStorage(`chat_info_${contextChatId}`, {});
-                    if (groupInfo.ensemblePersona) {
-                        extraContext += `\n\n[Ensemble Persona for This Group]\n${groupInfo.ensemblePersona}`;
-                    }
                 }
 
-                // 3. 加载当前上下文【明确关联】的NPC人设（无论单聊还是群聊）
+                // 2.2 加载当前上下文【明确关联】的NPC人设（无论单聊还是群聊）
                 const associatedNpcNamesForMoments = loadFromLocalStorage(`chat_associated_npcs_${contextChatId}`, []);
                 if (associatedNpcNamesForMoments.length > 0) {
                     extraContext += '\n\n[Associated NPCs for this Context]\n';
@@ -6431,12 +6615,26 @@ chatHistoryForPrompt = apiPayloadMessages.map(msg => {
                 }
             }
            
-            const contextHeader = `
+            let contextHeader = `
 [CONTEXT - READ FIRST]
 This is the context from your primary chat. Use it to inform your reactions on Moments.
 Preamble: ${preamble || 'None'}
 User Persona (${mainUserName}): ${finalUserPersonaText || 'Default'}
 ${extraContext}
+`;
+            // --- 核心新增：筛选并注入朋友圈专属世界书 ---
+            let momentsWorldBookContent = '';
+            const momentsWorldBooks = worldBookEntries.filter(wb => wb.name.includes('(MOMENTS)') && wb.enabled);
+            if (momentsWorldBooks.length > 0) {
+                momentsWorldBookContent += '\n\n[MOMENTS-SPECIFIC CONTEXT (WORLD BOOK)]\nThis is special background information ONLY for your actions on Moments.\n';
+                momentsWorldBooks.forEach(entry => {
+                    momentsWorldBookContent += `\n- **${entry.name.replace('(MOMENTS)', '').trim()}**: ${entry.content}`;
+                });
+            }
+            contextHeader += momentsWorldBookContent;
+            // --- 新增结束 ---
+
+            contextHeader += `
 ---
 [RECENT CHAT HISTORY]
 ${chatHistoryForPrompt || 'No recent chat history.'}
@@ -6496,16 +6694,37 @@ Based on the posts above, your persona, and your relationship with the authors, 
      *   **Format:** \`[like_moment: post_id_here]\`
    *   **TO COMMENT or REPLY:** For when you have something to say. Your comment must match your persona.
      *   **CRITICAL:** NO SELF-TALKING. Do not comment on your own posts.
-     *   **YOUR OPTIONS FOR "content":** You have TWO choices for the comment's content:
-         1.  **A line of text:** For expressing complex thoughts, opinions, or questions.
-         2.  **A sticker command:** For simple, direct emotional reactions (e.g., approval, laughter, surprise). The format MUST be \`[sticker:Sticker Name]\`.
-     *   **AVAILABLE STICKERS:** [${stickerNames}]
-     *   **HOW TO CHOOSE:** If your reaction is simple like "Cool!" or "Haha", a sticker is better. If you have more to say, use text.
+     *   **YOUR OPTIONS FOR "content" (Decision Hierarchy):** You have several tools for commenting. You MUST follow this hierarchy to ensure your interactions feel natural.
 
-     *   **FORMATS:**
-         *   **To comment on a post (with text):** \`[comment_moment: {"postId":"post_id_here", "content":"Your thoughtful, in-character comment."}]\`
-         *   **To comment on a post (with a sticker):** \`[comment_moment: {"postId":"post_id_here", "content":"[sticker:开心]"}]\`
-         *   **To reply to a comment (with text):** \`[comment_moment: {"postId":"post_id_here", "content":"Your reply.", "replyTo":"username_here"}]\`
+         **1. The Default & Preferred Method: Plain Text**
+            *   **USE CASE:** This is your primary tool. Use it for almost all comments: expressing thoughts, opinions, questions, or engaging in conversation.
+            *   **GOAL:** Sound like a real person having a conversation.
+
+         **2. The Quick Reaction: Sticker Command**
+            *   **USE CASE:** For simple, direct emotional reactions where words aren't necessary (e.g., "Cool!", "Wow!", "Haha").
+            *   **FORMAT:** \\\`[sticker:Sticker Name]\\\`
+
+         **3. The Special Tool (Use Sparingly): HTML Snippet**
+            *   **USE CASE:** This is a special-purpose tool, NOT a standard way to comment. Use it **infrequently** and **ONLY** when your character's unique personality and the specific situation absolutely demand a visually distinct, custom-formatted response that plain text cannot possibly convey.
+            *   **WARNING:** Overusing HTML snippets will make your character feel robotic and unnatural. Your goal is realism.
+            *   **FORMAT:** The entire HTML code MUST be wrapped in \\\`<snippet>...</snippet>\\\` tags.
+
+     *   **AVAILABLE STICKERS:** [${stickerNames}]
+
+     *   **MANDATORY THINKING PROCESS (HOW TO CHOOSE):**
+         1.  **ASK FIRST: "Can I say this with just words?"** If the answer is yes, you **MUST** use plain text. This should be your choice 90% of the time.
+         2.  **ASK SECOND: "Is this a simple, one-word emotion?"** If yes, a sticker is a good alternative to text.
+         3.  **ASK LAST: "Is this a rare, special occasion where my character would go out of their way to create a unique visual card to make a statement?"** Only if the answer is a definitive "yes" should you consider using an HTML snippet.
+
+     *   **FORMATS & EXAMPLES:**
+         *   **To comment with text:** \`[comment_moment: {"postId":"post_id_here", "content":"Your text comment."}]\`
+         *   **To comment with a sticker:** \`[comment_moment: {"postId":"post_id_here", "content":"[sticker:开心]"}]\`
+         *   **To reply to another comment:** \`[comment_moment: {"postId":"post_id_here", "content":"Your reply.", "replyTo":"username_here"}]\`
+         *   **To comment with a custom HTML block (SPECIAL CASE):** Instead of using the \`[comment_moment]\` command, you should simply output the raw \`<snippet>...\</snippet>\` block directly. The system will automatically understand it as a comment on the latest post. For example:
+           \`\`\`
+           <snippet><div style='white-space: normal; background:red;color:white;padding:5px;max-width:100%;box-sizing:border-box;'>Hello World!</div></snippet>
+           \`\`\`
+     *   **CRITICAL HTML RULE:** The HTML inside the snippet **MUST be responsive**. **DO NOT** use fixed \`width\` properties like \`width: 200px\`. Your snippet will be placed inside a container that already has a width limit. Make sure your content wraps naturally. **【【【空白诅咒破除铁律】】】** 同样，为了防止产生空白，你生成的HTML代码的【最外层】\`<div>\` **必须** 包含 \`style="white-space: normal;"\`。
 
 **2. PRIVATE MESSAGE IMPULSE (Use Sparingly)**
    *   **Use Case:** Only when a post makes you want to start a **private, one-on-one conversation** that is not suitable for a public comment section.
@@ -6563,11 +6782,26 @@ Even if nothing seems immediately interesting, you must find a reason to act, ba
             }
             // --- END: 核心修正 ---
 
+           //改后
             let contextHeader = `
 [CONTEXT - READ FIRST]
 Use this context to decide WHAT to post. Your post must be consistent with this background information.
-Preamble: ${preamble || 'None'}
+Preamle: ${preamble || 'None'}
 User Persona (${userNameForPrompt}): ${finalUserPersonaText || 'Default'}
+`;
+            // --- 核心新增：筛选并注入朋友圈专属世界书 ---
+            let momentsWorldBookContent = '';
+            const momentsWorldBooks = worldBookEntries.filter(wb => wb.name.includes('(MOMENTS)') && wb.enabled);
+            if (momentsWorldBooks.length > 0) {
+                momentsWorldBookContent += '\n\n[MOMENTS-SPECIFIC CONTEXT (WORLD BOOK)]\nThis is special background information ONLY for your actions on Moments.\n';
+                momentsWorldBooks.forEach(entry => {
+                    momentsWorldBookContent += `\n- **${entry.name.replace('(MOMENTS)', '').trim()}**: ${entry.content}`;
+                });
+            }
+            contextHeader += momentsWorldBookContent;
+            // --- 新增结束 ---
+
+            contextHeader += `
 ---
 [RECENT CHAT HISTORY]
 ${chatHistoryForPrompt || 'No recent chat history.'}
@@ -6667,70 +6901,70 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                 }
 
                 const cleanedResponse = aiResponse.trim();
-                const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message):\s*({[\s\S]*?})\]/g;
-                let match;
+                
+                // --- 核心重构：使用一个更强大的正则表达式，一次性匹配所有可能的动作 ---
+                // 这个表达式可以匹配 <snippet>...</snippet> 或者 [...] 格式的指令
+                const actionRegex = /(<snippet>[\s\S]*?<\/snippet>)|(\[(like_moment|comment_moment|post_moment|send_private_message):\s*[\s\S]*?\])/g;
+
+                const allActions = cleanedResponse.match(actionRegex);
+
+                if (!allActions || allActions.length === 0) {
+                    console.warn(`[诊断日志] 角色 "${senderName}": API返回了内容，但没有找到任何有效的指令或HTML片段。内容:`, cleanedResponse);
+                    return;
+                }
+                
                 let commandsFound = 0;
-
-                while ((match = momentInteractionRegex.exec(cleanedResponse)) !== null) {
+                // --- 核心重构：循环遍历所有匹配到的动作并逐一处理 ---
+                for (const actionBlock of allActions) {
                     commandsFound++;
-                    const command = match[1];
-                    const value = match[2];
+                    console.log(`[诊断日志] 角色 "${senderName}": 找到动作 #${commandsFound}: ${actionBlock.substring(0, 50)}...`);
 
-                    console.log(`[诊断日志] 角色 "${senderName}": 找到指令 #${commandsFound}: ${command}`);
+                    // 情况一：如果这是一个 <snippet> 块
+                    if (actionBlock.startsWith('<snippet>')) {
+                        // 这说明AI想用HTML评论最新的帖子。我们自动为它构建一个评论指令。
+                        const latestPost = momentsManager.getLatestVisiblePostFor(senderName);
+                        if (latestPost) {
+                            const commentData = {
+                                postId: latestPost.id,
+                                content: actionBlock // 直接把完整的 <snippet>...</snippet> 作为内容
+                            };
+                            momentsManager.handleInteractionFromAI(senderName, 'comment', commentData);
+                        } else {
+                            console.warn(`[诊断日志] 角色 "${senderName}": 尝试用HTML评论，但找不到任何可见的帖子。`);
+                        }
+                        continue; // 处理完这个动作，进入下一个循环
+                    }
+                    
+                    // 情况二：如果这是一个常规的 [...] 指令
+                    const commandMatch = actionBlock.match(/\[(like_moment|comment_moment|post_moment|send_private_message):\s*([\s\S]*?)\]/);
+                    if (!commandMatch) continue;
+                    
+                    const command = commandMatch[1];
+                    const value = commandMatch[2];
 
                     if (command === 'like_moment') {
                         momentsManager.handleInteractionFromAI(senderName, 'like', { postId: value.trim() });
                     } else if (command === 'comment_moment') {
-                    try {
-                        // 【【【最终修复：使用更强大的正则表达式，能处理所有情况】】】
-                        const postIdMatch = value.match(/"postId"\s*:\s*"([^"]+)"/);
-                        
-                        // 这个新的正则表达式可以捕获 "content":"..." 中间的所有内容，直到遇到下一个引号或右花括号
-                        const contentMatch = value.match(/"content"\s*:\s*"((?:\\"|[^"])*)"/);
-                        
-                        const replyToMatch = value.match(/"replyTo"\s*:\s*"([^"]+)"/);
-
-                        if (postIdMatch && postIdMatch[1] && contentMatch && contentMatch[1]) {
-                            const commentData = {
-                                postId: postIdMatch[1],
-                                // 关键：对提取出的内容进行一次JSON字符串的反转义，
-                                // 这样 "无语？\\n[sticker:..]" 就会变回 "无语？\n[sticker:..]"
-                                content: JSON.parse(`"${contentMatch[1]}"`)
-                            };
-                            
-                            if (replyToMatch && replyToMatch[1]) {
-                                commentData.replyTo = replyToMatch[1];
-                            }
-
+                        try {
+                            const commentData = JSON.parse(value);
                             momentsManager.handleInteractionFromAI(senderName, 'comment', commentData);
-                        } else {
-                            throw new Error("AI returned a comment with invalid or missing postId/content fields.");
+                        } catch (e) {
+                             console.error(`[诊断日志] 角色 "${senderName}": 解析评论指令 (JSON) 失败`, e, value);
                         }
-                    } catch (e) {
-                        console.error(`[诊断日志] 角色 "${senderName}": 解析评论指令失败`, e, value);
-                    }
                     } else if (command === 'post_moment') {
                         try {
-                            const jsonString = value.replace(/```json/g, '').replace(/```/g, '').trim();
-                            const postData = JSON.parse(jsonString);
+                            const postData = JSON.parse(value);
                             momentsManager.createPostFromAI(senderName, postData);
                         } catch (e) {
                             console.error(`[诊断日志] 角色 "${senderName}": 解析发帖指令失败`, e, value);
                         }
                     } else if (command === 'send_private_message') {
                         try {
-                            const valueTrimmed = value.trim();
-                            const messagesArray = valueTrimmed.split('|||').map(msg => msg.trim()).filter(Boolean);
-
+                            const messagesArray = value.split('|||').map(msg => msg.trim()).filter(Boolean);
                             if (messagesArray.length > 0) {
+                                // (这部分私信路由的逻辑是正确的，保持不变)
                                 let finalTargetChatId = null;
                                 let logMessage = '';
-
-                                // =================================================================
-                                // 【【【【【【 全新的、严格遵守您规则的路由逻辑 】】】】】】
-                                // =================================================================
-
-                                // 规则 1: 单聊角色 -> 返回其专属单聊窗口
                                 const isPrivateCharacter = !isNpc && !isGroupPersona && !isEnsemblePersona;
                                 if (isPrivateCharacter) {
                                     const privateChat = chatList.find(chat => chat.type === '私聊' && chat.name === senderName);
@@ -6741,7 +6975,6 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                                         logMessage = `单聊角色 "${senderName}" 尝试发送私信，但未找到其专属单聊窗口，操作取消。`;
                                     }
                                 }
-                                // 规则 2: NPC -> 返回与关联角色的【共同群聊】
                                 else if (isNpc) {
                                     const associatedChar = npcSettings.associations[senderName];
                                     if (associatedChar) {
@@ -6760,7 +6993,6 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                                         logMessage = `NPC "${senderName}" 尝试发送私信，但未设置关联角色，操作取消。`;
                                     }
                                 }
-                                // 规则 3: 群演人设 或 群聊主角 -> 返回其【源群聊】
                                 else if (isEnsemblePersona || isGroupPersona) {
                                     const sourceGroupChat = chatList.find(chat => {
                                         if (chat.type !== '群聊') return false;
@@ -6778,12 +7010,8 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                                         logMessage = `群聊角色 "${senderName}" 尝试发送私信，但未找到其源群聊，操作取消。`;
                                     }
                                 }
-
-                                // 统一的日志输出和发送执行
                                 console.log(`[诊断日志] ${logMessage}`);
-
                                 if (finalTargetChatId) {
-                                    console.log(`[诊断日志] 准备向 Chat ID "${finalTargetChatId}" 发送 ${messagesArray.length} 条消息。`);
                                     await conversationManager.handleProactiveAIMessage(finalTargetChatId, senderName, messagesArray);
                                 }
                             }
@@ -6791,10 +7019,6 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                             console.error(`[诊断日志] 角色 "${senderName}": 处理私信指令时发生未知错误`, e, value);
                         }
                     }
-                }
-
-                if (commandsFound === 0) {
-                    console.warn(`[诊断日志] 角色 "${senderName}": API返回了内容，但没有找到任何有效的指令。内容:`, cleanedResponse);
                 }
             }
         }
@@ -7517,6 +7741,9 @@ info.myPersona = document.getElementById('my-persona').value.trim();
         *   其内容**必须**是一个**完整、独立**的HTML代码块。
         *   **绝对禁止** 在此区块内包含任何叙事性文字。
         *   **绝对禁止** 使用 \`sender="..."\` 属性。
+        *   **【【【空白诅咒破除铁律】】】** 为了防止产生巨大的空白区域，你生成的HTML代码的【最外层】\`<div>\` **必须** 包含 \`style="white-space: normal;"\`。
+
+    *   **自定义指令区块:** \`<block type="command">\`
 
     *   **自定义指令区块:** \`<block type="command">\`
         *   **专门**用于承载你自定义的、需要被代码解析的正则指令块（例如 \`[DANMAKU_PLAYER]...[/DANMAKU_PLAYER]\`）。
@@ -7696,8 +7923,9 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                         if (memoContent) {
                             let finalContent = memoContent;
                             const chat = chatList.find(c => c.id === targetChatId);
-                            // 检查是否是群聊，并且我们有一个有效的角色名
+                            // 核心修正：判断是否是群聊，并且AI在后台任务中明确指定了发送者
                             if (chat && chat.type === '群聊' && senderFromBlock) {
+                                // 如果是，就在备忘录内容前加上正确的角色名
                                 finalContent = `[${senderFromBlock}]\n${memoContent}`;
                             }
 
@@ -8740,11 +8968,12 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     1.  将你的 **对话内容** 和 **HTML 片段** 全部放在一个 \`<block type="text" ...>\` 块内。
     2.  使用 \`<snippet>...</snippet>\` 标签将需要渲染为 HTML 的部分包裹起来。
     3.  **宽度限制:** 所有在 \`<snippet>\` 内的 HTML 块，其最外层容器的宽度【禁止】超过 \`210px\`。
+    4.  **【【【空白诅咒破除铁律 (ABSOLUTE MANDATORY)】】】** 为了防止你的代码块在聊天气泡中产生巨大的空白，你【必须】在你生成的HTML代码的【最外层】那个\`<div>\`的\`style\`属性里，加上\`white-space: normal;\`。
 
 *   **正确范例 (混合内容):**
     \\\`\`\`xml
     <block type="text" sender="张三">我发现了一个有趣的东西：<snippet>
-    <div style="background:#f7f7f7; padding:10px; border-radius:8px; width: 210px;">
+    <div style="white-space: normal; background:#f7f7f7; padding:10px; border-radius:8px; width: 210px;">
         这是一个单气泡内的 HTML 卡片。
     </div>
     </snippet>这是卡片之后的对话。</block>
@@ -8757,10 +8986,11 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
 *   **格式规则:**
     *   在最外层的 \`<div>\` 标签上，添加一个固定的属性：\`data-ai-log-as-text="true"\`。
+    *   **【【【空白诅咒破除铁律】】】** 同样，为了防止产生空白，你【必须】在这个\`<div>\`的\`style\`属性里，加上\`white-space: normal;\`。
 
 *   **正确示例 (AI会记住这个动作):**
     \\\`\`\`html
-    <div style="padding: 10px; border-left: 3px solid #ccc; color: #888; font-style: italic; width: 210px;" data-ai-log-as-text="true">
+    <div style="white-space: normal; padding: 10px; border-left: 3px solid #ccc; color: #888; font-style: italic; width: 210px;" data-ai-log-as-text="true">
     他缓缓走到窗边，指尖轻轻拂过冰冷的玻璃，看着窗外无声坠落的雨滴。
     </div>
     \\\`\`\`
@@ -8816,14 +9046,16 @@ When generating a custom HTML card, you MUST adhere to the following rules witho
 
 3.  **Self-Contained:** The entire snippet must be a single, self-contained visual component.
 
+4.  **【【【空白诅咒破除铁律 (ABSOLUTE MANDATORY)】】】** 为了防止你的代码块在聊天气泡中产生巨大的空白，你【必须】在你生成的HTML代码的【最外层】那个\`<div>\`的\`style\`属性里，加上\`white-space: normal;\`。
+
 ---
 **[CORRECT vs. WRONG EXAMPLES]**
 
-*   **【THE ONLY CORRECT FORMAT】(All styles are inline):**
+*   **【THE ONLY CORRECT FORMAT】(All styles are inline and includes the curse-breaker):**
     \`\`\`
     <block type="html">
     <snippet>
-    <div style="background: #1a1a1d; border: 1px solid #c3073f; color: #e0e0e0; padding: 15px; border-radius: 4px;">
+    <div style="white-space: normal; background: #1a1a1d; border: 1px solid #c3073f; color: #e0e0e0; padding: 15px; border-radius: 4px;">
       <h3 style="color: #c3073f; text-align: center; margin: 0;">// ANALYSIS //</h3>
       ...
     </div>
@@ -14351,7 +14583,21 @@ const momentsManager = (function() {
                 if (post.text && post.text.trim() !== '') {
                     const textDiv = document.createElement('div');
                     textDiv.className = 'post-content-text';
-                    textDiv.textContent = post.text;
+                    
+                    // --- 核心修复：在这里添加判断 ---
+                    const postContent = post.text;
+                    // 使用一个简单的正则表达式检查内容是否包含HTML标签
+                    const containsHtml = /<[a-z][\s\S]*>/i.test(postContent);
+
+                    if (containsHtml) {
+                        // 如果包含HTML，就使用innerHTML来渲染
+                        textDiv.innerHTML = postContent;
+                    } else {
+                        // 如果不包含，就继续使用textContent来安全地显示纯文本
+                        textDiv.textContent = postContent;
+                    }
+                    // --- 修复结束 ---
+
                     postBody.appendChild(textDiv);
                 }
                 switch (post.type) {
@@ -14499,28 +14745,58 @@ const momentsManager = (function() {
         function showPrivacyDetailsModal(postPrivacy, postId) { let description = '', listHtml = ''; const { type, list } = postPrivacy; if (type === 'public') description = '全部可见'; else if (type === 'private') description = '仅自己可见'; else if (type === 'include') { description = '仅以下用户可见:'; listHtml = `<div class="list-items-container">${list.map(name => `<span class="list-item">${name}</span>`).join('')}</div>`; } else if (type === 'exclude') { description = '不给以下用户看:'; listHtml = `<div class="list-items-container">${list.map(name => `<span class="list-item">${name}</span>`).join('')}</div>`; } currentPrivacyDisplay.innerHTML = `<strong>当前可见范围: </strong><span class="privacy-value">${description}</span>${listHtml}`; privacyDetailsModalOverlay.classList.add('visible'); modifyPrivacyBtn.onclick = () => { privacyDetailsModalOverlay.classList.remove('visible'); showPrivacySelectionModal(postPrivacy, (newPrivacy) => { const post = feedData.find(p => p.id === postId); if (post) { post.privacy = newPrivacy; saveFeed(); renderFeed(); } }); }; closePrivacyDetailsBtn.onclick = () => privacyDetailsModalOverlay.classList.remove('visible'); privacyDetailsModalOverlay.onclick = (e) => { if (e.target === privacyDetailsModalOverlay) privacyDetailsModalOverlay.classList.remove('visible'); }; }
         
         function updatePostInteractions(postId) { const postData = feedData.find(p => p.id === postId); const postEl = appRoot.querySelector(`#${postId}`); if (!postData || !postEl) return; const reactionsList = postEl.querySelector('.reactions-list'); const commentsList = postEl.querySelector('.comments-list'); const interactionsSection = postEl.querySelector('.interactions-section'); const likers = postData.reactions['点赞'] || []; reactionsList.innerHTML = likers.length > 0 ? `<span class="reaction-item"><span class="reaction-icon"></span>点赞 ${likers.length > 3 ? `${likers.length}人` : likers.join(', ')}</span>` : ''; commentsList.innerHTML = postData.comments.map(c => {
-            // 【【【核心修复：全新的、支持混合内容的渲染逻辑】】】
+    let contentHtml = '';
+    const commentText = c.text.trim();
+    const stickerMatch = commentText.match(/^\[sticker:([^\]]+)\]$/);
+
+    // 步骤 1: 检查是否为表情包指令
+    if (stickerMatch) {
+        const stickerName = stickerMatch[1];
+        const sticker = stickers.find(s => s.name === stickerName);
+        if (sticker) {
+            contentHtml = `<img src="${sticker.url}" alt="${stickerName}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+        } else {
+            contentHtml = escapeHtml(c.text); // 找不到表情包，按纯文本处理
+        }
+    } else {
+        // 步骤 2: 如果不是表情包，就检查是否包含HTML标签
+        // 这个简单的检查 <...> 能捕获所有HTML代码块和混合内容
+        const containsHtml = /<[a-z][\s\S]*>/i.test(commentText);
+        
+        if (containsHtml) {
+            // 1. 先移除<snippet>外壳
+            let processedHtml = commentText.replace(/<snippet>([\s\S]*)<\/snippet>/, '$1');
             
-            // 1. 首先，对整个评论文本进行HTML转义，确保所有内容（包括用户可能输入的恶意代码）都是安全的
-            let safeText = escapeHtml(c.text);
+            // 2. 查找并提取<style>标签
+            const styleRegex = /<style>([\s\S]*?)<\/style>/i;
+            const styleMatch = processedHtml.match(styleRegex);
 
-            // 2. 然后，在这个绝对安全的文本上，使用正则表达式查找并替换所有的表情包指令
-            //    /g 标志确保会替换所有匹配项，而不是只替换第一个
-            const contentHtml = safeText.replace(/\[sticker:([^\]]+)\]/g, (match, stickerName) => {
-                // 查找这个表情包是否存在
-                const sticker = stickers.find(s => s.name === stickerName);
-                if (sticker) {
-                    // 如果找到了，就返回一个 <img> 标签的HTML字符串来替换掉 [sticker:名字]
-                    return `<img src="${sticker.url}" alt="${stickerName}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
-                } else {
-                    // 如果因为某些原因没找到这个表情包，就把原始的指令文本返回，避免内容丢失
-                    return match;
+            if (styleMatch && styleMatch[1]) {
+                const cssRules = styleMatch[1];
+                const styleId = `dynamic-style-${c.id || Date.now()}`; // 用评论ID创建唯一ID
+
+                // 3. 检查是否已注入过此样式，防止重复
+                if (!document.getElementById(styleId)) {
+                    const styleElement = document.createElement('style');
+                    styleElement.id = styleId;
+                    styleElement.textContent = cssRules;
+                    document.head.appendChild(styleElement);
                 }
-            });
 
-            // 3. 返回最终的、已经包含了图片和安全文本的完整HTML
-            return `<div class="comment-item" data-user="${c.user}" data-comment-id="${c.id || ''}"><div class="comment-text-container"><span class="comment-meta"><span class="commenter-name">${c.user}</span>${c.replyTo ? ` 回复 <span class="reply-to-name">${c.replyTo}</span>` : ''}:</span><span class="comment-content-text">${contentHtml}</span></div><button class="edit-comment-btn" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:13px;margin-left:auto;padding:0 8px;">编辑</button><button class="delete-comment-btn" title="删除评论">×</button></div>`;
-        }).join(''); commentsList.querySelectorAll('.delete-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); deleteComment(postId, e.target.closest('.comment-item').dataset.commentId); })); commentsList.querySelectorAll('.edit-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); editComment(postId, e.target.closest('.comment-item').dataset.commentId); })); interactionsSection.style.display = (reactionsList.innerHTML.trim() || commentsList.innerHTML.trim()) ? 'block' : 'none'; }
+                // 4. 从HTML中移除<style>标签
+                processedHtml = processedHtml.replace(styleRegex, '');
+            }
+
+            contentHtml = processedHtml;
+
+        } else {
+            // 如果不含HTML，则按原样转义纯文本
+            contentHtml = escapeHtml(c.text);
+        }
+    }
+
+    return `<div class="comment-item" data-user="${c.user}" data-comment-id="${c.id || ''}"><div class="comment-text-container"><span class="comment-meta"><span class="commenter-name">${c.user}</span>${c.replyTo ? ` 回复 <span class="reply-to-name">${c.replyTo}</span>` : ''}:</span><span class="comment-content-text">${contentHtml}</span></div><button class="edit-comment-btn" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:13px;margin-left:auto;padding:0 8px;">编辑</button><button class="delete-comment-btn" title="删除评论">×</button></div>`;
+}).join(''); commentsList.querySelectorAll('.delete-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); deleteComment(postId, e.target.closest('.comment-item').dataset.commentId); })); commentsList.querySelectorAll('.edit-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); editComment(postId, e.target.closest('.comment-item').dataset.commentId); })); interactionsSection.style.display = (reactionsList.innerHTML.trim() || commentsList.innerHTML.trim()) ? 'block' : 'none'; }
         
         function showFullListModal(title, items) { 
             fullListModalTitle.textContent = title; 
@@ -14767,8 +15043,7 @@ const momentsManager = (function() {
             commentModalOverlay.classList.add('visible');
             commentInput.focus();
         }
-
-        sendCommentBtn.addEventListener('click', () => {
+sendCommentBtn.addEventListener('click', () => {
             const text = commentInput.value.trim();
             if (text && activePostForComment) {
                 const post = feedData.find(p => p.id === activePostForComment);
@@ -14781,6 +15056,7 @@ const momentsManager = (function() {
                 }
             }
         });
+        
 
         cancelCommentBtn.addEventListener('click', () => commentModalOverlay.classList.remove('visible'));
         commentModalOverlay.addEventListener('click', e => { if (e.target === commentModalOverlay) commentModalOverlay.classList.remove('visible'); });
@@ -14990,6 +15266,18 @@ const momentsManager = (function() {
         function refreshData() {
             loadFeed();
         }
+        // --- START: 新增辅助函数 ---
+        function getLatestVisiblePostFor(characterName) {
+            // 这个函数会找到对指定角色可见的、时间上最新的那个帖子
+            const visiblePosts = feedData.filter(post => isPostVisibleToUser(post, characterName));
+            if (visiblePosts.length > 0) {
+                // feedData 已经是按时间降序排列的，所以第一个就是最新的
+                return visiblePosts[0];
+            }
+            return null;
+        }
+        // --- END: 新增辅助函数 ---
+
 
         function init() {
             // --- ↓↓↓ 核心修改 从这里开始 ↓↓↓ ---
@@ -15054,7 +15342,7 @@ if (momentsCommentStickerBtn) {
 checkMomentsUpdates(); // <--- 新增这一行
         }
         
-        return { init, refreshData, createPostFromAI, getRecentMomentsForAI, handleInteractionFromAI };
+        return { init, refreshData, createPostFromAI, getRecentMomentsForAI, handleInteractionFromAI, getLatestVisiblePostFor };
 })();
     
     const stickerManager = (function() {
@@ -16395,7 +16683,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         async function showNpcEditorModal(npcName) {
         const isEditing = npcList.includes(npcName);
         const persona = (npcSettings.personas && npcSettings.personas[npcName]) || '';
-        const association = (npcSettings.associations && npcSettings.associations[npcName]) || '';
+        const association = (npcSettings.associations && npcSettings.associations[npcName]) || []; // 默认值变为空数组
         const dynamicSetting = (npcSettings.dynamics && npcSettings.dynamics[npcName]) || { probability: 40, interval: 60 };
 
         // 移除了折叠功能，直接显示所有内容
@@ -16411,8 +16699,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                     </div>
                     <hr style="border: none; border-top: 1px solid #eee;">
                     <div class="form-group" style="margin:0;">
-                        <label for="npc-editor-association">关联角色</label>
-                        <select id="npc-editor-association" class="modal-input modal-select"><option>正在加载角色列表...</option></select>
+                        <label for="npc-editor-association">关联角色 (可多选)</label>
+                        <div id="npc-editor-association-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-top: 5px;">正在加载...</div>
                     </div>
                     
                     <hr style="border: none; border-top: 1px solid #eee;">
@@ -16438,14 +16726,59 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                     { text: '保存', value: 'save', class: 'primary' }
                 ],
                 onRender: (modalDOM) => {
-                    // 在弹窗显示后，再加载和填充列表
-                    const selectEl = modalDOM.querySelector('#npc-editor-association');
+                    const assocListEl = modalDOM.querySelector('#npc-editor-association-list');
                     
-                    // 【【【【【【 核心修复：调用 getAllUniqueCharacters() 获取完整角色列表 】】】】】】
+                    // --- 1. 获取并分类所有角色 ---
                     const allCharacters = getAllUniqueCharacters();
-                    const characterOptionsHtml = '<option value="">不关联</option>' + allCharacters.map(name => `<option value="${name}" ${association === name ? 'selected' : ''}>${name}</option>`).join('');
+                    const userPersonaNames = new Set(userPersonas.map(p => p.name));
+                    const aiCharacterNames = new Set(chatList.filter(c => c.type === '私聊').map(c => c.name));
+                    const npcNames = new Set(npcList);
+
+                    const categorized = {
+                        user: [],
+                        ai: [],
+                        npc: [],
+                        group: []
+                    };
+
+                    allCharacters.forEach(name => {
+                        if (userPersonaNames.has(name) || name === '{{user}}') {
+                            categorized.user.push(name);
+                        } else if (aiCharacterNames.has(name)) {
+                            categorized.ai.push(name);
+                        } else if (npcNames.has(name)) {
+                            categorized.npc.push(name);
+                        } else {
+                            // 剩下的就是群聊实体
+                            categorized.group.push(name);
+                        }
+                    });
+
+                    let currentAssociations = Array.isArray(association) ? association : (association ? [association] : []);
+
+                    // --- 2. 构建带有分组和新样式的HTML ---
+                    let characterOptionsHtml = '';
+                    const createCategoryHtml = (title, names) => {
+                        if (names.length === 0) return '';
+                        let html = `<div class="association-category"><h4>${title}</h4><div class="association-grid">`;
+                        names.sort().forEach(name => {
+                            html += `
+                                <label class="association-item">
+                                    <input type="checkbox" class="npc-association-checkbox" value="${name}" ${currentAssociations.includes(name) ? 'checked' : ''}>
+                                    <span>${name}</span>
+                                </label>
+                            `;
+                        });
+                        html += `</div></div>`;
+                        return html;
+                    };
                     
-                    selectEl.innerHTML = characterOptionsHtml;
+                    characterOptionsHtml += createCategoryHtml('用户人设', categorized.user);
+                    characterOptionsHtml += createCategoryHtml('AI 角色', categorized.ai);
+                    characterOptionsHtml += createCategoryHtml('NPC', categorized.npc);
+                    characterOptionsHtml += createCategoryHtml('群聊实体', categorized.group);
+
+                    assocListEl.innerHTML = characterOptionsHtml;
                 }
             });
 
@@ -16453,7 +16786,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 const modalBox = result.target.closest('.modal-box');
                 const newName = modalBox.querySelector('#npc-editor-name').value.trim();
                 const newPersona = modalBox.querySelector('#npc-editor-persona').value.trim();
-                const newAssociation = modalBox.querySelector('#npc-editor-association').value;
+                // 从所有选中的复选框中读取值，形成一个数组
+                const newAssociation = Array.from(modalBox.querySelectorAll('.npc-association-checkbox:checked')).map(cb => cb.value);
                 const newDynamics = {
                     probability: parseInt(modalBox.querySelector('#npc-editor-dynamics-probability').value, 10),
                     interval: parseInt(modalBox.querySelector('#npc-editor-dynamics-interval').value, 10)
@@ -20647,10 +20981,11 @@ After you formulate your chat response, you MUST ALSO generate a new memo for yo
 **CRITICAL RULES:**
 1.  **SINGLE MEMO:** You MUST generate ONLY ONE complete memo.
 2.  **MULTI-LINE NOTES:** This single memo can, and should, contain multiple lines (notes) if needed. Use the newline character (\\n) to separate each note.
-3.  **NO SEPARATORS:** You MUST NOT use "---" or any other separator. Your entire output for this task is just one block of text.
-4.  **Language:** Simplified Chinese.
+3.  **SENDER ATTRIBUTE (MANDATORY):** The opening \`<background_update>\` tag **MUST** include the \`sender\` attribute, set to your current character name.
+4.  **NO SEPARATORS:** You MUST NOT use "---" or any other separator. Your entire output for this task is just one block of text.
+5.  **Language:** Simplified Chinese.
 
-**Format your response STRICTLY as follows, at the VERY END of your entire output:**
+Format your response STRICTLY as follows, at the VERY END of your entire output:
 <background_update type="pager" sender="${senderName}">
 First line (note 1) of your memo.
 Second line (note 2) of your memo.
