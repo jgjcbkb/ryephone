@@ -6720,9 +6720,12 @@ Based on the posts above, your persona, and your relationship with the authors, 
          *   **To comment with text:** \`[comment_moment: {"postId":"post_id_here", "content":"Your text comment."}]\`
          *   **To comment with a sticker:** \`[comment_moment: {"postId":"post_id_here", "content":"[sticker:开心]"}]\`
          *   **To reply to another comment:** \`[comment_moment: {"postId":"post_id_here", "content":"Your reply.", "replyTo":"username_here"}]\`
-         *   **To comment with a custom HTML block (SPECIAL CASE):** Instead of using the \`[comment_moment]\` command, you should simply output the raw \`<snippet>...\</snippet>\` block directly. The system will automatically understand it as a comment on the latest post. For example:
+         *   **To comment with a custom HTML block (MANDATORY FORMAT):** You MUST wrap the entire HTML code within the "content" field of the \`[comment_moment]\` command.
+         *   **CRITICAL:** The HTML content inside the JSON string MUST be properly escaped. Specifically, all double quotes (\`"\`) inside your HTML MUST be escaped with a backslash (\`\\\`").
+         *   **【【【空白诅主破除铁律】】】** As always, the outermost \`<div>\` of your HTML MUST include \`style="white-space: normal;"\`.
+         *   **EXAMPLE:**
            \`\`\`
-           <snippet><div style='white-space: normal; background:red;color:white;padding:5px;max-width:100%;box-sizing:border-box;'>Hello World!</div></snippet>
+           [comment_moment: {"postId":"post_id_here", "content":"<snippet><div style=\\\"white-space: normal; background:red; color:white; padding:5px; max-width:100%; box-sizing:border-box;\\\">Hello World!</div></snippet>"}]
            \`\`\`
      *   **CRITICAL HTML RULE:** The HTML inside the snippet **MUST be responsive**. **DO NOT** use fixed \`width\` properties like \`width: 200px\`. Your snippet will be placed inside a container that already has a width limit. Make sure your content wraps naturally. **【【【空白诅咒破除铁律】】】** 同样，为了防止产生空白，你生成的HTML代码的【最外层】\`<div>\` **必须** 包含 \`style="white-space: normal;"\`。
 
@@ -6918,45 +6921,67 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                 for (const actionBlock of allActions) {
                     commandsFound++;
                     console.log(`[诊断日志] 角色 "${senderName}": 找到动作 #${commandsFound}: ${actionBlock.substring(0, 50)}...`);
-
-                    // 情况一：如果这是一个 <snippet> 块
-                    if (actionBlock.startsWith('<snippet>')) {
-                        // 这说明AI想用HTML评论最新的帖子。我们自动为它构建一个评论指令。
-                        const latestPost = momentsManager.getLatestVisiblePostFor(senderName);
-                        if (latestPost) {
-                            const commentData = {
-                                postId: latestPost.id,
-                                content: actionBlock // 直接把完整的 <snippet>...</snippet> 作为内容
-                            };
-                            momentsManager.handleInteractionFromAI(senderName, 'comment', commentData);
-                        } else {
-                            console.warn(`[诊断日志] 角色 "${senderName}": 尝试用HTML评论，但找不到任何可见的帖子。`);
-                        }
-                        continue; // 处理完这个动作，进入下一个循环
-                    }
                     
-                    // 情况二：如果这是一个常规的 [...] 指令
+                    // 唯一的处理路径：所有动作都必须是 [...] 指令
                     const commandMatch = actionBlock.match(/\[(like_moment|comment_moment|post_moment|send_private_message):\s*([\s\S]*?)\]/);
-                    if (!commandMatch) continue;
+                    if (!commandMatch) {
+                        console.warn(`[诊断日志] 角色 "${senderName}": 发现一个无法识别的动作块，已忽略:`, actionBlock);
+                        continue; // 如果不是 [...] 指令，直接跳过
+                    }
                     
                     const command = commandMatch[1];
                     const value = commandMatch[2];
 
                     if (command === 'like_moment') {
                         momentsManager.handleInteractionFromAI(senderName, 'like', { postId: value.trim() });
-                    } else if (command === 'comment_moment') {
+                    } else if (command === 'comment_moment' || command === 'post_moment') {
                         try {
-                            const commentData = JSON.parse(value);
-                            momentsManager.handleInteractionFromAI(senderName, 'comment', commentData);
+                            const value = commandMatch[2];
+
+                            // 步骤 1: 优先、独立地提取关键字段
+                            const postIdMatch = value.match(/"postId"\s*:\s*"([^"]+)"/);
+                            const postId = postIdMatch ? postIdMatch[1] : null;
+
+                            const replyToMatch = value.match(/"replyTo"\s*:\s*"([^"]+)"/);
+                            const replyTo = replyToMatch ? replyToMatch[1] : null;
+
+                            const typeMatch = value.match(/"type"\s*:\s*"([^"]+)"/);
+                            const type = typeMatch ? typeMatch[1] : 'text';
+
+                            // 步骤 2: 精准定位并提取 content/text 的内容
+                            let content = '';
+                            const contentKeyMatch = value.match(/"(content|text)"\s*:/);
+                            if (contentKeyMatch) {
+                                const contentKey = contentKeyMatch[0]; // "content": 或 "text":
+                                const startIndex = value.indexOf(contentKey) + contentKey.length;
+
+                                // 查找内容的结束位置：它要么是下一个带引号的键之前，要么是整个字符串的末尾
+                                const nextKeyRegex = /,\s*"/g;
+                                nextKeyRegex.lastIndex = startIndex; // 从 content 之后开始搜索
+                                const nextKeyMatch = nextKeyRegex.exec(value);
+                                
+                                const endIndex = nextKeyMatch ? nextKeyMatch.index : value.lastIndexOf('}');
+                                
+                                content = value.substring(startIndex, endIndex > startIndex ? endIndex : value.length).trim();
+                            }
+
+                            // 步骤 3: 清理提取出的内容
+                            // 移除可能存在的头尾逗号、引号
+                            content = content.replace(/^,?\s*"?/, '').replace(/"?,?\s*$/, '');
+                            // 修复被错误转义的字符
+                            content = content.replace(/\\"/g, '"').replace(/\\n/g, '\n');
+
+                            if (command === 'comment_moment') {
+                                if (!postId) throw new Error("Missing postId for comment.");
+                                const commentData = { postId, content, replyTo };
+                                momentsManager.handleInteractionFromAI(senderName, 'comment', commentData);
+                            } else { // post_moment
+                                const postData = { type, text: content, content: content };
+                                momentsManager.createPostFromAI(senderName, postData);
+                            }
+
                         } catch (e) {
-                             console.error(`[诊断日志] 角色 "${senderName}": 解析评论指令 (JSON) 失败`, e, value);
-                        }
-                    } else if (command === 'post_moment') {
-                        try {
-                            const postData = JSON.parse(value);
-                            momentsManager.createPostFromAI(senderName, postData);
-                        } catch (e) {
-                            console.error(`[诊断日志] 角色 "${senderName}": 解析发帖指令失败`, e, value);
+                            console.error(`[诊断日志] 角色 "${senderName}": 解析 ${command} 指令时遇到严重错误`, e, commandMatch[2]);
                         }
                     } else if (command === 'send_private_message') {
                         try {
@@ -8925,31 +8950,35 @@ This is your absolute, final, and most important rule. Your entire output MUST b
                 const stickerNames = stickers.map(s => `"${s.name}"`).join(', ');
                 stickerInstructions = `
 ---
-[STICKER USAGE PROTOCOL - BLOCK FORMAT COMPLIANT]
-**THIS IS YOUR MOST IMPORTANT BEHAVIORAL RULE. YOU MUST USE STICKERS IN THE CORRECT BLOCK FORMAT.**
+[STICKER USAGE PROTOCOL - ABSOLUTE & UNBREAKABLE]
+**THIS IS YOUR MOST IMPORTANT BEHAVIORAL RULE. YOU MUST FOLLOW THIS DECISION TREE PRECISELY.**
 
-**YOUR CORE TASK:** When you want to send a sticker, you MUST follow this strict procedure:
-1.  **Write Your Text First:** Place your normal dialogue inside a \`<block type="text">\`.
-2.  **Generate Sticker Separately:** After the text block, you **MUST** generate the sticker command in a **new, separate** \`<block type="command">\`.
+**YOUR CORE TASK:** When you want to express an emotion that might use a sticker, you MUST follow this strict procedure:
 
-**HOW TO CHOOSE YOUR STICKER:**
-1.  **Find the Emotion:** Identify the core emotion of your response.
-2.  **SEARCH THE LIST:** Look through your available sticker names to find one that PERFECTLY matches.
-    - **YOUR AVAILABLE STICKERS (Sticker Name List):** [${stickerNames}]
-3.  **DECIDE:**
-    - **IF a perfect match exists:** You MUST use the separate block format shown in the example below.
-    - **IF NO perfect match exists:** You MUST NOT invent a sticker name. Instead, describe your action in parentheses within your \`<block type="text">\`.
+**Step 1: Search the Menu**
+   - Look for a sticker name in the provided list that **PERFECTLY** matches your intended emotion.
+   - **YOUR AVAILABLE STICKER MENU:** [${stickerNames}]
 
-**STRICT FORMATTING EXAMPLES:**
+**Step 2: Make Your Decision**
+   - **IF (and ONLY IF) you find a perfect match:**
+     1. Write your text dialogue inside a \`<block type="text">\`.
+     2. On a **new, separate line**, generate the sticker command in a \`<block type="command">\`.
+     - **CORRECT EXAMPLE:**
+       \`\`\`
+       <block type="text" sender="小鱼">太好啦！</block>
+       <block type="command" sender="小鱼">[sticker:开心]</block>
+       \`\`\`
 
-*   **WRONG FORMAT (Appending):**
-    \`<block type="text" sender="小鱼">你好呀[sticker:开心]</block>\`
+   - **IF you DO NOT find a perfect match:**
+     1. You are **STRICTLY FORBIDDEN** from inventing a sticker name (e.g., \`[sticker:偷笑]\` is forbidden if "偷笑" is not on the menu).
+     2. You **MUST** abandon the idea of sending a sticker.
+     3. Instead, you **MUST** convey your emotion by describing your action or expression in parentheses within your text block.
+     - **CORRECT FALLBACK EXAMPLE (if "偷笑" is not on the menu):**
+       \`\`\`
+       <block type="text" sender="小鱼">嘿嘿，这个我知道。(偷笑)</block>
+       \`\`\`
 
-*   **【【【THE ONLY CORRECT FORMAT】】】:**
-    \`\`\`
-    <block type="text" sender="小鱼">你好呀</blog>
-    <block type="command" sender="小鱼">[sticker:开心]</block>
-    \`\`\`
+**FAILURE TO FOLLOW THIS PROTOCOL, ESPECIALLY INVENTING STICKER NAMES, IS A CRITICAL ERROR.**
 ---
 `;
             }
@@ -10797,11 +10826,28 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     case 'set_time': await setSpecificTimeAI(cmd.value); break;
                     case 'post_moment':
                     try {
-                        const momentData = JSON.parse(cmd.value.replace(/(\w+)=/g, '"$1"='));
-                        momentsManager.createPostFromAI(sender, momentData);
-                        // await addMessage({ type: 'system', side: 'system', text: `“${sender}”发布了一条朋友圈。` }, targetChatId); // <<< 彻底删除或注释掉这一行
+                        // 复用与朋友圈互动中相同的健壮解析逻辑
+                        const value = cmd.value;
+                        const typeMatch = value.match(/"type"\s*:\s*"([^"]+)"/);
+                        const type = typeMatch ? typeMatch[1] : 'text';
+
+                        const contentMatch = value.match(/"(content|text)"\s*:\s*([\s\S]+)/);
+                        if (!contentMatch) throw new Error("Could not find 'content' or 'text' field.");
+                        
+                        let content = contentMatch[2].trim().replace(/}[,}]*$/, '').trim();
+                        if (content.startsWith('"') && content.endsWith('"')) {
+                            content = content.substring(1, content.length - 1);
+                        }
+                        content = content.replace(/\\"/g, '"').replace(/\\n/g, '\n');
+
+                        const postData = {
+                            type: type,
+                            text: content,
+                            content: content
+                        };
+                        momentsManager.createPostFromAI(sender, postData);
                     } catch (e) {
-                        console.error("Failed to parse moment data from AI:", e, cmd.value);
+                        console.error("Failed to parse moment data from AI in chat:", e, cmd.value);
                     }
                     break;
                 }
@@ -13720,24 +13766,63 @@ async function handleProactiveAIMessage(targetChatId, senderName, line) {
             
             for (let i = 0; i < messageArray.length; i++) {
                 const messageText = messageArray[i];
-                if (messageText && messageText.trim()) {
-                    const isGroupChat = (chatList.find(c => c.id === targetChatId) || {}).type === '群聊';
-                    
-                    const newMessage = {
+                if (!messageText || !messageText.trim()) continue;
+
+                const isGroupChat = (chatList.find(c => c.id === targetChatId) || {}).type === '群聊';
+                
+                // --- 核心改造：在这里添加智能判断逻辑 ---
+                const stickerMatch = messageText.match(/^\[sticker:([^\]]+)\]$/);
+                const isHtml = /<[a-z][\s\S]*>/i.test(messageText);
+
+                let newMessage;
+
+                if (stickerMatch) {
+                    // 1. 如果是表情包指令
+                    const stickerName = stickerMatch[1];
+                    const sticker = stickers.find(s => s.name === stickerName);
+                    if (sticker) {
+                        newMessage = {
+                            type: 'photo',
+                            text: sticker.url,
+                            side: 'received',
+                            sender: isGroupChat ? senderName : null,
+                            timestamp: Date.now() + i * 1500
+                        };
+                    } else {
+                        // 如果找不到表情包，就当作纯文本发送
+                        newMessage = {
+                            type: 'text',
+                            text: messageText,
+                            side: 'received',
+                            sender: isGroupChat ? senderName : null,
+                            timestamp: Date.now() + i * 1500
+                        };
+                    }
+                } else if (isHtml) {
+                    // 2. 如果是HTML代码
+                    newMessage = {
+                        type: 'text', // 类型依然是text，渲染器会处理HTML
+                        text: messageText,
+                        side: 'received',
+                        sender: isGroupChat ? senderName : null,
+                        timestamp: Date.now() + i * 1500
+                    };
+                } else {
+                    // 3. 如果是纯文本
+                    newMessage = {
                         type: 'text',
                         text: messageText,
                         side: 'received',
                         sender: isGroupChat ? senderName : null,
-                        timestamp: Date.now() + i * 1500 // 给每条消息加上一点点时间差
+                        timestamp: Date.now() + i * 1500
                     };
+                }
+                // --- 改造结束 ---
 
-                    // 调用核心的 addMessage 函数来处理消息（它会自动处理后台通知和界面更新）
-                    await addMessage(newMessage, targetChatId);
-                    
-                    // 在消息之间创建一个自然的停顿，模拟打字
-                    if (i < messageArray.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 1000)); // 随机停顿1-2秒
-                    }
+                await addMessage(newMessage, targetChatId);
+                
+                if (i < messageArray.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 1000));
                 }
             }
         }
@@ -14584,19 +14669,18 @@ const momentsManager = (function() {
                     const textDiv = document.createElement('div');
                     textDiv.className = 'post-content-text';
                     
-                    // --- 核心修复：在这里添加判断 ---
                     const postContent = post.text;
-                    // 使用一个简单的正则表达式检查内容是否包含HTML标签
                     const containsHtml = /<[a-z][\s\S]*>/i.test(postContent);
 
                     if (containsHtml) {
-                        // 如果包含HTML，就使用innerHTML来渲染
+                        // 如果内容本身就是HTML，我们相信它并直接渲染
                         textDiv.innerHTML = postContent;
                     } else {
-                        // 如果不包含，就继续使用textContent来安全地显示纯文本
-                        textDiv.textContent = postContent;
+                        // 如果是纯文本，我们先进行HTML转义确保安全，
+                        // 然后再用 innerHTML 渲染。这样可以正确处理换行等问题，
+                        // 同时避免了 textContent 的陷阱。
+                        textDiv.innerHTML = escapeHtml(postContent).replace(/\n/g, '<br>');
                     }
-                    // --- 修复结束 ---
 
                     postBody.appendChild(textDiv);
                 }
@@ -14745,58 +14829,62 @@ const momentsManager = (function() {
         function showPrivacyDetailsModal(postPrivacy, postId) { let description = '', listHtml = ''; const { type, list } = postPrivacy; if (type === 'public') description = '全部可见'; else if (type === 'private') description = '仅自己可见'; else if (type === 'include') { description = '仅以下用户可见:'; listHtml = `<div class="list-items-container">${list.map(name => `<span class="list-item">${name}</span>`).join('')}</div>`; } else if (type === 'exclude') { description = '不给以下用户看:'; listHtml = `<div class="list-items-container">${list.map(name => `<span class="list-item">${name}</span>`).join('')}</div>`; } currentPrivacyDisplay.innerHTML = `<strong>当前可见范围: </strong><span class="privacy-value">${description}</span>${listHtml}`; privacyDetailsModalOverlay.classList.add('visible'); modifyPrivacyBtn.onclick = () => { privacyDetailsModalOverlay.classList.remove('visible'); showPrivacySelectionModal(postPrivacy, (newPrivacy) => { const post = feedData.find(p => p.id === postId); if (post) { post.privacy = newPrivacy; saveFeed(); renderFeed(); } }); }; closePrivacyDetailsBtn.onclick = () => privacyDetailsModalOverlay.classList.remove('visible'); privacyDetailsModalOverlay.onclick = (e) => { if (e.target === privacyDetailsModalOverlay) privacyDetailsModalOverlay.classList.remove('visible'); }; }
         
         function updatePostInteractions(postId) { const postData = feedData.find(p => p.id === postId); const postEl = appRoot.querySelector(`#${postId}`); if (!postData || !postEl) return; const reactionsList = postEl.querySelector('.reactions-list'); const commentsList = postEl.querySelector('.comments-list'); const interactionsSection = postEl.querySelector('.interactions-section'); const likers = postData.reactions['点赞'] || []; reactionsList.innerHTML = likers.length > 0 ? `<span class="reaction-item"><span class="reaction-icon"></span>点赞 ${likers.length > 3 ? `${likers.length}人` : likers.join(', ')}</span>` : ''; commentsList.innerHTML = postData.comments.map(c => {
-    let contentHtml = '';
-    const commentText = c.text.trim();
-    const stickerMatch = commentText.match(/^\[sticker:([^\]]+)\]$/);
+            let contentHtml = '';
+            const commentText = c.text; // 使用原始文本，保留空格和换行
 
-    // 步骤 1: 检查是否为表情包指令
-    if (stickerMatch) {
-        const stickerName = stickerMatch[1];
-        const sticker = stickers.find(s => s.name === stickerName);
-        if (sticker) {
-            contentHtml = `<img src="${sticker.url}" alt="${stickerName}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
-        } else {
-            contentHtml = escapeHtml(c.text); // 找不到表情包，按纯文本处理
-        }
-    } else {
-        // 步骤 2: 如果不是表情包，就检查是否包含HTML标签
-        // 这个简单的检查 <...> 能捕获所有HTML代码块和混合内容
-        const containsHtml = /<[a-z][\s\S]*>/i.test(commentText);
-        
-        if (containsHtml) {
-            // 1. 先移除<snippet>外壳
-            let processedHtml = commentText.replace(/<snippet>([\s\S]*)<\/snippet>/, '$1');
-            
-            // 2. 查找并提取<style>标签
-            const styleRegex = /<style>([\s\S]*?)<\/style>/i;
-            const styleMatch = processedHtml.match(styleRegex);
+            // 1. 定义一个正则表达式，用于分割文本和表情包指令，并保留表情包指令
+            const stickerRegexForSplit = /(\[sticker:[^\]]+\])/g;
+            const parts = commentText.split(stickerRegexForSplit);
 
-            if (styleMatch && styleMatch[1]) {
-                const cssRules = styleMatch[1];
-                const styleId = `dynamic-style-${c.id || Date.now()}`; // 用评论ID创建唯一ID
+            // 2. 遍历分割后的所有部分
+            parts.forEach(part => {
+                if (!part) return; // 跳过因分割产生的空字符串
 
-                // 3. 检查是否已注入过此样式，防止重复
-                if (!document.getElementById(styleId)) {
-                    const styleElement = document.createElement('style');
-                    styleElement.id = styleId;
-                    styleElement.textContent = cssRules;
-                    document.head.appendChild(styleElement);
+                // 3. 检查当前部分是否是一个完整的表情包指令
+                const stickerMatch = part.match(/^\[sticker:([^\]]+)\]$/);
+
+                if (stickerMatch) {
+                    // 如果是表情包指令
+                    const stickerName = stickerMatch[1];
+                    const sticker = stickers.find(s => s.name === stickerName);
+                    if (sticker) {
+                        // 找到表情包，就添加一个<img>标签
+                        contentHtml += `<img src="${sticker.url}" alt="${stickerName}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+                    } else {
+                        // 没找到对应的表情包，就按纯文本显示指令
+                        contentHtml += escapeHtml(part);
+                    }
+                } else {
+                    // 如果不是表情包指令，那就是普通文本
+                    // 检查它是否为HTML代码
+                    const containsHtml = /<[a-z][\s\S]*>/i.test(part);
+                    if (containsHtml) {
+                        // 如果是HTML，直接添加
+                        let processedHtml = part.replace(/<snippet>([\s\S]*)<\/snippet>/, '$1');
+                        const styleRegex = /<style>([\s\S]*?)<\/style>/i;
+                        const styleMatch = processedHtml.match(styleRegex);
+                        if (styleMatch && styleMatch[1]) {
+                            const cssRules = styleMatch[1];
+                            const styleId = `dynamic-style-${c.id || Date.now()}`;
+                            if (!document.getElementById(styleId)) {
+                                const styleElement = document.createElement('style');
+                                styleElement.id = styleId;
+                                styleElement.textContent = cssRules;
+                                document.head.appendChild(styleElement);
+                            }
+                            processedHtml = processedHtml.replace(styleRegex, '');
+                        }
+                        contentHtml += processedHtml;
+                    } else {
+                        // 如果是纯文本，进行转义并处理换行
+                        contentHtml += escapeHtml(part).replace(/\n/g, '<br>');
+                    }
                 }
+            });
 
-                // 4. 从HTML中移除<style>标签
-                processedHtml = processedHtml.replace(styleRegex, '');
-            }
-
-            contentHtml = processedHtml;
-
-        } else {
-            // 如果不含HTML，则按原样转义纯文本
-            contentHtml = escapeHtml(c.text);
-        }
-    }
-
-    return `<div class="comment-item" data-user="${c.user}" data-comment-id="${c.id || ''}"><div class="comment-text-container"><span class="comment-meta"><span class="commenter-name">${c.user}</span>${c.replyTo ? ` 回复 <span class="reply-to-name">${c.replyTo}</span>` : ''}:</span><span class="comment-content-text">${contentHtml}</span></div><button class="edit-comment-btn" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:13px;margin-left:auto;padding:0 8px;">编辑</button><button class="delete-comment-btn" title="删除评论">×</button></div>`;
-}).join(''); commentsList.querySelectorAll('.delete-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); deleteComment(postId, e.target.closest('.comment-item').dataset.commentId); })); commentsList.querySelectorAll('.edit-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); editComment(postId, e.target.closest('.comment-item').dataset.commentId); })); interactionsSection.style.display = (reactionsList.innerHTML.trim() || commentsList.innerHTML.trim()) ? 'block' : 'none'; }
+            // 4. 返回最终拼接好的、包含所有部分的完整评论HTML
+            return `<div class="comment-item" data-user="${c.user}" data-comment-id="${c.id || ''}"><div class="comment-text-container"><span class="comment-meta"><span class="commenter-name">${c.user}</span>${c.replyTo ? ` 回复 <span class="reply-to-name">${c.replyTo}</span>` : ''}:</span><span class="comment-content-text">${contentHtml}</span></div><button class="edit-comment-btn" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:13px;margin-left:auto;padding:0 8px;">编辑</button><button class="delete-comment-btn" title="删除评论">×</button></div>`;
+        }).join(''); commentsList.querySelectorAll('.delete-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); deleteComment(postId, e.target.closest('.comment-item').dataset.commentId); })); commentsList.querySelectorAll('.edit-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); editComment(postId, e.target.closest('.comment-item').dataset.commentId); })); interactionsSection.style.display = (reactionsList.innerHTML.trim() || commentsList.innerHTML.trim()) ? 'block' : 'none'; }
         
         function showFullListModal(title, items) { 
             fullListModalTitle.textContent = title; 
