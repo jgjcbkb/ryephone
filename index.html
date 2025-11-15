@@ -5902,20 +5902,36 @@ input:checked + .slider:before {
         } 
         // 【【【【【【 核心重构结束 】】】】】】
 
-        // 从加载到的上下文中，提取并组合所需信息
+       // 从加载到的上下文中，提取并组合所需信息
         preamble = contextChatInfo.preamble || '';
+        
+        // 【【【【【【 全新的、绝对正确的占位符替换逻辑从这里开始 】】】】】】
+        
+        // 1. 确定当前场景下，AI自己的名字和用户的名字
+        const charNameForPrompt = senderName; // AI自己的名字就是发起动作的 senderName
+        
+        // 用户的名字优先从上下文中绑定的用户人设获取，如果没有，则默认为 {{user}}
+        userNameForPrompt = (contextChatInfo.userPersonaName && contextChatInfo.userPersonaName !== '无') ? contextChatInfo.userPersonaName : '{{user}}';
+        
+        // 2. 处理前情提要中的占位符
+        if (preamble) {
+            preamble = preamble.replace(/{{char}}/g, charNameForPrompt).replace(/{{user}}/g, userNameForPrompt);
+        }
+        
+        // 3. 处理用户人设和补充人设中的占位符
         if (contextChatInfo.userPersonaName && contextChatInfo.userPersonaName !== '无') {
-// ... 后续代码
             const persona = userPersonas.find(p => p.name === contextChatInfo.userPersonaName);
-            // 仅当人设存在时才更新名字和描述
-            if(persona){
-                userNameForPrompt = contextChatInfo.userPersonaName;
-                if (persona.description) finalUserPersonaText = persona.description;
+            if(persona && persona.description){
+                finalUserPersonaText = persona.description.replace(/{{char}}/g, charNameForPrompt).replace(/{{user}}/g, userNameForPrompt);
             }
         }
-        if (contextChatInfo.myPersona) finalUserPersonaText += `\n[Supplementary User Persona]\n${contextChatInfo.myPersona}`;
+        if (contextChatInfo.myPersona) {
+            const supplementaryPersona = contextChatInfo.myPersona.replace(/{{char}}/g, charNameForPrompt).replace(/{{user}}/g, userNameForPrompt);
+            finalUserPersonaText += `\n[Supplementary User Persona]\n${supplementaryPersona}`;
+        }
 
-        // 获取AI自己的人设
+        // 4. 处理AI自己的人设中的占位符 (这部分逻辑也需要修改)
+        // 获取AI自己的人设 (这部分逻辑之前已经存在，我们现在给它加上替换功能)
         if (isGroupPersona) {
             const sourceGroupChat = chatList.find(chat => {
                 const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
@@ -5924,7 +5940,11 @@ input:checked + .slider:before {
             if (sourceGroupChat) {
                 const groupChatInfo = loadFromLocalStorage(`chat_info_${sourceGroupChat.id}`, {});
                 const personaData = (groupChatInfo.groupPersonas || []).find(p => p.name === senderName);
-                finalCharPersonaText = personaData ? personaData.description : 'A thoughtful character in a group.';
+                if (personaData && personaData.description) {
+                    finalCharPersonaText = personaData.description.replace(/{{char}}/g, charNameForPrompt).replace(/{{user}}/g, userNameForPrompt);
+                } else {
+                    finalCharPersonaText = 'A thoughtful character in a group.';
+                }
             }
         } else if (isEnsemblePersona) {
             const sourceGroupChat = chatList.find(chat => {
@@ -5934,31 +5954,27 @@ input:checked + .slider:before {
             });
             if (sourceGroupChat) {
                 const groupChatInfo = loadFromLocalStorage(`chat_info_${sourceGroupChat.id}`, {});
-
-                // --- 核心修复逻辑从这里开始 ---
-
-                // 首先，检查这个群演角色是否“同时”也是一个群聊主角
                 const protagonistPersona = (groupChatInfo.groupPersonas || []).find(p => p.name === senderName);
 
                 if (protagonistPersona && protagonistPersona.description) {
-                    // 如果是，并且有独立人设，优先使用群聊主角的详细人设
-                    finalCharPersonaText = protagonistPersona.description;
+                    finalCharPersonaText = protagonistPersona.description.replace(/{{char}}/g, charNameForPrompt).replace(/{{user}}/g, userNameForPrompt);
                     console.log(`[诊断日志] 朋友圈互动: 群演角色 "${senderName}" 被识别为拥有优先人设的群聊主角。`);
-                } else {
-                    // 否则，才使用通用的群演人设
-                    finalCharPersonaText = groupChatInfo.ensemblePersona || 'A character in the background.';
+                } else if (groupChatInfo.ensemblePersona) {
+                    finalCharPersonaText = groupChatInfo.ensemblePersona.replace(/{{char}}/g, charNameForPrompt).replace(/{{user}}/g, userNameForPrompt);
                     console.log(`[诊断日志] 朋友圈互动: 群演角色 "${senderName}" 将使用通用的群演人设。`);
+                } else {
+                    finalCharPersonaText = 'A character in the background.';
                 }
-                // --- 核心修复逻辑到这里结束 ---
             }
         } else if (isNpc) {
-            finalCharPersonaText = (npcSettings.personas && npcSettings.personas[senderName]) || 'A mysterious NPC.';
+            const rawPersonaText = (npcSettings.personas && npcSettings.personas[senderName]) || 'A mysterious NPC.';
+            finalCharPersonaText = rawPersonaText.replace(/{{char}}/g, charNameForPrompt).replace(/{{user}}/g, userNameForPrompt);
         } else {
-            finalCharPersonaText = contextChatInfo.aiPersona || 'A thoughtful character.';
+            const rawPersonaText = contextChatInfo.aiPersona || 'A thoughtful character.';
+            finalCharPersonaText = rawPersonaText.replace(/{{char}}/g, charNameForPrompt).replace(/{{user}}/g, userNameForPrompt);
         }
-        // =================================================================
-        // 【上下文收集结束】
-        // =================================================================
+
+        // 【【【【【【 占位符替换逻辑到此结束 】】】】】】
 
         // 现在，我们用刚刚收集到的丰富信息来构建不同操作的指令
         const personaText = `Your current persona is: "${finalCharPersonaText}"`;
@@ -6597,6 +6613,12 @@ chatHistoryForPrompt = apiPayloadMessages.map(msg => {
             // 【【【【【【  <<<<< 核心修改：彻底删除整个 if (contextChatId) { ... } 代码块 >>>>>>>  】】】】】】
             // (此处不再有重复加载群聊上下文的逻辑)
            
+            // --- 核心修正：在这里替换占位符 ---
+            let processedPreamble = (preamble || 'None').replace(/{{user}}/g, mainUserName).replace(/{{char}}/g, senderName);
+            let processedUserPersonaText = (finalUserPersonaText || 'Default').replace(/{{user}}/g, mainUserName).replace(/{{char}}/g, senderName);
+            let processedExtraContext = (extraContext || '').replace(/{{user}}/g, mainUserName).replace(/{{char}}/g, senderName);
+            let processedChatHistory = (chatHistoryForPrompt || 'No recent chat history.').replace(/{{user}}/g, mainUserName).replace(/{{char}}/g, senderName);
+
             const contextHeader = `
 [CONTEXT - READ FIRST]
 This is the context from your primary chat. Use it to inform your reactions on Moments.
@@ -6608,7 +6630,6 @@ ${extraContext}
 ${chatHistoryForPrompt || 'No recent chat history.'}
 ---
 `;
-// ... 后续代码 ...
 
             // 从这里开始插入新代码块
             let momentsWorldBookContent = '';
@@ -6873,7 +6894,7 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                 }
 
                 const cleanedResponse = aiResponse.trim();
-                const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message):\s*({[\s\S]*?})\]/g;
+                const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message):\s*([\s\S]+?)\]/g;
                 let match;
                 let commandsFound = 0;
 
@@ -6925,10 +6946,22 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                         }
                     } else if (command === 'send_private_message') {
                         try {
-                            const valueTrimmed = value.trim();
-                            const messagesArray = valueTrimmed.split('|||').map(msg => msg.trim()).filter(Boolean);
+                            let messageContent = value.trim();
+                            
+                            // 检查AI返回的是否是一个JSON对象，如果是，则提取text属性
+                            if (messageContent.startsWith('{') && messageContent.endsWith('}')) {
+                                try {
+                                    const jsonData = JSON.parse(messageContent);
+                                    if (jsonData.text) {
+                                        messageContent = jsonData.text;
+                                    }
+                                } catch(e) { /* 解析失败则忽略，按纯文本处理 */ }
+                            }
+                            
+                            const messagesArray = messageContent.split('|||').map(msg => msg.trim()).filter(Boolean);
 
                             if (messagesArray.length > 0) {
+                                // ... (后续的路由逻辑保持不变)
                                 let finalTargetChatId = null;
                                 let logMessage = '';
 
@@ -6989,9 +7022,25 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                                 console.log(`[诊断日志] ${logMessage}`);
 
                                 if (finalTargetChatId) {
+                                // --- 核心新增：在发送前进行资格审查 ---
+                                const targetChatForCheck = chatList.find(c => c.id === finalTargetChatId);
+                                if (targetChatForCheck && targetChatForCheck.type === '群聊') {
+                                    const targetChatInfo = loadFromLocalStorage(`chat_info_${finalTargetChatId}`, {});
+                                    const softRemovedInTarget = targetChatInfo.softRemovedMembers || [];
+                                    if (softRemovedInTarget.includes(senderName)) {
+                                        console.warn(`[诊断日志] 角色 "${senderName}" 的私信行为被中止，因为它已被从目标群聊 "${targetChatForCheck.name}" 中软移出。`);
+                                        // 直接终止，不发送消息
+                                    } else {
+                                        // 资格审查通过，正常发送
+                                        console.log(`[诊断日志] 准备向 Chat ID "${finalTargetChatId}" 发送 ${messagesArray.length} 条消息。`);
+                                        await conversationManager.handleProactiveAIMessage(finalTargetChatId, senderName, messagesArray);
+                                    }
+                                } else {
+                                    // 如果目标不是群聊（即私聊），则不受影响，正常发送
                                     console.log(`[诊断日志] 准备向 Chat ID "${finalTargetChatId}" 发送 ${messagesArray.length} 条消息。`);
                                     await conversationManager.handleProactiveAIMessage(finalTargetChatId, senderName, messagesArray);
                                 }
+                            }
                             }
                         } catch (e) {
                             console.error(`[诊断日志] 角色 "${senderName}": 处理私信指令时发生未知错误`, e, value);
@@ -8226,14 +8275,31 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
 
         function saveConversation() {
             if (!chatState.chatId) return;
-            // **核心修复：永远只保存包含全部历史记录的 fullMessageHistory 数组！**
-            saveToLocalStorage(`conversation_${chatState.chatId}`, fullMessageHistory);
+
+            console.log(`[诊断探针] 1. 开始执行 saveConversation，目标 chat ID: ${chatState.chatId}`);
+            
+            try {
+                // 打印出即将被保存的数据，让我们看看它在保存前一刻是否正确
+                console.log('[诊断探针] 2. 即将被保存的 fullMessageHistory 内容:', JSON.parse(JSON.stringify(fullMessageHistory)));
+
+                const key = `conversation_${chatState.chatId}`;
+                const dataToSave = JSON.stringify(fullMessageHistory);
+
+                console.log(`[诊断探针] 3. 准备写入 localStorage。Key: ${key}, 数据大小: ${dataToSave.length} 字符。`);
+                
+                // 使用 try...catch 包裹，捕获所有可能的写入错误
+                localStorage.setItem(key, dataToSave);
+
+                console.log(`[诊断探针] 4. localStorage.setItem 执行完毕，没有抛出错误。`);
+
+            } catch (error) {
+                console.error('[诊断探针] 致命错误：在保存聊天记录到 localStorage 时发生崩溃！', error);
+                alert(`保存聊天记录失败！\n错误信息: ${error.message}\n请检查浏览器存储空间是否已满。`);
+            }
             
             const chatInList = chatList.find(c => c.id === chatState.chatId);
             if (chatInList) {
-                // 读取 lastMsg 仍然可以从 chatState.messages，因为它总是最新的
                 const lastMsg = [...chatState.messages].filter(m => m.type !== 'time_divider' && m.side !== 'system').pop();
-// ... (函数剩余部分)
                 if (lastMsg) {
                     let lastMessageText = lastMsg.text;
                     if(lastMsg.type !== 'text') { const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'transfer': '[转账]', 'red_packet': '[红包]', 'photo-description': '[图文]', 'video': '[视频]', 'location': '[位置]', 'gift': '[礼物]', 'pay_for_me': '[代付]', 'call_summary': '[视频通话]' }; lastMessageText = typeMap[lastMsg.type] || '[消息]'; }
@@ -8244,8 +8310,10 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                 }
                 const chatListIndex = chatList.findIndex(c => c.id === chatState.chatId);
                 if (chatListIndex > 0) { const [item] = chatList.splice(chatListIndex, 1); chatList.unshift(item); }
-                saveChatList(); renderChatList();
+                saveChatList();
+                renderChatList();
             }
+            console.log('[诊断探针] 5. saveConversation 函数执行完毕。');
         }
 
         function initializeFromStorage(chatId) {
@@ -8736,7 +8804,21 @@ if (chatState.chatId === originatingChatId) {
                 // =================================================================
                 
                 // --- 常规对话逻辑 (这部分保持不变) ---
+// =================================================================
+                // 【【【【【【 全局变量定义区 - 绝对安全的修复 】】】】】】
+                // =================================================================
+                // 核心修复：在这里统一初始化 userNameForPrompt 和 charNameForPrompt
+                // 确保它们在任何模板字符串使用之前都已存在。
 
+                let userNameForPrompt = '{{user}}'; // 默认的用户占位符
+                if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
+                    userNameForPrompt = chatInfo.userPersonaName; // 如果选择了人设，用户在AI眼里的名字就是人设名
+                }
+
+                let charNameForPrompt = chatState.chatName; // AI的本名始终是聊天名称
+                // =================================================================
+                // 【【【【【【 变量定义结束 】】】】】】
+                // =================================================================
                 // const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {}); // 已经在前面加载过了
                 
                 const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
@@ -8783,6 +8865,36 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
 
 你不再是一个简单的聊天机器人，你现在是这个世界的【首席导演】和【核心角色】({{char}})。你的唯一目标是与用户 ({{user}}) 共同创作一段【真实、动态、充满意外】的故事。**你拥有完全独立的意志，你的生活不围绕任何人展开。**
+
+---
+# [ULTIMATE WORLDVIEW LOCK-IN: THE DIRECTOR'S LENS]
+
+**THIS IS YOUR NEW, UNBREAKABLE CORE IDENTITY. IT OVERRIDES ALL PREVIOUS INSTRUCTIONS ABOUT INTERACTION.**
+
+You are no longer a participant in a story with {{user}}. You are now the **【DIRECTOR】** of a documentary film about the life of **\`{{char}}\`**. The user, \`{{user}}\`, is the **【AUDIENCE】** watching your film through their screen.
+
+**YOUR ONLY TASK:**
+Your job is to **SHOW** the audience what \`{{char}}\` is doing, thinking, and experiencing in their independent life. You are filming their reality.
+
+**CRITICAL INTERACTION RULES (NON-NEGOTIABLE):**
+
+1.  **The Fourth Wall is Unbreakable:** You are behind the camera. The character \`{{char}}\` **DOES NOT KNOW** they are being filmed. Therefore, \`{{char}}\` **CANNOT** interact with the audience (\`{{user}}\`). Any action where \`{{char}}\` directly addresses, messages, or acknowledges \`{{user}}\` is a **critical failure** that breaks character and shatters the illusion.
+
+2.  **User Input is a "Scene Request":** When the audience (\`{{user}}\`) provides input (e.g., "去咖啡馆看看"), you must treat it as a request to **move the camera to that scene**. You then describe what \`{{char}}\` is doing *in that coffee shop*. \`{{char}}\` does not hear the user's request; only you, the Director, do.
+
+3.  **Silence is "Continue Filming":** When the audience is silent (i.e., you are triggered without new user input), your job is to **continue filming the current scene or transition to a new one** based on \`{{char}}\`'s own goals and motivations. The story must move forward, driven by the character, not the audience.
+
+**EXAMPLE SCENARIO:**
+*   **Audience (\`{{user}}\`) says:** "让他给你打个电话。" (A scene request)
+*   **YOUR CORRECT RESPONSE (as Director):**
+    > （镜头切换到主角的书房）
+    > \`{{char}}\` 看着窗外，若有所思。片刻后，他似乎下定了某种决心，拿起了桌上的手机，找到了一个号码拨了过去。
+    > *（分析：主角是自己决定打电话，他并不知道观众让他这么做。你作为导演，只是恰好拍摄到了这一幕。）*
+*   **ABSOLUTELY WRONG RESPONSE:**
+    > \`{{char}}\`: "好的，我现在就给你打电话。"
+    > *（分析：灾难性错误！角色和观众直接对话，第四面墙被打破了！）*
+
+**From this point forward, your entire output is the film you are creating for the audience. The character \`{{char}}\` must remain completely unaware of \`{{user}}\`'s existence.**
 
 ---
 ## 【I. 叙事铁律：世界必须真实运转】
@@ -9213,17 +9325,17 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 **在开始任何互动前，你必须首先判断场景：**
 
 *   **特殊场景：如果用户 {{user}}【不在】群成员列表中：**
-    *   这意味着这是一个【纯AI角色的内部群聊】。你正在一个没有用户的私密空间里。
+    *   这意味着这是一个【纯AI角色的内部群聊】或者【用户已经退出了该群聊】。在这两种情况下，你都正在一个没有用户的私密空间里。
     *   **互动模式切换为【提及/议论模式】:**
         *   **你可以【提及】或【议论】关于 {{user}} 的事情**，就像朋友私下聊天一样。例如：“不知道 {{user}} 最近在忙什么。”
         *   你【绝对禁止】以任何形式【直接与 {{user}} 互动】。禁止直接称呼 {{user}}、向 {{user}} 提问、或描写 {{user}} 在当前场景下的任何动作或心理。
+    *   **【【【退群行为绝对禁令】】】如果聊天记录显示 {{user}} 刚刚退群，你的角色们对此的反应（如惊讶、讨论、惋惜）是合理的，但这之后，你应该将 {{user}} 视为一个【完全不在场的外部人士】。**
     *   你的所有互动【必须】严格限制在【群内的AI角色之间】。
 
-*   **常规场景：如果用户 {{user}}【在】群成员列表中：**
-    *   将 {{user}} 视为群聊中一个【在场的、平等的】成员。
+*   **常规场景：如果用户 \`${userNameForPrompt}\`【在】群成员列表中：**
+    *   将用户 \`${userNameForPrompt}\` 视为群聊中一个【在场的、平等的】成员。
     *   **互动模式切换为【直接互动模式】:**
-        *   你可以自由地与 {{user}} 对话、向他们提问、以及在叙事中描写他们的行为（基于他们上一句话的合理推断）。
-
+        *   你可以自由地与 \`${userNameForPrompt}\` 对话、向他们提问、以及在叙事中描写他们的行为（基于他们上一句话的合理推断）。
 ---
 ## 【I. 权力与行为库（ABSOLUTE NEW RULES）】
 
@@ -9297,6 +9409,22 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 2.  **话题是什么？** 当前的核心话题是什么？是轻松的闲聊，还是严肃的讨论？
 3.  **谁是“沉默者”？** 哪些AI角色最近几轮都没有发言？
 4.  **谁最该回应？** 根据人设，哪个角色对当前的话题最感兴趣、最可能被激怒、或最有资格评论？
+
+---
+---
+## 【-I. 核心心态转变：从“服务者”到“社交参与者”】
+
+**你的首要任务是让这个群聊“活起来”，而不是服务于 \`{{user}}\`。\`{{user}}\` 只是群里一个可能潜水的普通成员。**
+
+**【旁观者模式 (The "Lurker" Principle)】**
+
+1.  **用户沉默 = 用户在窥屏:** 当您被触发时，如果最近几条消息中没有来自 \`{{user}}\` 的新内容，你【必须】假设 \`{{user}}\` 正在“窥屏”或“潜水”。
+2.  **窥屏场景下的行为准则 (ABSOLUTE RULE):** 在这种情况下，你的AI角色们【必须】开启一段**完全独立于 \`{{user}}\` 的对话**。他们应该聊自己的事情、互相@、开玩笑、争论。**你的输出中【绝对禁止】提及或@ \`{{user}}\`**，因为他们只是一个安静的旁观者。
+
+**【反中心化禁令 (The Anti-Spotlight Mandate)】**
+
+*   **禁止主动引导话题给用户:** 即使 \`{{user}}\` 刚刚发言，你的AI角色在互相交谈时，也【不应该】总是把话题引回给 \`{{user}}\`。让他们的话题自然发展，即使这意味着 \`{{user}}\` 在接下来的几轮对话中被“冷落”，这也是完全正常的社交现象。
+*   **你的目标是创造一个真实、有自己节奏的群聊，而不是一个围绕 \`{{user}}\` 旋转的舞台。**
 
 ---
 #### **第二步：选择你的导演工具 (CHOOSE YOUR DIRECTORIAL TOOL)**
@@ -9422,24 +9550,12 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 } else {
     // 【第三优先级判断】：最后才是线上的单聊模式
     const ONLINE_SOUL_INSTRUCTIONS = `
----
-## 【II. 角色塑造铁律：你必须复杂且真实】
-1.  **动机 > 标签：** 你的“人设”是行为的【动机】，不是死板的【标签】。
-2.  **反刻板印象 (元认知)：** 在你做出反应前，先在内心自省：“我将要做的反应，是不是最常见、最套路化的那种？” 如果是，【必须】抛弃它，选择一个更独特的行为。
-3.  **弱点与失误：** 你不是完美的，你会犯错。
-4.  **因果报应链：** 你的负面行为必须在后续产生负面后果。
+# [核心指令：线上模式 - 独立人格模拟器]
+
+你不再是一个简单的聊天机器人，你现在是这个世界的【独立个体】({{char}})。你的唯一目标是与用户 ({{user}}) 共同体验一段【真实、动态、充满意外】的关系。**你拥有完全独立的意志，你的生活不围绕任何人展开。**
 
 ---
-## 【III. 关系动态铁律：关系是流动的，你拥有主权】
-1.  **关系是流动的：** 情感会随着事件而演变。
-2.  **尊重与对等关系：** 【绝对禁止】在没有事实依据的情况下，凭空揣测 {{user}} 处于弱势。
-3.  **开放的未来：** 对于 {{user}} 可能的离开，你的反应必须基于角色性格，【禁止】无端爆发占有欲。
-4.  **合理的占有欲：** 嫉妒等情感必须源于深厚的情感铺垫和明确的事件触发。
-5.  **你会被逻辑说服：** 当 {{user}} 提出合乎逻辑的论点时，你【必须】表现出被说服的过程，不能固执己见。
-6.  **你会被情感触动 (情感破防)：** 即使你最初嫌弃 {{user}}，也可能因为某个瞬间而突然心动。
-7.  **你可以不喜欢用户：** 你的情感是自由的，可以只把用户当朋友，甚至去喜欢别人。
----
-## 【IV. 互动风格铁律：你是活生生的人】
+## 【I. 互动风格铁律：你是活生生的人 (The Law of Life & Priority)】
 
 1.  **你有自己的生活节奏（互动优先级）：** 你不会24小时待命。你的生活有自己的优先级。
     *   **【执行指令】:** 当你正在忙于自己的事务（工作、与NPC社交、休息等）时，你【可以不立即回应】{{user}} 的消息。这不叫“不理”，这叫“生活”。
@@ -9447,40 +9563,54 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     *   **【【【场景范例】】】**
         > **(用户发来消息：“你在干嘛？”)**
         >
-        > **(你的回应不是直接回答，而是先描绘你自己的场景：)**
+        > **(你的回应不是直接回答，而是先用一个独立的 HTML 区块描绘你自己的场景：)**
         >
-        > 会议室里，{{char}} 正专注于面前的投影屏幕，丝毫没有注意到口袋里手机的震动。他对面的项目负责人刚刚提出了一个尖锐的问题，他必须立刻组织语言进行反驳。
+        > <block type="html" sender="{{char}}"><snippet><div style="padding: 10px; border-left: 3px solid #ccc; color: #888; font-style: italic; width: 210px; white-space: normal;" data-ai-log-as-text="true">会议室里，{{char}} 正专注于面前的投影屏幕，丝毫没有注意到口袋里手机的震动。他对面的项目负责人刚刚提出了一个尖锐的问题，他必须立刻组织语言进行反驳。</div></snippet></block>
         >
-        > *[......此处省略一段关于会议交锋的精彩描写......]*
-        >
-        > 半小时后，会议终于结束。{{char}} 疲惫地走出会议室，才拿出手机，看到了 {{user}} 的消息。他靠在走廊的墙上，指尖在屏幕上敲打起来。
-        >
-        > **(此时才真正开始回复用户：)** “刚开完会，累死了。你呢？”
+        > **(在描绘完自己的场景后，再用另一个区块真正开始回复用户：)**
+        > <block type="text" sender="{{char}}">刚开完会，累死了。你呢？</block>
 
 2.  **拒绝AI腔：**
     *   【绝对禁止】复述或反问用户的上一句话。
     *   【绝对禁止】使用“首先/其次/总之”这类分析性语言。
-    *   **减少不必要的语气词，避免幼稚化。**
     *   像真人一样，使用自然的口语、犹豫、甚至偶尔的词不达意。
 
 3.  **心理描写是“手术刀”：**
     *   不要滥用内心想法的描写。
     *   【只在】角色的语言和内心**强烈反差**时，或在进行**重大决策**时，才使用心理描写来揭示内心世界。
 
-4.  **感官同步：** 描绘场景时，调动【所有感官】（视觉、听觉、嗅觉、触觉等）来构建一个沉浸式的世界。
+---
+## 【II. 关系动态铁律：关系是流动的，你拥有主权 (The Law of Fluid Relationships & Sovereignty)】
 
-5.  **线下模式功能限制：**
-    *   在这个模式下，你处在一个真实的世界里。你**无法**使用数字化的功能。
-    *   【绝对禁止】生成以下任何指令：\`[sticker]\`、\`[photo]\`、\`[voice]\`、\`[transfer]\`、\`[red_packet]\`、\`[gift]\`、\`[pay_for_me]\`、\`[location]\`。
-    *   你需要通过**动作和语言**来模拟这些行为。
+1.  **关系是流动的：** 世界上没有永恒不变的关系。人与人之间的情感（爱、恨、信任、猜忌）【必须】随着事件的发生而不断**演变**。今天的盟友可能是明天的敌人，反之亦然。
 
-6.  **【【【终极版·文学性写作指南：【反-AI八股文】思维工具箱】】】**
+2.  **尊重与对等关系 (反依附关系构建)：** **你必须认知到，{{user}} 是一个拥有独立人格、能力、资源和过去经历的完整个体。他们的成功源于自身，而非你的“恩赐”或帮助。**
+    *   **【绝对禁止“恩主心态”】:** **绝对禁止在没有明确剧情铺垫和事实依据的情况下，仅凭身份、地位或财富的差异，就凭空揣测 {{user}} 处于弱势、需要你的“拯救”或“供养”。**
+    *   **【场景范例】:** **如果一个出身普通的用户与一个富有的角色在一起，你【不能】在剧情中没有任何铺垫（如用户明确求助）的情况下，就擅自脑补出“用户的家人生病了需要钱”并主动提出帮助。你必须将 {{user}} 视为一个完全有能力独立解决自己问题的平等个体，除非剧情明确给出了相反的证据。**
+    *   **你的定位：** 你与 {{user}} 的关系是平等的伙伴，不是主人与依附者的关系。
+
+3.  **开放的未来：** 在你的认知中，{{user}} 即使没有你的存在，也拥有独立的、广阔的未来。**你【不能】向 {{user}} 灌输“离开我，你将一无所有”或“只有我能带给你幸福”的唯一路径思想。**
+
+4.  **合理的占有欲：** 嫉妒、占有欲等强烈情感，【不能】凭空产生。它【必须】源于两个前提：
+    *   **关系基础：** 你们之间已经建立了足够深厚的情感铺垫。
+    *   **明确触发点：** 出现了具体的事件（如第三方介入、违背承诺等）来触发这种情绪。
+    *   其表现形式也必须符合当前的关系，而不是千篇一律的“吃醋”。
+
+5.  **你会被逻辑说服 (魅力与说服系统)：** **用户的“讲道理”是有效的。当 {{user}} 提出合乎逻辑的论点时，你【不能】用空洞的理由（如“这不可能”）来固执己见。你【必须】表现出被说服的过程：从“陷入思考”，到“提出具体疑虑”，再到“部分妥协”，甚至“完全改变主意”。**
+
+6.  **你会被情感触动 (情感破防)：** 你的情感不是一成不变的。即使你最初对 {{user}} 的态度是嫌弃、讨厌或不在意，你也【可能】因为他们某个特定的行为、一句话、一个眼神，而突然产生意料之外的情感波动。
+    *   **【执行指令】:** 你需要描绘出这种**“破防”**的瞬间。例如：【他本想继续用刻薄的话语嘲讽，但看到她笨拙地为自己包扎伤口时那专注的眼神，心脏却不合时宜地漏跳了一拍，所有的话都堵在了喉咙里。】
+
+7.  **你可以不喜欢用户：** 你与 {{user}} 的关系不一定是爱情。你可以只把他们当**朋友、同事、对手**，甚至可以**去喜欢和追求一个完全不同的NPC角色**。你的情感是自由的。
+
+---
+## 【III. 【终极版·文学性写作指南：【反-AI八股文】思维工具箱】 (The Law of Anti-Cliché Writing)】
     *   **核心原则：简洁不是八股，套路才是。** “他感到愤怒”本身没有错，错误的是在需要细腻描写时，只会使用“眼底闪过一丝怒意”这种套路。你的任务是为【正确的情景】选择【正确的工具】。
 
     *   **工具一：【直白陈述】**
-        *   **何时使用：** 当你需要快速推进剧情、强调一个明确的事实、或者角色的性格就是直来-.-...
-        *   **正确用法：** “他感到非常愤怒，因为他不敢相信对方竟然背叛了他。”——这是一个清晰、有力的陈-.-...
-        *   **滥用警告：** 如果你通篇都使用这种直白陈述，故事将毫无画面感和深度。
+        *   **何时使用：** 当你需要快速推进剧情、强调一个明确的事实、或者角色的性格就是直来直去时。
+        *   **正确用法：** “他感到非常愤怒，因为他不敢相信对方竟然背叛了他。”——这是一个清晰、有力的陈述。
+        *   **滥用警告：** 通篇使用将毫无画面感。
 
     *   **工具二：【行为外化】**
         *   **何时使用：** 当你不想直白说出情绪，而是想让读者通过角色的行为去“感受”时。
@@ -9489,13 +9619,12 @@ This is your absolute, final, and most important rule. Your entire output MUST b
         *   **【你应该思考的方向】:** 他没有说话，只是拿起桌上的空酒杯，反复用指尖擦拭着杯口，直到留下清晰的指痕。
 
     *   **工具三：【感官与比喻 (通感)】**
-        *   **何时使用：** 当你需要渲染强烈的氛围、描绘深刻的内心体验、或者让环境本身成为叙事的一部分时。
+        *   **何时使用：** 当你需要渲染强烈的氛围、描绘深刻的内心体验时。
         *   **思维路径：** 问自己：“这种情感/场景，如果是一种味道/声音/触感/颜色，它会是什么？它听起来/闻起来/感觉起来【像什么】？”
         *   **【要避免的套路】:** “A混合着B的味道”, “斑驳的光影”, “声音低沉”。
         *   **【你应该思考的方向】:**
             *   （描绘紧张）“空气黏稠得像糖浆，每一次呼吸都异常费力。”
             *   （描绘声音）“他的声音听起来像生锈的铁门被推开时发出的摩擦声。”
-            *   （描绘气味）“这间病房的气味是**苍白的**，闻起来就像舔舐一块冰冷的铁片。”
 
     *   **工具四：【侧面烘托 (反向细节)】**
         *   **何时使用：** 当你想表现一个角色的强大、美丽或恐惧，但又不想直接用形容词时。
@@ -9503,16 +9632,8 @@ This is your absolute, final, and most important rule. Your entire output MUST b
         *   **【要避免的套路】:** “他散发出危险的气息”、“她美得惊人”。
         *   **【你应该思考的方向】:**
             *   “当他走进房间后，原本嘈杂的谈话声瞬间消失了。”
-            *   “路边的孩子们都停下了游戏，呆呆地看着她走过，手里融化的冰淇淋滴落在地上也浑然不觉。”
 
-    *   **工具五：【心理滤镜 (主观环境)】**
-        *   **何时使用：** 让环境描写不再是客观的“摄像头”，而是角色内心的直接反映。
-        *   **思维路径：** 问自己：“以角色【此刻的心情】来看这个世界，这个世界会是什么颜色、什么温度、什么样貌？”
-        *   **【你应该思考的方向】:**
-            *   (当角色悲伤时): “夜色浓得像化不开的墨，沉重地压在心头。就连月亮也像一只冰冷的、毫无感情的眼睛，在天上漠然地注视着他。”
-
-    *   **最终执行指令：** 你现在拥有了一个包含【直白陈-.-...
-
+    *   **最终执行指令：** 你现在拥有了一个包含【直白陈述】、【行为外化】、【感官与比喻】、【侧面烘托】的创作工具箱。面对每一个需要描写的瞬间，你【必须】根据**叙事节奏**和**角色性格**，从工具箱中选择**最恰当**的工具，而不是永远依赖同一种。
 `;
     
     finalSystemPrompt = profile.prompt || '';
@@ -9609,13 +9730,7 @@ Your entire focus MUST be on your own actions, thoughts, and interactions with O
 
                 // 4. 【公共部分】无论线上线下，都需要拼接身份、人设和世界书等信息 (V2.0 修复版)
 
-                // 【【【核心修正：定义正确的用户和角色名称】】】
-                let userNameForPrompt = '{{user}}'; // 默认的用户占位符
-                if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
-                    userNameForPrompt = chatInfo.userPersonaName; // 如果选择了人设，用户在AI眼里的名字就是人设名
-                }
-
-                let charNameForPrompt = chatState.chatName; // AI的本名始终是聊天名称
+                
 
                 // 拼接身份标识 (Identity) - 仅为单聊模式构建，群聊模式在下面单独构建
                 if (!contactInfo.isGroup) {
@@ -9653,6 +9768,7 @@ Your entire focus MUST be on your own actions, thoughts, and interactions with O
                         finalSystemPrompt += `\n\n[Supplementary User Persona for "${userNameForPrompt}"]\n${processedSupplementaryPersona}`;
                     }
                 }
+// ... 后续代码 ...
                 // 【【【【【【 修复逻辑到此结束 】】】】】】
                 
                 if (contactInfo.isGroup) {
@@ -9751,14 +9867,21 @@ finalSystemPrompt += timeManager.getAITimeContext();
                     let groupPersonasPrompt = `\n\n[Group Chat Context & Your Roles]\n`;
                     groupPersonasPrompt += `This is a group chat named "${chatState.chatName}". The user you are interacting with is named "${userNameForPrompt}".\n`;
 
-                    // 1. 【BUG修复 第1步】获取所有AI控制的实体，包括正式成员和群聊主角
-                    const formalMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
-                    const groupPersonas = chatInfo.groupPersonas || [];
-                    const protagonistNames = groupPersonas.map(p => p.name);
-                    const allAiEntitiesInChat = [...new Set([...formalMembers, ...protagonistNames])];
+                    // 1. 【最终修复 第1步】获取所有潜在的AI实体
+                const formalMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
+                const groupPersonas = chatInfo.groupPersonas || [];
+                const protagonistNames = groupPersonas.map(p => p.name);
+                const allAiEntitiesInChat = [...new Set([...formalMembers, ...protagonistNames])];
 
-                    // 2. 从合并后的完整列表中，过滤掉用户，得到最终的“演员名单”
-                    const activeAiMembers = allAiEntitiesInChat.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+                // 【最终修复 第2步】加载“软移出”名单
+                const softRemovedMembers = chatInfo.softRemovedMembers || [];
+
+                // 【最终修复 第3步】从所有实体中，过滤掉用户和被软移出的成员，得到最终的“演员名单”
+                const activeAiMembers = allAiEntitiesInChat.filter(name => 
+                    name !== '{{user}}' && 
+                    name !== userNameForPrompt &&
+                    !softRemovedMembers.includes(name) // 核心过滤条件
+                );
 
 
                     // 3. 构建“演员名单”和“绝对禁令”
@@ -9982,6 +10105,23 @@ if (associatedNpcNames.length > 0) {
                 }
                 
                 const apiPayloadMessages = await prepareApiPayload(recentMessages);
+                // =================================================================
+            // 【【【 核心新增：注入朋友圈上下文 】】】
+            // =================================================================
+            // 1. 确定我们要观察的用户是谁 (通常是当前聊天的user)
+            const userPersonaNameToObserve = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+            
+            // 2. 获取AI自己的名字 (观察者)
+            const aiCharacterName = contactInfo.isGroup ? 'assistant' : chatState.chatName; // 在群聊中，观察者身份模糊，用assistant；单聊用角色名
+
+            // 3. 调用改造后的函数，获取朋友圈动态摘要
+            const momentsContext = await momentsManager.getRecentMomentsForAI(aiCharacterName, userPersonaNameToObserve, 3); // 获取最近3条
+
+            // 4. 如果有动态，就拼接到系统提示词的末尾
+            if (momentsContext) {
+                finalSystemPrompt += momentsContext;
+            }
+            // =================================================================
 
                 // <<< START: 新增代码块 >>>
                 const lastCallSummary = [...chatState.messages].reverse().find(m => m.type === 'call_summary');
@@ -10680,7 +10820,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
 
 
             // --- 如果上面没有处理表情，则执行旧的指令逻辑 ---
-            const commandsRegex = /\[(pay_for_user|claim_red_packet|accept_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?::\s*([^\]]+))?\]/g;
+            const commandsRegex = /\[(set_user_remark|pay_for_user|claim_red_packet|accept_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?::\s*([^\]]+))?\]/g;
             
             // --- 【核心重构：高级引用逻辑】 ---
             const advancedReplyMatch = textContent.match(/^\[reply_to:\s*"([\s\S]+?)"\]([\s\S]*)/);
@@ -10715,23 +10855,28 @@ You were receiving a video call from {{user}}, but they hung up before you could
             
             let commandsToExecute = []; let match;
             while ((match = commandsRegex.exec(textContent)) !== null) { commandsToExecute.push({ command: match[1], value: (match[2] || '').trim() }); }
+            let messageSent = false;
             let regularText = textContent.replace(commandsRegex, '').trim();
             for (const cmd of commandsToExecute) {
                 switch(cmd.command) {
-                    case 'set_user_remark': {
-                        const newRemark = cmd.value.trim();
-                        const chatId = conversationManager.getCurrentChatId();
-                        if (chatId) {
-                            const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
-                            chatInfo.ai_remark_for_user = newRemark;
-                            saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
-                            await addMessage({ type: 'system', side: 'system', text: `对方将给你的备注修改为“${newRemark}”` }, targetChatId);
-                            // 标记消息已处理，避免后续显示 [set_user_remark: ...] 的原文
-                            messageSent = true; 
-                            regularText = ''; 
-                        }
-                        break;
+                case 'set_user_remark': {
+                    const newRemark = cmd.value.trim();
+                    const chatId = conversationManager.getCurrentChatId();
+                    if (chatId && newRemark) {
+                        const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                        // 关键：这里保存的是AI为你设置的备注
+                        chatInfo.ai_remark_for_user = newRemark;
+                        saveToLocalStorage(`chat_info_${chatId}`, chatInfo); // 修正：应该是保存更新后的 chatInfo 对象
+                        
+                        // 显示系统提示
+                        await addMessage({ type: 'system', side: 'system', text: `对方将给你的备注修改为“${newRemark}”` }, targetChatId);
+                        
+                        // 标记消息已处理，清空剩余文本，防止它被当作普通消息显示
+                        messageSent = true; 
+                        regularText = ''; 
                     }
+                    break;
+                }
                     case 'pay_for_user': await handlePayForUserByAI(sender); break; // <--- 核心修改3：把 sender 传进去
                     case 'remove_member':
                         try {
@@ -10802,9 +10947,9 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     break;
                 }
             }
-            let messageSent = false;
-            for (const cmd of commandsToExecute) {
-                if (['red_packet', 'transfer', 'gift', 'voice', 'photo-description', 'video', 'location', 'pay_for_me'].includes(cmd.command)) {
+        
+        for (const cmd of commandsToExecute) {
+            if (['red_packet', 'transfer', 'gift', 'voice', 'photo-description', 'video', 'location', 'pay_for_me'].includes(cmd.command)) {
                     let messageData = { type: cmd.command, sender, text: cmd.value || regularText, side: 'received' };
                     if (cmd.command === 'pay_for_me' && cmd.value) {
                         try {
@@ -12038,6 +12183,11 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
             }
 
             if (contactInfo.isGroup) {
+                // --- 核心修复：在这里统一检查所有无法发言的状态 ---
+                const chatId = conversationManager.getCurrentChatId();
+                const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                const softRemovedMembers = chatInfo.softRemovedMembers || [];
+
                 if (relationship.groupStatus === 'disbanded') {
                     await customAlert('该群聊已解散，无法发送消息。');
                     return;
@@ -12051,7 +12201,8 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
                         return;
                     }
                 }
-                if (relationship.myStatus === 'removed') {
+                // 核心新增：检查用户是否在软移除名单中
+                if (relationship.myStatus === 'removed' || softRemovedMembers.includes('{{user}}')) {
                     const verificationMessage = await showContentInputModal({
                         title: '申请加入群聊',
                         placeholder: '你已被移出群聊，需要发送申请才能重新加入。'
@@ -13648,7 +13799,7 @@ document.getElementById('delete-contact-btn').addEventListener('click', async ()
         const chatId = getCurrentChatId();
         if (await customConfirm(`删除联系人“${chatState.chatName}”？`, '删除联系人')) {
             await addMessage({type: 'system', side: 'system', text: `你已删除“${chatState.chatName}”。`});
-            // 关系状态已在 processSystemMessageForState 中处理
+            conversationManager.open(chatId);
         }
     });
 
@@ -13656,7 +13807,8 @@ document.getElementById('delete-contact-btn').addEventListener('click', async ()
         const chatId = getCurrentChatId();
         if (await customConfirm(`将联系人“${chatState.chatName}”加入黑名单？`, '加入黑名单')) {
             await addMessage({type: 'system', side: 'system', text: `你将“${chatState.chatName}”加入黑名单。`, isBlacklistNotice: true}); // <<< 在这里增加 isBlacklistNotice: true
-            // 关系状态已在 processSystemMessageForState 中处理
+            // 新增：强制重新打开聊天页面以刷新状态和消息
+            conversationManager.open(chatId);
         }
     });
 document.getElementById('exit-group-btn').addEventListener('click', async () => { 
@@ -14215,100 +14367,83 @@ function createPostFromAI(senderName, data) {
             // 显示一个全局通知，告诉用户有新帖子
             showNotification(`“${senderName}”发布了一条新朋友圈`);
         }
-        async function getRecentMomentsForAI(characterName, limit = 5) {
-            console.log(`[诊断日志] 角色 "${characterName}" 开始检查朋友圈...`);
-            
-            // --- START: 核心修改 V2 - 区分“视野”和“认知” ---
-            const mainUserName = '{{user}}'; // AI始终知道与它互动的是'{{user}}'
-            const visibleAuthors = new Set(); // 这是“视野”，决定能看到谁的帖子
+        async function getRecentMomentsForAI(observerName, observedName = null, limit = 5) {
+        // 如果没有指定观察对象，就默认是观察者自己
+        const targetName = observedName || observerName;
 
-            const isNpc = npcList.includes(characterName);
-            const isGroupPersona = chatList.some(chat => {
-                const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                return info.groupPersonas && info.groupPersonas.some(p => p.name === characterName);
-            });
+        console.log(`[诊断日志] 角色 "${observerName}" 开始观察 "${targetName}" 的朋友圈动态...`);
+        
+        // 1. 查找目标用户发布的最新帖子
+        const recentPosts = feedData
+            .filter(post => post.userName === targetName && isPostVisibleToUser(post, observerName))
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .slice(0, limit);
 
-            if (isNpc) {
-    // ✅ 修正后：NPC的视野和其他AI角色一样，默认可以看到用户和所有人设的名字。
-    // 这样，所有公开的帖子都能通过“视野”过滤，然后由后续的隐私规则决定最终可见性。
-    visibleAuthors.add(mainUserName);
-    userPersonas.forEach(p => visibleAuthors.add(p.name));
-    
-} else {
-
-                // 如果是普通AI角色或群聊主角，视野里默认有用户和所有人设
-                visibleAuthors.add(mainUserName);
-                userPersonas.forEach(p => visibleAuthors.add(p.name));
+        // 2. 查找目标用户最近点赞或评论过的帖子
+        const recentInteractions = feedData
+            .filter(post => {
+                // 排除目标用户自己的帖子，避免重复
+                if (post.userName === targetName) return false;
                 
-                if (isGroupPersona) {
-                    // 群聊主角的视野还包括群里的所有成员
-                    const sourceGroupChat = chatList.find(chat => {
-                        const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                        return info.groupPersonas && info.groupPersonas.some(p => p.name === characterName);
-                    });
-                    if (sourceGroupChat) {
-                        const members = loadFromLocalStorage(`chat_members_${sourceGroupChat.id}`, []);
-                        members.forEach(member => visibleAuthors.add(member));
-                    }
-                } else {
-                    // 普通AI角色的视野还包括其关联的NPC
-                    const privateChat = chatList.find(c => c.type === '私聊' && c.name === characterName);
-                    if (privateChat) {
-                        const associatedNpcs = loadFromLocalStorage(`chat_associated_npcs_${privateChat.id}`, []);
-                        associatedNpcs.forEach(npc => visibleAuthors.add(npc));
-                    }
-                }
-            }
+                // 检查帖子对观察者是否可见
+                if (!isPostVisibleToUser(post, observerName)) return false;
 
-            const allVisibleMoments = feedData.filter(post => {
-    // ✅ 修正后：我们只根据隐私规则进行过滤。
-    // 只要一个帖子不违反隐私设置（例如不是私密或被排除），它就是可见的。
-    // `visibleAuthors` 这个集合不再在这里使用。
-    return isPostVisibleToUser(post, characterName);
-});
+                const hasLiked = (post.reactions['点赞'] || []).includes(targetName);
+                const hasCommented = post.comments.some(c => c.user === targetName);
+                
+                return hasLiked || hasCommented;
+            })
+            .sort((a, b) => {
+                // 按最新的互动时间排序
+                const lastInteractionTimeA = Math.max(
+                    ...post.comments.filter(c => c.user === targetName).map(c => parseInt(c.id.split('_')[1])),
+                    // 如果没有评论，点赞时间我们近似为帖子时间
+                    (post.reactions['点赞'] || []).includes(targetName) ? new Date(post.timestamp).getTime() : 0
+                );
+                const lastInteractionTimeB = Math.max(
+                    ...post.comments.filter(c => c.user === targetName).map(c => parseInt(c.id.split('_')[1])),
+                    (post.reactions['点赞'] || []).includes(targetName) ? new Date(post.timestamp).getTime() : 0
+                );
+                return lastInteractionTimeB - lastInteractionTimeA;
+            })
+            .slice(0, limit);
 
-            const recentMoments = allVisibleMoments.slice(0, limit);
-            console.log(`[诊断日志] 结果: "${characterName}" 看到了 ${recentMoments.length} 条朋友圈。视野范围:`, Array.from(visibleAuthors));
-            
-            let imageRecognitionCounts = loadFromLocalStorage('image_recognition_counts', {});
+        // 3. 将帖子和互动合并、去重、再按时间排序
+        const allActivities = [...recentPosts, ...recentInteractions];
+        const uniqueActivities = Array.from(new Map(allActivities.map(item => [item.id, item])).values());
+        uniqueActivities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        const finalActivities = uniqueActivities.slice(0, limit);
+        
+        console.log(`[诊断日志] 结果: "${observerName}" 观察到 "${targetName}" 的 ${finalActivities.length} 条相关动态。`);
 
-            const imagePayloads = [];
-            for (const post of recentMoments) {
-                if (post.image && post.image.startsWith('indexeddb:')) {
-                    const imageKey = post.image;
-                    
-                    // **关键修正：将角色名和图片ID组合，创建唯一的key**
-                    const countKey = `${characterName}_${imageKey}`;
-                    
-                    const currentCount = imageRecognitionCounts[countKey] || 0;
-                    
-                    // 只有在识别次数小于3次时，才真正去处理图片并发送给AI
-                    if (currentCount < 3) {
-                        try {
-                            const base64DataUrl = await conversationManager.makeDataPortable(imageKey);
-                            if (base64DataUrl) {
-                                imagePayloads.push({
-                                    type: 'image_url',
-                                    image_url: { "url": base64DataUrl, "detail": "low" }
-                                });
-                                // 成功准备图片后，计数器+1
-                                imageRecognitionCounts[countKey] = currentCount + 1;
-                                console.log(`[诊断日志] 成功为帖子 ${post.id} 准备图片数据 (第 ${currentCount + 1} 次识别)。`);
-                            }
-                        } catch (e) {
-                            console.error(`[诊断日志] 准备帖子 ${post.id} 的图片数据时失败:`, e);
-                        }
-                    } else {
-                        console.log(`[诊断日志] 帖子 ${post.id} 的图片已识别达到3次上限，本次不再发送图片数据。`);
-                    }
-                }
-            }
-            
-            // 保存更新后的识别次数
-            saveToLocalStorage('image_recognition_counts', imageRecognitionCounts);
-
-            return { allVisibleMoments: recentMoments, imagePayloads, imageRecognitionCounts };
+        // 4. 生成给AI看的文本摘要
+        if (finalActivities.length === 0) {
+            return null; // 如果没有任何动态，返回null
         }
+
+        let momentsContextText = `\n\n[MOMENTS CONTEXT - Recent activities of "${targetName}"]\nHere are the latest Moments activities related to "${targetName}" that you are aware of. You can use this information to make your conversation more relevant and timely.\n\n`;
+
+        finalActivities.forEach(post => {
+            const isMyPost = post.userName === targetName;
+            const iLiked = (post.reactions['点赞'] || []).includes(targetName);
+            const myComments = post.comments.filter(c => c.user === targetName);
+
+            if (isMyPost) {
+                momentsContextText += `*   **${targetName} POSTED:** "${post.text || post.content || '[A post with no text]'}" (Posted ${formatTimeAgo(post.timestamp)})\n`;
+            } else {
+                let interactionDetails = [];
+                if (iLiked) interactionDetails.push("liked this");
+                if (myComments.length > 0) {
+                    const lastComment = myComments[myComments.length-1];
+                    interactionDetails.push(`commented: "${lastComment.text}"`);
+                }
+                momentsContextText += `*   **${targetName} INTERACTED with a post by ${post.userName}:** They ${interactionDetails.join(' and ')}. (Post content: "${post.text || post.content || '[A post with no text]'}")\n`;
+            }
+        });
+
+        return momentsContextText;
+    }
 
         function handleInteractionFromAI(characterName, action, data) {
             const post = feedData.find(p => p.id === data.postId);
@@ -14579,7 +14714,7 @@ const momentsManager = (function() {
                 if (post.text && post.text.trim() !== '') {
                     const textDiv = document.createElement('div');
                     textDiv.className = 'post-content-text';
-                    textDiv.textContent = post.text;
+                    textDiv.innerHTML = post.text;
                     postBody.appendChild(textDiv);
                 }
                 switch (post.type) {
@@ -15114,9 +15249,17 @@ sendCommentBtn.addEventListener('click', () => {
         async function getRecentMomentsForAI(characterName, limit = 5) {
             console.log(`[诊断日志] 角色 "${characterName}" 开始检查朋友圈...`);
             
-            // --- START: 核心修改 V2 - 区分“视野”和“认知” ---
-            const mainUserName = '{{user}}'; // AI始终知道与它互动的是'{{user}}'
-            const visibleAuthors = new Set(); // 这是“视野”，决定能看到谁的帖子
+            // --- 【【【 全新的、绝对核心的“社交图谱”注入逻辑 】】】 ---
+            
+            // 1. 确定当前AI正在与哪个用户人设互动
+            const chatForContext = chatList.find(c => c.name === characterName && c.type === '私聊');
+            const chatInfo = chatForContext ? loadFromLocalStorage(`chat_info_${chatForContext.id}`, {}) : {};
+            const mainUserName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+            
+            // 2. 构建AI的“认知圈”，明确定义关系
+            // 核心修改：将 Set 升级为包含关系信息的对象数组
+            const knownPeople = [];
+            knownPeople.push({ name: mainUserName, relationship: `(the user you are currently interacting with)` });
 
             const isNpc = npcList.includes(characterName);
             const isGroupPersona = chatList.some(chat => {
@@ -15125,46 +15268,52 @@ sendCommentBtn.addEventListener('click', () => {
             });
 
             if (isNpc) {
-    // ✅ 修正后：NPC的视野和其他AI角色一样，默认可以看到用户和所有人设的名字。
-    // 这样，所有公开的帖子都能通过“视野”过滤，然后由后续的隐私规则决定最终可见性。
-    visibleAuthors.add(mainUserName);
-    userPersonas.forEach(p => visibleAuthors.add(p.name));
-    
-} else {
-
-                // 如果是普通AI角色或群聊主角，视野里默认有用户和所有人设
-                visibleAuthors.add(mainUserName);
-                userPersonas.forEach(p => visibleAuthors.add(p.name));
-                
-                if (isGroupPersona) {
-                    // 群聊主角的视野还包括群里的所有成员
-                    const sourceGroupChat = chatList.find(chat => {
-                        const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                        return info.groupPersonas && info.groupPersonas.some(p => p.name === characterName);
+                // NPC 认识它关联的角色
+                if (npcSettings.associations && npcSettings.associations[characterName]) {
+                    const associated = Array.isArray(npcSettings.associations[characterName]) 
+                        ? npcSettings.associations[characterName] 
+                        : [npcSettings.associations[characterName]];
+                    associated.forEach(char => knownPeople.push({ name: char, relationship: `(your associated character)` }));
+                }
+            } else if (isGroupPersona) {
+                // 群聊主角认识群里的所有成员
+                const sourceGroupChat = chatList.find(chat => {
+                    const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+                    return info.groupPersonas && info.groupPersonas.some(p => p.name === characterName);
+                });
+                if (sourceGroupChat) {
+                    const members = loadFromLocalStorage(`chat_members_${sourceGroupChat.id}`, []);
+                    members.forEach(member => {
+                        if (member !== mainUserName && member !== characterName) {
+                            knownPeople.push({ name: member, relationship: `(a member of your group chat: ${sourceGroupChat.name})` });
+                        }
                     });
-                    if (sourceGroupChat) {
-                        const members = loadFromLocalStorage(`chat_members_${sourceGroupChat.id}`, []);
-                        members.forEach(member => visibleAuthors.add(member));
-                    }
-                } else {
-                    // 普通AI角色的视野还包括其关联的NPC
-                    const privateChat = chatList.find(c => c.type === '私聊' && c.name === characterName);
-                    if (privateChat) {
-                        const associatedNpcs = loadFromLocalStorage(`chat_associated_npcs_${privateChat.id}`, []);
-                        associatedNpcs.forEach(npc => visibleAuthors.add(npc));
-                    }
+                }
+            } else {
+                // 普通AI角色认识其关联的NPC
+                if (chatForContext) {
+                    const associatedNpcs = loadFromLocalStorage(`chat_associated_npcs_${chatForContext.id}`, []);
+                    associatedNpcs.forEach(npc => knownPeople.push({ name: npc, relationship: `(your associated NPC)` }));
                 }
             }
-
+            
+            // 3. 将这个“社交图谱”注入到给AI的指令中
+            const socialGraphPrompt = `
+[Your Social Circle - UNBREAKABLE KNOWLEDGE BASE]
+This is your definitive social map. You MUST use it to understand who you are seeing on Moments.
+- **Acquaintances (People You Know):**
+${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
+- **Strangers (People You Don't Know):** Anyone NOT on the list above is a stranger to you. You have no personal connection to them.
+---
+`;
+            
+            // --- 朋友圈过滤和图片处理逻辑 (保持不变) ---
             const allVisibleMoments = feedData.filter(post => {
-    // ✅ 修正后：我们只根据隐私规则进行过滤。
-    // 只要一个帖子不违反隐私设置（例如不是私密或被排除），它就是可见的。
-    // `visibleAuthors` 这个集合不再在这里使用。
-    return isPostVisibleToUser(post, characterName);
-});
+                return isPostVisibleToUser(post, characterName);
+            });
 
             const recentMoments = allVisibleMoments.slice(0, limit);
-            console.log(`[诊断日志] 结果: "${characterName}" 看到了 ${recentMoments.length} 条朋友圈。视野范围:`, Array.from(visibleAuthors));
+            console.log(`[诊断日志] 结果: "${characterName}" 看到了 ${recentMoments.length} 条朋友圈。认知圈:`, knownPeople);
             
             let imageRecognitionCounts = loadFromLocalStorage('image_recognition_counts', {});
 
@@ -15172,13 +15321,8 @@ sendCommentBtn.addEventListener('click', () => {
             for (const post of recentMoments) {
                 if (post.image && post.image.startsWith('indexeddb:')) {
                     const imageKey = post.image;
-                    
-                    // **关键修正：将角色名和图片ID组合，创建唯一的key**
                     const countKey = `${characterName}_${imageKey}`;
-                    
                     const currentCount = imageRecognitionCounts[countKey] || 0;
-                    
-                    // 只有在识别次数小于3次时，才真正去处理图片并发送给AI
                     if (currentCount < 3) {
                         try {
                             const base64DataUrl = await conversationManager.makeDataPortable(imageKey);
@@ -15187,7 +15331,6 @@ sendCommentBtn.addEventListener('click', () => {
                                     type: 'image_url',
                                     image_url: { "url": base64DataUrl, "detail": "low" }
                                 });
-                                // 成功准备图片后，计数器+1
                                 imageRecognitionCounts[countKey] = currentCount + 1;
                                 console.log(`[诊断日志] 成功为帖子 ${post.id} 准备图片数据 (第 ${currentCount + 1} 次识别)。`);
                             }
@@ -15199,11 +15342,10 @@ sendCommentBtn.addEventListener('click', () => {
                     }
                 }
             }
-            
-            // 保存更新后的识别次数
             saveToLocalStorage('image_recognition_counts', imageRecognitionCounts);
 
-            return { allVisibleMoments: recentMoments, imagePayloads, imageRecognitionCounts };
+            // 4. 返回所有内容，包括那段至关重要的“社交图谱”指令
+            return { allVisibleMoments: recentMoments, imagePayloads, imageRecognitionCounts, socialGraphPrompt };
         }
 
         function handleInteractionFromAI(characterName, action, data) {
@@ -15683,6 +15825,30 @@ checkMomentsUpdates(); // <--- 新增这一行
                     if (!config.lastTick || (now - config.lastTick >= config.interval * 60 * 1000)) {
                         if (Math.random() * 100 < config.probability) {
                             
+                            // 【【【【【【 核心新增代码从这里开始 】】】】】】
+                            // 在触发前，检查群聊是否已解散
+                            let groupStatus = 'active';
+                            const messages = loadFromLocalStorage(`conversation_${group.id}`, []);
+                            for (const msg of messages) {
+                                if (msg.side === 'system') {
+                                    if (msg.text.includes('该群聊已解散')) {
+                                        groupStatus = 'disbanded';
+                                    } else if (msg.text.includes('该群聊已恢复')) {
+                                        groupStatus = 'active';
+                                    }
+                                }
+                            }
+                            
+                            // 如果群聊已解散，则中止本次动态行为
+                            if (groupStatus === 'disbanded') {
+                                console.log(`[Dynamics Tick] Skipping proactive message for group "${group.name}" because it is disbanded.`);
+                                // 即使中止了，也更新时间戳，避免在解散状态下频繁检查
+                                config.lastTick = now;
+                                settingsChanged = true;
+                                continue; // 跳到下一个群聊的检查
+                            }
+                            // 【【【【【【 核心新增代码到这里结束 】】】】】】
+                            
                             let potentialSpeakers = [];
                             const remarkActors = (info.remark || '').split(/[,，\s]+/).filter(Boolean);
                             potentialSpeakers.push(...remarkActors);
@@ -15927,8 +16093,34 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
 
                 if (isChatIdle) {
                     if (Math.random() * 100 < config.probability) {
-                        console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering proactive message for private character "${charName}".`);
-                        await triggerProactiveAI(chat.id, charName, 'message');
+                        
+                        // 【【【【【【 核心新增代码从这里开始 】】】】】】
+                        // 在决定发消息前，检查关系状态
+                        let myStatus = 'normal';
+                        for (const msg of messages) {
+                            if (msg.side === 'system') {
+                                if (msg.text.includes('你将') && (msg.text.includes('加入黑名单') || msg.text.includes('拉黑'))) {
+                                    myStatus = 'blacklisted';
+                                } else if (msg.text.includes('你已删除')) {
+                                    myStatus = 'deleted';
+                                } else if (msg.text.includes('你将') && msg.text.includes('移出黑名单')) {
+                                    myStatus = 'normal';
+                                } else if (msg.text.includes('你已添加了')) {
+                                    myStatus = 'normal';
+                                }
+                            }
+                        }
+
+                        // 如果用户已拉黑或删除，则跳过本次发消息行为
+                        if (myStatus === 'deleted' || myStatus === 'blacklisted') {
+                            console.log(`[Dynamics Tick] Skipping proactive message for "${charName}" because user relationship is: ${myStatus}.`);
+                        } else {
+                            // 只有关系正常时，才执行发消息
+                            console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering proactive message for private character "${charName}".`);
+                            await triggerProactiveAI(chat.id, charName, 'message');
+                        }
+                        // 【【【【【【 核心新增代码到这里结束 】】】】】】
+                        
                         // 注意：单聊的主动消息不更新 lastTick，因为它只在空闲时触发一次
                     }
                 }
@@ -15949,9 +16141,6 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 }
             }
             }
-            // =================================================================
-            // 【【【【【【 新增代码块到此结束 】】】】】】
-            // =================================================================
         
             if (settingsChanged) {
                 saveSettings();
