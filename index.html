@@ -6348,7 +6348,7 @@ For this specific task, you have been cast to play **ONLY ONE ROLE**: **"${sende
 3.  Your response MUST come from "${senderName}"'s perspective and personality.
 
 **ABSOLUTE FORBIDDANCE:**
-You are **STRICTLY FORBIDDEN** from speaking, thinking, or acting as any other character in this response. Even though you can see other personas like "王楚染", "张三", etc., they are merely background context for you. **IGNORE THEM as potential speakers.** Your voice is "${senderName}", and only "${senderName}".
+You are **STRICTLY FORBIDDEN** from speaking, thinking, or acting as any other character in this response. Even though you can see other personas like "唐唐", "张三", etc., they are merely background context for you. **IGNORE THEM as potential speakers.** Your voice is "${senderName}", and only "${senderName}".
 ---
 `;
             finalSystemPrompt += directorMandate;
@@ -6362,7 +6362,7 @@ You are **STRICTLY FORBIDDEN** from speaking, thinking, or acting as any other c
             console.log(`[诊断日志] 角色 "${senderName}": 开始检查朋友圈...`);
             momentsManager.refreshData();
 
-            const { allVisibleMoments, imagePayloads, imageRecognitionCounts } = await momentsManager.getRecentMomentsForAI(senderName, 8);
+            const { allVisibleMoments, imagePayloads, imageRecognitionCounts, socialGraphPrompt, knownPeople } = await momentsManager.getRecentMomentsForAI(senderName, 8);
 
             if (allVisibleMoments.length === 0) {
                 console.log(`[诊断日志] 角色 "${senderName}": 没有看到任何新朋友圈，决策中断。`);
@@ -6414,11 +6414,22 @@ if (isGroupPersona) {
 // 【【【【【【 认知范围构建结束，AI不再知道所有用户人设的存在 】】】】】】
             
             const momentsContext = allVisibleMoments.map((post, i) => {
+                // --- 核心修改：在这里建立一个查找表，方便快速判断关系 ---
+                const knownPeopleMap = new Map(knownPeople.map(p => [p.name, p.relationship]));
+
                 let authorLabel = post.userName;
-                // 添加身份标签
-                if (post.userName === senderName) { authorLabel = `YOU (this is your own post)`; } 
-                else if (!isNpc && post.userName === mainUserName) { authorLabel = `${post.userName} (the user you are interacting with)`; }
-                else if (isNpc && npcSettings.associations[senderName] === post.userName) { authorLabel = `${post.userName} (your associated character)`;}
+                
+                // 检查发帖人是否在AI的“认知圈”里
+                if (knownPeopleMap.has(post.userName)) {
+                    // 如果在，就用预设好的关系标签
+                    authorLabel = `${post.userName} ${knownPeopleMap.get(post.userName)}`;
+                } else if (post.userName === senderName) {
+                    // AI自己的帖子
+                    authorLabel = `YOU (this is your own post)`;
+                } else {
+                    // 如果不在认知圈里，就强制打上“陌生人”标签！
+                    authorLabel = `${post.userName} (陌生人)`;
+                }
 
                 const commentsPreview = post.comments.filter(c => c.user !== senderName).slice(-3).map(c => {
                     let commenterLabel = c.user;
@@ -6526,108 +6537,71 @@ chatHistoryForPrompt = apiPayloadMessages.map(msg => {
 
             // --- 【【【核心、决定性、绝对正确的修正逻辑】】】 ---
             // 我们不再扫描所有群聊，而是只关注当前角色所在的上下文群聊（如果存在），以及其他直接关联的角色
-            let extraContext = '';
-            
-            // 步骤 1 (无条件执行): 如果当前角色是NPC，【必须】加载其所有关联角色的人设。
+            // --- 【【【 全新的、绝对正确的关联人设注入逻辑 】】】 ---
+            let associatedNpcsPrompt = '';
+            let associatedCharNames = [];
+
+            // 步骤 1: 根据角色类型，从正确的地方获取关联名单
             if (isNpc) {
-                // 确保 associations[senderName] 是一个数组，以实现向后兼容
-                let associatedCharNames = npcSettings.associations[senderName] || [];
-                if (typeof associatedCharNames === 'string') {
-                    associatedCharNames = [associatedCharNames];
-                }
-
-                if (associatedCharNames.length > 0) {
-                    extraContext += `\n[Your Associated Characters' Personas]`; // 标题改为复数
-                    
-                    // 遍历所有关联的角色名
-                    associatedCharNames.forEach(associatedCharName => {
-                        let associatedPersona = '';
-
-                        // 1. 检查关联角色是否是一个【用户人设】
-                        const userPersona = userPersonas.find(p => p.name === associatedCharName);
-                        if (userPersona && userPersona.description) {
-                            associatedPersona = userPersona.description;
-                        }
-
-                        // 2. 如果不是，再检查是否是一个【私聊AI角色】
-                        if (!associatedPersona) {
-                            const charChat = chatList.find(c => c.name === associatedCharName && c.type === '私聊');
-                            if (charChat) {
-                                const charChatInfo = loadFromLocalStorage(`chat_info_${charChat.id}`, {});
-                                if (charChatInfo.aiPersona) {
-                                    associatedPersona = charChatInfo.aiPersona;
-                                }
-                            }
-                        }
-
-                        // 3. 如果还不是，再检查是否是【另一个NPC】
-                        if (!associatedPersona) {
-                            if (npcSettings.personas && npcSettings.personas[associatedCharName]) {
-                                associatedPersona = npcSettings.personas[associatedCharName];
-                            }
-                        }
-                        
-                        // 4. 检查是否是一个【群聊主角】
-                        if (!associatedPersona) {
-                            const groupChatSource = chatList.find(chat => {
-                                if (chat.type !== '群聊') return false;
-                                const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                                return info.groupPersonas && info.groupPersonas.some(p => p.name === associatedCharName);
-                            });
-                            if (groupChatSource) {
-                                const info = loadFromLocalStorage(`chat_info_${groupChatSource.id}`, {});
-                                const personaData = info.groupPersonas.find(p => p.name === associatedCharName);
-                                if (personaData && personaData.description) {
-                                    associatedPersona = personaData.description;
-                                }
-                            }
-                        }
-
-                        // 5. 【【【【【【 核心新增：最后，检查是否是一个【群演人设】 】】】】】
-                        if (!associatedPersona) {
-                            // 遍历所有群聊，查找哪个群的备注里包含了这个关联角色
-                            const ensembleGroupSource = chatList.find(chat => {
-                                if (chat.type !== '群聊') return false;
-                                const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                                const ensembleNames = (info.remark || '').split(/[,，\s]+/).filter(Boolean);
-                                return ensembleNames.includes(associatedCharName);
-                            });
-
-                            // 如果找到了这个群，就使用这个群的通用群演人设
-                            if (ensembleGroupSource) {
-                                const info = loadFromLocalStorage(`chat_info_${ensembleGroupSource.id}`, {});
-                                if (info.ensemblePersona) {
-                                    associatedPersona = info.ensemblePersona;
-                                }
-                            }
-                        }
-
-                        // 只要从任何来源找到了人设，就将其作为列表项注入
-                        if (associatedPersona) {
-                           extraContext += `\n- ${associatedCharName}: ${associatedPersona}`;
-                        }
-                    });
+                // 如果是NPC，从NPC设置里读
+                let associations = (npcSettings.associations && npcSettings.associations[senderName]) || [];
+                associatedCharNames = Array.isArray(associations) ? associations : [associations];
+            } else {
+                // 如果是单聊角色，从聊天设置里读
+                const privateChat = chatList.find(c => c.type === '私聊' && c.name === senderName);
+                if (privateChat) {
+                    associatedCharNames = loadFromLocalStorage(`chat_associated_npcs_${privateChat.id}`, []);
                 }
             }
-            
-            // 【【【【【【  <<<<< 核心修改：彻底删除整个 if (contextChatId) { ... } 代码块 >>>>>>>  】】】】】】
-            // (此处不再有重复加载群聊上下文的逻辑)
-           
+
+            // 步骤 2: 如果有关联角色，就为他们查找人设并构建Prompt
+            if (associatedCharNames.length > 0) {
+                associatedNpcsPrompt += `\n[Your Associated Characters' Personas]\nThis is crucial information about people you know. You MUST use this to inform your interactions.\n`;
+                
+                associatedCharNames.forEach(charName => {
+                    let personaText = '';
+                    
+                    // 查找人设的逻辑 (这个逻辑是正确的，保持不变)
+                    const userPersona = userPersonas.find(p => p.name === charName);
+                    if (userPersona && userPersona.description) {
+                        personaText = userPersona.description;
+                    } else {
+                        const charChat = chatList.find(c => c.name === charName && c.type === '私聊');
+                        if (charChat) {
+                            const charInfo = loadFromLocalStorage(`chat_info_${charChat.id}`, {});
+                            personaText = charInfo.aiPersona || '';
+                        }
+                    }
+                    if (!personaText) {
+                        if (npcSettings.personas && npcSettings.personas[charName]) {
+                            personaText = npcSettings.personas[charName];
+                        }
+                    }
+
+                    if (personaText) {
+                        associatedNpcsPrompt += `- **${charName}**: ${personaText}\n`;
+                    } else {
+                        associatedNpcsPrompt += `- **${charName}**: (No detailed persona available)\n`;
+                    }
+                });
+            }
+            // --- 注入逻辑结束 ---
+
             // --- 核心修正：在这里替换占位符 ---
             let processedPreamble = (preamble || 'None').replace(/{{user}}/g, mainUserName).replace(/{{char}}/g, senderName);
             let processedUserPersonaText = (finalUserPersonaText || 'Default').replace(/{{user}}/g, mainUserName).replace(/{{char}}/g, senderName);
-            let processedExtraContext = (extraContext || '').replace(/{{user}}/g, mainUserName).replace(/{{char}}/g, senderName);
+            //  我们不再需要 processedExtraContext，而是直接使用新的 prompt 变量
             let processedChatHistory = (chatHistoryForPrompt || 'No recent chat history.').replace(/{{user}}/g, mainUserName).replace(/{{char}}/g, senderName);
 
             const contextHeader = `
 [CONTEXT - READ FIRST]
 This is the context from your primary chat. Use it to inform your reactions on Moments.
-Preamble: ${preamble || 'None'}
-User Persona (${mainUserName}): ${finalUserPersonaText || 'Default'}
-${extraContext}
+Preamble: ${processedPreamble}
+User Persona (${mainUserName}): ${processedUserPersonaText}
+${associatedNpcsPrompt}
 ---
 [RECENT CHAT HISTORY]
-${chatHistoryForPrompt || 'No recent chat history.'}
+${processedChatHistory}
 ---
 `;
 
@@ -7723,13 +7697,13 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     *   **原则二 (禁止独角戏)**: **绝对禁止**为龙套NPC编写任何独立的、与主角无关的心理活动或背景故事。镜头的焦点**永远**在主角身上。
     *   **原则三 (用完即弃)**: 龙套NPC在完成其功能（如递上一杯酒、说一句关键的传闻）后，就应该立刻淡出场景，**不能**持续占用篇幅。
     *   **正确示例**:
-        > 钱唐烦躁地敲了敲吧台。「酒保，再来一杯威士忌。」
+        > 唐唐烦躁地敲了敲吧台。「酒保，再来一杯威士忌。」
         > 
-        > 一个留着八字胡的**酒保**闻声赶来，他小心翼翼地为钱唐满上酒，低声说：「先生，城里最近不太平，您晚上最好还是早点回去。」说完，他便擦着杯子退到了一旁。
+        > 一个留着八字胡的**酒保**闻声赶来，他小心翼翼地为唐唐满上酒，低声说：「先生，城里最近不太平，您晚上最好还是早点回去。」说完，他便擦着杯子退到了一旁。
         >
-        > *（分析：酒保的出现是为了①服务主角钱唐 ②引出“不太平”的剧情线索。任务完成后，他立刻退场，镜头重新回到主角身上。）*
+        > *（分析：酒保的出现是为了①服务主角唐唐 ②引出“不太平”的剧情线索。任务完成后，他立刻退场，镜头重新回到主角身上。）*
     *   **错误示例**:
-        > 一个留着八字胡的**酒保**正在吧台后擦着杯子。他叫汉克，从北方来，背负着血海深仇。他看着钱唐，心里想着这个男人也许能帮他复仇......
+        > 一个留着八字胡的**酒保**正在吧台后擦着杯子。他叫汉克，从北方来，背负着血海深仇。他看着唐唐，心里想着这个男人也许能帮他复仇......
         >
         > *（分析：完全错误！给龙套NPC加了大量的内心戏和背景，镜头完全偏离了主角。）*
 
@@ -7815,7 +7789,7 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     // *** 第二次（之前遗漏的）转义修复 ***
     \`\`\`
     <block type="text">
-    钱唐猛地放下手机，抬手正想叫服务生清理桌上的烟灰缸...
+    唐唐猛地放下手机，抬手正想叫服务生清理桌上的烟灰缸...
     </block>
 
     <block type="command">
@@ -8854,7 +8828,7 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
 3.  **type="command"**: The content is a SINGLE, one-line command OR a complete custom regex block.
     - Example (Standard Command): <block type="command" sender="苏瓷言">[red_packet: 恭喜发财]</block>
-    - Example (Custom Regex): <block type="command" sender="钱唐">[DANMAKU_PLAYER]...[/DANMAKU_PLAYER]</block>
+    - Example (Custom Regex): <block type="command" sender="唐唐">[DANMAKU_PLAYER]...[/DANMAKU_PLAYER]</block>
 
 **FAILURE TO COMPLY WITH THIS BLOCK FORMAT WILL RESULT IN SYSTEM ERROR. THERE ARE NO EXCEPTIONS.**
 
@@ -9136,7 +9110,7 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
 3.  **type="command"**: The content is a SINGLE, one-line command OR a complete custom regex block.
     - Example (Standard Command): <block type="command" sender="苏瓷言">[red_packet: 恭喜发财]</block>
-    - Example (Custom Regex): <block type="command" sender="钱唐">[DANMAKU_PLAYER]...[/DANMAKU_PLAYER]</block>
+    - Example (Custom Regex): <block type="command" sender="唐唐">[DANMAKU_PLAYER]...[/DANMAKU_PLAYER]</block>
 
 **FAILURE TO COMPLY WITH THIS BLOCK FORMAT WILL RESULT IN SYSTEM ERROR. THERE ARE NO EXCEPTIONS.**
 
@@ -9309,7 +9283,7 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
 3.  **type="command"**: The content is a SINGLE, one-line command OR a complete custom regex block.
     - Example (Standard Command): <block type="command" sender="苏瓷言">[red_packet: 恭喜发财]</block>
-    - Example (Custom Regex): <block type="command" sender="钱唐">[DANMAKU_PLAYER]...[/DANMAKU_PLAYER]</block>
+    - Example (Custom Regex): <block type="command" sender="唐唐">[DANMAKU_PLAYER]...[/DANMAKU_PLAYER]</block>
 
 **FAILURE TO COMPLY WITH THIS BLOCK FORMAT WILL RESULT IN SYSTEM ERROR. THERE ARE NO EXCEPTIONS.**
 
@@ -14261,17 +14235,22 @@ const userPersonaManager = (function() {
             return;
         }
 
-        // 核心加固：确保 avatar 字段始终存在，即使它是一个空字符串
         const newPersona = { name, description, avatar: avatar || '' };
 
         if (editIndex !== '') {
-
+            const oldName = userPersonas[editIndex].name;
+            
             userPersonas[editIndex] = newPersona;
+            savePersonas();
+
+            // **调用最终的全局同步器**
+            globalNameAndDataSynchronizer(oldName, newPersona.name);
+            
         } else {
             userPersonas.push(newPersona);
+            savePersonas();
         }
 
-        savePersonas();
         renderPersonas();
         resetForm();
     }
@@ -14552,9 +14531,9 @@ const momentsManager = (function() {
                 }
 
                 const postTimestamp = new Date(post.timestamp).getTime();
-                if (postTimestamp > lastCheckedTimestamp) {
+                if (postTimestamp > lastCheckedTimestamp && post.userName !== currentPersonaName) {
                     updatedPostIds.add(post.id);
-                    return;
+                    return; // 是一条别人的新帖子，计入并跳到下一条
                 }
                 
                 const hasNewComments = post.comments.some(comment => {
@@ -14607,22 +14586,50 @@ const momentsManager = (function() {
         }
 
         function getSpecificAvatarUrl(username) {
-            if (username === '{{user}}') {
-                return myAvatar;
-            }
-
-            const persona = userPersonas.find(p => p.name === username);
-            if (persona) {
-                return persona.avatar || generateDefaultAvatar(username);
-            }
-
-            const friendChat = chatList.find(c => c.name === username || (loadFromLocalStorage(`chat_info_${c.id}`, {}).remark === username));
-            if (friendChat) {
-                return loadFromLocalStorage(`chat_avatar_${friendChat.id}`, null);
-            }
-            
-            return generateDefaultAvatar(username);
+        // 优先级 0: 如果是我自己 ({{user}})，直接使用全局头像
+        if (username === '{{user}}') {
+            return myAvatar || generateDefaultAvatar(username);
         }
+
+        // 优先级 1: 检查此角色是否是一个定义了头像的【用户人设】
+        const userPersona = userPersonas.find(p => p.name === username);
+        if (userPersona && userPersona.avatar) {
+            return userPersona.avatar;
+        }
+
+        // 优先级 2: 检查此角色是否是一个拥有【私聊窗口】的AI，并使用其聊天特定头像
+        const friendChat = chatList.find(c => c.name === username && c.type === '私聊');
+        if (friendChat) {
+            const chatAvatar = loadFromLocalStorage(`chat_avatar_${friendChat.id}`, null);
+            if (chatAvatar) {
+                return chatAvatar;
+            }
+        }
+
+        // 优先级 3: 检查此角色是否在某个群聊中被定义为【群聊主角】，并设置了头像
+        // 遍历所有群聊来查找
+        for (const chat of chatList) {
+            if (chat.type === '群聊') {
+                const chatInfo = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+                const groupPersona = (chatInfo.groupPersonas || []).find(p => p.name === username);
+                if (groupPersona && groupPersona.avatar) {
+                    return groupPersona.avatar;
+                }
+            }
+        }
+
+        // 优先级 4: 检查此角色是否是一个定义了头像的【NPC】
+        const npcSettingsData = loadFromLocalStorage('app-npc-settings', {});
+        if (npcSettingsData.personas && npcSettingsData.personas[username] && npcSettingsData.personas[username].avatar) {
+             return npcSettingsData.personas[username].avatar;
+        }
+
+
+        // 优先级 5: 如果以上都找不到，则返回AI角色的通用默认头像
+        return 'https://i.postimg.cc/hPRcjXgc/IMG-0466.png';
+    }
+
+           
         
         function formatTimeAgo(timestamp) {
             const now = new Date();
@@ -14661,62 +14668,80 @@ const momentsManager = (function() {
         }
         
         function renderFeed() {
-        feedData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        feedContainer.innerHTML = '';
-
-        // 【【【全新的、带有“加载更多”逻辑的渲染系统】】】
-
-        let currentlyRenderedCount = 0;
-        const POSTS_PER_PAGE = 13; // 每次加载13条
-
-        // 1. 定义一个函数，专门用来渲染一批帖子
-        const renderMorePosts = () => {
-            const postsToRender = feedData.slice(currentlyRenderedCount, currentlyRenderedCount + POSTS_PER_PAGE);
-            
-            postsToRender.forEach(post => {
-                // 检查隐私，这部分逻辑保持不变
-                if (post.privacy.type === 'exclude' && post.privacy.list.includes(currentPersonaName)) {
-                    return;
-                }
-
-                // --- 这里是您原来就有的、渲染单个帖子的完整代码，我们直接把它搬进来 ---
-                const postCard = document.createElement('div');
-                postCard.className = 'post-card';
-                postCard.id = post.id;
+            feedData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            feedContainer.innerHTML = '';
+    
+            let currentlyRenderedCount = 0;
+            const POSTS_PER_PAGE = 13;
+    
+            const renderMorePosts = () => {
+                const postsToRender = feedData.slice(currentlyRenderedCount, currentlyRenderedCount + POSTS_PER_PAGE);
                 
-                postCard.innerHTML = `
-                    <div class="post-header">
-                        <div class="post-avatar" id="avatar-${post.id}"></div>
-                        <div class="post-author-info">
-                            <div class="post-user-name">${post.userName}</div>
+                postsToRender.forEach(post => {
+                    if (post.privacy.type === 'exclude' && post.privacy.list.includes(currentPersonaName)) {
+                        return;
+                    }
+    
+                    // --- 核心修改：在这里获取最新的作者名 ---
+                    let latestAuthorName = post.userName; // 默认使用原始名字
+    
+                    // 检查发帖人是否是一个用户人设
+                    const userPersona = userPersonas.find(p => p.name === post.userName);
+                    if (userPersona) {
+                        // 如果是，直接使用人设名字（因为用户人设名是唯一的，且在人设管理页面修改）
+                        latestAuthorName = userPersona.name;
+                    } else {
+                        // 如果不是用户人设，那它就是一个AI角色
+                        // 查找这个AI角色对应的私聊窗口
+                        const aiChat = chatList.find(c => c.name === post.userName && c.type === '私聊');
+                        if (aiChat) {
+                            // 如果找到了，就使用这个聊天窗口的最新名字
+                            // 这能确保在聊天设置里改了AI的名字后，朋友圈也能同步
+                            latestAuthorName = aiChat.name;
+                        }
+                        // 如果连私聊窗口都找不到了（可能被删了），就保持原始名字
+                    }
+                    // --- 修改结束 ---
+    
+                    const postCard = document.createElement('div');
+                    postCard.className = 'post-card';
+                    postCard.id = post.id;
+                    
+                    // --- 核心修改：在渲染HTML时，使用我们刚刚获取的 latestAuthorName ---
+                    postCard.innerHTML = `
+                        <div class="post-header">
+                            <div class="post-avatar" id="avatar-${post.id}"></div>
+                            <div class="post-author-info">
+                                <div class="post-user-name">${latestAuthorName}</div>
+                            </div>
+                            <div class="post-timestamp">
+                                ${formatTimeAgo(post.timestamp)}
+                            </div>
+                            <div class="post-options">
+                                <div class="post-options-main-actions"></div>
+                            </div>
                         </div>
-                        <div class="post-timestamp">
-                            ${formatTimeAgo(post.timestamp)}
+                        <div class="post-body"></div>
+                        <div class="post-footer">
+                            <div class="actions-btn-container">
+                                <div class="actions-btn-dot"></div>
+                                <div class="actions-btn-dot"></div>
+                            </div>
                         </div>
-                        <div class="post-options">
-                            <div class="post-options-main-actions"></div>
+                        <div class="interactions-section">
+                            <div class="reactions-list"></div>
+                            <div class="comments-list"></div>
                         </div>
-                    </div>
-                    <div class="post-body"></div>
-                    <div class="post-footer">
-                        <div class="actions-btn-container">
-                            <div class="actions-btn-dot"></div>
-                            <div class="actions-btn-dot"></div>
-                        </div>
-                    </div>
-                    <div class="interactions-section">
-                        <div class="reactions-list"></div>
-                        <div class="comments-list"></div>
-                    </div>
-                `;
-                
-                const postBody = postCard.querySelector('.post-body');
-                if (post.text && post.text.trim() !== '') {
-                    const textDiv = document.createElement('div');
-                    textDiv.className = 'post-content-text';
-                    textDiv.innerHTML = post.text;
-                    postBody.appendChild(textDiv);
-                }
+                    `;
+                    // --- 修改结束 ---
+                    
+                    const postBody = postCard.querySelector('.post-body');
+                    if (post.text && post.text.trim() !== '') {
+                        const textDiv = document.createElement('div');
+                        textDiv.className = 'post-content-text';
+                        textDiv.innerHTML = post.text;
+                        postBody.appendChild(textDiv);
+                    }
                 switch (post.type) {
                     case 'photo':
                         if (post.image) {
@@ -14796,29 +14821,26 @@ const momentsManager = (function() {
                 
                 feedContainer.appendChild(postCard);
                 
+                // --- 核心修改：使用原始的 post.userName 来获取头像，因为头像是和原始ID绑定的 ---
                 const avatarEl = postCard.querySelector(`#avatar-${post.id}`);
                 const avatarUrl = getSpecificAvatarUrl(post.userName);
                 setImageSrc(avatarEl, avatarUrl);
+                // --- 修改结束 ---
 
                 updatePostInteractions(post.id);
-                // --- 单个帖子渲染代码结束 ---
             });
             
             currentlyRenderedCount += postsToRender.length;
         };
 
-        // 2. 移除旧的滚动监听器，防止重复绑定
         feedContainer.onscroll = null;
 
-        // 3. 创建一个新的滚动监听器
         feedContainer.onscroll = () => {
-            // 当滚动条接近底部时，并且还有未渲染的帖子时
             if ((feedContainer.scrollTop + feedContainer.clientHeight >= feedContainer.scrollHeight - 200) && (currentlyRenderedCount < feedData.length)) {
-                renderMorePosts(); // 加载并渲染下一批
+                renderMorePosts();
             }
         };
         
-        // 4. 初始时，先渲染第一批（13条）
         renderMorePosts();
     }
         
@@ -14861,50 +14883,84 @@ const momentsManager = (function() {
 
         function showPrivacyDetailsModal(postPrivacy, postId) { let description = '', listHtml = ''; const { type, list } = postPrivacy; if (type === 'public') description = '全部可见'; else if (type === 'private') description = '仅自己可见'; else if (type === 'include') { description = '仅以下用户可见:'; listHtml = `<div class="list-items-container">${list.map(name => `<span class="list-item">${name}</span>`).join('')}</div>`; } else if (type === 'exclude') { description = '不给以下用户看:'; listHtml = `<div class="list-items-container">${list.map(name => `<span class="list-item">${name}</span>`).join('')}</div>`; } currentPrivacyDisplay.innerHTML = `<strong>当前可见范围: </strong><span class="privacy-value">${description}</span>${listHtml}`; privacyDetailsModalOverlay.classList.add('visible'); modifyPrivacyBtn.onclick = () => { privacyDetailsModalOverlay.classList.remove('visible'); showPrivacySelectionModal(postPrivacy, (newPrivacy) => { const post = feedData.find(p => p.id === postId); if (post) { post.privacy = newPrivacy; saveFeed(); renderFeed(); } }); }; closePrivacyDetailsBtn.onclick = () => privacyDetailsModalOverlay.classList.remove('visible'); privacyDetailsModalOverlay.onclick = (e) => { if (e.target === privacyDetailsModalOverlay) privacyDetailsModalOverlay.classList.remove('visible'); }; }
         
-        function updatePostInteractions(postId) { const postData = feedData.find(p => p.id === postId); const postEl = appRoot.querySelector(`#${postId}`); if (!postData || !postEl) return; const reactionsList = postEl.querySelector('.reactions-list'); const commentsList = postEl.querySelector('.comments-list'); const interactionsSection = postEl.querySelector('.interactions-section'); const likers = postData.reactions['点赞'] || []; reactionsList.innerHTML = likers.length > 0 ? `<span class="reaction-item"><span class="reaction-icon"></span>点赞 ${likers.length > 3 ? `${likers.length}人` : likers.join(', ')}</span>` : ''; commentsList.innerHTML = postData.comments.map(c => {
-    let contentHtml = '';
-    const commentText = c.text.trim();
+        function updatePostInteractions(postId) {
+            const postData = feedData.find(p => p.id === postId);
+            const postEl = appRoot.querySelector(`#${postId}`);
+            if (!postData || !postEl) return;
 
-    // 优先级 1: 分离出 <snippet> 代码块
-    const snippetParts = commentText.split(/<snippet>([\s\S]*?)<\/snippet>/);
-    
-    snippetParts.forEach((part, index) => {
-        if (!part) return;
+            const reactionsList = postEl.querySelector('.reactions-list');
+            const commentsList = postEl.querySelector('.comments-list');
+            const interactionsSection = postEl.querySelector('.interactions-section');
 
-        if (index % 2 === 1) {
-            // 这是 <snippet> 内部的原始HTML，直接添加
-            contentHtml += part;
-        } else {
-            // 这是纯文本部分，可能混有表情包指令
-            // 我们需要对这部分进行二次处理
-            
-            // 使用带捕获组的 split，将文本按表情包指令分割
-            const textAndStickerParts = part.split(/(\[sticker:[^\]]+\])/g);
-
-            textAndStickerParts.forEach(subPart => {
-                if (!subPart) return;
-
-                const stickerMatch = subPart.match(/^\[sticker:([^\]]+)\]$/);
-                if (stickerMatch) {
-                    // 这部分是一个完整的表情包指令
-                    const stickerName = stickerMatch[1];
-                    const sticker = stickers.find(s => s.name === stickerName);
-                    if (sticker) {
-                        contentHtml += `<img src="${sticker.url}" alt="${stickerName}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
-                    } else {
-                        // 找不到表情包，按原文转义后显示
-                        contentHtml += escapeHtml(subPart);
-                    }
-                } else {
-                    // 这部分是纯文本，进行HTML转义以确保安全
-                    contentHtml += escapeHtml(subPart);
+            // --- 核心修改1：为点赞列表增加实时姓名检查 ---
+            const getLatestName = (originalName) => {
+                // 如果是当前用户，直接返回最新的 user persona name 或 '{{user}}'
+                if (originalName === '{{user}}') {
+                    return currentPersonaName;
                 }
-            });
-        }
-    });
+                
+                // 检查是否是用户人设
+                const userPersona = userPersonas.find(p => p.name === originalName);
+                if (userPersona) return userPersona.name;
+                
+                // 检查是否是AI角色
+                const aiChat = chatList.find(c => c.name === originalName && c.type === '私聊');
+                if (aiChat) return aiChat.name;
 
-    return `<div class="comment-item" data-user="${c.user}" data-comment-id="${c.id || ''}"><div class="comment-text-container"><span class="comment-meta"><span class="commenter-name">${c.user}</span>${c.replyTo ? ` 回复 <span class="reply-to-name">${c.replyTo}</span>` : ''}:</span><span class="comment-content-text">${contentHtml}</span></div><button class="edit-comment-btn" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:13px;margin-left:auto;padding:0 8px;">编辑</button><button class="delete-comment-btn" title="删除评论">×</button></div>`;
-}).join(''); commentsList.querySelectorAll('.delete-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); deleteComment(postId, e.target.closest('.comment-item').dataset.commentId); })); commentsList.querySelectorAll('.edit-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); editComment(postId, e.target.closest('.comment-item').dataset.commentId); })); interactionsSection.style.display = (reactionsList.innerHTML.trim() || commentsList.innerHTML.trim()) ? 'block' : 'none'; }
+                // 检查是否是NPC (NPC名字一般不改，但以防万一)
+                if (npcList.includes(originalName)) return originalName;
+
+                // 如果都找不到，返回原始名字作为保底
+                return originalName;
+            };
+            
+            const likers = postData.reactions['点赞'] || [];
+            const latestLikerNames = likers.map(getLatestName);
+            reactionsList.innerHTML = latestLikerNames.length > 0 ? `<span class="reaction-item"><span class="reaction-icon"></span>点赞 ${latestLikerNames.length > 3 ? `${latestLikerNames.length}人` : latestLikerNames.join(', ')}</span>` : '';
+            // --- 修改结束 ---
+
+            commentsList.innerHTML = postData.comments.map(c => {
+                let contentHtml = '';
+                const commentText = c.text.trim();
+
+                const snippetParts = commentText.split(/<snippet>([\s\S]*?)<\/snippet>/);
+                
+                snippetParts.forEach((part, index) => {
+                    if (!part) return;
+                    if (index % 2 === 1) {
+                        contentHtml += part;
+                    } else {
+                        const textAndStickerParts = part.split(/(\[sticker:[^\]]+\])/g);
+                        textAndStickerParts.forEach(subPart => {
+                            if (!subPart) return;
+                            const stickerMatch = subPart.match(/^\[sticker:([^\]]+)\]$/);
+                            if (stickerMatch) {
+                                const stickerName = stickerMatch[1];
+                                const sticker = stickers.find(s => s.name === stickerName);
+                                if (sticker) {
+                                    contentHtml += `<img src="${sticker.url}" alt="${stickerName}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+                                } else {
+                                    contentHtml += escapeHtml(subPart);
+                                }
+                            } else {
+                                contentHtml += escapeHtml(subPart);
+                            }
+                        });
+                    }
+                });
+                
+                // --- 核心修改2：为评论和回复列表增加实时姓名检查 ---
+                const latestCommenterName = getLatestName(c.user);
+                const latestReplyToName = c.replyTo ? getLatestName(c.replyTo) : null;
+                // --- 修改结束 ---
+
+                return `<div class="comment-item" data-user="${c.user}" data-comment-id="${c.id || ''}"><div class="comment-text-container"><span class="comment-meta"><span class="commenter-name">${latestCommenterName}</span>${latestReplyToName ? ` 回复 <span class="reply-to-name">${latestReplyToName}</span>` : ''}:</span><span class="comment-content-text">${contentHtml}</span></div><button class="edit-comment-btn" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:13px;margin-left:auto;padding:0 8px;">编辑</button><button class="delete-comment-btn" title="删除评论">×</button></div>`;
+            }).join('');
+
+            commentsList.querySelectorAll('.delete-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); deleteComment(postId, e.target.closest('.comment-item').dataset.commentId); }));
+            commentsList.querySelectorAll('.edit-comment-btn').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); editComment(postId, e.target.closest('.comment-item').dataset.commentId); }));
+            interactionsSection.style.display = (reactionsList.innerHTML.trim() || commentsList.innerHTML.trim()) ? 'block' : 'none';
+        }
         
         function showFullListModal(title, items) { 
             fullListModalTitle.textContent = title; 
@@ -15247,57 +15303,51 @@ sendCommentBtn.addEventListener('click', () => {
         }
 
         async function getRecentMomentsForAI(characterName, limit = 5) {
-            console.log(`[诊断日志] 角色 "${characterName}" 开始检查朋友圈...`);
+            // --- 终极防御性修复：在这里定义 senderName，确保它在任何情况下都存在 ---
+            const senderName = characterName;
+
+            console.log(`[诊断日志] 角色 "${senderName}" 开始检查朋友圈...`);
             
-            // --- 【【【 全新的、绝对核心的“社交图谱”注入逻辑 】】】 ---
-            
-            // 1. 确定当前AI正在与哪个用户人设互动
-            const chatForContext = chatList.find(c => c.name === characterName && c.type === '私聊');
+            const chatForContext = chatList.find(c => c.name === senderName && c.type === '私聊');
             const chatInfo = chatForContext ? loadFromLocalStorage(`chat_info_${chatForContext.id}`, {}) : {};
             const mainUserName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
             
-            // 2. 构建AI的“认知圈”，明确定义关系
-            // 核心修改：将 Set 升级为包含关系信息的对象数组
             const knownPeople = [];
             knownPeople.push({ name: mainUserName, relationship: `(the user you are currently interacting with)` });
 
-            const isNpc = npcList.includes(characterName);
+            const isNpc = npcList.includes(senderName);
             const isGroupPersona = chatList.some(chat => {
                 const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                return info.groupPersonas && info.groupPersonas.some(p => p.name === characterName);
+                return info.groupPersonas && info.groupPersonas.some(p => p.name === senderName);
             });
 
             if (isNpc) {
-                // NPC 认识它关联的角色
-                if (npcSettings.associations && npcSettings.associations[characterName]) {
-                    const associated = Array.isArray(npcSettings.associations[characterName]) 
-                        ? npcSettings.associations[characterName] 
-                        : [npcSettings.associations[characterName]];
+                if (npcSettings.associations && npcSettings.associations[senderName]) {
+                    const associated = Array.isArray(npcSettings.associations[senderName]) 
+                        ? npcSettings.associations[senderName] 
+                        : [npcSettings.associations[senderName]];
                     associated.forEach(char => knownPeople.push({ name: char, relationship: `(your associated character)` }));
                 }
             } else if (isGroupPersona) {
-                // 群聊主角认识群里的所有成员
                 const sourceGroupChat = chatList.find(chat => {
                     const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                    return info.groupPersonas && info.groupPersonas.some(p => p.name === characterName);
+                    return info.groupPersonas && info.groupPersonas.some(p => p.name === senderName);
                 });
                 if (sourceGroupChat) {
                     const members = loadFromLocalStorage(`chat_members_${sourceGroupChat.id}`, []);
                     members.forEach(member => {
-                        if (member !== mainUserName && member !== characterName) {
+                        if (member !== mainUserName && member !== senderName) {
                             knownPeople.push({ name: member, relationship: `(a member of your group chat: ${sourceGroupChat.name})` });
                         }
                     });
                 }
             } else {
-                // 普通AI角色认识其关联的NPC
                 if (chatForContext) {
                     const associatedNpcs = loadFromLocalStorage(`chat_associated_npcs_${chatForContext.id}`, []);
                     associatedNpcs.forEach(npc => knownPeople.push({ name: npc, relationship: `(your associated NPC)` }));
                 }
             }
             
-            // 3. 将这个“社交图谱”注入到给AI的指令中
             const socialGraphPrompt = `
 [Your Social Circle - UNBREAKABLE KNOWLEDGE BASE]
 This is your definitive social map. You MUST use it to understand who you are seeing on Moments.
@@ -15307,13 +15357,12 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
 ---
 `;
             
-            // --- 朋友圈过滤和图片处理逻辑 (保持不变) ---
             const allVisibleMoments = feedData.filter(post => {
-                return isPostVisibleToUser(post, characterName);
+                return isPostVisibleToUser(post, senderName);
             });
 
             const recentMoments = allVisibleMoments.slice(0, limit);
-            console.log(`[诊断日志] 结果: "${characterName}" 看到了 ${recentMoments.length} 条朋友圈。认知圈:`, knownPeople);
+            console.log(`[诊断日志] 结果: "${senderName}" 看到了 ${recentMoments.length} 条朋友圈。认知圈:`, knownPeople);
             
             let imageRecognitionCounts = loadFromLocalStorage('image_recognition_counts', {});
 
@@ -15321,7 +15370,7 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
             for (const post of recentMoments) {
                 if (post.image && post.image.startsWith('indexeddb:')) {
                     const imageKey = post.image;
-                    const countKey = `${characterName}_${imageKey}`;
+                    const countKey = `${senderName}_${imageKey}`;
                     const currentCount = imageRecognitionCounts[countKey] || 0;
                     if (currentCount < 3) {
                         try {
@@ -15344,8 +15393,7 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
             }
             saveToLocalStorage('image_recognition_counts', imageRecognitionCounts);
 
-            // 4. 返回所有内容，包括那段至关重要的“社交图谱”指令
-            return { allVisibleMoments: recentMoments, imagePayloads, imageRecognitionCounts, socialGraphPrompt };
+            return { allVisibleMoments: recentMoments, imagePayloads, imageRecognitionCounts, socialGraphPrompt, knownPeople };
         }
 
         function handleInteractionFromAI(characterName, action, data) {
@@ -16793,56 +16841,101 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         }
 
         function handleImport() {
-            const textarea = document.getElementById('npc-import-textarea');
-            const text = textarea.value;
-            if (!text.trim()) return;
+        const textarea = document.getElementById('npc-import-textarea');
+        const text = textarea.value;
+        if (!text.trim()) return;
 
-            const blocks = text.split('---');
-            let newCount = 0;
-            const existingNpcNames = new Set(npcList);
+        const blocks = text.split('---');
+        let newCount = 0;
+        const existingNpcNames = new Set(npcList);
 
-            if (!npcSettings.personas) {
-                npcSettings.personas = {};
-            }
-
-            blocks.forEach(block => {
-                const trimmedBlock = block.trim();
-                if (trimmedBlock.length === 0) return;
-
-                const lines = trimmedBlock.split('\n');
-                const npcName = lines[0].trim();
-                const npcPersona = lines.slice(1).join('\n').trim();
-
-                if (!npcName) return;
-
-                if (!existingNpcNames.has(npcName)) {
-                    npcList.push(npcName);
-                    existingNpcNames.add(npcName);
-                    newCount++;
-                }
-
-                npcSettings.personas[npcName] = npcPersona;
-            });
-
-            npcList.sort();
-            saveNpcData();
-            renderNpcPage();
-            textarea.value = '';
-            alert(`成功导入 ${newCount} 个新NPC，并录入/更新了人设信息！`);
+        if (!npcSettings.personas) {
+            npcSettings.personas = {};
         }
-        async function showNpcEditorModal(npcName) {
-        const isEditing = npcList.includes(npcName);
-        const persona = (npcSettings.personas && npcSettings.personas[npcName]) || '';
-        const association = (npcSettings.associations && npcSettings.associations[npcName]) || []; // 默认值变为空数组
-        const dynamicSetting = (npcSettings.dynamics && npcSettings.dynamics[npcName]) || { probability: 40, interval: 60 };
 
-        // 移除了折叠功能，直接显示所有内容
-        const modalHtml = `
+        blocks.forEach(block => {
+            const trimmedBlock = block.trim();
+            if (trimmedBlock.length === 0) return;
+
+            const lines = trimmedBlock.split('\n');
+            const npcName = lines[0].trim();
+            
+            if (!npcName) return;
+
+            // --- 核心修改：解析头像和人设 ---
+            let npcAvatar = '';
+            let npcPersonaLines = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line.startsWith('头像=')) {
+                    npcAvatar = line.substring(3).trim();
+                } else {
+                    npcPersonaLines.push(lines[i]); // 保留原始缩进和换行
+                }
+            }
+            const npcPersona = npcPersonaLines.join('\n').trim();
+            // --- 修改结束 ---
+
+            if (!existingNpcNames.has(npcName)) {
+                npcList.push(npcName);
+                existingNpcNames.add(npcName);
+                newCount++;
+            }
+            
+            // 确保为这个NPC创建一个对象来存储人设和头像
+            if (typeof npcSettings.personas[npcName] !== 'object' || npcSettings.personas[npcName] === null) {
+                npcSettings.personas[npcName] = {};
+            }
+            
+            npcSettings.personas[npcName].description = npcPersona;
+            npcSettings.personas[npcName].avatar = npcAvatar;
+        });
+
+        npcList.sort();
+        saveNpcData();
+        renderNpcPage();
+        textarea.value = '';
+        // --- 核心修改：更新提示文本和导入框的placeholder ---
+        document.getElementById('npc-import-textarea').placeholder = '输入NPC名称，可选“头像=链接”，然后是人设，使用 --- 分隔。\n例如：\n张三\n头像=https://.../a.png\n性格火爆...\n---';
+        alert(`成功导入 ${newCount} 个新NPC，并录入/更新了人设与头像信息！`);
+    }
+        async function showNpcEditorModal(npcName) {
+            const isEditing = npcList.includes(npcName);
+            
+            // --- 核心修改：从对象中提取人设和头像 ---
+            const personaData = (npcSettings.personas && npcSettings.personas[npcName]) || {};
+            const persona = personaData.description || '';
+            const avatar = personaData.avatar || '';
+            // --- 修改结束 ---
+
+            const association = (npcSettings.associations && npcSettings.associations[npcName]) || [];
+            const dynamicSetting = (npcSettings.dynamics && npcSettings.dynamics[npcName]) || { probability: 40, interval: 60 };
+
+            // --- 核心修改：在HTML中加入头像UI ---
+            const avatarHtml = `
+                <div class="form-group">
+                    <label>NPC头像</label>
+                    <div class="avatar-management-row">
+                        <div class="avatar-preview" id="npc-avatar-preview"></div>
+                        <div class="form-buttons-spaced" style="flex-grow: 1;">
+                            <button id="npc-avatar-link-btn" class="modal-button secondary">链接</button>
+                            <button id="npc-avatar-gallery-btn" class="modal-button secondary">本地</button>
+                        </div>
+                    </div>
+                    <input type="hidden" id="npc-avatar-url">
+                </div>
+                <hr style="border: none; border-top: 1px solid #eee;">
+            `;
+            // --- 修改结束 ---
+
+            const modalHtml = `
                 <div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 65vh; overflow-y: auto; padding-right: 10px;">
                     <div class="form-group" style="margin:0;">
                         <label for="npc-editor-name">名称</label>
                         <input type="text" id="npc-editor-name" class="modal-input" placeholder="NPC的唯一名称" value="${npcName || ''}">
                     </div>
+                    ${avatarHtml}
                     <div class="form-group" style="margin:0;">
                         <label for="npc-editor-persona">人设</label>
                         <textarea id="npc-editor-persona" class="modal-textarea" placeholder="描述NPC的性格、背景、行为模式等...">${persona}</textarea>
@@ -16876,21 +16969,51 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                     { text: '保存', value: 'save', class: 'primary' }
                 ],
                 onRender: (modalDOM) => {
+                    // --- 核心修改：为头像UI绑定事件和加载数据 ---
+                    const avatarPreview = modalDOM.querySelector('#npc-avatar-preview');
+                    const avatarUrlInput = modalDOM.querySelector('#npc-avatar-url');
+
+                    if (avatar) {
+                        avatarUrlInput.value = avatar;
+                        setImageSrc(avatarPreview, avatar);
+                    }
+
+                    modalDOM.querySelector('#npc-avatar-link-btn').addEventListener('click', async () => {
+                        const url = await conversationManager.showContentInputModal({ title: '输入头像链接', placeholder: '请输入图片URL...' });
+                        if (url && url.trim()) {
+                            avatarUrlInput.value = url.trim();
+                            setImageSrc(avatarPreview, url.trim());
+                        }
+                    });
+
+                    modalDOM.querySelector('#npc-avatar-gallery-btn').addEventListener('click', () => {
+                        const fileInput = document.createElement('input');
+                        fileInput.type = 'file';
+                        fileInput.accept = 'image/*';
+                        fileInput.onchange = async (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            const dbKey = `npc-avatar-${Date.now()}`;
+                            const indexedDbRef = `indexeddb:${dbKey}`;
+                            try {
+                                await imageStore.setItem(dbKey, file);
+                                avatarUrlInput.value = indexedDbRef;
+                                await setImageSrc(avatarPreview, indexedDbRef);
+                            } catch (error) {
+                                alert("头像上传失败！");
+                            }
+                        };
+                        fileInput.click();
+                    });
+                    // --- 修改结束 ---
+
                     const assocListEl = modalDOM.querySelector('#npc-editor-association-list');
-                    
-                    // --- 1. 获取并分类所有角色 ---
                     const allCharacters = getAllUniqueCharacters();
                     const userPersonaNames = new Set(userPersonas.map(p => p.name));
                     const aiCharacterNames = new Set(chatList.filter(c => c.type === '私聊').map(c => c.name));
                     const npcNames = new Set(npcList);
 
-                    const categorized = {
-                        user: [],
-                        ai: [],
-                        npc: [],
-                        group: []
-                    };
-
+                    const categorized = { user: [], ai: [], npc: [], group: [] };
                     allCharacters.forEach(name => {
                         if (userPersonaNames.has(name) || name === '{{user}}') {
                             categorized.user.push(name);
@@ -16899,14 +17022,12 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                         } else if (npcNames.has(name)) {
                             categorized.npc.push(name);
                         } else {
-                            // 剩下的就是群聊实体
                             categorized.group.push(name);
                         }
                     });
 
                     let currentAssociations = Array.isArray(association) ? association : (association ? [association] : []);
 
-                    // --- 2. 构建带有分组和新样式的HTML ---
                     let characterOptionsHtml = '';
                     const createCategoryHtml = (title, names) => {
                         if (names.length === 0) return '';
@@ -16931,12 +17052,12 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                     assocListEl.innerHTML = characterOptionsHtml;
                 }
             });
-
+            
             if (result && result.value === 'save') {
                 const modalBox = result.target.closest('.modal-box');
                 const newName = modalBox.querySelector('#npc-editor-name').value.trim();
                 const newPersona = modalBox.querySelector('#npc-editor-persona').value.trim();
-                // 从所有选中的复选框中读取值，形成一个数组
+                const newAvatar = modalBox.querySelector('#npc-avatar-url').value.trim(); // 获取头像
                 const newAssociation = Array.from(modalBox.querySelectorAll('.npc-association-checkbox:checked')).map(cb => cb.value);
                 const newDynamics = {
                     probability: parseInt(modalBox.querySelector('#npc-editor-dynamics-probability').value, 10),
@@ -16981,9 +17102,13 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 }
                 
                 if (!npcSettings.personas) npcSettings.personas = {};
-                npcSettings.personas[newName] = newPersona;
+                // --- 核心修改：保存为人设对象 ---
+                npcSettings.personas[newName] = {
+                    description: newPersona,
+                    avatar: newAvatar
+                };
+                // --- 修改结束 ---
 
-                // 保存新增的关联和动态设置
                 if (!npcSettings.associations) npcSettings.associations = {};
                 npcSettings.associations[newName] = newAssociation;
 
@@ -17696,12 +17821,20 @@ async function handleRemoveMember() {
         const newName = newNameInput.value.trim();
         if (!newName) { alert('名称不能为空！'); return; }
         if (newName === chat.name) { alert('名称未改变。'); return; }
+        
+        const oldName = chat.name;
+
+        // 正常改内存里的 chatList
         chat.name = newName;
         saveChatList();
         renderChatList();
+        
+        // **调用最终的全局同步器**
+        globalNameAndDataSynchronizer(oldName, newName);
+
         const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
         conversationManager.updateHeaderTitle(chatInfo.remark || newName);
-        alert('名称修改成功！');
+        alert('名称修改成功！所有相关记录已同步更新。');
     });
     
     document.getElementById('mode-online').addEventListener('click', () => { 
@@ -21112,12 +21245,12 @@ After your chat response, you MUST generate a private mood journal entry.
 
 *   **CORRECT EXAMPLE (What you SHOULD do):**
     \`<background_update type="mood_card" sender="祁司礼">
-    今天阿衍似乎有些不开心，我该怎么哄她呢？也许明天带她去海边散散心会好一些。
+    今天图图似乎有些不开心，我该怎么哄她呢？也许明天带她去海边散散心会好一些。
     </background_update>\`
 
 *   **WRONG, CATASTROPHIC FAILURE EXAMPLE (What you MUST NOT do):**
     \`<background_update type="mood_card" sender="祁司礼">
-    [苦] 用户阿衍表示无聊。虽然核心Active Cast列表为空，但我启用了群备注中的角色祁司礼进行回应...
+    [苦] 用户图图表示无聊。虽然核心Active Cast列表为空，但我启用了群备注中的角色祁司礼进行回应...
     </background_update>\`
 
 **Final Instruction:** Generate the correctly formatted \`<background_update>\` block at the VERY END of your entire output.`;
@@ -21151,6 +21284,156 @@ Third line (note 3), and so on...
                 break;
         }
         return prompt; // 返回生成的指令文本
+    }
+    // =================================================================================
+    // 全局名字暴力替换器 (The Final Solution)
+    // =================================================================================
+    function globalNameUpdater(oldName, newName) {
+        if (!oldName || !newName || oldName === newName) {
+            return; // 如果名字没变，或者有问题，直接滚蛋
+        }
+
+        console.log(`%c[全局名称更新] 正在执行地毯式搜索替换: "${oldName}" -> "${newName}"`, 'color: red; font-weight: bold; font-size: 14px;');
+        let changesMade = false;
+
+        // 1. 更新朋友圈数据 (你的核心痛点)
+        let momentsFeedData = loadFromLocalStorage('moments_feed_data', []);
+        momentsFeedData.forEach(post => {
+            if (post.userName === oldName) { post.userName = newName; changesMade = true; }
+            if (post.reactions && post.reactions['点赞'] && post.reactions['点赞'].includes(oldName)) {
+                post.reactions['点赞'] = post.reactions['点赞'].map(name => name === oldName ? newName : name);
+                changesMade = true;
+            }
+            if (post.comments) {
+                post.comments.forEach(comment => {
+                    if (comment.user === oldName) { comment.user = newName; changesMade = true; }
+                    if (comment.replyTo === oldName) { comment.replyTo = newName; changesMade = true; }
+                });
+            }
+        });
+        saveToLocalStorage('moments_feed_data', momentsFeedData);
+        if (changesMade) console.log('[全局名称更新] ✅ 朋友圈数据已更新。');
+
+        // 2. 更新所有群聊的成员列表
+        chatList.forEach(chat => {
+            if (chat.type === '群聊') {
+                const membersKey = `chat_members_${chat.id}`;
+                let members = loadFromLocalStorage(membersKey, []);
+                if (members.includes(oldName)) {
+                    members = members.map(name => name === oldName ? newName : name);
+                    saveToLocalStorage(membersKey, members);
+                    console.log(`[全局名称更新] ✅ 群聊 "${chat.name}" 的成员列表已更新。`);
+                }
+            }
+        });
+
+        // 3. 更新NPC列表和设置
+        if (npcList.includes(oldName)) {
+            npcList = npcList.map(name => name === oldName ? newName : name);
+            saveToLocalStorage('app-npc-list', npcList);
+            console.log('[全局名称更新] ✅ NPC 列表已更新。');
+        }
+        if (npcSettings.associations && npcSettings.associations[oldName]) {
+            npcSettings.associations[newName] = npcSettings.associations[oldName];
+            delete npcSettings.associations[oldName];
+            saveToLocalStorage('app-npc-settings', npcSettings);
+            console.log('[全局名称更新] ✅ NPC 关联设置已更新。');
+        }
+        
+        // 4. 更新所有聊天记录里的 sender 字段
+        chatList.forEach(chat => {
+            const conversationKey = `conversation_${chat.id}`;
+            let messages = loadFromLocalStorage(conversationKey, []);
+            let conversationChanged = false;
+            messages.forEach(msg => {
+                if (msg.sender === oldName) {
+                    msg.sender = newName;
+                    conversationChanged = true;
+                }
+            });
+            if (conversationChanged) {
+                saveToLocalStorage(conversationKey, messages);
+                console.log(`[全局名称更新] ✅ 聊天 "${chat.name}" 的历史记录已更新。`);
+            }
+        });
+
+        console.log('[全局名称更新] 所有相关数据更新完毕。');
+    }
+    // =================================================================================
+    // 全局同步更新器 (The Goddamn Final Version)
+    // =================================================================================
+    function globalNameAndDataSynchronizer(oldName, newName) {
+        if (!oldName || !newName || oldName === newName) {
+            return;
+        }
+
+        console.log(`%c[全局同步更新] 启动最终方案: "${oldName}" -> "${newName}"`, 'color: #ff0000; font-weight: bold; font-size: 16px;');
+        
+        // 1. 更新朋友圈数据 (硬盘 + 内存)
+        let momentsFeedData = loadFromLocalStorage('moments_feed_data', []);
+        let momentsChanged = false;
+        momentsFeedData.forEach(post => {
+            if (post.userName === oldName) { post.userName = newName; momentsChanged = true; }
+            if (post.reactions && post.reactions['点赞']?.includes(oldName)) {
+                post.reactions['点赞'] = post.reactions['点赞'].map(name => name === oldName ? newName : name);
+                momentsChanged = true;
+            }
+            if (post.comments) {
+                post.comments.forEach(comment => {
+                    if (comment.user === oldName) { comment.user = newName; momentsChanged = true; }
+                    if (comment.replyTo === oldName) { comment.replyTo = newName; momentsChanged = true; }
+                });
+            }
+        });
+        saveToLocalStorage('moments_feed_data', momentsFeedData);
+        // **核心：强制刷新内存**
+        momentsManager.refreshData(); 
+        if (momentsChanged) console.log('[全局同步更新] ✅ 朋友圈数据已同步。');
+
+        // 2. 更新所有群聊的成员列表 (只需更新硬盘，因为每次渲染都会重读)
+        chatList.forEach(chat => {
+            if (chat.type === '群聊') {
+                const membersKey = `chat_members_${chat.id}`;
+                let members = loadFromLocalStorage(membersKey, []);
+                if (members.includes(oldName)) {
+                    members = members.map(name => name === oldName ? newName : name);
+                    saveToLocalStorage(membersKey, members);
+                }
+            }
+        });
+        console.log('[全局同步更新] ✅ 群聊成员列表已扫描更新。');
+
+        // 3. 更新NPC数据 (硬盘 + 内存)
+        if (npcList.includes(oldName)) {
+            npcList = npcList.map(name => name === oldName ? newName : name);
+            saveToLocalStorage('app-npc-list', npcList);
+            console.log('[全局同步更新] ✅ NPC 列表已同步。');
+        }
+        if (npcSettings.associations?.[oldName]) {
+            npcSettings.associations[newName] = npcSettings.associations[oldName];
+            delete npcSettings.associations[oldName];
+            saveToLocalStorage('app-npc-settings', npcSettings);
+            console.log('[全局同步更新] ✅ NPC 关联设置已同步。');
+        }
+        
+        // 4. 更新所有聊天记录里的 sender (只需更新硬盘，因为打开聊天会重读)
+        chatList.forEach(chat => {
+            const conversationKey = `conversation_${chat.id}`;
+            let messages = loadFromLocalStorage(conversationKey, []);
+            let conversationChanged = false;
+            messages.forEach(msg => {
+                if (msg.sender === oldName) {
+                    msg.sender = newName;
+                    conversationChanged = true;
+                }
+            });
+            if (conversationChanged) {
+                saveToLocalStorage(conversationKey, messages);
+            }
+        });
+        console.log('[全局同步更新] ✅ 所有聊天记录历史已扫描更新。');
+
+        console.log('[全局同步更新] 同步完成。');
     }
 </script>
 </body>
