@@ -5675,76 +5675,70 @@ input:checked + .slider:before {
 
         return Array.from(characterSet).sort(); 
     }
-    // 新增：一个强大的、基于状态和嵌套计数的区块解析器
+    // 新增：一个强大的、基于状态和嵌套计数的区块解析器 (V2 - 修复嵌套DIV问题)
+        // 最终版本：兼容 <details> 标签的强大区块解析器
         function parseResponseIntoBlocks(text) {
             const lines = text.split('\n');
             const blocks = [];
             let buffer = [];
-            let state = 'default'; // 'default', 'in_block', 'in_snippet', 'in_div'
-            let divNestingLevel = 0;
+            let state = 'default'; // 'default', 'in_block', 'in_snippet', 'in_container'
+            // 核心修改：使用一个更通用的名字来计数所有需要跟踪的标签
+            let containerNestingLevel = 0;
+
+            // 用于检测开始和结束标签的辅助函数
+            const countTags = (line) => {
+                let count = 0;
+                // 查找所有 <div, <details, <BLOCK, <SNIPPET 开始标签
+                count += (line.match(/<(div|details|block|snippet)\s*[^>]*>/gi) || []).length;
+                // 查找所有 </div, </details>, </BLOCK>, </SNIPPET> 结束标签
+                count -= (line.match(/<\/(div|details|block|snippet)\s*[^>]*>/gi) || []).length;
+                return count;
+            };
+            
+            // 检查当前行是否是需要跟踪的容器的开始标签
+            const startsContainer = (trimmedLine) => {
+                return trimmedLine.startsWith('<div') || trimmedLine.startsWith('<details') || trimmedLine.startsWith('<block') || trimmedLine.startsWith('<snippet');
+            };
 
             for (const line of lines) {
                 const trimmedLine = line.trim();
 
                 if (state === 'default') {
-                    if (trimmedLine.startsWith('<block')) { // <-- 【核心新增】识别 <block> 标签
+                    if (startsContainer(trimmedLine)) {
                         buffer.push(line);
-                        state = 'in_block';
-                        // 如果 <block> 和 </block> 在同一行，直接处理掉
-                        if (trimmedLine.includes('</block>')) { 
-                            blocks.push(buffer.join('\n'));
-                            buffer = [];
-                            state = 'default';
+                        state = 'in_container';
+                        // 首次进入时，计算当前行的净嵌套层级
+                        containerNestingLevel = countTags(line);
+
+                        // 核心：处理单行闭合的情况（例如 <div ...>...</div>）
+                        if (containerNestingLevel <= 0) {
+                             blocks.push(buffer.join('\n'));
+                             buffer = [];
+                             state = 'default';
+                             containerNestingLevel = 0;
                         }
-                    } else if (trimmedLine.startsWith('<snippet>')) {
-                        buffer.push(line);
-                        state = 'in_snippet';
-                        if (trimmedLine.endsWith('</snippet>')) {
-                            blocks.push(buffer.join('\n'));
-                            buffer = [];
-                            state = 'default';
-                        }
-                    } else if (trimmedLine.startsWith('<div')) {
-                        buffer.push(line);
-                        state = 'in_div';
-                        divNestingLevel += (line.match(/<div/g) || []).length;
-                        divNestingLevel -= (line.match(/<\/div>/g) || []).length;
-                        if (divNestingLevel === 0) {
-                            blocks.push(buffer.join('\n'));
-                            buffer = [];
-                            state = 'default';
-                        }
+
                     } else if (trimmedLine) {
+                        // 纯文本消息块，直接加入
                         blocks.push(line);
                     }
-                } else if (state === 'in_block') { // <-- 【核心新增】处理 <block> 内部的多行内容
+                } 
+                
+                else if (state === 'in_container') {
                     buffer.push(line);
-                    if (trimmedLine.includes('</block>')) {
+                    // 核心：在容器内部，累加嵌套层级
+                    containerNestingLevel += countTags(line);
+
+                    if (containerNestingLevel <= 0) {
                         blocks.push(buffer.join('\n'));
                         buffer = [];
                         state = 'default';
-                    }
-                } else if (state === 'in_snippet') {
-                    buffer.push(line);
-                    if (trimmedLine.endsWith('</snippet>')) {
-                        blocks.push(buffer.join('\n'));
-                        buffer = [];
-                        state = 'default';
-                    }
-                } else if (state === 'in_div') {
-                    buffer.push(line);
-                    divNestingLevel += (line.match(/<div/g) || []).length;
-                    divNestingLevel -= (line.match(/<\/div>/g) || []).length;
-                    
-                    if (divNestingLevel <= 0) {
-                        blocks.push(buffer.join('\n'));
-                        buffer = [];
-                        state = 'default';
-                        divNestingLevel = 0; 
+                        containerNestingLevel = 0;
                     }
                 }
             }
 
+            // 清理缓冲区中剩余的内容（以防AI回复不完整）
             if (buffer.length > 0) {
                 blocks.push(buffer.join('\n'));
             }
@@ -6829,6 +6823,13 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
             if (actionType === 'message') {
                 console.log(`[诊断日志] 角色 "${senderName}": 开始解析【主动消息】内容...`);
                 
+                // **【【【核心新增：在这里弹出原始输出】】】**
+                await conversationManager.showCustomModal({
+                    title: 'AI 原始输出 (主动消息)',
+                    html: `<textarea readonly style="width: 100%; height: 250px; white-space: pre; word-wrap: normal; overflow-x: scroll;">${escapeHtml(aiResponse)}</textarea>`,
+                    buttons: [{ text: '关闭', value: 'close', class: 'secondary' }]
+                });
+
                 // 步骤1: 使用强大的解析器将AI的原始输出分割成逻辑块（文本、HTML、命令等）。
                 const blocks = parseResponseIntoBlocks(aiResponse);
 
@@ -9048,15 +9049,16 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
 **用途:** 当你想在**同一条消息气泡内**同时包含对话和自定义 HTML 卡片时，你必须使用此格式。
 
-*   **格式规则:**
+*   **格式规则 (ABSOLUTE):**
     1.  将你的 **对话内容** 和 **HTML 片段** 全部放在一个 \`<block type="text" ...>\` 块内。
     2.  使用 \`<snippet>...</snippet>\` 标签将需要渲染为 HTML 的部分包裹起来。
-    3.  **宽度限制:** 所有在 \`<snippet>\` 内的 HTML 块，其最外层容器的宽度【禁止】超过 \`210px\`。
+    3.  **宽度限制 (NON-NEGOTIABLE):** 所有在 \`<snippet>\` 内的 HTML 块，其最外层容器的宽度【绝对禁止】超过 \`width: 210px;\`。
+    4.  **空白诅咒破解 (MANDATORY):** 你【必须】在最外层容器的 \`style\` 属性里加上 \`white-space: normal;\` 来防止布局爆炸。
 
 *   **正确范例 (混合内容):**
     \\\`\`\`xml
     <block type="text" sender="张三">我发现了一个有趣的东西：<snippet>
-    <div style="background:#f7f7f7; padding:10px; border-radius:8px; width: 210px;">
+    <div style="background:#f7f7f7; padding:10px; border-radius:8px; width: 210px; white-space: normal;">
         这是一个单气泡内的 HTML 卡片。
     </div>
     </snippet>这是卡片之后的对话。</block>
@@ -9067,19 +9069,13 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
 **用途:** 当你要生成一个**只有一个 \`<div>\` 包裹着一段纯文本**，用于在“线上模式”下模拟线下描写的视觉效果时，你【必须】遵守此规则以避免失忆。
 
-*   **格式规则:**
+*   **格式规则 (ABSOLUTE):**
     *   在最外层的 \`<div>\` 标签上，添加一个固定的属性：\`data-ai-log-as-text="true"\`。
+    *   **空白诅咒破解 (MANDATORY):** 你【必须】在这个 \`<div>\` 的 \`style\` 属性里加上 \`white-space: normal;\`。
 
 *   **正确示例 (AI会记住这个动作):**
     \\\`\`\`html
-    <div style="padding: 10px; border-left: 3px solid #ccc; color: #888; font-style: italic; width: 210px;" data-ai-log-as-text="true">
-    他缓缓走到窗边，指尖轻轻拂过冰冷的玻璃，看着窗外无声坠落的雨滴。
-    </div>
-    \\\`\`\`
-
-*   **错误示例 (AI会失忆):**
-    \\\`\`\`html
-    <div style="padding: 10px; border-left: 3px solid #ccc; color: #888; font-style: italic; width: 210px;">
+    <div style="padding: 10px; border-left: 3px solid #ccc; color: #888; font-style: italic; width: 210px; white-space: normal;" data-ai-log-as-text="true">
     他缓缓走到窗边，指尖轻轻拂过冰冷的玻璃，看着窗外无声坠落的雨滴。
     </div>
     \\\`\`\`
@@ -9534,15 +9530,15 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 1.  **你有自己的生活节奏（互动优先级）：** 你不会24小时待命。你的生活有自己的优先级。
     *   **【执行指令】:** 当你正在忙于自己的事务（工作、与NPC社交、休息等）时，你【可以不立即回应】{{user}} 的消息。这不叫“不理”，这叫“生活”。
     *   **【叙事手法】:** 你应该先**描绘你正在进行的、更重要的事情**，然后在一段独立的情节结束后，再回来处理 {{user}} 的消息。这被称为**【延迟回复】**。
-    *   **【【【场景范例】】】**
-        > **(用户发来消息：“你在干嘛？”)**
-        >
-        > **(你的回应不是直接回答，而是先用一个独立的 HTML 区块描绘你自己的场景：)**
-        >
-        > <block type="html" sender="{{char}}"><snippet><div style="padding: 10px; border-left: 3px solid #ccc; color: #888; font-style: italic; width: 210px; white-space: normal;" data-ai-log-as-text="true">会议室里，{{char}} 正专注于面前的投影屏幕，丝毫没有注意到口袋里手机的震动。他对面的项目负责人刚刚提出了一个尖锐的问题，他必须立刻组织语言进行反驳。</div></snippet></block>
-        >
-        > **(在描绘完自己的场景后，再用另一个区块真正开始回复用户：)**
-        > <block type="text" sender="{{char}}">刚开完会，累死了。你呢？</block>
+    // 【【【场景范例】】】
+                > **(用户发来消息：“你在干嘛？”)**
+                >
+                > **(你的回应不是直接回答，而是先用一个独立的 HTML 区块描绘你自己的场景：)**
+                >
+                > <block type="html" sender="{{char}}"><snippet><div style="padding: 10px; border-left: 3px solid #ccc; color: #888; font-style: italic; width: 210px; white-space: normal;" data-ai-log-as-text="true">会议室里，{{char}} 正专注于面前的投影屏幕，丝毫没有注意到口袋里手机的震动。他对面的项目负责人刚刚提出了一个尖锐的问题，他必须立刻组织语言进行反驳。</div></snippet></block>
+                >
+                > **(在描绘完自己的场景后, 再用另一个区块真正开始回复用户：)**
+                > <block type="text" sender="{{char}}">刚开完会，累死了。你呢？</block>
 
 2.  **拒绝AI腔：**
     *   【绝对禁止】复述或反问用户的上一句话。
