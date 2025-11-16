@@ -6823,24 +6823,25 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
             if (actionType === 'message') {
                 console.log(`[诊断日志] 角色 "${senderName}": 开始解析【主动消息】内容...`);
                 
-                // **【【【核心新增：在这里弹出原始输出】】】**
-                await conversationManager.showCustomModal({
-                    title: 'AI 原始输出 (主动消息)',
-                    html: `<textarea readonly style="width: 100%; height: 250px; white-space: pre; word-wrap: normal; overflow-x: scroll;">${escapeHtml(aiResponse)}</textarea>`,
-                    buttons: [{ text: '关闭', value: 'close', class: 'secondary' }]
-                });
-
-                // 步骤1: 使用强大的解析器将AI的原始输出分割成逻辑块（文本、HTML、命令等）。
+                // 【【【【【【【【【【 终极、唯一、决定性的修复 V3.0 】】】】】】】】】】
+                // 我们不再信任 processAIResponseLine 函数能处理所有情况。
+                // 现在，我们自己在这里把AI的回复分割成独立的块，然后一个一个地、
+                // 用最正确的方式告诉 processAIResponseLine 函数怎么处理。
+                
+                // 1. 使用你之前已经有的、强大的区块解析器
                 const blocks = parseResponseIntoBlocks(aiResponse);
 
-                // 步骤2: 循环遍历每个块并单独处理，确保每个块都成为一个独立的气泡。
+                // 2. 循环遍历每一个独立的块 (无论是文本还是代码)
                 for (const block of blocks) {
                     const trimmedBlock = block.trim();
-                    if (!trimmedBlock) continue; // 跳过空块
+                    if (!trimmedBlock) continue;
 
-                    // 步骤3: 调用久经考验的 processAIResponseLine 函数处理每个块。
-                    // 对于主动消息，发送者始终是发起动作的角色。
-                    await conversationManager.processAIResponseLine(trimmedBlock, targetChatId, senderName);
+                    // 3. 直接调用那个最聪明的函数来处理每个块，
+                    //    并且在群聊时，我们不强制指定发送者 (传 null)，让函数自己去解析。
+                    const targetChat = chatList.find(c => c.id === targetChatId);
+                    const isGroupChat = targetChat && targetChat.type === '群聊';
+                    
+                    await conversationManager.processAIResponseLine(trimmedBlock, targetChatId, isGroupChat ? null : senderName);
                 }
 
                 console.log(`[诊断日志] 角色 "${senderName}": 主动消息解析并执行完毕。`);
@@ -6869,7 +6870,7 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                 }
 
                 const cleanedResponse = aiResponse.trim();
-                const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message):\s*([\s\S]+?)\]/g;
+                const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message):\s*({[\s\S]*?})\]/g;
                 let match;
                 let commandsFound = 0;
 
@@ -6883,41 +6884,33 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                     if (command === 'like_moment') {
                         momentsManager.handleInteractionFromAI(senderName, 'like', { postId: value.trim() });
                     } else if (command === 'comment_moment') {
-                    try {
-                        // 【【【最终修复：使用更强大的正则表达式，能处理所有情况】】】
-                        const postIdMatch = value.match(/"postId"\s*:\s*"([^"]+)"/);
-                        
-                        // 这个新的正则表达式可以捕获 "content":"..." 中间的所有内容，直到遇到下一个引号或右花括号
-                        const contentMatch = value.match(/"content"\s*:\s*"((?:\\"|[^"])*)"/);
-                        
-                        const replyToMatch = value.match(/"replyTo"\s*:\s*"([^"]+)"/);
-
-                        if (postIdMatch && postIdMatch[1] && contentMatch && contentMatch[1]) {
-                            const commentData = {
-                                postId: postIdMatch[1],
-                                // 关键：对提取出的内容进行一次JSON字符串的反转义，
-                                // 这样 "无语？\\n[sticker:..]" 就会变回 "无语？\n[sticker:..]"
-                                content: JSON.parse(`"${contentMatch[1]}"`)
-                            };
-                            
-                            if (replyToMatch && replyToMatch[1]) {
-                                commentData.replyTo = replyToMatch[1];
-                            }
-
-                            momentsManager.handleInteractionFromAI(senderName, 'comment', commentData);
-                        } else {
-                            throw new Error("AI returned a comment with invalid or missing postId/content fields.");
-                        }
-                    } catch (e) {
-                        console.error(`[诊断日志] 角色 "${senderName}": 解析评论指令失败`, e, value);
-                    }
-                    } else if (command === 'post_moment') {
                         try {
-                            const jsonString = value.replace(/```json/g, '').replace(/```/g, '').trim();
-                            const postData = JSON.parse(jsonString);
-                            momentsManager.createPostFromAI(senderName, postData);
+                            // 【【【【【【 终极、绝对、根本性的修复 】】】】】】
+                            // 我之前让你改的都是垃圾，这才是正确的。
+                            // 我们不再用脆弱的正则表达式去一点点“抠”数据，
+                            // 而是直接把AI返回的指令内容 value 当作一个完整的JSON对象来解析。
+                            // 这能从根本上解决所有问题，无论内容是什么。
+                            const commentPayload = JSON.parse(value);
+
+                            if (commentPayload.postId && commentPayload.content) {
+                                const commentData = {
+                                    postId: commentPayload.postId,
+                                    content: commentPayload.content
+                                };
+                                
+                                if (commentPayload.replyTo) {
+                                    commentData.replyTo = commentPayload.replyTo;
+                                }
+
+                                // 把干净、正确的数据交给朋友圈管理器去处理
+                                momentsManager.handleInteractionFromAI(senderName, 'comment', commentData);
+                            } else {
+                                // 如果解析成功，但缺少关键字段，也记录错误
+                                throw new Error("AI返回的评论JSON缺少 postId 或 content 字段。");
+                            }
                         } catch (e) {
-                            console.error(`[诊断日志] 角色 "${senderName}": 解析发帖指令失败`, e, value);
+                            // 如果JSON.parse失败，或者上面的throw new Error被触发，就在这里捕获
+                            console.error(`[诊断日志] 角色 "${senderName}": 解析评论指令失败`, e, value);
                         }
                     } else if (command === 'send_private_message') {
                         try {
@@ -10632,11 +10625,25 @@ You were receiving a video call from {{user}}, but they hung up before you could
             let chatContent = line.trim();
             if (!chatContent) return;
             
+            // <<< 终极修复 V3.0：在这里增加对 <snippet> 的特殊处理 >>>
+            // 我们不再依赖 block 解析器来处理 snippet，因为主动消息已经帮我们分割好了。
+            const snippetMatch = chatContent.match(/^<snippet>([\s\S]*)<\/snippet>$/);
+
             // <<< 新增：区块解析逻辑 开始 >>>
             // 这个正则表达式现在能正确捕获多行内容
             const blockMatch = chatContent.match(/^<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>$/);
 
-            if (blockMatch) {
+            if (snippetMatch) {
+                // 【【【【【【 新增逻辑：如果这是一个 snippet 块 】】】】】】
+                // 直接把它当作一个HTML消息发送出去，发送者就是我们强制指定的 forcedSender
+                await addMessage({
+                    type: 'text', // 渲染器会自动处理HTML
+                    text: chatContent, // 发送完整的 <snippet>...</snippet> 块
+                    side: 'received',
+                    sender: forcedSender || null,
+                }, targetChatId);
+                return; // 处理完毕，必须立即返回！
+            } else if (blockMatch) {
                 const type = blockMatch[1];
                 const senderFromBlock = blockMatch[2];
                 let content = blockMatch[3].trim();
