@@ -5682,25 +5682,27 @@ input:checked + .slider:before {
             const blocks = [];
             let buffer = [];
             let state = 'default'; // 'default', 'in_block', 'in_snippet', 'in_container'
-            // 核心修改：使用一个更通用的名字来计数所有需要跟踪的标签
             let containerNestingLevel = 0;
 
             // 用于检测开始和结束标签的辅助函数
             const countTags = (line) => {
                 let count = 0;
-                // 查找所有 <div, <details, <BLOCK, <SNIPPET 开始标签
-                count += (line.match(/<(div|details|block|snippet)\s*[^>]*>/gi) || []).length;
-                // 查找所有 </div, </details>, </BLOCK>, </SNIPPET> 结束标签
-                count -= (line.match(/<\/(div|details|block|snippet)\s*[^>]*>/gi) || []).length;
+                // --- 【核心、唯一的修改点 1/2】: 在这里加上 style ---
+                // 查找所有 <div, <details, <block, <snippet, <style 开始标签
+                count += (line.match(/<(div|details|block|snippet|style)\s*[^>]*>/gi) || []).length;
+                // 查找所有 </div, </details>, </block>, </snippet, </style> 结束标签
+                count -= (line.match(/<\/(div|details|block|snippet|style)\s*[^>]*>/gi) || []).length;
                 return count;
             };
             
             // 检查当前行是否是需要跟踪的容器的开始标签
             const startsContainer = (trimmedLine) => {
-                return trimmedLine.startsWith('<div') || trimmedLine.startsWith('<details') || trimmedLine.startsWith('<block') || trimmedLine.startsWith('<snippet');
+                // --- 【核心、唯一的修改点 2/2】: 在这里也加上 style ---
+                return trimmedLine.startsWith('<div') || trimmedLine.startsWith('<details') || trimmedLine.startsWith('<block') || trimmedLine.startsWith('<snippet') || trimmedLine.startsWith('<style');
             };
 
             for (const line of lines) {
+// ... (函数剩余部分保持不变)
                 const trimmedLine = line.trim();
 
                 if (state === 'default') {
@@ -6820,18 +6822,36 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
         console.log(`[诊断日志] 角色 "${senderName}": API已返回内容。`);
         if (aiResponse && aiResponse.trim()) {
 
+            // --- 【【【在这里插入下面的新代码块】】】 ---
+            if (actionType === 'message') {
+                await conversationManager.showCustomModal({
+                    title: 'AI 原始输出 (主动发消息)',
+                    // 使用 <textarea> 并设置为 readonly，方便您复制全部内容
+                    html: `<textarea readonly style="width: 100%; height: 250px; white-space: pre; word-wrap: normal; overflow-x: scroll;">${escapeHtml(aiResponse)}</textarea>`,
+                    buttons: [{ text: '关闭', value: 'close', class: 'secondary' }]
+                });
+            }
+            // --- 【【【新代码块到此结束】】】 ---
+
             if (actionType === 'message') {
                 console.log(`[诊断日志] 角色 "${senderName}": 开始解析【主动消息】内容...`);
+// ...
+
+                // 【【【【【【【【【【 终极、唯一、决定性的修复 V2 】】】】】】】】】】
+                // 使用强大的区块解析器，将AI的回复分割成独立的文本块和指令块
+                const blocks = parseResponseIntoBlocks(aiResponse);
                 
-                // 【【【【【【【【【【 终极、唯一、决定性的修复 】】】】】】】】】】
-                // 我们不再用那个被我搞坏的、绕来绕去的旧逻辑了。
-                // 现在，我们直接、暴力地调用那个处理你“回复”时用的、聪明的、能正确显示所有东西的函数。
-                // 这样，无论AI主动发的是纯文本、HTML代码块、还是任何指令，都会被正确处理。
-                await conversationManager.processAIResponseLine(aiResponse, targetChatId, senderName);
+                // 逐个处理每个区块，确保每个指令都能被独立解析
+                for (const block of blocks) {
+                    if (block.trim()) { // 忽略空块
+                        await conversationManager.processAIResponseLine(block, targetChatId, senderName);
+                    }
+                }
 
                 console.log(`[诊断日志] 角色 "${senderName}": 主动消息解析并执行完毕。`);
 
             } else if (actionType === 'post_moment') {
+
                 // 这个逻辑是专门用于发帖的，保持不变，但要确保它在自己的分支里。
                 console.log(`[诊断日志] 角色 "${senderName}": 开始解析【主动发帖】指令...`);
                 try {
@@ -10938,19 +10958,20 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     break;
                 }
             }
-             // 【核心修正：判断剩余的文本是否是 HTML 卡片】(最终正确版)
+            // 【核心、终极、绝对正确的修复：判断剩余的文本是否是HTML块】
             const trimmedText = regularText.trim();
             if (!trimmedText) return; // 如果处理完指令后没有剩余文本，直接结束
 
-            // 严格判断是否为 HTML 卡片 (必须以 <div 开头)
-            const isHtmlCard = trimmedText.startsWith('<div');
+            // 我们不再只检查 `<div>`，而是检查任何以 `<` 开头并以 `>` 结尾的完整块。
+            // 这将正确识别 `<details>`, `<table>`, `<snippet>` 等所有合法的HTML块。
+            const isHtmlBlock = trimmedText.startsWith('<') && trimmedText.endsWith('>');
             
-            if (isHtmlCard) {
-                // 如果是 HTML 卡片，就把它当作一个整体，直接发送，然后立刻结束函数
+            if (isHtmlBlock) {
+                // 如果是任何类型的HTML块，就把它当作一个整体，直接发送，然后立刻结束函数
                 await addMessage({ type: 'text', sender, text: trimmedText, side: 'received' }, targetChatId);
                 return; 
             } else {
-                // 如果不是 HTML 卡片，那它就是纯文本，直接发送，然后也结束函数
+                // 如果不是HTML块，那它就是纯文本，走正常的文本发送流程
                 await addMessage({ type: 'text', sender, text: trimmedText, side: 'received' }, targetChatId);
                 return;
             }
@@ -11573,9 +11594,19 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         if (hasBeenReplaced) {
                             return processedText;
                         } else {
+                            // --- 【核心、决定性的修复从这里开始】 ---
+                            const trimmedText = rawText.trim();
+                            // 1. 判断这段文本本身是不是一个独立的HTML块 (以<开头, 以>结尾)
+                            if (trimmedText.startsWith('<') && trimmedText.endsWith('>')) {
+                                // 2. 如果是，我们相信它就是AI想要渲染的HTML，直接返回，【跳过】下面的转义和格式化
+                                return rawText; 
+                            }
+                            
+                            // 3. 如果不是，它就是普通的纯文本，我们执行原有的安全流程
                             let safeText = escapeHtml(rawText);
                             let formattedText = simpleMarkdownToHtml(safeText);
                             return formattedText.replace(/\n/g, '<br>');
+                            // --- 【修复到此结束】 ---
                         }
                     };
 
@@ -13825,32 +13856,7 @@ async function handleProactiveAIMessage(targetChatId, senderName, line) {
             await conversationManager.addMessage(newMessage, targetChatId);
         }
 
-        async function handleProactiveAIMessage(targetChatId, senderName, messages) {
-            const messageArray = Array.isArray(messages) ? messages : [messages];
-            
-            for (let i = 0; i < messageArray.length; i++) {
-                const messageText = messageArray[i];
-                if (messageText && messageText.trim()) {
-                    const isGroupChat = (chatList.find(c => c.id === targetChatId) || {}).type === '群聊';
-                    
-                    const newMessage = {
-                        type: 'text',
-                        text: messageText,
-                        side: 'received',
-                        sender: isGroupChat ? senderName : null,
-                        timestamp: Date.now() + i * 1500 // 给每条消息加上一点点时间差
-                    };
-
-                    // 调用核心的 addMessage 函数来处理消息（它会自动处理后台通知和界面更新）
-                    await addMessage(newMessage, targetChatId);
-                    
-                    // 在消息之间创建一个自然的停顿，模拟打字
-                    if (i < messageArray.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 1000)); // 随机停顿1-2秒
-                    }
-                }
-            }
-        }
+    
 async function showBranchHistoryModal(chatId) {
             const branchHistoryKey = `chat_branches_${chatId}`;
             let branches = loadFromLocalStorage(branchHistoryKey, []);
