@@ -6823,26 +6823,11 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
             if (actionType === 'message') {
                 console.log(`[诊断日志] 角色 "${senderName}": 开始解析【主动消息】内容...`);
                 
-                // 【【【【【【【【【【 终极、唯一、决定性的修复 V3.0 】】】】】】】】】】
-                // 我们不再信任 processAIResponseLine 函数能处理所有情况。
-                // 现在，我们自己在这里把AI的回复分割成独立的块，然后一个一个地、
-                // 用最正确的方式告诉 processAIResponseLine 函数怎么处理。
-                
-                // 1. 使用你之前已经有的、强大的区块解析器
-                const blocks = parseResponseIntoBlocks(aiResponse);
-
-                // 2. 循环遍历每一个独立的块 (无论是文本还是代码)
-                for (const block of blocks) {
-                    const trimmedBlock = block.trim();
-                    if (!trimmedBlock) continue;
-
-                    // 3. 直接调用那个最聪明的函数来处理每个块，
-                    //    并且在群聊时，我们不强制指定发送者 (传 null)，让函数自己去解析。
-                    const targetChat = chatList.find(c => c.id === targetChatId);
-                    const isGroupChat = targetChat && targetChat.type === '群聊';
-                    
-                    await conversationManager.processAIResponseLine(trimmedBlock, targetChatId, isGroupChat ? null : senderName);
-                }
+                // 【【【【【【【【【【 终极、唯一、决定性的修复 】】】】】】】】】】
+                // 我们不再用那个被我搞坏的、绕来绕去的旧逻辑了。
+                // 现在，我们直接、暴力地调用那个处理你“回复”时用的、聪明的、能正确显示所有东西的函数。
+                // 这样，无论AI主动发的是纯文本、HTML代码块、还是任何指令，都会被正确处理。
+                await conversationManager.processAIResponseLine(aiResponse, targetChatId, senderName);
 
                 console.log(`[诊断日志] 角色 "${senderName}": 主动消息解析并执行完毕。`);
 
@@ -8577,35 +8562,31 @@ A detailed, objective description of the cat image goes here. For example: A flu
                 let mainText = msg.text || '';
                 if (msg.type !== 'text') { mainText = descriptiveText; }
                 if (msg.type === 'text' && msg.side === 'received') {
-                    const trimmedMainText = mainText.trim();
+                    const trimmedMainText = (mainText || '').trim();
 
-                    const isHtmlBlock = trimmedMainText.startsWith('<div') || trimmedMainText.startsWith('<snippet>');
-                    const isRegexCommandBlock = trimmedMainText.startsWith('[') && trimmedMainText.endsWith(']') && trimmedMainText.includes('\n');
-
-                    if (isHtmlBlock) {
-                        // 检查这个HTML块是否是需要记录的简单动作
-                        if (trimmedMainText.includes('data-ai-log-as-text="true"')) {
-                            // 如果是，就提取它的纯文本内容
-                            const tempDiv = document.createElement('div');
-                            tempDiv.innerHTML = trimmedMainText;
-                            const actionText = tempDiv.textContent.trim();
+                    // 【【【【【【【【【【 终极、唯一、决定性的修复 V4 (移除占位符版) 】】】】】】】】】】
+                    // 1. 定义一个通用的正则表达式，匹配所有可能的块结构
+                    const blockRegex = /(<div[\s\S]*?>[\s\S]*?<\/div>|<details[\s\S]*?>[\s\S]*?<\/details>|<snippet[\s\S]*?>[\s\S]*?<\/snippet>|\[[A-Z_]+\][\s\S]*?\[\/[A-Z_]+\])/g;
+                    
+                    // 2. 使用 replace 和回调函数，对每一个匹配到的代码块进行独立判断
+                    mainText = trimmedMainText.replace(blockRegex, (matchedBlock) => {
+                        
+                        // 3. 检查当前代码块是否包含 `data-ai-log-as-text="true"` 标记
+                        if (matchedBlock.includes('data-ai-log-as-text="true"')) {
                             
-                            // 核心修正：直接用提取出的纯文本动作替换掉原来的代码块
-                            // 这样AI的记忆里就是一句干净的动作描述，而不是一个需要它模仿的系统指令
-                            if (actionText) {
-                                mainText = actionText;
-                            } else {
-                                // 如果提取不出任何文本，就按忽略处理
-                                mainText = '[System observation: A custom formatted block (HTML) was displayed here and is omitted for brevity.]';
-                            }
+                            // 4. 如果包含标记，就提取它的纯文本内容，作为AI的记忆
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = matchedBlock;
+                            return tempDiv.textContent.trim(); // 返回提取出的干净文本
+
                         } else {
-                            // 如果是没有暗号的复杂HTML块（小剧场），按原计划忽略
-                            mainText = '[System observation: A custom formatted block (HTML) was displayed here and is omitted for brevity.]';
+                            
+                            // 5. 【【【 核心修改在这里 】】】
+                            //    如果不包含标记，说明它就是个我们不想发送给AI的复杂代码块。
+                            //    我们直接返回一个【空字符串】，让它从AI的记忆里彻底消失！
+                            return '';
                         }
-                    } else if (isRegexCommandBlock) {
-                        // 对于多行指令块，也按原计划忽略
-                        mainText = '[System observation: A custom formatted block (regex command) was displayed here and is omitted for brevity.]';
-                    }
+                    }).trim();
                 }
                 if (msg.side === 'sent' && msg.type === 'text') { mainText = mainText.replace(/@(\S+)/g, (match, username) => `[System Observation: The user is now specifically addressing and calling out "${username}". Your response should be directed towards this action.]\n${match}`); }
                 if (msg.replyTo) { const originalMsg = allMessages.find(m => m.id === msg.replyTo); let originalContentText = `(a previous message)`; if(originalMsg) { if(originalMsg.text) originalContentText = `"${originalMsg.text}"`; else originalContentText = `a ${originalMsg.type}`; } mainText = `[Replying to ${originalContentText}] ${mainText}`; }
@@ -10625,25 +10606,11 @@ You were receiving a video call from {{user}}, but they hung up before you could
             let chatContent = line.trim();
             if (!chatContent) return;
             
-            // <<< 终极修复 V3.0：在这里增加对 <snippet> 的特殊处理 >>>
-            // 我们不再依赖 block 解析器来处理 snippet，因为主动消息已经帮我们分割好了。
-            const snippetMatch = chatContent.match(/^<snippet>([\s\S]*)<\/snippet>$/);
-
             // <<< 新增：区块解析逻辑 开始 >>>
             // 这个正则表达式现在能正确捕获多行内容
             const blockMatch = chatContent.match(/^<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>$/);
 
-            if (snippetMatch) {
-                // 【【【【【【 新增逻辑：如果这是一个 snippet 块 】】】】】】
-                // 直接把它当作一个HTML消息发送出去，发送者就是我们强制指定的 forcedSender
-                await addMessage({
-                    type: 'text', // 渲染器会自动处理HTML
-                    text: chatContent, // 发送完整的 <snippet>...</snippet> 块
-                    side: 'received',
-                    sender: forcedSender || null,
-                }, targetChatId);
-                return; // 处理完毕，必须立即返回！
-            } else if (blockMatch) {
+            if (blockMatch) {
                 const type = blockMatch[1];
                 const senderFromBlock = blockMatch[2];
                 let content = blockMatch[3].trim();
@@ -10684,12 +10651,28 @@ You were receiving a video call from {{user}}, but they hung up before you could
             const targetChat = chatList.find(c => c.id === targetChatId);
             const isTargetGroup = targetChat && targetChat.type === '群聊';
 
+            // 【【【【【【【【【【 终极、唯一、决定性的修复 】】】】】】】】】】
+            // 我们现在统一所有逻辑，不再搞双重标准。
             if (forcedSender) {
-                // 如果有强制发送者（来自主动消息或block解析），直接使用
-                sender = forcedSender;
-                textContent = chatContent.trim(); // 使用已经被block解析器处理过的 chatContent
+                // 这是为“主动发消息”设计的特殊逻辑，不会影响正常的对话回复。
+                
+                // 1. 先尝试解析AI的回复是否自带了 "名字: 内容" 格式。
+                const groupMatch = chatContent.match(/^([^:]+):\s*([\s\S]*)$/);
+                
+                if (groupMatch && groupMatch[1].trim() === forcedSender) {
+                    // 如果AI主动发消息时，自己带上了名字 (例如 "张三: 大家好")
+                    // 我们就尊重它的格式，正常解析出 sender 和内容。
+                    sender = forcedSender;
+                    textContent = groupMatch[2].trim();
+                } else {
+                    // 如果AI主动发消息时，没带名字 (例如 "大家好")
+                    // 这正是我们想要的情况！此时我们将 sender 设为 null。
+                    // 这样 addMessageToDOM 就不会再画蛇添足地加上 "张三:" 的标签了。
+                    sender = null;
+                    textContent = chatContent.trim();
+                }
             } else if (isTargetGroup) {
-                // 如果是群聊，并且没有强制发送者，才尝试解析 "名字: 内容" 格式
+                // 这是处理“正常回复”的逻辑，保持不变。
                 const groupMatch = chatContent.match(/^([^:]+):\s*([\s\S]*)$/);
                 if (groupMatch) {
                     [ , sender, textContent] = groupMatch.map(s => s.trim());
@@ -10702,16 +10685,18 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         return; 
                     }
                 } else { 
-                    // 如果解析失败，说明是AI直接返回内容，此时 sender 应该是未知的，但我们不能用“群成员”
-                    // 这种情况通常是主动消息，应该由 forcedSender 处理，如果走到这里说明逻辑有误，但做一个保护
-                    sender = chatState.chatName; // Fallback to current chat name, though should be avoided
+                    // 如果AI在正常回复时没有带名字（例如在群聊里只回了一个表情包指令），
+                    // 我们需要知道是谁回的，所以这里不能是 null。
+                    // 这个逻辑是正确的，需要保留。
+                    sender = chatState.chatName; 
                     textContent = chatContent.trim(); 
                 }
             } else { 
-                // 私聊模式
+                // 私聊模式，逻辑不变。
                 sender = targetChat ? targetChat.name : chatState.chatName; 
                 textContent = chatContent.trim(); 
             }
+
             
             
             
@@ -15574,7 +15559,7 @@ checkMomentsUpdates(); // <--- 新增这一行
                 if (result.value === 'import') {
                     const content = await conversationManager.showContentInputModal({
                         title: '批量导入表情包',
-                        placeholder: '每行一个，格式: 图片链接 名字\nhttps://.../a.png 猫猫可爱\nhttps://.../b.gif 狗狗摇头',
+                        placeholder: '每行一个，支持多种格式：\n名字 链接\n链接 名字\n名字:链接\n链接:名字',
                         isTextarea: true
                     });
                     
@@ -15582,21 +15567,40 @@ checkMomentsUpdates(); // <--- 新增这一行
                         const lines = content.trim().split('\n');
                         let newStickersCount = 0;
                         lines.forEach(line => {
-                            const parts = line.trim().split(/\s+/);
-                            if (parts.length >= 2) {
-                                const url = parts[0];
-                                const name = parts.slice(1).join(' ');
-                                if (url.startsWith('http')) { 
+                            const trimmedLine = line.trim();
+                            if (!trimmedLine) return; // 跳过空行
+
+                            // 【【【【【【【【【【 核心、唯一、决定性的修改 】】】】】】】】】】
+                            
+                            // 1. 定义一个正则表达式，用来匹配 URL
+                            const urlRegex = /(https?:\/\/[^\s:"]+)/;
+                            const urlMatch = trimmedLine.match(urlRegex);
+
+                            // 2. 如果在这一行里找不到 URL，直接跳过
+                            if (!urlMatch) return;
+
+                            // 3. 提取出 URL
+                            const url = urlMatch[0];
+                            
+                            // 4. 从原始行中，把 URL、冒号和所有空格都替换为空，剩下的就是名字
+                            const name = trimmedLine.replace(url, '').replace(/:/g, '').trim();
+
+                            // 5. 只要 URL 和名字都存在，就认为这是一条有效的记录
+                            if (url && name) {
+                                // 检查是否已存在同名表情包，避免重复
+                                if (!stickers.some(s => s.name === name)) {
                                     stickers.push({ url, name });
                                     newStickersCount++;
                                 }
                             }
+                            // 【【【【【【【【【【 修改结束 】】】】】】】】】】
                         });
+
                         if (newStickersCount > 0) {
                             saveStickers();
                             alert(`成功导入 ${newStickersCount} 个新表情！`);
                         } else {
-                            alert('没有导入任何新表情。请检查格式。');
+                            alert('没有导入任何新表情，或导入的表情包名称已存在。请检查格式。');
                         }
                     }
                     continue; 
