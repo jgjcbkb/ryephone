@@ -13537,11 +13537,13 @@ dynamicDecorationBtn.addEventListener('click', triggerAIContinuation);
 headerMoreBtn.addEventListener('click', async () => { 
     const menuButtons = [ 
         { text: '聊天信息', value: 'chat_info', class: 'primary' },
+        { text: '截图分享', value: 'screenshot', class: 'primary' }, // <-- 新增这一行
         { text: '统计字数', value: 'char_count', class: 'primary' },
         { text: '更换聊天背景', value: 'change_bg', class: 'primary' }, 
         { text: '更换气泡样式', value: 'change_bubble', class: 'primary' }, 
         { text: '字体', value: 'font_color', class: 'primary' } 
     ]; 
+// ...
     
     if (!contactInfo.isGroup) { 
         const autoReplyStatus = autoReplySettings.enabled ? ' (已启用)' : ''; 
@@ -13558,6 +13560,10 @@ headerMoreBtn.addEventListener('click', async () => {
         case 'chat_info':
             openChatInfoPage();
             break;
+        case 'screenshot': // <-- 新增这个 case
+            capturePhoneScreen();
+            break;
+
         case 'char_count':
             const { systemChars, personaChars, worldbookChars, npcChars, contextChars, totalChars } = calculateApiPayloadSize();
             const alertText = `系统提示 (含前情提要): ${systemChars}字\n` +
@@ -13935,7 +13941,94 @@ async function showBranchHistoryModal(chatId) {
                 }
             });
         }
+// ******** 从这里开始，粘贴下面的全新函数 ********
 
+        async function capturePhoneScreen() {
+            const phoneElement = document.querySelector('.phone');
+            if (!phoneElement) {
+                await customAlert('错误：找不到手机框架元素。');
+                return;
+            }
+
+            // 告知用户即将发生什么
+            await customAlert('即将请求屏幕分享权限以进行截图。请在弹出的窗口中选择【此标签页】进行分享。', '截图准备');
+
+            let stream = null;
+            try {
+                // 1. 请求用户授权分享当前标签页
+                stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: "never" }, // 不包含鼠标指针
+                    audio: false,
+                    preferCurrentTab: true // 优先推荐当前标签页
+                });
+
+                // 2. 从视频流中获取轨道并准备“拍照”
+                const track = stream.getVideoTracks()[0];
+                const imageCapture = new ImageCapture(track);
+
+                // 3. “拍下”当前帧
+                const frame = await imageCapture.grabFrame();
+
+                // 4. 将拍下的帧绘制到一个临时的、看不见的完整画布上
+                const fullCanvas = document.createElement('canvas');
+                fullCanvas.width = frame.width;
+                fullCanvas.height = frame.height;
+                const fullCtx = fullCanvas.getContext('2d');
+                fullCtx.drawImage(frame, 0, 0);
+
+                // 5. 获取“黑麦手机”元素在屏幕上的精确位置和尺寸
+                const phoneRect = phoneElement.getBoundingClientRect();
+                
+                // 6. 创建一个新的、用于裁剪的画布
+                const cropCanvas = document.createElement('canvas');
+                // 乘以 window.devicePixelRatio 可以获得更高清的截图
+                const dpr = window.devicePixelRatio || 1;
+                cropCanvas.width = phoneRect.width * dpr;
+                cropCanvas.height = phoneRect.height * dpr;
+                const cropCtx = cropCanvas.getContext('2d');
+                
+                // 7. 从完整画布中，将“黑麦手机”的部分精确地“抠”出来，并画到新的裁剪画布上
+                cropCtx.drawImage(
+                    fullCanvas,
+                    phoneRect.left * dpr, // 裁剪区域的起始X坐标
+                    phoneRect.top * dpr,  // 裁剪区域的起始Y坐标
+                    phoneRect.width * dpr,  // 裁剪区域的宽度
+                    phoneRect.height * dpr, // 裁剪区域的高度
+                    0, 0,                  // 在新画布上的绘制起点 (0,0)
+                    phoneRect.width * dpr,  // 绘制的宽度
+                    phoneRect.height * dpr  // 绘制的高度
+                );
+
+                // 8. 将最终裁剪好的画布转换成图片URL
+                const imageURL = cropCanvas.toDataURL('image/png');
+
+                // 9. 创建下载链接并触发下载
+                const downloadLink = document.createElement('a');
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/[-T:]/g, "");
+                downloadLink.href = imageURL;
+                downloadLink.download = `黑麦手机截图_${timestamp}.png`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+
+            } catch (error) {
+                console.error('截图失败:', error);
+                if (error.name === 'NotAllowedError') {
+                    await customAlert('您取消了截图授权，操作已中止。');
+                } else {
+                    await customAlert('截图失败，可能是浏览器不支持或发生了未知错误。');
+                }
+            } finally {
+                // 10. 无论成功与否，都必须停止屏幕分享，关闭浏览器顶部的提示条
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+            }
+        }
+
+        // ******** 粘贴到这里结束 ********
+        
+        
         async function viewBranchDetail(chatId, branchId) {
             const branches = loadFromLocalStorage(`chat_branches_${chatId}`, []);
             const branch = branches.find(b => b.id === branchId);
@@ -14066,7 +14159,7 @@ async function showBranchHistoryModal(chatId) {
                 await customAlert('删除失败：找不到该分支。');
             }
         }
-        return { open, getCurrentChatId, updateHeaderTitle, reRenderMessages, injectCustomBubbleStyles: publicInjectCustomBubbleStyles, showCustomModal, addMessage, renderGroupMemberList, handleSendMessageAttempt, showContentInputModal, regenerateLastResponse, customConfirm, makeDataPortable, prepareApiPayload, customAlert, handleProactiveAIMessage, processAIResponseLine, executeBackgroundUpdatesAndCleanText, showBubbleSettingsModal };
+        return { open, getCurrentChatId, updateHeaderTitle, reRenderMessages, injectCustomBubbleStyles: publicInjectCustomBubbleStyles, showCustomModal, addMessage, renderGroupMemberList, handleSendMessageAttempt, showContentInputModal, regenerateLastResponse, customConfirm, makeDataPortable, prepareApiPayload, customAlert, handleProactiveAIMessage, processAIResponseLine, executeBackgroundUpdatesAndCleanText, showBubbleSettingsModal, capturePhoneScreen };
 })();
 async function showGroupPersonaEditor(persona = {}, isEditing = false) {
         // --- 1. 新增的头像UI HTML ---
