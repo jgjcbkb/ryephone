@@ -15576,7 +15576,7 @@ checkMomentsUpdates(); // <--- 新增这一行
                             const trimmedLine = line.trim();
                             if (!trimmedLine) return; // 跳过空行
 
-                            // 【【【【【【【【【【 核心、唯一、决定性的修改 】】】】】】】】】】
+                            // 【【【【【【【【【【 全新的、绝对正确的、符合您要求的修复 】】】】】】】】】】
                             
                             // 1. 定义一个正则表达式，用来匹配 URL
                             const urlRegex = /(https?:\/\/[^\s:"]+)/;
@@ -15593,16 +15593,18 @@ checkMomentsUpdates(); // <--- 新增这一行
 
                             // 5. 只要 URL 和名字都存在，就认为这是一条有效的记录
                             if (url && name) {
-                                // 检查是否已存在同名表情包，避免重复
-                                if (!stickers.some(s => s.name === name)) {
+                                // 【核心、唯一的修改点】: 我们不再检查 s.name === name，
+                                // 而是检查 s.url === url。只要链接不同，就可以导入！
+                                if (!stickers.some(s => s.url === url)) {
                                     stickers.push({ url, name });
                                     newStickersCount++;
                                 }
                             }
-                            // 【【【【【【【【【【 修改结束 】】】】】】】】】】
+                            // 【【【【【【【【【【 修复结束 】】】】】】】】】】
                         });
 
                         if (newStickersCount > 0) {
+//... (剩余部分保持不变)
                             saveStickers();
                             alert(`成功导入 ${newStickersCount} 个新表情！`);
                         } else {
