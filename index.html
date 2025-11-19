@@ -4373,6 +4373,42 @@ input:checked + .slider:before {
     box-sizing: border-box;
 }
 /* --- END: 强制朋友圈评论区内的HTML片段宽度自适应 --- */
+/* --- 转发消息样式 --- */
+.forward-content-box {
+    background-color: #f3f3f5; /* 微信风格的浅灰色背景 */
+    padding: 12px;
+    margin-top: 10px;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    font-size: 14px;
+    color: #333;
+    position: relative;
+}
+
+/* 原作者名字样式 */
+.forward-author-name {
+    color: #576b95; /* 蓝色链接色 */
+    font-weight: 600;
+    margin-right: 4px;
+    cursor: pointer;
+}
+
+/* 转发框内的图片样式 (稍微缩小一点以示区别) */
+.forward-content-box img.post-image {
+    margin-top: 8px;
+    max-width: 180px !important; /* 限制最大宽度 */
+    max-height: 180px;
+    width: auto;
+    border-radius: 4px;
+}
+
+/* 转发框内的视频描述容器 */
+.forward-content-box .message.video {
+    margin: 8px 0 0 0 !important;
+    width: 100%;
+    max-width: 200px; /* 视频卡片缩小 */
+}
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -4665,8 +4701,9 @@ input:checked + .slider:before {
                     </div></div></div>
                 <!-- PAGE 5: Conversation -->
                 <div id="page-conversation" class="page">
-                    <input type="file" id="image-upload-input" class="visually-hidden" accept="image/*">
-                    <div class="chat-app-container">
+    <!-- 核心修改：添加 multiple 属性 -->
+    <input type="file" id="image-upload-input" class="visually-hidden" accept="image/*" multiple>
+    <div class="chat-app-container">
                         <div id="dynamic-decoration-btn" class="dynamic-decoration"></div>
                         <div id="chat-view">
                             <div class="chat-header">
@@ -6213,6 +6250,56 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                 finalSystemPrompt += `\n\n[RECENT CHAT HISTORY]\n${chatHistoryForPrompt}`;
             }
             // --- END: 重新注入聊天记录上下文 ---
+            // =================================================================
+// 【【【 核心新增：注入朋友圈上下文 (主动发消息版) 】】】
+// =================================================================
+const aiCharacterName = senderName; // 主动发消息时，senderName 就是 AI 角色名
+const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 5); 
+
+let momentsContext = "";
+if (momentsData && momentsData.allVisibleMoments.length > 0) {
+    momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
+    momentsData.allVisibleMoments.forEach((post, i) => {
+         let author = post.userName === aiCharacterName ? "You" : post.userName;
+         
+         // --- 核心修改：优先读取图片描述 ---
+         let content = post.text || post.content || ""; 
+         
+         if (post.image) {
+             if (post.imageDescription) {
+                 // 如果有AI生成过的描述，直接使用
+                 content += ` [图片内容: ${post.imageDescription}]`;
+             } else {
+                 // 如果还没有描述，标记为图片
+                 content += ` [图片(未描述)]`;
+             }
+         } else if (post.type === 'video' && !content) {
+             content = "[视频]";
+         }
+         
+         if (!content.trim()) content = "[分享]";
+         // --------------------------------
+
+         let interactions = "";
+         // 检查点赞
+         if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
+             interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
+         }
+         // 检查评论
+         if (post.comments.length > 0) {
+             const commentsText = post.comments.map(c => `${c.user}: ${c.text}`).join(' | ');
+             interactions += ` (Comments: ${commentsText})`;
+         }
+         
+         momentsContext += `Post #${i+1} by ${author}: "${content}"${interactions}\n`;
+    });
+}
+
+if (momentsContext) {
+    finalSystemPrompt += momentsContext;
+}
+// =================================================================
+            
 
             // 拼接世界书
             const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${targetChatId}`, []);
@@ -6493,10 +6580,18 @@ if (isGroupPersona) {
                 
                 let contentDescription = post.text || post.content || '';
                 let imageInfo = '(No image)';
+                
+                // 核心修改：优先检查是否已经有了 imageDescription
                 if (post.image) {
-                    const countKey = `${senderName}_${post.image}`;
-                    const recognitionCount = imageRecognitionCounts[countKey] || 0;
-                    imageInfo = recognitionCount < 3 ? `[Image content is provided below. You have seen this image ${recognitionCount} times.]` : `[You have seen this image ${recognitionCount} times. Do NOT comment on the image itself again.]`;
+                    if (post.imageDescription) {
+                        // 如果有描述，直接使用描述，不再消耗识别次数
+                        imageInfo = `[Image Description: ${post.imageDescription}]`;
+                    } else {
+                        // 如果没有描述，才走原来的识别逻辑
+                        const countKey = `${senderName}_${post.image}`;
+                        const recognitionCount = imageRecognitionCounts[countKey] || 0;
+                        imageInfo = recognitionCount < 3 ? `[Image content is provided below. You have seen this image ${recognitionCount} times.]` : `[You have seen this image ${recognitionCount} times. Do NOT comment on the image itself again.]`;
+                    }
                 }
                 const privacyInfo = `(Privacy: ${post.privacy.type})`;
                 
@@ -6648,6 +6743,14 @@ You are now browsing Moments, a public social space, as **${senderName}**. Your 
 ${momentsContext}
 
 ---
+## **[MANDATORY SIDE MISSION: IMAGE DESCRIBER]**
+**IF** you see any post in the timeline above that has **"[Image content is provided below...]"**, it means the system has sent you a picture that hasn't been described yet.
+**YOU MUST** generate a hidden description tag for it at the end of your response.
+
+**Format:** \`<moment_img_desc id="POST_ID">A detailed, objective description of the image.</moment_img_desc>\`
+**Example:** \`<moment_img_desc id="post_12345">A golden retriever dog running on a grassy field under a blue sky.</moment_img_desc>\`
+
+---
 ## **YOUR ACTION TOOLKIT & DECISION-MAKING PROCESS**
 
 Based on the posts above, your persona, and your relationship with the authors, you can and should perform **MULTIPLE ACTIONS**.
@@ -6691,6 +6794,7 @@ Based on the posts above, your persona, and your relationship with the authors, 
          *   **To comment on a post (with HTML):** \`[comment_moment: {"postId":"post_id_here", "content":"<snippet><div style='background:red;color:white;padding:5px;max-width:100%;box-sizing:border-box;'>Hello World!</div></snippet>"}]\`
 *   **To comment on a post (with HTML):** \`[comment_moment: {"postId":"post_id_here", "content":"<snippet><div style='background:red;color:white;padding:5px;max-width:100%;box-sizing:border-box;white-space:normal;'>Hello World!</div></snippet>"}]\`
      *   **To reply to a comment (with text):** \`[comment_moment: {"postId":"post_id_here", "content":"Your reply.", "replyTo":"username_here"}]\`
+     *   **To FORWARD a post:** \`[forward_moment: {"postId":"post_id_here", "text":"Your commentary on why you are sharing this."}]\`
      *   **CRITICAL HTML RULE (EXPANDED - READ CAREFULLY):**
          1.  **Responsiveness:** The HTML **MUST be responsive**. Do not use fixed widths.
          2.  **Whitespace Curse:** Comment bubbles inherit a "preserve whitespace" rule. To prevent your HTML block from having huge empty spaces due to newlines in your code, you **MUST** add \`white-space: normal;\` to the style of your outermost \`<div>\`.
@@ -6699,8 +6803,6 @@ Based on the posts above, your persona, and your relationship with the authors, 
    *   **Use Case:** Only when a post makes you want to start a **private, one-on-one conversation** that is not suitable for a public comment section.
    *   **Format:** \`[send_private_message: Your message content here.]\`
    *   **(Optional Multi-Message):** Use \`|||\` to separate multiple messages for a natural flow. (e.g., \`Hello|||How are you?\`)
-
-// 请用下面这段全新的代码块替换上面删除的内容：
 
 ---
 ## **FINAL, UNBREAKABLE MANDATE: ACTION IS MANDATORY**
@@ -6868,14 +6970,26 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                 } catch (e) {
                     console.error(`[诊断日志] 角色 "${senderName}": 解析主动发帖指令失败`, e, aiResponse);
                 }
-            } else { // 这是朋友圈互动（browse_moments）的逻辑，保持不变
+            } else { // 这是朋友圈互动（browse_moments）的逻辑
                 if (aiResponse.trim() === "No action taken.") {
                     console.log(`[诊断日志] 角色 "${senderName}": AI决定不采取行动。`);
                     return;
                 }
 
                 const cleanedResponse = aiResponse.trim();
-                const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message):\s*({[\s\S]*?})\]/g;
+
+                // 【核心修改：解析并保存图片描述】
+                const descRegex = /<moment_img_desc id="([^"]+)">([\s\S]*?)<\/moment_img_desc>/g;
+                let descMatch;
+                while ((descMatch = descRegex.exec(cleanedResponse)) !== null) {
+                    const postId = descMatch[1];
+                    const description = descMatch[2].trim();
+                    if (postId && description) {
+                        momentsManager.updatePostDescription(postId, description);
+                    }
+                }
+
+                const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message|forward_moment):\s*({[\s\S]*?})\]/g;
                 let match;
                 let commandsFound = 0;
 
@@ -6916,6 +7030,15 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                         } catch (e) {
                             // 如果JSON.parse失败，或者上面的throw new Error被触发，就在这里捕获
                             console.error(`[诊断日志] 角色 "${senderName}": 解析评论指令失败`, e, value);
+                        }
+                    } else if (command === 'forward_moment') { // 【核心新增：处理转发指令】
+                        try {
+                            const forwardPayload = JSON.parse(value);
+                            if (forwardPayload.postId) {
+                                momentsManager.handleForwardFromAI(senderName, forwardPayload);
+                            }
+                        } catch (e) {
+                            console.error(`[诊断日志] 角色 "${senderName}": 解析转发指令失败`, e, value);
                         }
                     } else if (command === 'send_private_message') {
                         try {
@@ -10069,25 +10192,76 @@ if (associatedNpcNames.length > 0) {
                 }
                 
                 const apiPayloadMessages = await prepareApiPayload(recentMessages);
-                // =================================================================
-            // 【【【 核心新增：注入朋友圈上下文 】】】
-            // =================================================================
-            // 1. 确定我们要观察的用户是谁 (通常是当前聊天的user)
-            const userPersonaNameToObserve = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
-            
-            // 2. 获取AI自己的名字 (观察者)
-            const aiCharacterName = contactInfo.isGroup ? 'assistant' : chatState.chatName; // 在群聊中，观察者身份模糊，用assistant；单聊用角色名
 
-            // 3. 调用改造后的函数，获取朋友圈动态摘要
-            const momentsContext = await momentsManager.getRecentMomentsForAI(aiCharacterName, userPersonaNameToObserve, 3); // 获取最近3条
+// =================================================================
+// 【【【 核心新增：注入朋友圈上下文 】】】
+// =================================================================
+// 1. 确定我们要观察的用户是谁 (通常是当前聊天的user)
+const userPersonaNameToObserve = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
 
-            // 4. 如果有动态，就拼接到系统提示词的末尾
-            if (momentsContext) {
-                finalSystemPrompt += momentsContext;
-            }
-            // =================================================================
+// 2. 获取AI自己的名字 (观察者)
+const aiCharacterName = contactInfo.isGroup ? 'assistant' : chatState.chatName; // 在群聊中，观察者身份模糊，用assistant；单聊用角色名
 
-                // <<< START: 新增代码块 >>>
+// 3. 调用改造后的函数，获取朋友圈动态摘要
+// 注意：这里我们复用了 momentsManager.getRecentMomentsForAI
+// 我们稍微调整下它的用法：传入 observerName, observedName, limit
+// 但因为该函数目前只接受一个参数 characterName（作为观察者和被观察者），
+// 我们需要用到它返回的 allVisibleMoments 数据自己拼接，或者稍后微调那个函数。
+// 为了最快生效且不破坏现有逻辑，我们直接获取AI视角的动态。
+
+const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 5); 
+// getRecentMomentsForAI 返回的是对象 { allVisibleMoments, ... }
+// 我们需要把它转换成文本。幸运的是，该函数内部已经有转换逻辑了，只是没返回文本。
+// 建议稍微修改一下 momentsManager.getRecentMomentsForAI 让它返回文本，或者在这里手动拼接。
+
+// --- 这里是手动拼接逻辑，确保万无一失 ---
+let momentsContext = "";
+if (momentsData && momentsData.allVisibleMoments.length > 0) {
+    momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
+    
+    momentsData.allVisibleMoments.forEach((post, i) => {
+         let author = post.userName === aiCharacterName ? "You" : post.userName;
+         
+         // --- 核心修改：优先读取图片描述 ---
+         let content = post.text || post.content || ""; 
+         
+         if (post.image) {
+             if (post.imageDescription) {
+                 // 如果有AI生成过的描述，直接使用
+                 content += ` [图片内容: ${post.imageDescription}]`;
+             } else {
+                 // 如果还没有描述，标记为图片
+                 content += ` [图片(未描述)]`;
+             }
+         } else if (post.type === 'video' && !content) {
+             content = "[视频]";
+         }
+         
+         if (!content.trim()) content = "[分享]";
+         // --------------------------------
+
+         let interactions = "";
+         // 检查点赞
+         if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
+             interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
+         }
+         // 检查评论
+         if (post.comments.length > 0) {
+             const commentsText = post.comments.map(c => `${c.user}: ${c.text}`).join(' | ');
+             interactions += ` (Comments: ${commentsText})`;
+         }
+         
+         momentsContext += `Post #${i+1} by ${author}: "${content}"${interactions}\n`;
+    });
+}
+
+// 4. 如果有动态，就拼接到系统提示词的末尾
+if (momentsContext) {
+    finalSystemPrompt += momentsContext;
+}
+// =================================================================
+
+                // <<< START: 新增代码块 >>> (这是原本就有的代码，接在下面)
                 const lastCallSummary = [...chatState.messages].reverse().find(m => m.type === 'call_summary');
                 if (lastCallSummary && lastCallSummary.callData && lastCallSummary.callData.conversation) {
                     const callHistoryText = lastCallSummary.callData.conversation.map(c => `${c.sender}: ${c.text}`).join('\n');
@@ -13225,16 +13399,27 @@ function toggleMessageSelection(messageId) {
 function updateMultiSelectCounter() { const count = selectedMessageIds.length; multiSelectCounter.textContent = `已选择 ${count} 条`; multiSelectDeleteBtn.disabled = count === 0; }
 
 imageUploadInput.addEventListener('change', async (e) => {
-    if (e.target.files && e.target.files[0]) {
-        const file = e.target.files[0];
-        const key = `chat-image-${Date.now()}`;
-        try {
-            await imageStore.setItem(key, file);
-            await handleSendMessageAttempt('photo', `indexeddb:${key}`);
-        } catch (error) {
-            console.error("Failed to store image in IndexedDB", error);
-            alert("图片保存失败！");
+    // 检查是否有文件被选中 (支持多选)
+    if (e.target.files && e.target.files.length > 0) {
+        
+        // 使用循环遍历所有选中的文件
+        for (let i = 0; i < e.target.files.length; i++) {
+            const file = e.target.files[i];
+            // 核心修改：为key增加索引后缀，防止毫秒级并发导致的覆盖
+            const key = `chat-image-${Date.now()}-${i}`;
+            
+            try {
+                await imageStore.setItem(key, file);
+                // 依次发送每一张图片
+                // 注意：这里使用 conversationManager.handleSendMessageAttempt 确保作用域正确
+                await conversationManager.handleSendMessageAttempt('photo', `indexeddb:${key}`);
+            } catch (error) {
+                console.error(`Failed to store image index ${i} in IndexedDB`, error);
+                alert(`第 ${i+1} 张图片保存失败！`);
+            }
         }
+        
+        // 全部处理完后，清空输入框，允许再次选择相同文件
         imageUploadInput.value = ''; 
     }
 });
@@ -13537,13 +13722,11 @@ dynamicDecorationBtn.addEventListener('click', triggerAIContinuation);
 headerMoreBtn.addEventListener('click', async () => { 
     const menuButtons = [ 
         { text: '聊天信息', value: 'chat_info', class: 'primary' },
-        { text: '截图分享', value: 'screenshot', class: 'primary' }, // <-- 新增这一行
         { text: '统计字数', value: 'char_count', class: 'primary' },
         { text: '更换聊天背景', value: 'change_bg', class: 'primary' }, 
         { text: '更换气泡样式', value: 'change_bubble', class: 'primary' }, 
         { text: '字体', value: 'font_color', class: 'primary' } 
     ]; 
-// ...
     
     if (!contactInfo.isGroup) { 
         const autoReplyStatus = autoReplySettings.enabled ? ' (已启用)' : ''; 
@@ -13560,10 +13743,6 @@ headerMoreBtn.addEventListener('click', async () => {
         case 'chat_info':
             openChatInfoPage();
             break;
-        case 'screenshot': // <-- 新增这个 case
-            capturePhoneScreen();
-            break;
-
         case 'char_count':
             const { systemChars, personaChars, worldbookChars, npcChars, contextChars, totalChars } = calculateApiPayloadSize();
             const alertText = `系统提示 (含前情提要): ${systemChars}字\n` +
@@ -13941,94 +14120,7 @@ async function showBranchHistoryModal(chatId) {
                 }
             });
         }
-// ******** 从这里开始，粘贴下面的全新函数 ********
 
-        async function capturePhoneScreen() {
-            const phoneElement = document.querySelector('.phone');
-            if (!phoneElement) {
-                await customAlert('错误：找不到手机框架元素。');
-                return;
-            }
-
-            // 告知用户即将发生什么
-            await customAlert('即将请求屏幕分享权限以进行截图。请在弹出的窗口中选择【此标签页】进行分享。', '截图准备');
-
-            let stream = null;
-            try {
-                // 1. 请求用户授权分享当前标签页
-                stream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { cursor: "never" }, // 不包含鼠标指针
-                    audio: false,
-                    preferCurrentTab: true // 优先推荐当前标签页
-                });
-
-                // 2. 从视频流中获取轨道并准备“拍照”
-                const track = stream.getVideoTracks()[0];
-                const imageCapture = new ImageCapture(track);
-
-                // 3. “拍下”当前帧
-                const frame = await imageCapture.grabFrame();
-
-                // 4. 将拍下的帧绘制到一个临时的、看不见的完整画布上
-                const fullCanvas = document.createElement('canvas');
-                fullCanvas.width = frame.width;
-                fullCanvas.height = frame.height;
-                const fullCtx = fullCanvas.getContext('2d');
-                fullCtx.drawImage(frame, 0, 0);
-
-                // 5. 获取“黑麦手机”元素在屏幕上的精确位置和尺寸
-                const phoneRect = phoneElement.getBoundingClientRect();
-                
-                // 6. 创建一个新的、用于裁剪的画布
-                const cropCanvas = document.createElement('canvas');
-                // 乘以 window.devicePixelRatio 可以获得更高清的截图
-                const dpr = window.devicePixelRatio || 1;
-                cropCanvas.width = phoneRect.width * dpr;
-                cropCanvas.height = phoneRect.height * dpr;
-                const cropCtx = cropCanvas.getContext('2d');
-                
-                // 7. 从完整画布中，将“黑麦手机”的部分精确地“抠”出来，并画到新的裁剪画布上
-                cropCtx.drawImage(
-                    fullCanvas,
-                    phoneRect.left * dpr, // 裁剪区域的起始X坐标
-                    phoneRect.top * dpr,  // 裁剪区域的起始Y坐标
-                    phoneRect.width * dpr,  // 裁剪区域的宽度
-                    phoneRect.height * dpr, // 裁剪区域的高度
-                    0, 0,                  // 在新画布上的绘制起点 (0,0)
-                    phoneRect.width * dpr,  // 绘制的宽度
-                    phoneRect.height * dpr  // 绘制的高度
-                );
-
-                // 8. 将最终裁剪好的画布转换成图片URL
-                const imageURL = cropCanvas.toDataURL('image/png');
-
-                // 9. 创建下载链接并触发下载
-                const downloadLink = document.createElement('a');
-                const timestamp = new Date().toISOString().slice(0, 19).replace(/[-T:]/g, "");
-                downloadLink.href = imageURL;
-                downloadLink.download = `黑麦手机截图_${timestamp}.png`;
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-                document.body.removeChild(downloadLink);
-
-            } catch (error) {
-                console.error('截图失败:', error);
-                if (error.name === 'NotAllowedError') {
-                    await customAlert('您取消了截图授权，操作已中止。');
-                } else {
-                    await customAlert('截图失败，可能是浏览器不支持或发生了未知错误。');
-                }
-            } finally {
-                // 10. 无论成功与否，都必须停止屏幕分享，关闭浏览器顶部的提示条
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                }
-            }
-        }
-
-        // ******** 粘贴到这里结束 ********
-        
-        
         async function viewBranchDetail(chatId, branchId) {
             const branches = loadFromLocalStorage(`chat_branches_${chatId}`, []);
             const branch = branches.find(b => b.id === branchId);
@@ -14159,7 +14251,7 @@ async function showBranchHistoryModal(chatId) {
                 await customAlert('删除失败：找不到该分支。');
             }
         }
-        return { open, getCurrentChatId, updateHeaderTitle, reRenderMessages, injectCustomBubbleStyles: publicInjectCustomBubbleStyles, showCustomModal, addMessage, renderGroupMemberList, handleSendMessageAttempt, showContentInputModal, regenerateLastResponse, customConfirm, makeDataPortable, prepareApiPayload, customAlert, handleProactiveAIMessage, processAIResponseLine, executeBackgroundUpdatesAndCleanText, showBubbleSettingsModal, capturePhoneScreen };
+        return { open, getCurrentChatId, updateHeaderTitle, reRenderMessages, injectCustomBubbleStyles: publicInjectCustomBubbleStyles, showCustomModal, addMessage, renderGroupMemberList, handleSendMessageAttempt, showContentInputModal, regenerateLastResponse, customConfirm, makeDataPortable, prepareApiPayload, customAlert, handleProactiveAIMessage, processAIResponseLine, executeBackgroundUpdatesAndCleanText, showBubbleSettingsModal };
 })();
 async function showGroupPersonaEditor(persona = {}, isEditing = false) {
         // --- 1. 新增的头像UI HTML ---
@@ -14830,6 +14922,84 @@ const momentsManager = (function() {
                         postBody.appendChild(textDiv);
                     }
                 switch (post.type) {
+                   
+                    // 【【【 核心新增：转发类型的渲染逻辑 】】】
+                    // 【【【 核心新增：转发类型的渲染逻辑 (V2.0 修复版) 】】】
+                    case 'forward':
+                        const originalPostId = post.forwardedPostId;
+                        // 在当前的所有帖子数据中查找原帖
+                        let originalPost = feedData.find(p => p.id === originalPostId);
+                        
+                        const forwardBox = document.createElement('div');
+                        forwardBox.className = 'forward-content-box';
+                        
+                        if (!originalPost) {
+                            // 情况A：原帖已经被删除了
+                            forwardBox.innerHTML = `<div style="background:#f7f7f7; color:#888; padding:10px; text-align:center;">该内容已被发布者删除</div>`;
+                        } else {
+                            // 情况B：原帖还在，读取它的【最新】数据
+                            
+                            // 获取原作者最新名字
+                            let authorName = originalPost.userName;
+                            const userPersona = userPersonas.find(p => p.name === authorName);
+                            if (userPersona) authorName = userPersona.name;
+                            else {
+                                 const aiChat = chatList.find(c => c.name === authorName && c.type === '私聊');
+                                 if(aiChat) authorName = aiChat.name;
+                            }
+
+                            // 1. 决定要显示的摘要文字
+                            let summaryText = '';
+                            if (originalPost.type === 'text' || originalPost.type === 'photo') {
+                                summaryText = originalPost.text || '';
+                            } else {
+                                // 对于视频、声明等，只显示正文，不重复显示 content
+                                summaryText = originalPost.text || '';
+                            }
+
+                            // 渲染名字和摘要
+                            let innerHTML = `<div style="line-height:1.5;"><span class="forward-author-name">@${authorName}</span>${summaryText ? ': ' + summaryText : ''}</div>`;
+                            forwardBox.innerHTML = innerHTML;
+
+                            // 2. 根据原贴类型，在框内追加渲染多媒体内容
+                            if (originalPost.type === 'photo' && originalPost.image) {
+                                const img = document.createElement('img');
+                                img.className = 'post-image';
+                                setImageSrc(img, originalPost.image);
+                                forwardBox.appendChild(img);
+                            } else if (originalPost.type === 'video' && originalPost.content) {
+                                const videoDiv = document.createElement('div');
+                                videoDiv.className = 'message video';
+                                // 注意 ID 要加上前缀防止冲突
+                                videoDiv.innerHTML = `<div class="message-video-description" id="video-fwd-${post.id}" data-text="${originalPost.content}"><div class="video-thumbnail"></div><div class="video-content-wrapper"><div class="video-text-container"></div><div class="spacer"></div><div class="video-progress-area"><div class="video-progress-bar-container"><div class="video-progress-bar-fill"></div></div><div class="moving-decoration"></div></div></div><div class="play-button-overlay"><div class="play-icon"></div></div></div>`;
+                                forwardBox.appendChild(videoDiv);
+                            } else if (originalPost.type === 'photo-description' || originalPost.type === 'text-on-image') {
+                                const card = document.createElement('div');
+                                card.className = 'message photo-description';
+                                card.style.marginTop = '8px';
+                                const textContentDiv = document.createElement('div');
+                                textContentDiv.className = 'text-overlay-content';
+                                textContentDiv.textContent = originalPost.content;
+                                card.appendChild(textContentDiv);
+                                forwardBox.appendChild(card);
+                            } else if (originalPost.type === 'statement') {
+                                const statementDiv = document.createElement('div');
+                                statementDiv.className = 'message statement';
+                                statementDiv.style.marginTop = '8px';
+                                statementDiv.style.transform = 'scale(0.95)'; 
+                                statementDiv.style.transformOrigin = 'top left';
+                                statementDiv.style.width = '105%'; 
+                                
+                                const html = (originalPost.content || '').split('\n').map(p => `<p class="statement-paragraph">${p.trim()}</p>`).join('');
+                                statementDiv.innerHTML = `<div class="statement-inner-frame" style="background:white;"><div class="statement-title">声 明</div><div class="statement-content">${html}</div><div class="details-wrapper"><div class="statement-details"><span class="statement-name">${originalPost.signer || ''}</span><span class="statement-date">${originalPost.date || ''}</span></div></div></div>`;
+                                forwardBox.appendChild(statementDiv);
+                            }
+                        }
+
+                        postBody.appendChild(forwardBox);
+                        break;
+
+                    
                     case 'photo':
                         if (post.image) {
                             const img = document.createElement('img');
@@ -15219,6 +15389,7 @@ const momentsManager = (function() {
             else if (e.target.closest('.actions-panel')) {
                  if (e.target.matches('.reaction-btn')) handleReaction(postCard.id, '点赞');
                  else if (e.target.matches('.comment-action-btn')) openCommentModal(postCard.id);
+                 else if (e.target.matches('.share-action-btn') || e.target.closest('.share-action-btn')) handleSharePost(postCard.id); // <--- 新增这一行
             } 
             else if (e.target.closest('.reactions-list')) {
                  const postData = feedData.find(p => p.id === postCard.id);
@@ -15264,6 +15435,11 @@ const momentsManager = (function() {
                         <svg viewBox="0 0 24 24"><path d="M20,2H4A2,2 0 0,0 2,4V22L6,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2Z"></path></svg>
                         <span>评论</span>
                     </button>
+                    <div class="action-divider"></div>
+                    <button class="share-action-btn" style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: white; padding: 6px 14px; border-radius: 20px; cursor: pointer; background: none; border: none; transition: background-color 0.2s;">
+                        <svg viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+                        <span>转发</span>
+                    </button>
                 `;
                 button.parentElement.appendChild(panel);
             }
@@ -15284,6 +15460,49 @@ const momentsManager = (function() {
                 panelButton.parentElement.querySelector('.actions-panel').remove();
                 setTimeout(() => showActionsPanel(panelButton), 50);
             }
+        }
+        async function handleSharePost(postId) {
+            const originalPost = feedData.find(p => p.id === postId);
+            if (!originalPost) return;
+
+            const thought = await conversationManager.showContentInputModal({
+                title: '转发朋友圈',
+                placeholder: '这一刻的想法...',
+                value: '' // 默认为空
+            });
+
+            // 如果用户点击取消（返回null），则不转发
+            if (thought === null) return;
+
+            // 获取最新的原作者名字 (处理可能的人设更名)
+            let originalAuthorName = originalPost.userName;
+            const userPersona = userPersonas.find(p => p.name === originalPost.userName);
+            if (userPersona) originalAuthorName = userPersona.name;
+            else {
+                 const aiChat = chatList.find(c => c.name === originalPost.userName && c.type === '私聊');
+                 if(aiChat) originalAuthorName = aiChat.name;
+            }
+
+            const newPost = {
+                id: `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                userName: currentPersonaName,
+                timestamp: new Date().toISOString(),
+                reactions: { '点赞': [] },
+                comments: [],
+                privacy: { type: 'public', list: [], days: null }, 
+                
+                // 核心修改：将类型设为 'forward'，只保存原贴的 ID
+                type: 'forward', 
+                text: thought.trim(), // 用户的转发心得
+                
+                // 我们只存 ID，不再复制内容。渲染时去 feedData 里找。
+                forwardedPostId: originalPost.id
+            };
+
+            feedData.unshift(newPost);
+            saveFeed();
+            renderFeed();
+            showNotification('转发成功');
         }
 
         function openCommentModal(postId, userToReply = null) {
@@ -15390,7 +15609,6 @@ sendCommentBtn.addEventListener('click', () => {
         }
 
         async function getRecentMomentsForAI(characterName, limit = 5) {
-            // --- 终极防御性修复：在这里定义 senderName，确保它在任何情况下都存在 ---
             const senderName = characterName;
 
             console.log(`[诊断日志] 角色 "${senderName}" 开始检查朋友圈...`);
@@ -15449,38 +15667,112 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
             });
 
             const recentMoments = allVisibleMoments.slice(0, limit);
-            console.log(`[诊断日志] 结果: "${senderName}" 看到了 ${recentMoments.length} 条朋友圈。认知圈:`, knownPeople);
+            console.log(`[诊断日志] 结果: "${senderName}" 看到了 ${recentMoments.length} 条朋友圈。`);
             
-            let imageRecognitionCounts = loadFromLocalStorage('image_recognition_counts', {});
-
             const imagePayloads = [];
-            for (const post of recentMoments) {
-                if (post.image && post.image.startsWith('indexeddb:')) {
-                    const imageKey = post.image;
-                    const countKey = `${senderName}_${imageKey}`;
-                    const currentCount = imageRecognitionCounts[countKey] || 0;
-                    if (currentCount < 3) {
-                        try {
-                            const base64DataUrl = await conversationManager.makeDataPortable(imageKey);
-                            if (base64DataUrl) {
-                                imagePayloads.push({
-                                    type: 'image_url',
-                                    image_url: { "url": base64DataUrl, "detail": "low" }
-                                });
-                                imageRecognitionCounts[countKey] = currentCount + 1;
-                                console.log(`[诊断日志] 成功为帖子 ${post.id} 准备图片数据 (第 ${currentCount + 1} 次识别)。`);
-                            }
-                        } catch (e) {
-                            console.error(`[诊断日志] 准备帖子 ${post.id} 的图片数据时失败:`, e);
+            
+            const momentsContextText = `\n\n[MOMENTS CONTEXT - Recent activities of "${senderName}"]\nHere are the latest Moments activities related to "${senderName}" that you are aware of. You can use this information to make your conversation more relevant and timely.\n\n`;
+
+            let contextTextBody = recentMoments.map((post, i) => {
+                const knownPeopleMap = new Map(knownPeople.map(p => [p.name, p.relationship]));
+                let authorLabel = post.userName;
+                
+                if (knownPeopleMap.has(post.userName)) {
+                    authorLabel = `${post.userName} ${knownPeopleMap.get(post.userName)}`;
+                } else if (post.userName === senderName) {
+                    authorLabel = `YOU (this is your own post)`;
+                } else {
+                    authorLabel = `${post.userName} (陌生人)`;
+                }
+
+                const commentsPreview = post.comments.filter(c => c.user !== senderName).slice(-3).map(c => {
+                    let commenterLabel = c.user;
+                    if (c.user === mainUserName) { commenterLabel = `${c.user} (the user)`; }
+                    const rawText = c.text.trim();
+                    let simplifiedContent = rawText;
+                    const htmlBlockRegex = /(<snippet>[\s\S]*?<\/snippet>)|(<div[\s\S]*?>[\s\S]*?<\/div>)/g;
+                    if (htmlBlockRegex.test(rawText)) {
+                        simplifiedContent = rawText.replace(htmlBlockRegex, ' [一条格式化消息] ').trim();
+                    }
+                    const stickerMatch = simplifiedContent.match(/^\[sticker:([^\]]+)\]$/);
+                    if (stickerMatch) {
+                        simplifiedContent = `[表情: ${stickerMatch[1]}]`;
+                    }
+                    return `- ${commenterLabel} (replying to ${c.replyTo || 'post'}): "${simplifiedContent}"`;
+                }).join('\n');
+
+                // 【核心修改开始：处理转发逻辑】
+                let contentDescription = post.text || post.content || '';
+                let imageInfo = '(No image)';
+
+                if (post.type === 'forward') {
+                    let originalPost = null;
+                    if (post.forwardedPostId) {
+                        originalPost = feedData.find(p => p.id === post.forwardedPostId);
+                    } else if (post.forwarded) {
+                        originalPost = post.forwarded;
+                    }
+
+                    if (originalPost) {
+                        let originalContent = originalPost.text || originalPost.content || '[Media Content]';
+                        // 如果原帖有图片，且有描述
+                        if (originalPost.image && originalPost.imageDescription) {
+                            originalContent += ` [Image Content: ${originalPost.imageDescription}]`;
                         }
+                        contentDescription = `[Forwarding Post by @${originalPost.userName || 'Unknown'}]: "${originalContent}"\nYour commentary on this forward: "${post.text || ''}"`;
                     } else {
-                        console.log(`[诊断日志] 帖子 ${post.id} 的图片已识别达到3次上限，本次不再发送图片数据。`);
+                        contentDescription = `[Forwarding Post]: Original content has been deleted. Your commentary: "${post.text || ''}"`;
+                    }
+                } 
+                // 普通帖子的处理逻辑
+                else {
+                    if (post.image) {
+                        if (post.imageDescription) {
+                            imageInfo = `[Image Description: ${post.imageDescription}]`;
+                        } else {
+                            imageInfo = `[Image content is provided below. IMPORTANT: You MUST generate a <moment_img_desc> tag for this image to describe it.]`;
+                            
+                            if (post.image.startsWith('indexeddb:')) {
+                                imagePayloads.push({
+                                    _isPendingImage: true,
+                                    key: post.image
+                                });
+                            }
+                        }
+                    }
+                }
+                // 【修改结束】
+
+                const privacyInfo = `(Privacy: ${post.privacy.type})`;
+                return `Post #${i + 1} (ID: ${post.id}) by ${authorLabel} ${privacyInfo}: "${contentDescription}" ${imageInfo}\n  Recent Comments:\n${commentsPreview || '  - No comments yet.'}`;
+            }).join('\n\n');
+
+            const finalImagePayloads = [];
+            for (const payload of imagePayloads) {
+                if (payload._isPendingImage) {
+                    try {
+                        const base64DataUrl = await conversationManager.makeDataPortable(payload.key);
+                        if (base64DataUrl) {
+                            finalImagePayloads.push({
+                                type: 'image_url',
+                                image_url: { "url": base64DataUrl, "detail": "low" }
+                            });
+                            console.log(`[诊断日志] 帖子未包含描述，正在发送图片数据供 AI 识别。`);
+                        }
+                    } catch (e) {
+                        console.error(`[诊断日志] 图片数据准备失败:`, e);
                     }
                 }
             }
-            saveToLocalStorage('image_recognition_counts', imageRecognitionCounts);
 
-            return { allVisibleMoments: recentMoments, imagePayloads, imageRecognitionCounts, socialGraphPrompt, knownPeople };
+            return { 
+                allVisibleMoments: recentMoments, 
+                imagePayloads: finalImagePayloads, 
+                imageRecognitionCounts: {}, 
+                socialGraphPrompt, 
+                knownPeople,
+                momentsContextText: momentsContextText + contextTextBody 
+            };
         }
 
         function handleInteractionFromAI(characterName, action, data) {
@@ -15516,7 +15808,54 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
         function refreshData() {
             loadFeed();
         }
+        function updatePostDescription(postId, description) {
+            const post = feedData.find(p => p.id === postId);
+            if (post) {
+                post.imageDescription = description;
+                saveFeed();
+                console.log(`[Moments] Updated image description for post ${postId}`);
+            }
+        }
+function handleForwardFromAI(characterName, data) {
+            const originalPost = feedData.find(p => p.id === data.postId);
+            if (!originalPost) {
+                console.warn(`[Dynamics] Forward action failed: Original post ${data.postId} not found.`);
+                return;
+            }
 
+            // 获取最新的原作者名字
+            let originalAuthorName = originalPost.userName;
+            const userPersona = userPersonas.find(p => p.name === originalPost.userName);
+            if (userPersona) originalAuthorName = userPersona.name;
+            else {
+                 const aiChat = chatList.find(c => c.name === originalPost.userName && c.type === '私聊');
+                 if(aiChat) originalAuthorName = aiChat.name;
+            }
+
+            const newPost = {
+                id: `post_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                userName: characterName,
+                timestamp: new Date().toISOString(),
+                reactions: { '点赞': [] },
+                comments: [],
+                privacy: { type: 'public', list: [], days: null }, // AI转发默认公开
+                
+                // 核心：类型为转发，只存ID
+                type: 'forward', 
+                text: data.text || '', // AI的转发心得
+                forwardedPostId: originalPost.id
+            };
+
+            feedData.unshift(newPost);
+            saveFeed();
+            
+            if (document.getElementById('tab-content-moments').classList.contains('active')) {
+                renderFeed();
+            }
+            console.log(`[Dynamics] ${characterName} forwarded post ${originalPost.id}`);
+            showNotification(`“${characterName}”转发了一条朋友圈`);
+            checkMomentsUpdates();
+        }
         function init() {
             // --- ↓↓↓ 核心修改 从这里开始 ↓↓↓ ---
             // 1. 从 localStorage 读取上次查看时间，如果没有，就默认为当前时间
@@ -15580,7 +15919,7 @@ if (momentsCommentStickerBtn) {
 checkMomentsUpdates(); // <--- 新增这一行
         }
         
-        return { init, refreshData, createPostFromAI, getRecentMomentsForAI, handleInteractionFromAI };
+        return { init, refreshData, createPostFromAI, getRecentMomentsForAI, handleInteractionFromAI, updatePostDescription, handleForwardFromAI };
 })();
     
     const stickerManager = (function() {
