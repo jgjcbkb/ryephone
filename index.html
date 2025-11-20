@@ -12322,35 +12322,60 @@ const reRenderMessages = (isInitialLoad = false) => {
     }
     // 如果是加载更多，滚动位置的恢复将在 loadMoreMessages 函数中处理
 };
-async function getAiGeneratedReplyForMe(chatIdForReply, messageToReply, stance) {
-            // 1. 【核心修复】创建加载弹窗，并立即获取其关闭函数
-            let closeModalFunction;
-            const loadingPromise = new Promise(resolve => {
-                conversationManager.showCustomModal({
-                    title: 'AI 正在代写...',
+async function getAiGeneratedReplyForMe(targetChatId, messageToReply, stance) {
+            let loadingModalOverlay = null;
+
+            // 创建一个可以手动控制的关闭函数
+            const showLoadingModal = () => {
+                const existingModal = document.querySelector('.modal-overlay[data-modal-id]');
+                if (existingModal) existingModal.remove(); // 移除可能残留的旧弹窗
+                
+                conversationManager.showCustomModal({ 
+                    title: 'AI 正在代写...', 
                     text: '请稍候...',
-                    onRender: (modalDOM, closeModal) => {
-                        closeModalFunction = closeModal; // 将关闭函数存起来
-                        // 允许点击外部遮罩层关闭（这会resolve Promise）
+                    onRender: (modalDOM) => {
+                        loadingModalOverlay = modalDOM;
+                        // 允许点击遮罩层关闭（虽然在自动发送模式下用户可能来不及点）
                         modalDOM.addEventListener('click', (e) => {
                             if (e.target === modalDOM) {
-                                closeModal({ value: 'cancelled_by_user' });
+                                modalDOM.classList.remove('visible');
                             }
                         });
                     }
-                }).then(resolve); // 将 showCustomModal 的 Promise 连接到 loadingPromise
-            });
+                });
+            };
+            
+            // 立即显示加载弹窗
+            showLoadingModal();
 
+            const closeLoadingModal = () => {
+                if (loadingModalOverlay) {
+                    loadingModalOverlay.classList.remove('visible');
+                    // 确保弹窗从DOM中移除
+                    setTimeout(() => {
+                        if (loadingModalOverlay && loadingModalOverlay.parentElement) {
+                            loadingModalOverlay.remove();
+                        }
+                    }, 300);
+                }
+            };
+            
             try {
-                // 【核心修复】使用发起代写的 chatIdForReply，而不是全局的 chatId
-                const chatInfo = loadFromLocalStorage(`chat_info_${chatIdForReply}`, {});
+                // 【【【核心修复1】】】所有数据都从传入的 targetChatId 加载，不再依赖全局状态
+                const chatInfo = loadFromLocalStorage(`chat_info_${targetChatId}`, {});
                 const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
                 
                 if (profileIndexStr === null) throw new Error("未配置有效的API。");
                 const profile = apiProfiles[parseInt(profileIndexStr)];
                 if (!profile) throw new Error("API配置不存在。");
 
-                // 获取人设
+                // 1. 构建完整的系统上下文
+                let fullSystemPrompt = profile.prompt || '';
+                const userDisplayName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+                const charDisplayName = messageToReply.sender || chatState.chatName; // 保持不变，用于指代目标
+
+                if (chatInfo.preamble) { fullSystemPrompt = `[Preamble]\n${chatInfo.preamble}\n\n` + fullSystemPrompt; }
+
                 let userPersonaText = "一个普通用户。";
                 const personaName = chatInfo.userPersonaName;
                 if (personaName && personaName !== '无') {
@@ -12358,24 +12383,36 @@ async function getAiGeneratedReplyForMe(chatIdForReply, messageToReply, stance) 
                     if (persona && persona.description) { userPersonaText = persona.description; }
                 }
                 if (chatInfo.myPersona) { userPersonaText += `\n[补充人设]:\n${chatInfo.myPersona}`; }
+                fullSystemPrompt += `\n\n[User Persona for "${userDisplayName}"]\n${userPersonaText}`;
 
-                const userDisplayName = (personaName && personaName !== '无') ? personaName : '{{user}}';
-                const charDisplayName = messageToReply.sender || chatList.find(c => c.id === chatIdForReply)?.name || '角色';
+                const chat = chatList.find(c => c.id === targetChatId);
+                if (chat && chat.type === '群聊') {
+                    fullSystemPrompt += `\n\n[Group Chat Context]\n你正在一个群聊中。`;
+                } else {
+                    fullSystemPrompt += `\n\n[AI Character Persona]\n${chatInfo.aiPersona || 'A helpful assistant.'}`;
+                }
 
-                // 【核心修复】修改Prompt，强调是回复“前文”
-                let prompt = `
+                const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${targetChatId}`, []);
+                worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
+                    fullSystemPrompt += `\n\n[World Book: ${entry.name}]\n${entry.content}`;
+                });
+                
+                timeManager.updateSettingsForChat(targetChatId);
+                fullSystemPrompt += timeManager.getAITimeContext();
+                
+                fullSystemPrompt = fullSystemPrompt.replace(/{{user}}/g, userDisplayName).replace(/{{char}}/g, charDisplayName);
+
+                // 2. 【【【核心修复2】】】重构任务指令，强调“回复前文”
+                const taskPrompt = `
 # 角色扮演任务：代写回复
 
-你是一个顶级的写作助手。你的任务是扮演用户 "${userDisplayName}"，根据他的人设、当前的对话上下文，以及指定的回复策略，为他代写一条回复。
+你是一个顶级的写作助手。你的任务是扮演用户 "${userDisplayName}"，根据他的人设、当前的对话上下文（已在系统指令和历史记录中提供），以及指定的回复策略，为他代写一条回复。
 
 ## 任务详情
 
 1.  **你的身份:** 你就是用户 "${userDisplayName}"。
-2.  **你的性格与人设:**
-    \`\`\`
-    ${userPersonaText}
-    \`\`\`
-3.  **回复目标:** 你的回复并非仅仅针对某一句特定的话，而是要回应由以下这句话引发的**整个前文对话情景**：
+2.  **核心目标:** 你的回复应该是对【整个对话前文】的自然延续和回应，而不仅仅是针对下面引用的最后一条消息。
+3.  **参考消息:** 作为你回应的直接触发点，对方的最后一条消息是：
     > "${charDisplayName}": "${messageToReply.text}"
 4.  **回复策略 (必须遵守):** 你的回复必须严格遵循以下策略：**${stance}**
 5.  **输出要求:**
@@ -12385,26 +12422,16 @@ async function getAiGeneratedReplyForMe(chatIdForReply, messageToReply, stance) 
     *   语言：简体中文。
 `;
                 
-                // 准备完整的上下文
-                let fullSystemPrompt = (profile.prompt || '') + `\n\n[User Persona for "${userDisplayName}"]\n${userPersonaText}`;
-                if (chatInfo.preamble) { fullSystemPrompt = `[Preamble]\n${chatInfo.preamble}\n\n` + fullSystemPrompt; }
-                if (chatInfo.aiPersona) { fullSystemPrompt += `\n\n[Character Persona for "${charDisplayName}"]\n${chatInfo.aiPersona}`; }
-                const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${chatIdForReply}`, []);
-                worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
-                    fullSystemPrompt += `\n\n[Background: ${entry.name}]\n${entry.content}`;
-                });
-                timeManager.updateSettingsForChat(chatIdForReply);
-                fullSystemPrompt += timeManager.getAITimeContext();
-
+                // 【【【核心修复3】】】从目标聊天的完整历史记录中加载上下文
+                const fullHistory = loadFromLocalStorage(`conversation_${targetChatId}`, []);
                 const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
-                const sourceMessages = loadFromLocalStorage(`conversation_${chatIdForReply}`, []);
-                const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
+                const recentMessages = memoryLength > 0 ? fullHistory.slice(-memoryLength) : fullHistory;
                 const apiPayloadMessages = await prepareApiPayload(recentMessages);
 
                 const finalMessages = [
                     { role: "system", content: fullSystemPrompt },
                     ...apiPayloadMessages,
-                    { role: "user", content: prompt }
+                    { role: "user", content: taskPrompt }
                 ];
 
                 const chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
@@ -12413,6 +12440,8 @@ async function getAiGeneratedReplyForMe(chatIdForReply, messageToReply, stance) 
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
                     body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false })
                 });
+
+                closeLoadingModal(); // 无论成功失败，先关弹窗
 
                 if (!response.ok) {
                     const errorBody = await response.text();
@@ -12423,22 +12452,18 @@ async function getAiGeneratedReplyForMe(chatIdForReply, messageToReply, stance) 
                 return data.choices[0]?.message?.content || "";
 
             } catch (error) {
+                closeLoadingModal(); // 确保出错时也关闭弹窗
                 await conversationManager.customAlert(`代写回复失败: ${error.message}`);
                 return null;
-            } finally {
-                // 2. 【核心修复】无论成功或失败，都调用关闭函数
-                if (closeModalFunction) {
-                    closeModalFunction();
-                }
             }
         }
 
         async function handleReplyForMe(messageId) {
             const message = chatState.messages.find(m => m.id === messageId);
             if (!message) return;
-            
-            // 【核心修复】在发起时就记录下当前的聊天ID
-            const chatIdForReply = conversationManager.getCurrentChatId();
+
+            // 【【【核心修复1】】】保存当前聊天ID，以便后续在任何页面都能正确发送
+            const originalChatId = conversationManager.getCurrentChatId();
 
             const modalHtml = `
                 <div class="modal-buttons" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
@@ -12464,23 +12489,28 @@ async function getAiGeneratedReplyForMe(chatIdForReply, messageToReply, stance) 
                     { text: '使用自定义策略代写', value: 'custom', class: 'primary' }
                 ],
                 onRender: (modalDOM, closeModal) => {
+                    // 监听快捷按钮
                     modalDOM.querySelector('.modal-buttons').addEventListener('click', (e) => {
                         const button = e.target.closest('button[data-stance]');
                         if (button) {
                             e.stopPropagation();
-                            const stance = button.dataset.stance;
-                            closeModal({ value: stance });
+                            closeModal({ value: button.dataset.stance });
+                        }
+                    });
+                    // 【【【核心修复2】】】允许点击遮罩层关闭弹窗
+                    modalDOM.addEventListener('click', (e) => {
+                        if (e.target === modalDOM) {
+                            closeModal({ value: 'close' });
                         }
                     });
                 }
             });
-
+            
             if (!result || result.value === 'cancel' || result.value === 'close') {
                 return;
             }
 
             let selectedStance;
-
             if (result.value === 'custom') {
                 const customInput = result.target.closest('.modal-box').querySelector('#custom-stance-input').value.trim();
                 selectedStance = customInput || '自由发挥，完全遵循你的人设和上下文进行最合理的回应';
@@ -12488,22 +12518,19 @@ async function getAiGeneratedReplyForMe(chatIdForReply, messageToReply, stance) 
                 selectedStance = result.value;
             }
             
-            // 【核心修复】将记录的 chatIdForReply 传递给AI函数
-            const generatedReply = await getAiGeneratedReplyForMe(chatIdForReply, message, selectedStance);
+            const generatedReply = await getAiGeneratedReplyForMe(originalChatId, message, selectedStance);
 
             if (generatedReply) {
-                // 【核心修复】判断用户是否已切换聊天
-                const currentActiveChatId = conversationManager.getCurrentChatId();
-                if (currentActiveChatId !== chatIdForReply) {
-                    // 如果已切换，直接将回复发送到后台
-                    await conversationManager.addMessage({ type: 'text', text: generatedReply, side: 'sent' }, chatIdForReply);
-                    await conversationManager.customAlert(`已将代写回复发送至 "${chatList.find(c => c.id === chatIdForReply)?.name}"。`);
-                } else {
-                    // 如果没切换，则填充到输入框
-                    footerMessageInput.value = generatedReply;
-                    footerMessageInput.dispatchEvent(new Event('input'));
-                    footerMessageInput.focus();
-                }
+                // 【【【核心修复3】】】无论当前在哪，都将消息发送到原始聊天窗口
+                await conversationManager.addMessage({
+                    type: 'text',
+                    text: generatedReply,
+                    side: 'sent'
+                }, originalChatId);
+                
+                // 给用户一个反馈，告知已发送
+                // （如果用户还在原聊天页面，他会直接看到新消息；如果不在，这个提示很有用）
+                showNotification(`已代你在 "${chatState.chatName}" 中回复`);
             }
         }
 // 修改后 (最终正确版)
@@ -15446,12 +15473,16 @@ const momentsManager = (function() {
                     if (index % 2 === 1) {
                         contentHtml += part;
                     } else {
-                        const textAndStickerParts = part.split(/(\[sticker:[^\]]+\])/g);
+                        // 【【【核心修改 1】】】: 在 split 正则表达式中，用 [:：] 替代 :
+                        // 这表示匹配 英文冒号 或 中文冒号
+                        const textAndStickerParts = part.split(/(\[sticker[:：][^\]]+\])/g);
                         textAndStickerParts.forEach(subPart => {
                             if (!subPart) return;
-                            const stickerMatch = subPart.match(/^\[sticker:([^\]]+)\]$/);
+                            // 【【【核心修改 2】】】: 在 match 正则表达式中，同样用 [:：] 替代 :
+                            const stickerMatch = subPart.match(/^\[sticker[:：]([^\]]+)\]$/);
                             if (stickerMatch) {
-                                const stickerName = stickerMatch[1];
+                                // 提取到的 stickerName 前后可能有空格，需要 trim() 一下
+                                const stickerName = stickerMatch[1].trim();
                                 const sticker = stickers.find(s => s.name === stickerName);
                                 if (sticker) {
                                     contentHtml += `<img src="${sticker.url}" alt="${stickerName}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
@@ -15464,6 +15495,7 @@ const momentsManager = (function() {
                         });
                     }
                 });
+// ... (函数下半部分)
                 
                 // --- 核心修改2：为评论和回复列表增加实时姓名检查 ---
                 const latestCommenterName = getLatestName(c.user);
