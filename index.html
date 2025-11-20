@@ -8223,10 +8223,8 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                 overlay.className = 'modal-overlay';
                 if (config.customClass) overlay.classList.add(config.customClass);
 
-                // --- 新增代码块 开始 ---
-                // 自动计算并设置更高的 z-index
                 const existingModals = document.querySelectorAll('.modal-overlay.visible');
-                let maxZIndex = 2000; // 基础 z-index
+                let maxZIndex = 2000;
                 if (existingModals.length > 0) {
                     maxZIndex = Math.max(...Array.from(existingModals).map(m => {
                         const z = parseInt(window.getComputedStyle(m).zIndex, 10);
@@ -8234,7 +8232,6 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                     }));
                 }
                 overlay.style.zIndex = maxZIndex + 10;
-                // --- 新增代码块 结束 ---
 
                 const modalId = `modal-${Date.now()}`;
                 overlay.dataset.modalId = modalId;
@@ -8277,15 +8274,28 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                     }, { once: true });
                 };
 
+                // ******** 从这里开始是核心修改 ********
                 const internalClickHandler = e => {
                     const target = e.target;
+                    const modalBox = target.closest('.modal-box');
                     const button = target.closest('.modal-button, .modal-close-btn');
+
                     if (button) {
+                        // 如果点击的是按钮，正常关闭并返回值
                         e.stopPropagation();
                         closeModal({ value: button.dataset.value, data: null, target: button });
+                    } else if (!modalBox) {
+                        // 如果点击的位置不在 modal-box 内部（即点击了遮罩层）
+                        // 并且这个弹窗没有按钮（说明它是个提示框，如“正在加载”）
+                        // 或者配置中明确允许点击外部关闭
+                        if (!config.buttons || config.closeOnOverlayClick) {
+                            e.stopPropagation();
+                            closeModal({ value: 'close', data: null, target: overlay });
+                        }
                     }
                 };
-                
+                // ******** 核心修改结束 ********
+
                 overlay.addEventListener('click', internalClickHandler);
                 
                 if (config.onRender && typeof config.onRender === 'function') {
@@ -12323,9 +12333,26 @@ const reRenderMessages = (isInitialLoad = false) => {
     // 如果是加载更多，滚动位置的恢复将在 loadMoreMessages 函数中处理
 };
 async function getAiGeneratedReplyForMe(messageToReply, stance) {
-            const loadingModal = conversationManager.showCustomModal({ title: 'AI 正在代写...', text: '请稍候...' });
+            // ******** 从这里开始是核心修改 ********
+            let loadingModalCloseResolver; // 创建一个 Promise 解析器
+            const loadingModalPromise = new Promise(resolve => {
+                loadingModalCloseResolver = resolve;
+            });
+
+            // 调用 showCustomModal，但这次我们传入 onRender 回调
+            conversationManager.showCustomModal({ 
+                title: 'AI 正在代写...', 
+                text: '请稍候...',
+                // 关键：在弹窗渲染时，获取它的 closeModal 函数
+                onRender: (modalDOM, closeModal) => {
+                    // 将关闭函数与我们的 Promise 解析器关联起来
+                    loadingModalCloseResolver(closeModal);
+                }
+            });
+            // ******** 核心修改结束 ********
             
             try {
+                // ... (函数的主要逻辑，保持不变) ...
                 const chatId = conversationManager.getCurrentChatId();
                 const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
                 const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
@@ -12334,76 +12361,51 @@ async function getAiGeneratedReplyForMe(messageToReply, stance) {
                 const profile = apiProfiles[parseInt(profileIndexStr)];
                 if (!profile) throw new Error("API配置不存在。");
 
-                // ########## 1. 构建完整的、与主回复逻辑一致的系统上下文 ##########
-                let fullSystemPrompt = profile.prompt || '';
-                const userDisplayName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
-                const charDisplayName = messageToReply.sender || chatState.chatName;
-
-                // 注入前情提要
-                if (chatInfo.preamble) {
-                    fullSystemPrompt = `[Preamble - Highest Priority Context]\n${chatInfo.preamble}\n\n` + fullSystemPrompt;
-                }
-
-                // 注入用户人设
                 let userPersonaText = "一个普通用户。";
                 const personaName = chatInfo.userPersonaName;
                 if (personaName && personaName !== '无') {
                     const persona = userPersonas.find(p => p.name === personaName);
-                    if (persona && persona.description) { userPersonaText = persona.description; }
+                    if (persona && persona.description) {
+                        userPersonaText = persona.description;
+                    }
                 }
-                if (chatInfo.myPersona) { userPersonaText += `\n[补充人设]:\n${chatInfo.myPersona}`; }
-                fullSystemPrompt += `\n\n[User Persona for "${userDisplayName}"]\n${userPersonaText}`;
-
-                // 注入AI人设 (区分单聊和群聊)
-                const chat = chatList.find(c => c.id === chatId);
-                if (chat && chat.type === '群聊') {
-                    // (此处省略复杂的群聊人设构建，因为它在主回复逻辑中已存在，这里简化处理，但保留核心)
-                    fullSystemPrompt += `\n\n[Group Chat Context]\n你正在一个群聊中，需要扮演多个角色。`;
-                } else {
-                    fullSystemPrompt += `\n\n[Your Character Persona]\n${chatInfo.aiPersona || 'A helpful assistant.'}`;
+                if (chatInfo.myPersona) {
+                    userPersonaText += `\n[补充人设]:\n${chatInfo.myPersona}`;
                 }
 
-                // 注入世界书
-                const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${chatId}`, []);
-                worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
-                    fullSystemPrompt += `\n\n[Background Information: ${entry.name}]\n${entry.content}`;
-                });
-                
-                // 注入时间
-                timeManager.updateSettingsForChat(chatId);
-                fullSystemPrompt += timeManager.getAITimeContext();
-                
-                // 替换占位符
-                fullSystemPrompt = fullSystemPrompt.replace(/{{user}}/g, userDisplayName).replace(/{{char}}/g, charDisplayName);
+                const userDisplayName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+                const charDisplayName = messageToReply.sender || chatState.chatName;
 
-
-                // ########## 2. 构建具体的任务指令 ##########
-                const taskPrompt = `
+                let prompt = `
 # 角色扮演任务：代写回复
 
-你是一个顶级的写作助手。你的任务是扮演用户 "${userDisplayName}"，根据他的人设、当前的对话上下文（已在系统指令中提供），以及指定的回复策略，为他代写一条回复。
+你是一个顶级的写作助手。你的任务是扮演用户 "{{user}}"，根据他的人设、当前的对话上下文，以及指定的回复策略，为他代写一条回复。
 
 ## 任务详情
 
-1.  **你的身份:** 你就是用户 "${userDisplayName}"。
-2.  **回复目标:** 你需要回复的，是来自角色 "${charDisplayName}" 的这条消息：
-    > "${charDisplayName}": "${messageToReply.text}"
-3.  **回复策略 (必须遵守):** 你的回复必须严格遵循以下策略：**${stance}**
-4.  **输出要求:**
-    *   你的回复必须完全符合 "${userDisplayName}" 的人设和口吻。
+1.  **你的身份:** 你就是用户 "{{user}}"。
+2.  **你的性格与人设:**
+    \`\`\`
+    ${userPersonaText}
+    \`\`\`
+3.  **回复目标:** 你需要回复的，是来自角色 "{{char}}" 的这条消息：
+    > "{{char}}": "${messageToReply.text}"
+4.  **回复策略 (必须遵守):** 你的回复必须严格遵循以下策略：**${stance}**
+5.  **输出要求:**
+    *   你的回复必须完全符合 "{{user}}" 的人设和口吻。
     *   你的输出【只能】包含代写的回复文本本身。
     *   【绝对禁止】包含任何解释、分析、或 "好的，这是代写的回复：" 之类的额外内容。
     *   语言：简体中文。
 `;
-                
+                prompt = prompt.replace(/{{user}}/g, userDisplayName).replace(/{{char}}/g, charDisplayName);
+
                 const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
                 const recentMessages = memoryLength > 0 ? chatState.messages.slice(-memoryLength) : chatState.messages;
                 const apiPayloadMessages = await prepareApiPayload(recentMessages);
 
                 const finalMessages = [
-                    { role: "system", content: fullSystemPrompt }, // 完整的世界观和人设
-                    ...apiPayloadMessages, // 对话历史
-                    { role: "user", content: taskPrompt } // 具体任务
+                    ...apiPayloadMessages,
+                    { role: "user", content: prompt }
                 ];
 
                 const chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
@@ -12425,12 +12427,14 @@ async function getAiGeneratedReplyForMe(messageToReply, stance) {
                 await conversationManager.customAlert(`代写回复失败: ${error.message}`);
                 return null;
             } finally {
-                const modalToClose = document.querySelector('.modal-overlay[data-modal-id]');
-                if (modalToClose) {
-                    const closeButton = modalToClose.querySelector('.modal-close-btn, .modal-button[data-value="close"]');
-                    if(closeButton) closeButton.click();
-                    else modalToClose.classList.remove('visible');
+                // ******** 从这里开始是核心修改 ********
+                // 等待 Promise 完成，拿到 closeModal 函数
+                const closeModal = await loadingModalPromise;
+                if (closeModal) {
+                    // 调用它来关闭弹窗
+                    closeModal();
                 }
+                // ******** 核心修改结束 ********
             }
         }
 
