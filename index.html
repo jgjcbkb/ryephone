@@ -12322,6 +12322,189 @@ const reRenderMessages = (isInitialLoad = false) => {
     }
     // 如果是加载更多，滚动位置的恢复将在 loadMoreMessages 函数中处理
 };
+async function getAiGeneratedReplyForMe(messageToReply, stance) {
+            const loadingModal = conversationManager.showCustomModal({ title: 'AI 正在代写...', text: '请稍候...' });
+            
+            try {
+                const chatId = conversationManager.getCurrentChatId();
+                const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
+                
+                if (profileIndexStr === null) throw new Error("未配置有效的API。");
+                const profile = apiProfiles[parseInt(profileIndexStr)];
+                if (!profile) throw new Error("API配置不存在。");
+
+                // ########## 1. 构建完整的、与主回复逻辑一致的系统上下文 ##########
+                let fullSystemPrompt = profile.prompt || '';
+                const userDisplayName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+                const charDisplayName = messageToReply.sender || chatState.chatName;
+
+                // 注入前情提要
+                if (chatInfo.preamble) {
+                    fullSystemPrompt = `[Preamble - Highest Priority Context]\n${chatInfo.preamble}\n\n` + fullSystemPrompt;
+                }
+
+                // 注入用户人设
+                let userPersonaText = "一个普通用户。";
+                const personaName = chatInfo.userPersonaName;
+                if (personaName && personaName !== '无') {
+                    const persona = userPersonas.find(p => p.name === personaName);
+                    if (persona && persona.description) { userPersonaText = persona.description; }
+                }
+                if (chatInfo.myPersona) { userPersonaText += `\n[补充人设]:\n${chatInfo.myPersona}`; }
+                fullSystemPrompt += `\n\n[User Persona for "${userDisplayName}"]\n${userPersonaText}`;
+
+                // 注入AI人设 (区分单聊和群聊)
+                const chat = chatList.find(c => c.id === chatId);
+                if (chat && chat.type === '群聊') {
+                    // (此处省略复杂的群聊人设构建，因为它在主回复逻辑中已存在，这里简化处理，但保留核心)
+                    fullSystemPrompt += `\n\n[Group Chat Context]\n你正在一个群聊中，需要扮演多个角色。`;
+                } else {
+                    fullSystemPrompt += `\n\n[Your Character Persona]\n${chatInfo.aiPersona || 'A helpful assistant.'}`;
+                }
+
+                // 注入世界书
+                const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${chatId}`, []);
+                worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
+                    fullSystemPrompt += `\n\n[Background Information: ${entry.name}]\n${entry.content}`;
+                });
+                
+                // 注入时间
+                timeManager.updateSettingsForChat(chatId);
+                fullSystemPrompt += timeManager.getAITimeContext();
+                
+                // 替换占位符
+                fullSystemPrompt = fullSystemPrompt.replace(/{{user}}/g, userDisplayName).replace(/{{char}}/g, charDisplayName);
+
+
+                // ########## 2. 构建具体的任务指令 ##########
+                const taskPrompt = `
+# 角色扮演任务：代写回复
+
+你是一个顶级的写作助手。你的任务是扮演用户 "${userDisplayName}"，根据他的人设、当前的对话上下文（已在系统指令中提供），以及指定的回复策略，为他代写一条回复。
+
+## 任务详情
+
+1.  **你的身份:** 你就是用户 "${userDisplayName}"。
+2.  **回复目标:** 你需要回复的，是来自角色 "${charDisplayName}" 的这条消息：
+    > "${charDisplayName}": "${messageToReply.text}"
+3.  **回复策略 (必须遵守):** 你的回复必须严格遵循以下策略：**${stance}**
+4.  **输出要求:**
+    *   你的回复必须完全符合 "${userDisplayName}" 的人设和口吻。
+    *   你的输出【只能】包含代写的回复文本本身。
+    *   【绝对禁止】包含任何解释、分析、或 "好的，这是代写的回复：" 之类的额外内容。
+    *   语言：简体中文。
+`;
+                
+                const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
+                const recentMessages = memoryLength > 0 ? chatState.messages.slice(-memoryLength) : chatState.messages;
+                const apiPayloadMessages = await prepareApiPayload(recentMessages);
+
+                const finalMessages = [
+                    { role: "system", content: fullSystemPrompt }, // 完整的世界观和人设
+                    ...apiPayloadMessages, // 对话历史
+                    { role: "user", content: taskPrompt } // 具体任务
+                ];
+
+                const chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
+                const response = await fetch(chatUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
+                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false })
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`API 错误 ${response.status}: ${errorBody}`);
+                }
+                
+                const data = await response.json();
+                return data.choices[0]?.message?.content || "";
+
+            } catch (error) {
+                await conversationManager.customAlert(`代写回复失败: ${error.message}`);
+                return null;
+            } finally {
+                const modalToClose = document.querySelector('.modal-overlay[data-modal-id]');
+                if (modalToClose) {
+                    const closeButton = modalToClose.querySelector('.modal-close-btn, .modal-button[data-value="close"]');
+                    if(closeButton) closeButton.click();
+                    else modalToClose.classList.remove('visible');
+                }
+            }
+        }
+
+        async function handleReplyForMe(messageId) {
+            const message = chatState.messages.find(m => m.id === messageId);
+            if (!message) return;
+
+            // 1. 全新的HTML结构，将“取消”按钮从主按钮区移除
+            const modalHtml = `
+                <div class="modal-buttons" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <button class="modal-button primary" data-stance="附和 👍">附和</button>
+                    <button class="modal-button primary" data-stance="追问 🤔">追问</button>
+                    <button class="modal-button primary" data-stance="示弱 😔">示弱</button>
+                    <button class="modal-button danger" data-stance="反击 😠">反击</button>
+                    <button class="modal-button primary" data-stance="反转 😏">反转</button>
+                    <button class="modal-button secondary" data-stance="敷衍 😒">敷衍</button>
+                </div>
+                <div style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;">
+                    <label for="custom-stance-input" style="display: block; text-align: left; margin-bottom: 8px; font-weight: 500;">或输入自定义策略：</label>
+                    <input type="text" id="custom-stance-input" class="modal-input" placeholder="留空则表示让AI自由发挥">
+                </div>
+            `;
+
+            // 2. 将“使用自定义策略”和“取消”作为底部的主要操作按钮
+            const result = await conversationManager.showCustomModal({
+                title: '选择回复策略',
+                html: modalHtml,
+                showCloseButton: true,
+                buttons: [
+                    { text: '取消', value: 'cancel', class: 'secondary' },
+                    { text: '使用自定义策略代写', value: 'custom', class: 'primary' }
+                ],
+                onRender: (modalDOM, closeModal) => {
+                    // 只为快捷按钮添加监听
+                    modalDOM.querySelector('.modal-buttons').addEventListener('click', (e) => {
+                        const button = e.target.closest('button[data-stance]');
+                        if (button) {
+                            e.stopPropagation();
+                            const stance = button.dataset.stance;
+                            closeModal({ value: stance });
+                        }
+                    });
+                }
+            });
+
+            // 3. 全新的结果处理逻辑
+            if (!result || result.value === 'cancel' || result.value === 'close') {
+                return;
+            }
+
+            let selectedStance;
+
+            if (result.value === 'custom') {
+                // 如果用户点击的是“使用自定义策略”按钮
+                const customInput = result.target.closest('.modal-box').querySelector('#custom-stance-input').value.trim();
+                if (customInput) {
+                    selectedStance = customInput;
+                } else {
+                    // 如果输入框为空，则使用“自由发挥”作为策略
+                    selectedStance = '自由发挥，完全遵循你的人设和上下文进行最合理的回应';
+                }
+            } else {
+                // 如果用户点击的是快捷按钮
+                selectedStance = result.value;
+            }
+            
+            const generatedReply = await getAiGeneratedReplyForMe(message, selectedStance);
+
+            if (generatedReply) {
+                footerMessageInput.value = generatedReply;
+                footerMessageInput.dispatchEvent(new Event('input'));
+                footerMessageInput.focus();
+            }
+        }
 // 修改后 (最终正确版)
 async function handleSendMessageAttempt(type, text, extraData = {}) {
             // START: 新增正则替换核心逻辑 (带诊断日志)
@@ -12651,10 +12834,12 @@ const showContextMenu = (event, messageId) => {
             let menuItems = [];
             if (message.side === 'sent') { 
                 menuItems = [ { label: '引用', action: 'quote' }, { label: '撤回', action: 'recall' }, { label: '编辑', action: 'edit' }, { label: '从此处重新生成', action: 'regenerate_from' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
-            } else { 
-                menuItems = [ { label: '引用', action: 'quote' }, { label: '编辑', action: 'edit' }, { label: '从此处重新生成', action: 'regenerate_from' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
+              } else { 
+                // 在这里新增 '代我回复' 选项
+                menuItems = [ { label: '引用', action: 'quote' }, { label: '代我回复', action: 'reply_for_me' }, { label: '编辑', action: 'edit' }, { label: '从此处重新生成', action: 'regenerate_from' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
                 if (contactInfo.isGroup) { menuItems.unshift({ label: '@ Ta', action: 'at' }); } 
             }
+
             messageContextMenu.innerHTML = ''; menuItems.forEach(item => { const div = document.createElement('div'); div.className = 'context-menu-item'; div.textContent = item.label; div.dataset.action = item.action; messageContextMenu.appendChild(div); });
 
     messageContextMenu.style.left = `${event.clientX}px`; messageContextMenu.style.top = `${event.clientY}px`; messageContextMenu.classList.remove('hidden');
@@ -12665,11 +12850,14 @@ const showContextMenu = (event, messageId) => {
         const action = e.target.dataset.action; hideContextMenu(); const msgToActOn = chatState.messages.find(m => m.id === messageId); if (!msgToActOn) return;
         switch(action) {
             case 'quote': startReply(messageId); break;
+            case 'reply_for_me': // 新增的 case
+                handleReplyForMe(messageId);
+                break;
             case 'recall': recallMessage(messageId); break;
             case 'regenerate_from':
                 regenerateFromMessage(messageId);
                 break;
-            // ===== 从这里开始复制，一直复制到最下面的 break; =====
+
         case 'edit':
             switch (msgToActOn.type) {
                 case 'text':
@@ -13331,9 +13519,10 @@ elements.userPersonaSelect.innerHTML = '<option value="无">无</option>';
                 offlineBtn.classList.add('active'); onlineBtn.classList.remove('active');
                 elements.offlineWbGroup.classList.remove('hidden');
                 offlineWordcountGroup.classList.remove('hidden'); // 显示字数限制
-                // 在群聊线下模式，隐藏头像显示选项
-                document.getElementById('avatar-display-mode').closest('.form-group').style.display = contactInfo.isGroup ? 'none' : 'flex';
+                // 在群聊线下模式，隐藏头像显示选项  <- (注释可以保留，代码行删除)
+                // document.getElementById('avatar-display-mode').closest('.form-group').style.display = contactInfo.isGroup ? 'none' : 'flex';
             } else {
+
                 onlineBtn.classList.add('active'); offlineBtn.classList.remove('active');
                 elements.offlineWbGroup.classList.add('hidden');
                 offlineWordcountGroup.classList.add('hidden'); // 隐藏字数限制
@@ -13775,95 +13964,164 @@ headerMoreBtn.addEventListener('click', async () => {
 });
 
 function calculateApiPayloadSize() {
-    let systemChars = 0, worldbookChars = 0, contextChars = 0, npcChars = 0, offlineWbChars = 0,
-        preambleChars = 0, userPersonaChars = 0, charPersonaChars = 0, identityChars = 0;
+    // ---- 步骤 1: 收集所有需要发送给API的原始文本片段 ----
     
     const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
     const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? activeProfileIndex.toString() : null);
     
-    // 1. 系统提示字数
+    let systemPromptText = '';
     if (profileIndexStr !== null) {
         const profile = apiProfiles[parseInt(profileIndexStr)];
         if (profile && profile.prompt) {
-            systemChars = profile.prompt.length;
+            systemPromptText = profile.prompt;
         }
     }
 
-    // 2. 【新增】前情提要字数
-    if (chatInfo.preamble) {
-        preambleChars = chatInfo.preamble.length;
-    }
-
-    // 3. 【新增】角色身份、备注等字数
+    const preambleText = chatInfo.preamble || '';
+    
     const characterName = chatState.chatName;
     const characterRemark = chatInfo.remark || '';
-    identityChars += `[Your Identity]\nYour name is "${characterName}".`.length;
+    let identityText = `[Your Identity]\nYour name is "${characterName}".`;
     if (characterRemark) {
-        identityChars += ` The user has given you a nickname/remark: "${characterRemark}". You should be aware of this.`.length;
+        identityText += ` The user has given you a nickname/remark: "${characterRemark}". You should be aware of this.`;
     }
-    
-    // 4. 【新增】用户人设和补充人设字数
+
+    let userPersonaText = '';
     if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
         const persona = userPersonas.find(p => p.name === chatInfo.userPersonaName);
         if (persona && persona.description) {
-            userPersonaChars += `[User Persona]\n${persona.description.replace('{{user}}', 'You')}`.length;
+            userPersonaText = `[User Persona]\n${persona.description}`;
         }
     }
     if (chatInfo.myPersona) {
-        userPersonaChars += `[Supplementary User Persona]\n${chatInfo.myPersona.replace('{{user}}', 'You')}`.length;
+        userPersonaText += `\n[Supplementary User Persona]\n${chatInfo.myPersona}`;
     }
 
-    // 5. 【新增】对方人设字数
-    if (chatInfo.aiPersona) {
-        charPersonaChars = `[Character Persona]\n${chatInfo.aiPersona.replace('{{char}}', 'You')}`.length;
-    }
-    
-    // 6. 挂载的世界书字数
+    const charPersonaText = chatInfo.aiPersona ? `[Character Persona]\n${chatInfo.aiPersona}` : '';
+
     const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${chatState.chatId}`, []);
     const activeWorldBookEntries = worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled);
-    worldbookChars = activeWorldBookEntries.reduce((sum, entry) => sum + (entry.content ? entry.content.length : 0), 0);
+    let worldbookText = activeWorldBookEntries.reduce((text, entry) => text + `\n[Background Information: ${entry.name}]\n${entry.content}`, '');
 
-    // 7. 线下模式绑定的世界书字数
-    if (chatInfo.mode === 'offline' && chatInfo.offlineWorldbookName) {
-        if (!mountedWbNames.includes(chatInfo.offlineWorldbookName)) {
-            const offlineWb = worldBookEntries.find(wb => wb.name === chatInfo.offlineWorldbookName && wb.enabled);
-            if (offlineWb && offlineWb.content) {
-                offlineWbChars = offlineWb.content.length;
+    if (chatInfo.mode === 'offline' && chatInfo.offlineWorldbookNames && chatInfo.offlineWorldbookNames.length > 0) {
+        chatInfo.offlineWorldbookNames.forEach(name => {
+            if (!mountedWbNames.includes(name)) {
+                const offlineWb = worldBookEntries.find(wb => wb.name === name && wb.enabled);
+                if (offlineWb && offlineWb.content) {
+                    worldbookText += `\n[Background Information: ${name}]\n${offlineWb.content}`;
+                }
             }
-        }
+        });
     }
-    
-    // 8. 关联的NPC人设字数
+
+    let npcText = '';
     const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${chatState.chatId}`, []);
     if (associatedNpcNames.length > 0) {
         const npcSettings = loadFromLocalStorage('app-npc-settings', {});
         if (npcSettings.personas) {
-            associatedNpcNames.forEach(name => {
-                if (npcSettings.personas[name]) {
-                    npcChars += npcSettings.personas[name].length;
+            npcText = associatedNpcNames.reduce((text, name) => {
+                const personaData = npcSettings.personas[name];
+                if (personaData && personaData.description) {
+                    return text + `\n- ${name}: ${personaData.description}`;
                 }
-            });
+                return text;
+            }, '\n[Associated NPCs]');
         }
     }
-    
-    // 9. 上下文字数
+
+    // ---- 步骤 2: 对所有文本片段进行最终处理（占位符替换） ----
+    const userDisplayName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+    const charDisplayName = characterName;
+
+    const replacePlaceholders = (text) => text.replace(/{{user}}/g, userDisplayName).replace(/{{char}}/g, charDisplayName);
+
+    const finalSystemPromptText = replacePlaceholders(systemPromptText);
+    const finalPreambleText = replacePlaceholders(preambleText);
+    const finalIdentityText = replacePlaceholders(identityText);
+    const finalUserPersonaText = replacePlaceholders(userPersonaText);
+    const finalCharPersonaText = replacePlaceholders(charPersonaText);
+    // 世界书和NPC人设通常不包含 {{user}} 或 {{char}}，但为了安全起见也处理一下
+    const finalWorldbookText = replacePlaceholders(worldbookText);
+    const finalNpcText = replacePlaceholders(npcText);
+
+    // ---- 步骤 3: 计算各个部分的精确字数 ----
+    const systemChars = finalSystemPromptText.length + finalIdentityText.length + finalPreambleText.length;
+    const personaChars = finalUserPersonaText.length + finalCharPersonaText.length;
+    const worldbookChars = finalWorldbookText.length;
+    const npcChars = finalNpcText.length;
+
+    // ---- 步骤 4: 用最精确的方式计算上下文（context）的字数 ----
     const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
     const recentMessages = memoryLength > 0 ? chatState.messages.slice(-memoryLength) : chatState.messages;
-    contextChars = recentMessages.reduce((sum, msg) => sum + (msg.text && typeof msg.text === 'string' && !msg.text.startsWith('indexeddb:') ? msg.text.length : 0), 0);
+    const enabledRegexNames = chatInfo.enabledRegexes || [];
+    const globalRules = appearanceSettings.regexReplacements || [];
+    const activeRules = globalRules.filter(rule => enabledRegexNames.includes(rule.name) && rule.enabled);
 
-    const totalPersonaChars = userPersonaChars + charPersonaChars;
-    const totalWbChars = worldbookChars + offlineWbChars;
-    const totalSystemChars = systemChars + identityChars + preambleChars; // 将前情提要和身份信息归入系统提示
-    const totalChars = totalSystemChars + totalPersonaChars + totalWbChars + npcChars + contextChars;
-    
-    // 返回最终的、最完整的统计结果
+    const contextChars = recentMessages.reduce((sum, msg) => {
+        if (!msg.text || typeof msg.text !== 'string' || msg.text.startsWith('indexeddb:')) {
+            return sum;
+        }
+
+        let textToProcess = msg.text.trim();
+        let finalCharCount = 0;
+
+        if (msg.side === 'received') {
+            const blockRegex = /(<div[\s\S]*?>[\s\S]*?<\/div>|<details[\s\S]*?>[\s\S]*?<\/details>|<snippet[\s\S]*?>[\s\S]*?<\/snippet>|\[[A-Z_]+\][\s\S]*?\[\/[A-Z_]+\])/g;
+            textToProcess = textToProcess.replace(blockRegex, (matchedBlock) => {
+                if (matchedBlock.includes('data-ai-log-as-text="true"')) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = matchedBlock;
+                    return tempDiv.textContent.trim();
+                } else {
+                    return '';
+                }
+            }).trim();
+        }
+        
+        if (!textToProcess) {
+            return sum;
+        }
+
+        let hasBeenReplaced = false;
+        let processedText = textToProcess;
+        
+        if (activeRules.length > 0) {
+            for (const rule of activeRules) {
+                if (rule.pattern) {
+                    try {
+                        const regex = new RegExp(rule.pattern, rule.flags || 'g');
+                        const textBefore = processedText;
+                        processedText = processedText.replace(regex, rule.template || '');
+                        if (textBefore !== processedText) {
+                            hasBeenReplaced = true;
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+            }
+        }
+
+        if (hasBeenReplaced) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = processedText;
+            finalCharCount = tempDiv.textContent.length;
+        } else {
+            finalCharCount = processedText.length;
+        }
+
+        return sum + finalCharCount;
+    }, 0);
+
+    // ---- 步骤 5: 计算最终的总发送字数 ----
+    const totalChars = systemChars + personaChars + worldbookChars + npcChars + contextChars;
+
+    // ---- 步骤 6: 返回一个包含所有分项和总计的对象 ----
     return { 
-        systemChars: totalSystemChars, 
-        personaChars: totalPersonaChars,
-        worldbookChars: totalWbChars,
-        npcChars, 
-        contextChars, 
-        totalChars 
+        systemChars: systemChars, 
+        personaChars: personaChars,
+        worldbookChars: worldbookChars,
+        npcChars: npcChars, 
+        contextChars: contextChars, 
+        totalChars: totalChars 
     };
 }
 messagesContainer.addEventListener('click', async (e) => { 
@@ -18113,32 +18371,44 @@ async function handleRemoveMember() {
         const mainMessages = loadFromLocalStorage(`conversation_${chatId}`, []); 
         // 2. 获取回溯历史分支
         const branches = loadFromLocalStorage(`chat_branches_${chatId}`, []);
+        // 3. 获取心事、备忘录、账户数据
+        const moodCards = loadFromLocalStorage(`app-mood-cards_${chatId}`, []);
+        const pagerNotes = loadFromLocalStorage(`app-pager-notes_${chatId}`, []);
+        const accountData = loadFromLocalStorage(`app_account_data_${chatId}`, null);
+        // 4. 【【【核心新增】】】获取聊天信息数据
+        const chatInfoData = loadFromLocalStorage(`chat_info_${chatId}`, {});
 
-        if (mainMessages.length === 0 && branches.length === 0) { 
-            await conversationManager.customAlert('没有聊天记录或历史分支可导出。'); 
+        if (mainMessages.length === 0 && branches.length === 0 && moodCards.length === 0 && pagerNotes.length === 0 && !accountData && Object.keys(chatInfoData).length === 0) { 
+            await conversationManager.customAlert('没有聊天记录或任何关联数据可导出。'); 
             return; 
         } 
         
         try {
-            // 3. 创建一个结构化的备份对象
+            // 5. 创建一个包含所有数据的终极备份对象
             let backupData = {
-                type: "RyePhoneChatBackup", // 加上类型标记，方便导入时识别
-                version: 1,
-                chatId: chatId,
+                type: "RyePhoneChatBackup",
+                version: 3, // 版本号升级到 3
+                chatId: chatId, // 保留原始ID用于参考，但导入时会被忽略
+                chat_info: chatInfoData, // 【【【核心新增】】】
                 main_conversation: mainMessages,
-                branches: branches
+                branches: branches,
+                associated_data: {
+                    mood_cards: moodCards,
+                    pager_notes: pagerNotes,
+                    account_data: accountData
+                }
             };
 
-            // 4. 对整个备份对象进行图片数据处理
+            // 6. 对整个备份对象进行图片数据处理
             const portableBackup = await conversationManager.makeDataPortable(backupData);
             const jsonString = JSON.stringify(portableBackup, null, 2); 
             
             const now = new Date();
             const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
-            const filename = `聊天记录_${sanitizeFilename(chat.name)}_${timestamp}.json`;
+            const filename = `角色备份_${sanitizeFilename(chat.name)}_${timestamp}.json`;
 
             downloadHelper(jsonString, filename, 'application/json');
-            await conversationManager.customAlert('包含回溯历史的聊天记录已开始导出！'); 
+            await conversationManager.customAlert('包含聊天信息、记录、历史及所有关联数据的【完整角色备份】已开始导出！'); 
         } catch (error) { 
             await conversationManager.customAlert('导出失败: ' + error.message); 
         } 
@@ -18154,38 +18424,56 @@ async function handleRemoveMember() {
                 try { 
                     const importedData = JSON.parse(event.target.result); 
                     
-                    const confirmed = await conversationManager.customConfirm('这将覆盖当前对话的所有聊天记录（包括回溯历史），确定要导入吗？'); 
+                    const confirmed = await conversationManager.customConfirm('【警告】这将彻底覆盖当前角色的【所有数据】，包括聊天信息、记录、历史分支和关联数据（心事/备忘录/账户）。确定要导入吗？'); 
                     if (!confirmed) return;
 
-                    // 检查是新格式还是旧格式
-                    if (importedData.type === "RyePhoneChatBackup" && importedData.main_conversation) {
-                        // **新格式处理逻辑**
-                        const rehydratedData = await rehydrateDataFromPortable(importedData);
+                    await conversationManager.customAlert("正在导入并转换数据，请稍候...");
+
+                    // 统一进行数据再水合（处理图片）
+                    const rehydratedData = await rehydrateDataFromPortable(importedData);
+
+                    // 根据备份文件版本执行不同操作
+                    if (rehydratedData.type === "RyePhoneChatBackup") {
+                        // 版本 2 或 3 的新格式
                         
-                        // 1. 覆盖主线聊天记录
+                        // 【【【核心新增：版本3的覆盖逻辑】】】
+                        if (rehydratedData.version >= 3 && rehydratedData.chat_info) {
+                            saveToLocalStorage(`chat_info_${chatId}`, rehydratedData.chat_info);
+                        }
+                        
                         saveToLocalStorage(`conversation_${chatId}`, rehydratedData.main_conversation || []);
-                        
-                        // 2. 覆盖回溯历史分支
                         saveToLocalStorage(`chat_branches_${chatId}`, rehydratedData.branches || []);
+
+                        // 【【【核心新增：关联数据的覆盖】】】
+                        if (rehydratedData.associated_data) {
+                            saveToLocalStorage(`app-mood-cards_${chatId}`, rehydratedData.associated_data.mood_cards || []);
+                            saveToLocalStorage(`app-pager-notes_${chatId}`, rehydratedData.associated_data.pager_notes || []);
+                            if (rehydratedData.associated_data.account_data !== null) {
+                                saveToLocalStorage(`app_account_data_${chatId}`, rehydratedData.associated_data.account_data);
+                            } else {
+                                localStorage.removeItem(`app_account_data_${chatId}`);
+                            }
+                        }
                         
-                        await conversationManager.customAlert('包含回溯历史的聊天记录已导入成功！');
-                    } else if (Array.isArray(importedData)) {
-                        // **旧格式兼容逻辑**
-                        const rehydratedMessages = await rehydrateDataFromPortable(importedData);
+                        await conversationManager.customAlert('完整角色备份已成功导入！');
+
+                    } else if (Array.isArray(rehydratedData)) {
+                        // 旧格式（版本1）兼容逻辑
+                        saveToLocalStorage(`conversation_${chatId}`, rehydratedData);
+                        // 清空其他数据
+                        localStorage.removeItem(`chat_branches_${chatId}`);
+                        localStorage.removeItem(`app-mood-cards_${chatId}`);
+                        localStorage.removeItem(`app-pager-notes_${chatId}`);
+                        localStorage.removeItem(`app_account_data_${chatId}`);
                         
-                        // 1. 只覆盖主线聊天记录
-                        saveToLocalStorage(`conversation_${chatId}`, rehydratedMessages);
-                        
-                        // 2. 清空旧的回溯历史，因为旧备份里没有
-                        saveToLocalStorage(`chat_branches_${chatId}`, []); 
-                        
-                        await conversationManager.customAlert('（旧版）聊天记录已导入成功！');
+                        await conversationManager.customAlert('（旧版）聊天记录已导入成功！其他关联数据已被清空。');
                     } else {
                         throw new Error('文件格式不正确，无法识别。');
                     }
 
-                    // 统一的收尾操作
-                    conversationManager.open(chatId); 
+                    // 统一的收尾操作：刷新页面以确保所有设置生效
+                    await conversationManager.customAlert('为确保所有设置生效，应用即将刷新。');
+                    location.reload();
 
                 } catch (error) { 
                     await conversationManager.customAlert('导入失败: ' + error.message); 
