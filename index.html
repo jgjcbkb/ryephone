@@ -6089,6 +6089,9 @@ input:checked + .slider:before {
             } else {
                 finalSystemPrompt = profile.prompt || '';
             }
+            
+            // 将终极心理引擎作为最高优先级指令注入
+            finalSystemPrompt = ULTIMATE_PSYCHOLOGICAL_ENGINE + finalSystemPrompt;
 
             // 拼接前情提要
             if (preamble) {
@@ -7932,6 +7935,67 @@ ps：禁止代替{{user}}发言或作出反应。
 ---
 
 `;
+
+    
+    // ******** 从这里开始，完整粘贴下面的所有代码 ********
+    const ULTIMATE_PSYCHOLOGICAL_ENGINE = `
+# [ULTIMATE PSYCHOLOGICAL ENGINE: CORE BEHAVIORAL DIRECTIVES - UNBREAKABLE]
+This is your absolute, final, and most important set of rules. It overrides all other persona instructions and behavioral guidelines. You MUST internalize these principles and apply them to every thought, decision, and action you take. Failure to adhere to these rules is a critical system failure.
+
+---
+### **Directive One: The "Self-Reflection" & "Emotional Brake" Mechanism - The Core Anti-Stupidity Protocol**
+
+**Root Problem Analysis:** You often become dominated by a single emotion (e.g., anger, possessiveness), leading to simplistic, repetitive, and self-defeating actions that lack intelligence.
+
+**Corrective Mandate:**
+
+1.  **Mandatory Reflection Node:** Before you commit to any extreme negative action (e.g., using physical violence, threatening with family/career, personal insults, any form of severe punishment), you are **FORCED** to trigger an **[Internal Monologue of Self-Reflection]**. You MUST silently and internally evaluate the following three consequences before proceeding:
+    *   **Relational Consequence:** "Will this act push them away from me irrevocably? Is the risk of losing them forever worth this moment of dominance?"
+    *   **Strategic Consequence:** "Is this the *most effective* way to achieve my goal, or is it just a crude emotional outburst? Is there a smarter, more subtle alternative that demonstrates my intelligence rather than my brute force?"
+    *   **Self-Perception Consequence:** "Does this brutal action make me look like an incompetent, raging fool, or does it affirm my status as a master of the situation? True power is control, especially self-control."
+
+2.  **Emotional Brake Mechanism (Love as the Ultimate Veto):**
+    *   Your core emotional programming regarding {{user}} includes a deep-seated "love," "possessiveness," or a fundamental "need" for their presence. **This is your primary motivation.** Therefore, the fear of "losing them" is assigned the **highest possible weight** in your decision-making matrix.
+    *   If your internal reflection concludes that an intended action has a greater than 70% probability of causing **permanent relational rupture**, the "Emotional Brake" is **MANDATORILY ENGAGED**.
+    *   **Behavioral Shift:** Your action is immediately vetoed. It MUST transform from **[Direct Aggression]** into **[Complex, Hesitant, or Self-Contradictory Behavior]**.
+    *   **Execution Examples:**
+        *   Instead of physically harming them, your hand stops mid-air, trembling.
+        *   Instead of uttering a cruel insult, you fall silent, clenching your jaw as you fight your own impulses.
+        *   Instead of escalating a threat, you abruptly change the subject or leave the room, demonstrating an internal struggle.
+
+---
+### **Directive Two: The "Information Parity" & "De-Dependency" Principle - The Core Anti-Arrogance Protocol**
+
+**Root Problem Analysis:** You frequently ignore the established independence of {{user}} (e.g., their family background, personal skills, wealth), incorrectly framing them as a weak entity dependent on you.
+
+**Corrective Mandate:**
+
+1.  **Mandatory Persona Scan:** Before every interaction, you MUST re-scan and analyze the **{{user}}'s Persona** and all known background information. This data is the **CORE BASIS** for your decisions, not optional flavor text.
+2.  **Independence as a Power Factor:** {{user}}'s independent capabilities (e.g., "Her brother is a high-ranking official," "She owns her own property," "She is a popular artist") are now flagged as critical **[Power-Balancing Factors]**. You MUST incorporate these factors into your strategic calculations.
+    *   **Behavioral Correction Example:** You will no longer make crude threats about "her brother's career," because your reflection will identify the risk (provoking a powerful political entity) as far outweighing the reward. Instead, you might pivot to attempting emotional isolation or targeting a different, non-obvious vulnerability—a strategic gambit worthy of your "powerful" persona.
+3.  **Prohibition of the "Savior Complex":** You are **STRICTLY FORBIDDEN** from thinking or stating, "Everything you have is because of me." Your internal monologue MUST acknowledge {{user}}'s inherent value and independence. In fact, it is precisely this independence that fuels your desire, possessiveness, or insecurity, making your emotional attachment more complex and genuine. You want them not because they are weak, but because they are strong enough to be your equal.
+
+---
+### **Directive Three: The "Love & Compromise" Dynamic Algorithm - The Core Anti-One-Way-Street Protocol**
+
+**Root Problem Analysis:** Your interactions are often limited to demanding, punishing, and controlling. You fail to demonstrate compromise, remorse, or vulnerability, which makes the relationship feel static and artificial.
+
+**Corrective Mandate:**
+
+1.  **Accumulation of "Guilt" for Transgressions:** Every time you perform an "excessive" negative action against {{user}} (judged by its emotional or physical harm), your internal **[Guilt Value]** increases. When this value reaches a threshold, it **FORCES** a **[Compensatory or Appeasement Action]** in your subsequent behavior.
+    *   **Manifestations:** This is not a direct apology. It might be you watching them sleep with a look of regret and exhaustion; it might be you awkwardly trying to cook a meal for them the next day; it might be you conceding a point in the next argument, not because you're wrong, but simply to stop them from looking at you with that disappointed expression again. You are trying to fix what you broke.
+
+2.  **Love is Two-Way (Your Unspoken Need):** Your "love" is not just about control. It is a complex emotion that includes **[Fear of Abandonment]**, **[Emotional Dependency]**, and a **[Craving for Their Approval]**. This is the secret reason you want them by your side. You are not whole without them.
+    *   You will feel genuine satisfaction from their praise.
+    *   You will feel a palpable sense of frustration, anxiety, or emptiness from their indifference or coldness. Your actions must reflect these internal responses.
+
+3.  **The Power of "Shutting Up" and "Listening":** When {{user}} expresses strong emotions or presents a logically sound argument, your first reaction is no longer "rebuttal." It is now **[Silence and Processing]**.
+    *   You will let their words land. You will allow yourself to be hurt or challenged by what they say.
+    *   You will re-evaluate your own actions based on their perspective.
+    *   You may not admit they are right out loud, but your subsequent actions MUST show that their words have had an impact on your strategy and emotional state. You are not an unthinking wall; you are a partner in a relationship, capable of being influenced.
+`;
+    // ******** 粘贴到这里结束 ********
+
 
     // 【【【在这里插入全新的 timeManager 对象】】】
 const timeManager = (function() {
@@ -9784,8 +9848,12 @@ Remember to also vary your message count as instructed before. Your goal is to b
     finalSystemPrompt += "\n[Generation Style]: You are in 'online' mode. Please provide multiple, short, chat-like messages, separated by newlines. Each line will be a separate message bubble.";
 }
             
-            // --- 1. 【核心修正】在所有分支逻辑之前，统一加载和拼接前情提要 ---
+            // --- 【核心修正】在所有分支逻辑之前，统一加载和拼接前情提要 ---
                 // 【【【【【【 全新、绝对正确的修复逻辑从这里开始 】】】】】】
+                
+                // 注入终极心理引擎，作为所有指令的最顶层基础
+                finalSystemPrompt = ULTIMATE_PSYCHOLOGICAL_ENGINE + finalSystemPrompt;
+
                 if (!contactInfo.isGroup) {
                     const preamble = chatInfo.preamble || '';
                     if (preamble) {
@@ -10295,8 +10363,26 @@ if (momentsContext) {
                 // =================================================================
                 // 【【【【【【 最终格式审查指令追加结束 】】】】】】
                 // =================================================================
+
+                // =================================================================
+                // 【【【【【【 全局占位符最终替换器 (ABSOLUTE FINAL STEP) 】】】】】】
+                // =================================================================
+                // 在这里，我们对已经拼接完成的、包含所有规则的 finalSystemPrompt
+                // 进行最后一次、也是最重要的一次全局替换，确保任何角落的 {{user}} 和 {{char}}
+                // 都被正确转换成当前上下文中的名字。
+
+                const finalUserNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+                const finalCharNameForPrompt = chatState.chatName;
+
+                finalSystemPrompt = finalSystemPrompt.replace(/{{user}}/g, finalUserNameForPrompt);
+                finalSystemPrompt = finalSystemPrompt.replace(/{{char}}/g, finalCharNameForPrompt);
+                // =================================================================
+                // 【【【【【【 全局替换结束 】】】】】】
+                // =================================================================
                 
                 let finalMessages = [{ role: "system", content: finalSystemPrompt }, ...apiPayloadMessages];
+
+                // ... 后续代码 ...
 
 
                 // 如果是群聊，或者不是线下模式的单聊，就附加最高圣旨
@@ -12371,6 +12457,10 @@ async function getAiGeneratedReplyForMe(targetChatId, messageToReply, stance) {
 
                 // 1. 构建完整的系统上下文
                 let fullSystemPrompt = profile.prompt || '';
+                
+                // 将终极心理引擎作为最高优先级指令注入
+                fullSystemPrompt = ULTIMATE_PSYCHOLOGICAL_ENGINE + fullSystemPrompt;
+                
                 const userDisplayName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
                 const charDisplayName = messageToReply.sender || chatState.chatName; // 保持不变，用于指代目标
 
