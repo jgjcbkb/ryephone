@@ -6448,7 +6448,7 @@ You are **STRICTLY FORBIDDEN** from speaking, thinking, or acting as any other c
             console.log(`[诊断日志] 角色 "${senderName}": 开始检查朋友圈...`);
             momentsManager.refreshData();
 
-            const { allVisibleMoments, imagePayloads, imageRecognitionCounts, socialGraphPrompt, knownPeople } = await momentsManager.getRecentMomentsForAI(senderName, 8);
+            const { allVisibleMoments, imagePayloads, imageRecognitionCounts, socialGraphPrompt, knownPeople } = await momentsManager.getRecentMomentsForAI(senderName, 13);
 
             if (allVisibleMoments.length === 0) {
                 console.log(`[诊断日志] 角色 "${senderName}": 没有看到任何新朋友圈，决策中断。`);
