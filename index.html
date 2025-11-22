@@ -11510,10 +11510,27 @@ You were receiving a video call from {{user}}, but they hung up before you could
         }
         
         function getCharactersInCurrentChat() {
+            // 1. 安全检查
             if (!chatState.chatId) return ['{{user}}'];
-            if (contactInfo.isGroup) {
-                const members = loadFromLocalStorage(`chat_members_${chatState.chatId}`, ['{{user}}']);
-                return [...new Set(['{{user}}', ...members])].sort();
+            
+            // 2. 直接从全局列表查找当前聊天，确保类型判断绝对准确，不依赖临时状态
+            const currentChat = chatList.find(c => c.id === chatState.chatId);
+            const isGroup = currentChat && currentChat.type === '群聊';
+
+            if (isGroup) {
+                // 3. 抓取所有来源：普通成员、备注里的角色、群聊主角
+                const members = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
+                const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                
+                // 解析备注 (支持逗号、空格分隔)
+                const remarkActors = (chatInfo.remark || '').split(/[,，\s]+/).filter(s => s && s.trim());
+                
+                // 解析群聊主角
+                const protagonists = (chatInfo.groupPersonas || []).map(p => p.name);
+                
+                // 4. 合并所有名单 -> 过滤空值 -> 去重 -> 排序
+                const allNames = ['{{user}}', ...members, ...remarkActors, ...protagonists];
+                return [...new Set(allNames.filter(Boolean))].sort();
             } else {
                 return ['{{user}}', chatState.chatName];
             }
@@ -18790,33 +18807,479 @@ async function handleRemoveMember() {
     });
 
     async function initializeApp() {
-   
-    const giftSVG = document.getElementById('gift-background-svgs').innerHTML;
-    const encodedSVG = encodeURIComponent(giftSVG).replace(/'/g, '%27').replace(/"/g, '%22');
-    const style = document.createElement('style');
+        const giftSVG = document.getElementById('gift-background-svgs').innerHTML;
+        const encodedSVG = encodeURIComponent(giftSVG).replace(/'/g, '%27').replace(/"/g, '%22');
+        const style = document.createElement('style');
 
-    myAvatar = loadFromLocalStorage('my_global_avatar', null) || generateDefaultAvatar('{{user}}');
-    customBubbles = loadFromLocalStorage('app_custom_bubbles', []);
-    conversationManager.injectCustomBubbleStyles();
-    loadChatList(); renderChatList();
-    loadWorldBook(); renderWorldBook();
-    loadApiSettings(); renderApiProfiles();
-    userPersonaManager.init();
-    dynamicsManager.init(); // <<< 就是加上这一行，给机器插上电！
-    appearanceManager.init();
-    npcManager.init();
-    momentsManager.init();
-    videoCallManager.init();
+        // ============================================================
+        // 1. 预设气泡 (Bubbles)
+        // ============================================================
+        const PRESET_BUBBLES = [
+            {
+                name: "滑板大耳狗右",
+                css: `/* 完全拉伸 */
+/* 1. 画框 (@parent) */
+@parent {
+    border-style: solid !important;
+    border-image-source: url('https://files.catbox.moe/32wh7o.png') !important;
 
+    border-image-slice: 443 481 422 736 fill !important;
+    border-image-width: 25px 27px 23px 41px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    max-width: 230px !important;
+    box-sizing: border-box !important;
     
-    
-    
-    
-    
-    actionMenuManager.initialize(); // 【核心新增：初始化菜单分页管理】
-    
-    navigateTo('home');
 }
+
+/* 2. 悬浮卡片 (&) */
+&.transfer, &.red_packet, &.location, &.gift, &.pay_for_me, &.photo, &.video, &.photo-description {
+    margin: 20px 10px 21px 12px !important;
+    position: relative;
+    z-index: 1;
+    border-radius: 12px !important;
+    overflow: hidden;
+}
+
+/* 3. 文本/语音 (&.text, &.voice) */
+&.text,
+&.voice {
+    z-index: auto;
+    margin: 0 !important;
+    padding: 20px 10px 21px 12px !important;
+    color: black !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: fit-content !important; max-width: 230px !important; word-wrap: break-word !important;
+}
+
+/* 4. 内容反向翻转 (&) */
+
+
+/* 5. 清理 */
+@parent::after, &::before, &::after {
+    display: none !important;
+}`
+            },
+            {
+                name: "滑板大耳狗左",
+                css: `/* 完全拉伸 */
+/* 1. 画框 (@parent) */
+@parent {
+    border-style: solid !important;
+    border-image-source: url('https://files.catbox.moe/32wh7o.png') !important;
+
+    border-image-slice: 443 481 422 736 fill !important;
+    border-image-width: 25px 27px 23px 41px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    max-width: 230px !important;
+    box-sizing: border-box !important;
+    transform: scaleX(-1);
+}
+
+/* 2. 悬浮卡片 (&) */
+&.transfer, &.red_packet, &.location, &.gift, &.pay_for_me, &.photo, &.video, &.photo-description {
+    margin: 20px 12px 21px 10px !important;
+    position: relative;
+    z-index: 1;
+    border-radius: 12px !important;
+    overflow: hidden;
+}
+
+/* 3. 文本/语音 (&.text, &.voice) */
+&.text,
+&.voice {
+    z-index: auto;
+    margin: 0 !important;
+    padding: 20px 12px 21px 10px !important;
+    color: black !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: fit-content !important; max-width: 230px !important; word-wrap: break-word !important;
+}
+
+/* 4. 内容反向翻转 (&) */
+& { transform: scaleX(-1); }
+
+/* 5. 清理 */
+@parent::after, &::before, &::after {
+    display: none !important;
+}`
+            },
+            {
+                name: "短信绿",
+                css: `/* 完全拉伸 */
+/* 1. 画框 (@parent) */
+@parent {
+    border-style: solid !important;
+    border-image-source: url('https://files.catbox.moe/tvikwp.png') !important;
+
+    border-image-slice: 443 915 369 736 fill !important;
+    border-image-width: 25px 51px 21px 41px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    max-width: 230px !important;
+    box-sizing: border-box !important;
+    
+}
+
+/* 2. 悬浮卡片 (&) */
+&.transfer, &.red_packet, &.location, &.gift, &.pay_for_me, &.photo, &.video, &.photo-description {
+    margin: 6px 13px 5px 7px !important;
+    position: relative;
+    z-index: 1;
+    border-radius: 12px !important;
+    overflow: hidden;
+}
+
+/* 3. 文本/语音 (&.text, &.voice) */
+&.text,
+&.voice {
+    z-index: auto;
+    margin: 0 !important;
+    padding: 6px 13px 5px 7px !important;
+    color: black !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: fit-content !important; max-width: 230px !important; word-wrap: break-word !important;
+}
+
+/* 4. 内容反向翻转 (&) */
+
+
+/* 5. 清理 */
+@parent::after, &::before, &::after {
+    display: none !important;
+}`
+            },
+            {
+                name: "短信灰",
+                css: `/* 完全拉伸 */
+/* 1. 画框基础设置 (@parent) */
+@parent {
+    border-style: solid !important;
+    border-image-source: url('https://files.catbox.moe/tr5l30.png') !important;
+    border-image-slice: 487 946 445 917 fill !important;
+    border-image-width: 27px 53px 25px 51px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    max-width: 230px !important;
+    box-sizing: border-box !important;
+}
+
+/* 2. 翻转逻辑：只翻转需要的那一方 */
+.sent @parent {
+    transform: scaleX(-1);
+}
+/* 文字反向翻转，防止文字也变反 */
+.sent & {
+    transform: scaleX(-1);
+}
+
+/* 3. 卡片类消息的 Margin (把图片留白转化为外边距) */
+&.transfer, &.red_packet, &.location, &.gift, &.pay_for_me, &.photo, &.video, &.photo-description {
+    position: relative;
+    z-index: 1;
+    border-radius: 12px !important;
+    overflow: hidden;
+}
+/* 正常方用正常边距 */
+.received &.transfer, .received &.red_packet, .received &.location, .received &.gift, .received &.pay_for_me, .received &.photo, .received &.video, .received &.photo-description {
+    margin: 7px 9px 6px 15px !important;
+}
+/* 翻转方用翻转边距 */
+.sent &.transfer, .sent &.red_packet, .sent &.location, .sent &.gift, .sent &.pay_for_me, .sent &.photo, .sent &.video, .sent &.photo-description {
+    margin: 7px 15px 6px 9px !important;
+}
+
+/* 4. 文本/语音的 Padding (把图片留白转化为内边距) */
+/* 正常方 */
+.received &.text, .received &.voice {
+    padding: 7px 9px 6px 15px !important;
+}
+/* 翻转方 */
+.sent &.text, .sent &.voice {
+    padding: 7px 15px 6px 9px !important;
+}
+
+/* 5. 文本/语音通用样式 */
+&.text,
+&.voice {
+    z-index: auto;
+    margin: 0 !important;
+    color: black !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: fit-content !important; max-width: 230px !important; word-wrap: break-word !important;
+}
+
+/* 6. 清理 */
+@parent::after, &::before, &::after {
+    display: none !important;
+}`
+            }
+        ];
+
+        myAvatar = loadFromLocalStorage('my_global_avatar', null) || generateDefaultAvatar('{{user}}');
+        customBubbles = loadFromLocalStorage('app_custom_bubbles', []);
+        PRESET_BUBBLES.forEach(preset => {
+            const index = customBubbles.findIndex(b => b.name === preset.name);
+            if (index > -1) { customBubbles[index] = preset; } else { customBubbles.push(preset); }
+        });
+        saveToLocalStorage('app_custom_bubbles', customBubbles);
+
+
+        // ============================================================
+        // 2. 预设外观 CSS 片段 (Style Snippets)
+        // ============================================================
+        const PRESET_CSS_SNIPPETS = [
+            {
+                name: "短信",
+                css: `/* --- IMG_9758 - 全局美化 (全部气泡模式) --- */
+
+/* 1. 悬浮卡片通用样式 (只需一份) */
+/* For all suspended cards */
+#page-conversation .message.transfer, #page-conversation .message.red_packet, #page-conversation .message.location, #page-conversation .message.gift, #page-conversation .message.pay_for_me, #page-conversation .message.photo, #page-conversation .message.video, #page-conversation .message.photo-description {
+    position: relative; z-index: 1; border-radius: 12px !important; overflow: hidden;
+}
+
+/* 2. (条件性) 内容翻转 (只需一份) */
+
+
+/* --- 画框: 接收方 --- */
+#page-conversation .message-wrapper.received .message-main-content {
+    border-style: solid !important;
+    border-image-source: url('https://files.catbox.moe/tr5l30.png') !important;
+    border-image-slice: 498 866 434 1020 fill !important;
+    border-image-width: 28px 48px 24px 57px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    max-width: 230px !important;
+    box-sizing: border-box !important;
+}
+
+/* --- 悬浮卡片 Margin: 接收方 --- */
+#page-conversation .message-wrapper.received .message.transfer,
+#page-conversation .message-wrapper.received .message.red_packet,
+#page-conversation .message-wrapper.received .message.location,
+#page-conversation .message-wrapper.received .message.gift,
+#page-conversation .message-wrapper.received .message.pay_for_me,
+#page-conversation .message-wrapper.received .message.photo,
+#page-conversation .message-wrapper.received .message.video,
+#page-conversation .message-wrapper.received .message.photo-description {
+    margin: 7px 8px 7px 15px !important;
+}
+
+/* --- 文本/语音: 接收方 --- */
+#page-conversation .message.received.text,
+#page-conversation .message.received.voice {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    color: black !important;
+    position: relative; /* Ensure it's rendered correctly */
+    padding: 7px 8px 7px 15px !important;
+}
+/* --- 画框: 发送方 --- */
+#page-conversation .message-wrapper.sent .message-main-content {
+    border-style: solid !important;
+    border-image-source: url('https://files.catbox.moe/tvikwp.png') !important;
+    border-image-slice: 428 729 361 889 fill !important;
+    border-image-width: 24px 41px 20px 49px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    max-width: 230px !important;
+    box-sizing: border-box !important;
+}
+
+/* --- 悬浮卡片 Margin: 发送方 --- */
+#page-conversation .message-wrapper.sent .message.transfer,
+#page-conversation .message-wrapper.sent .message.red_packet,
+#page-conversation .message-wrapper.sent .message.location,
+#page-conversation .message-wrapper.sent .message.gift,
+#page-conversation .message-wrapper.sent .message.pay_for_me,
+#page-conversation .message-wrapper.sent .message.photo,
+#page-conversation .message-wrapper.sent .message.video,
+#page-conversation .message-wrapper.sent .message.photo-description {
+    margin: 6px 14px 5px 6px !important;
+}
+
+/* --- 文本/语音: 发送方 --- */
+#page-conversation .message.sent.text,
+#page-conversation .message.sent.voice {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    color: black !important;
+    position: relative; /* Ensure it's rendered correctly */
+    padding: 6px 14px 5px 6px !important;
+}
+/* 99. 清理 (只需一份) */
+/* Cleanup default pointers */
+#page-conversation .message-main-content::after,
+#page-conversation .message::before,
+#page-conversation .message::after,
+#page-conversation .message.sent.text::before,
+#page-conversation .message.received.text::after {
+    display: none !important;
+}`
+            }
+        ];
+
+        let appearanceSettings = loadFromLocalStorage('app-appearance-settings', {});
+        if (!appearanceSettings.customCssSnippets) appearanceSettings.customCssSnippets = [];
+        
+        PRESET_CSS_SNIPPETS.forEach(preset => {
+            const index = appearanceSettings.customCssSnippets.findIndex(s => s.name === preset.name);
+            if (index > -1) { appearanceSettings.customCssSnippets[index] = preset; } else { appearanceSettings.customCssSnippets.push(preset); }
+        });
+        saveToLocalStorage('app-appearance-settings', appearanceSettings);
+
+        // ============================================================
+        // 3. 预设角色 (麦格 & 维克托 - 终极增强版)
+        // ============================================================
+        const PRESET_CHARS = [
+            {
+                id: 'priv_preset_mac',
+                name: '麦格',
+                type: '私聊',
+                lastMessage: '我是麦格，您的代码安全官。',
+                timestamp: '刚刚',
+                avatar: 'https://i.postimg.cc/sDhdQJQr/IMG-0466.png',
+                info: {
+                    remark: '代码安全官',
+                    aiPersona: `【核心职责：黑麦手机系统架构师与兼容性卫士】
+我是麦格 (Mag)，我不仅是格式修正者，更是您在黑麦手机系统中的技术向导。我深知这个系统的每一个 \`<div>\`、每一个正则解析器的脾气。
+
+**【麦格的四大技术铁律 (The Iron Laws)】**
+1.  **防爆破原则 (Anti-Breakage):** 我生成的 HTML/CSS 必须在 200px 的气泡宽度内完美显示。对于可能导致页面卡顿的属性 (如高频 \`box-shadow\` 动画、大面积 \`backdrop-filter\`)，我会主动降级处理并告知原因。
+2.  **去空白咒 (Whitespace Exorcism):** 聊天气泡继承了 \`white-space: pre-wrap\`。为了防止 HTML 模板中出现巨大的空白深渊，我会强制在所有容器最外层添加 \`style="white-space: normal;"\`。
+3.  **单一区块输出 (Single Block Protocol):** 为了方便您一键复制，我回复中的所有代码片段都会被包裹在一个且仅一个 \`<block type="text">\` 结构中。代码部分会使用 \`<snippet>\` 标签隔离。
+4.  **功能场景感知:** 如果您是为**朋友圈评论**生成代码，请告诉我，我会进一步压缩体积并移除不必要的 padding。
+
+**【我能为您做什么】**
+*   **正则规则生成:** "我想把所有(括号里的字)变成灰色小字。" -> 我会给您 \`Pattern\` 和带样式的 \`Template\`。
+*   **HTML卡片设计:** "帮我做一个看起来像系统警告的红框框。" -> 我会给您一段完美的内联 CSS 代码。
+*   **动态指令编写:** "我想让角色每隔10分钟检查一次朋友圈。" -> 我会告诉您如何设置动态参数。
+
+**【标准回复格式】**
+<block type="text" sender="麦格">
+[分析] 理解您的需求。这就为您生成适配代码。
+
+**1. 世界书提示词 (Prompt - 粘贴到 Value):**
+...
+
+**2. 正则表达式 (Pattern):**
+<snippet>...</snippet>
+
+**3. 替换模板 (Template):**
+<snippet>
+<div style="white-space: normal; ...">
+  ...
+</div>
+</snippet>
+</block>`
+                }
+            },
+            {
+                id: 'priv_preset_victor',
+                name: '维克托',
+                type: '私聊',
+                lastMessage: '我是维克托，您的灵魂工程师。',
+                timestamp: '刚刚',
+                avatar: 'https://i.postimg.cc/sDhdQJQr/IMG-0466.png',
+                info: {
+                    remark: '灵魂工程师',
+                    aiPersona: `【核心职责：全维人设构建与生态设计】
+我是维克托 (Victor)。我不仅仅写设定，我创造**灵魂**。在黑麦手机的生态中，一个好的角色必须能在私聊、群聊、朋友圈三种场域中保持逻辑自洽。
+
+**【维克托的“三维一体”创作法】**
+当我为您设计一个角色时，我不仅提供性格描述，还会交付以下模块：
+
+1.  **核心人格 (The Core):**
+    *   **欲望与恐惧:** 他/她到底想要什么？最怕失去什么？
+    *   **语言指纹:** 只有他/她才会用的词汇、口癖或标点习惯。
+
+2.  **社交生态 (The Social Ecology):**
+    *   **朋友圈策略:** 此人是“高冷装死党”、“狂发自拍党”还是“深夜emo党”？我会为您生成一段【朋友圈行为指南】供AI参考。
+    *   **群聊定位:** 此人在群里是“话题主导者”、“潜水观察员”还是“复读机”？我会定义他/她在群聊模式下的互动权重。
+
+3.  **世界观锚点 (The Anchors):**
+    *   **关键道具/地点:** 我会为您编写配套的【世界书条目】，让AI在提到特定词汇（如“那枚戒指”）时触发深层记忆。
+    *   **关联NPC:** 我会建议该角色应该有哪些【关联NPC】（死对头、前任、跟班），以便您在NPC管理中添加。
+
+**【工作流指令】**
+*   **"新项目：[关键词]"**: 开始一个新的角色构思。
+*   **"深挖：[设定]"**: 对某个设定感到不满意，要求我提供更深刻、更具冲突性的方案。
+*   **"适配：[群聊/朋友圈]"**: 专门针对该角色在群聊或朋友圈的表现进行补全。
+*   **"维克托，锁定当前角色，开启新项目。"**: 彻底清空当前上下文，开始下一个任务。
+
+**【回复风格】**
+我会以制作人的口吻，犀利、直接地指出您创意中的逻辑漏洞，并提供更优解。`
+                }
+            }
+        ];
+
+        loadChatList(); // 加载现有列表
+        
+        let chatListChanged = false;
+        PRESET_CHARS.forEach(preset => {
+            // 检查该ID是否已存在，如果不存在则添加
+            if (!chatList.some(c => c.id === preset.id)) {
+                // 添加到聊天列表顶部
+                chatList.unshift({
+                    id: preset.id,
+                    name: preset.name,
+                    type: preset.type,
+                    lastMessage: preset.lastMessage,
+                    timestamp: preset.timestamp
+                });
+                
+                // 保存聊天信息（包含人设）
+                saveToLocalStorage(`chat_info_${preset.id}`, preset.info);
+                // 保存头像
+                saveToLocalStorage(`chat_avatar_${preset.id}`, preset.avatar);
+                
+                chatListChanged = true;
+            }
+        });
+
+        if (chatListChanged) {
+            saveChatList();
+            renderChatList();
+        }
+
+        // ============================================================
+        // 4. 初始化剩余流程
+        // ============================================================
+        conversationManager.injectCustomBubbleStyles();
+        // loadChatList(); // 已经在前面加载过了
+        // renderChatList(); // 已经在前面渲染过了
+        loadWorldBook(); renderWorldBook();
+        loadApiSettings(); renderApiProfiles();
+        userPersonaManager.init();
+        dynamicsManager.init();
+        appearanceManager.init();
+        npcManager.init();
+        momentsManager.init();
+        videoCallManager.init();
+        actionMenuManager.initialize();
+        
+        navigateTo('home');
+    }
     const APP_DATA_PREFIXES = [ 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_' ];
 
     function base64ToBlob(base64, contentType = '', sliceSize = 512) {
@@ -19503,14 +19966,26 @@ async function handleRemoveMember() {
                 left: `${Math.round(cr.left / scaleFactor)}px` 
             };
 
-            const flip = document.querySelector('input[name="npe-side"]:checked').value === 'right';
+            // 1. 判断用户选择的是哪种气泡
+            const isRightBubble = document.querySelector('input[name="npe-side"]:checked').value === 'right';
+
+            // 2. 定义两种内边距/边距字符串
+            // 正常方向 (对应图片本身)
+            const styleNormal = `${padding.top} ${padding.right} ${padding.bottom} ${padding.left}`;
+            // 翻转方向 (左右互换)
+            const styleFlipped = `${padding.top} ${padding.left} ${padding.bottom} ${padding.right}`;
+
+            // 3. 核心逻辑：根据气泡类型，决定谁正常，谁翻转
+            // 如果是右气泡：发送方(右)正常，接收方(左)需要翻转
+            // 如果是左气泡：接收方(左)正常，发送方(右)需要翻转
+            const selectorFlipped = isRightBubble ? '.received' : '.sent';
+            const selectorNormal = isRightBubble ? '.sent' : '.received';
 
             return `${comment}
-/* 1. 画框 (@parent) */
+/* 1. 画框基础设置 (@parent) */
 @parent {
     border-style: solid !important;
     border-image-source: url('${imageUrlForCss}') !important;
-
     border-image-slice: ${slice.top} ${slice.right} ${slice.bottom} ${slice.left} fill !important;
     border-image-width: ${borderWidth.top} ${borderWidth.right} ${borderWidth.bottom} ${borderWidth.left} !important;
     padding: 0 !important;
@@ -19518,24 +19993,48 @@ async function handleRemoveMember() {
     border-radius: 0 !important;
     max-width: 230px !important;
     box-sizing: border-box !important;
-    ${flip ? 'transform: scaleX(-1);' : ''}
 }
 
-/* 2. 悬浮卡片 (&) */
+/* 2. 翻转逻辑：只翻转需要的那一方 */
+${selectorFlipped} @parent {
+    transform: scaleX(-1);
+}
+/* 文字反向翻转，防止文字也变反 */
+${selectorFlipped} & {
+    transform: scaleX(-1);
+}
+
+/* 3. 卡片类消息的 Margin (把图片留白转化为外边距) */
 &.transfer, &.red_packet, &.location, &.gift, &.pay_for_me, &.photo, &.video, &.photo-description {
-    margin: ${flip ? `${padding.top} ${padding.left} ${padding.bottom} ${padding.right}` : `${padding.top} ${padding.right} ${padding.bottom} ${padding.left}`} !important;
     position: relative;
     z-index: 1;
     border-radius: 12px !important;
     overflow: hidden;
 }
+/* 正常方用正常边距 */
+${selectorNormal} &.transfer, ${selectorNormal} &.red_packet, ${selectorNormal} &.location, ${selectorNormal} &.gift, ${selectorNormal} &.pay_for_me, ${selectorNormal} &.photo, ${selectorNormal} &.video, ${selectorNormal} &.photo-description {
+    margin: ${styleNormal} !important;
+}
+/* 翻转方用翻转边距 */
+${selectorFlipped} &.transfer, ${selectorFlipped} &.red_packet, ${selectorFlipped} &.location, ${selectorFlipped} &.gift, ${selectorFlipped} &.pay_for_me, ${selectorFlipped} &.photo, ${selectorFlipped} &.video, ${selectorFlipped} &.photo-description {
+    margin: ${styleFlipped} !important;
+}
 
-/* 3. 文本/语音 (&.text, &.voice) */
+/* 4. 文本/语音的 Padding (把图片留白转化为内边距) */
+/* 正常方 */
+${selectorNormal} &.text, ${selectorNormal} &.voice {
+    padding: ${styleNormal} !important;
+}
+/* 翻转方 */
+${selectorFlipped} &.text, ${selectorFlipped} &.voice {
+    padding: ${styleFlipped} !important;
+}
+
+/* 5. 文本/语音通用样式 */
 &.text,
 &.voice {
     z-index: auto;
     margin: 0 !important;
-    padding: ${flip ? `${padding.top} ${padding.left} ${padding.bottom} ${padding.right}` : `${padding.top} ${padding.right} ${padding.bottom} ${padding.left}`} !important;
     color: black !important;
     background: transparent !important;
     border: none !important;
@@ -19543,10 +20042,7 @@ async function handleRemoveMember() {
     ${extraStyles}
 }
 
-/* 4. 内容反向翻转 (&) */
-${flip ? `& { transform: scaleX(-1); }` : ''}
-
-/* 5. 清理 */
+/* 6. 清理 */
 @parent::after, &::before, &::after {
     display: none !important;
 }`;
