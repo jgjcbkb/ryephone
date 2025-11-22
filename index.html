@@ -6532,8 +6532,8 @@ if (isGroupPersona) {
                     // 2. 检查并替换所有HTML块
                     // .test() 方法先快速检查字符串中是否存在匹配项
                     if (htmlBlockRegex.test(rawText)) {
-                        // 如果存在，就用占位符替换掉所有匹配到的HTML块
-                        simplifiedContent = rawText.replace(htmlBlockRegex, ' [一条格式化消息] ').trim();
+                        // 如果存在，就用空字符串替换掉所有匹配到的HTML块
+                        simplifiedContent = rawText.replace(htmlBlockRegex, '').trim();
                     }
 
                     // 3. 在处理完HTML后，再检查是否是纯表情包指令
