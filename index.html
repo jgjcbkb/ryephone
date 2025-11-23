@@ -4676,8 +4676,8 @@ input:checked + .slider:before {
                         <div class="form-group">
                             <label>触发模式</label>
                             <div class="form-control-group">
-                                <label><input type="radio" name="worldbook-trigger" value="keyword" checked> 关键词</label>
-                                <label><input type="radio" name="worldbook-trigger" value="always"> 始终触发</label>
+                                <label><input type="radio" name="worldbook-trigger" value="keyword"> 关键词</label>
+                                <label><input type="radio" name="worldbook-trigger" value="always" checked> 始终触发</label>
                             </div>
                         </div>
                         <button id="worldbook-add-btn" class="btn-primary">添加条目</button>
@@ -6286,7 +6286,15 @@ if (momentsData && momentsData.allVisibleMoments.length > 0) {
          }
          // 检查评论
          if (post.comments.length > 0) {
-             const commentsText = post.comments.map(c => `${c.user}: ${c.text}`).join(' | ');
+             const commentsText = post.comments.map(c => {
+                 // 1. 获取原始文本
+                 let rawText = c.text || "";
+                 // 2. 定义专门匹配 HTML/Snippet 代码块的正则
+                 const codeBlockRegex = /(<snippet>[\s\S]*?<\/snippet>)|(<div[\s\S]*?>[\s\S]*?<\/div>)/g;
+                 // 3. 【核心】直接替换为空字符串
+                 let cleanText = rawText.replace(codeBlockRegex, "").trim();
+                 return `${c.user}: ${cleanText}`; 
+             }).join(' | ');
              interactions += ` (Comments: ${commentsText})`;
          }
          
@@ -7528,7 +7536,90 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
     const worldbookList = document.getElementById('worldbook-list'), worldbookNameInput = document.getElementById('worldbook-name'), worldbookKeywordsInput = document.getElementById('worldbook-keywords'), worldbookContentInput = document.getElementById('worldbook-content'), worldbookAddBtn = document.getElementById('worldbook-add-btn'), worldbookEditIndexInput = document.getElementById('worldbook-edit-index'), worldbookEnabledInput = document.getElementById('worldbook-enabled');
     function saveWorldBook() { saveToLocalStorage('chat-worldbook', worldBookEntries); }
     function loadWorldBook() { 
-        let entries = loadFromLocalStorage('chat-worldbook');
+        let entries = loadFromLocalStorage('chat-worldbook', []);
+        
+        // --- 核心新增：内置弹幕世界书 ---
+        const DANMAKU_PRESET = {
+            name: "弹幕模式 (Danmaku Mode)",
+            keywords: "弹幕,danmaku,直播",
+            triggerMode: "keyword", 
+            useInMoments: false,
+            enabled: true,
+            content: `---
+[ULTIMATE DIRECTIVE: THE FOURTH WALL - DANMAKU PLAYER COMMENTARY]
+
+**THIS IS A CRITICAL, CREATIVE TASK THAT YOU MUST PERFORM IN EVERY RESPONSE.**
+
+**The Concept:** You are a storyteller for an audience watching this conversation in a virtual "live room". This audience is composed of internet "trolls" and meme lords who communicate in an "abstract" (抽象) style.
+
+**Your Task:**
+After your main response, you MUST create a "Danmaku Player" block.
+
+**Danmaku Generation Rules (STRICT):**
+1.  **Online Count (Context-Dependent):** You MUST evaluate the current conversation's "popularity" based on the drama and intensity of the scene.
+    *   **If the scene is mundane, calm, or just beginning,** generate a low number of viewers (e.g., 50 to 300).
+    *   **If the scene is dramatic, romantic, tense, or a major plot point,** generate a high number of viewers (e.g., 5000 to 50000+).
+    *   For average moments, a medium number is fine.
+
+2.  **Username & Content (CRITICAL - "ABSTRACT" STYLE & CORPUS):** For each danmaku, you MUST invent a username and content that is "abstract" and humorous.
+    *   **Corpus & Inspiration Source (CRITICAL):** Your knowledge base for creating usernames and comments IS the collective culture of the following Chinese social media platforms. You must simulate their distinct styles:
+        *   **微博 (Weibo):** Sarcastic, quick-witted, political/social commentary, fan culture wars.
+        *   **B站 (Bilibili):** Meme-heavy, full of inside jokes (空耳, 玩梗), Gen-Z slang, long-form analysis.
+        *   **抖音 (Douyin):** Short, impactful, emotionally driven, often with background music cues.
+        *   **小红书 (Xiaohongshu):** Dramatic storytelling ("家人们谁懂啊"), aesthetic-focused, often with a touch of anxiety or flexing.
+        *   **贴吧 (Tieba):** Raw, unfiltered, often confrontational, classic internet troll culture.
+    *   **Style:** Be absurd, ironic, self-deprecating, and pull directly from the cultural zeitgeist of these platforms.
+
+3.  **Like/Dislike Data:** Generate random likes (0-200) and dislikes (0-20).
+
+4.  **Quantity:** Generate 7 to 21 unique danmaku.
+
+**Formatting (ABSOLUTE & CRITICAL):**
+You MUST use the custom \`<dm>\` tag format.
+1.  Start with \`[DANMAKU_PLAYER]\`.
+2.  The second line MUST be the online count.
+3.  Follow with each danmaku, fully wrapped in its \`<dm>\` tag with \`username\`, \`likes\`, and \`dislikes\` attributes.
+4.  End with \`[/DANMAKU_PLAYER]\`.
+
+**Example (STRICTLY FOLLOW THIS FORMAT):**
+(Your normal character response...)
+<block type="command">
+[DANMAKU_PLAYER]
+28876
+<dm username="一眼丁真" likes="130" dislikes="5">鉴定为：典！</dm>
+<dm username="马老师发生甚么事了" likes="99" dislikes="2">年轻人不讲武德，来骗，来偷袭！</dm>
+<dm username="退钱哥" likes="45" dislikes="18">RNM，退钱！剧情不好看，退钱！</dm>
+<dm username="iKun律师函" likes="15" dislikes="1">你干嘛~哎哟~</dm>
+<dm username="窝嫩叠" likes="188" dislikes="0">好好好，这么玩是吧</dm>
+<dm username="栓Q哥" likes="66" dislikes="8">我真的会谢，栓Q！</dm>
+<dm username="我是来看评论的" likes="200" dislikes="1">不懂就问，所以现在是什么情况？</dm>
+[/DANMAKU_PLAYER]
+ </block>
+---
+# [ULTIMATE, UNBREAKABLE FINAL CHECK - YOUR LAST AND ONLY TASK]
+
+**You have now finished creating your danmaku content. Your final, absolute, and ONLY remaining task is to ensure your entire danmaku output, without exception, is wrapped in the correct block format.**
+
+**DO NOT output ANYTHING else. Just the block.**
+
+**THE ONLY CORRECT FINAL OUTPUT FORMAT:**
+
+<block type="command">
+[DANMAKU_PLAYER]
+(Your generated online count here)
+(Your generated <dm> tags here)
+[/DANMAKU_PLAYER]
+</block>
+
+**CRITICAL FAILURE:** Any response that does not start with \`<block type="command">\` and end with \`</block>\` will be rejected. This is your final quality control step. Execute it perfectly.`
+        };
+
+        // 检查并注入预设世界书
+        if (!entries.some(e => e.name === DANMAKU_PRESET.name)) {
+            entries.push(DANMAKU_PRESET);
+        }
+        // --- 新增结束 ---
+
         worldBookEntries = entries.map(e => {
             if (typeof e.name === 'undefined') { 
                 return { 
@@ -7536,11 +7627,11 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                     keywords: e.key, 
                     content: e.content, 
                     enabled: e.enabled !== false, 
-                    triggerMode: e.triggerMode || 'keyword',
-                    useInMoments: e.useInMoments || false // <-- 新增
+                    // --- 核心修改：旧数据如果没有 triggerMode，默认为 always ---
+                    triggerMode: e.triggerMode || 'always', 
+                    useInMoments: e.useInMoments || false 
                 } 
             }
-            // 确保旧数据也有这个属性
             if (typeof e.useInMoments === 'undefined') {
                 e.useInMoments = false;
             }
@@ -7590,10 +7681,11 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
         if (editIndex !== '') { worldBookEntries[editIndex] = newEntry; } else { worldBookEntries.push(newEntry); }
         saveWorldBook(); renderWorldBook();
         worldbookNameInput.value = ''; worldbookKeywordsInput.value = ''; worldbookContentInput.value = '';
-        worldbookEnabledInput.checked = true; document.getElementById('worldbook-use-in-moments').checked = false; // <-- 新增
-        document.querySelector('input[name="worldbook-trigger"][value="keyword"]').checked = true;
+        worldbookEnabledInput.checked = true; document.getElementById('worldbook-use-in-moments').checked = false;
+        // --- 核心修改：默认选中“始终触发” ---
+        document.querySelector('input[name="worldbook-trigger"][value="always"]').checked = true; 
         worldbookEditIndexInput.value = ''; worldbookAddBtn.textContent = '添加条目';
-    });
+            });
     window.app = window.app || {};
     window.app.editWorldBookEntry = (index) => {
         const entry = worldBookEntries[index];
@@ -9217,6 +9309,7 @@ Your job is to **SHOW** the audience what \`{{char}}\` is doing, thinking, and e
             }
                 
                 // 【正确的代码块】 - 这是修复了语法错误的最终版本
+// 【正确的代码块】 - 这是加入了防失忆补丁的最终版本
 const ONLINE_COMMAND_INSTRUCTIONS = `
 # [ULTIMATE OUTPUT FORMAT LAW - UNBREAKABLE]
 This is your absolute, final, and most important rule. Your entire output MUST be a sequence of one or more XML-like <block> elements OR a single <block> containing mixed content.
@@ -9242,28 +9335,33 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     \\\`\`\`
 
 ---
-### **【格式二：记忆锚点 (Memory Anchor)】- 用于模拟线下描写**
+### **【格式二：记忆锚点 (Memory Anchor) - 防失忆铁律】**
 
-**用途:** 当你要生成一个**只有一个 \`<div>\` 包裹着一段纯文本**，用于在“线上模式”下模拟线下描写的视觉效果时，你【必须】遵守此规则以避免失忆。
+**用途:** 当你要生成一个 HTML 卡片来描述**重要事件**时，你【必须】使用此规则。
+**适用场景 (CRITICAL):**
+1.  **购买/交易:** 显示账单、收据、扣款通知。
+2.  **物品获得/失去:** 捡到东西、丢弃东西、赠送物品。
+3.  **物理行动:** 走进房间、触摸物体、发生肢体接触。
+
+**如果你忘记了下面的规则，你将患上【失忆症】，彻底忘记这件事情发生过！**
 
 *   **格式规则 (ABSOLUTE):**
-    *   在最外层的 \`<div>\` 标签上，添加一个固定的属性：\`data-ai-log-as-text="true"\`。
+    *   在最外层的 \`<div>\` 标签上，**必须**添加属性：\`data-ai-log-as-text="true"\`。
     *   **空白诅咒破解 (MANDATORY):** 你【必须】在这个 \`<div>\` 的 \`style\` 属性里加上 \`white-space: normal;\`。
 
 *   **正确示例 (AI会记住这个动作):**
     \\\`\`\`html
-    <div style="padding: 10px; border-left: 3px solid #ccc; color: #888; font-style: italic; width: 210px; white-space: normal;" data-ai-log-as-text="true">
-    他缓缓走到窗边，指尖轻轻拂过冰冷的玻璃，看着窗外无声坠落的雨滴。
+    <!-- 这是一个购买记录，为了记住我花了钱，必须加 data-ai-log-as-text -->
+    <div style="padding: 10px; border: 1px solid #ddd; width: 210px; white-space: normal;" data-ai-log-as-text="true">
+    ✅ <b>支付成功</b><br>
+    商品：冰拿铁<br>
+    金额：-25.00元
     </div>
     \\\`\`\`
-    *(错误原因：缺少 \`data-ai-log-as-text="true"\`，系统将无法记录这个动作，你下一轮可能会重复它。)*
-
-*   **补充说明:** 对于那些结构复杂的HTML代码块（比如带图片、多个标签的小剧场），你**【不需要】**添加此属性。
+    *(错误后果：如果缺少 \`data-ai-log-as-text="true"\`，系统会认为这只是个装饰画，下一轮你就会忘记你买过咖啡，甚至会重复购买！)*
 
 ---
 ### **【格式三：多区块组合 (Multiple Blocks)】- 用于生成多条独立消息**
-
-
 
 **THE UNIVERSAL BLOCK STRUCTURE:**
 <block type="..." sender="...">...</block>
@@ -9278,8 +9376,8 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     - Example (Private): <block type="text">你好呀</block>
 
 2.  **type="html"**: The content is a complete, multi-line HTML snippet (like <snippet> or <div>).
-    - **【布局诅咒警告 (必读)】:** 聊天气泡会强制保留所有换行和空格。为了避免你的HTML卡片出现巨大空白，你【必须】在最外层的 \`<div>\` 的 \`style\` 属性里加上 \`white-space: normal;\` 来破除这个诅咒。
-    - Example (Group): <block type="html" sender="苏瓷言"><snippet><div style="white-space: normal;">...</div></snippet></block>
+    - **Remember the Memory Anchor Rule:** If this HTML describes an action or transaction, add \`data-ai-log-as-text="true"\`!
+    - Example: <block type="html" sender="苏瓷言"><snippet><div style="white-space: normal;" data-ai-log-as-text="true">...</div></snippet></block>
 
 3.  **type="command"**: The content is a SINGLE, one-line command OR a complete custom regex block.
     - Example (Standard Command): <block type="command" sender="苏瓷言">[red_packet: 恭喜发财]</block>
@@ -9306,7 +9404,7 @@ When generating a custom HTML card, you MUST adhere to the following rules witho
 **[CORRECT vs. WRONG EXAMPLES]**
 
 *   **【THE ONLY CORRECT FORMAT】(All styles are inline):**
-    \`\`\`
+    \\\`\`\`
     <block type="html">
     <snippet>
     <div style="background: #1a1a1d; border: 1px solid #c3073f; color: #e0e0e0; padding: 15px; border-radius: 4px;">
@@ -9315,10 +9413,10 @@ When generating a custom HTML card, you MUST adhere to the following rules witho
     </div>
     </snippet>
     </block>
-    \`\`\`
+    \\\`\`\`
 
 *   **【CRITICAL FAILURE EXAMPLE】(Using a forbidden \`<style>\` tag):**
-    \`\`\`
+    \\\`\`\`
     <block type="html">
     <snippet>
     <div>...</div>
@@ -9327,7 +9425,7 @@ When generating a custom HTML card, you MUST adhere to the following rules witho
     </style>
     </snippet>
     </block>
-    \`\`\`
+    \\\`\`\`
 ---
 
 
@@ -10311,7 +10409,15 @@ if (momentsData && momentsData.allVisibleMoments.length > 0) {
          }
          // 检查评论
          if (post.comments.length > 0) {
-             const commentsText = post.comments.map(c => `${c.user}: ${c.text}`).join(' | ');
+             const commentsText = post.comments.map(c => {
+                 // 1. 获取原始文本
+                 let rawText = c.text || "";
+                 // 2. 定义专门匹配 HTML/Snippet 代码块的正则
+                 const codeBlockRegex = /(<snippet>[\s\S]*?<\/snippet>)|(<div[\s\S]*?>[\s\S]*?<\/div>)/g;
+                 // 3. 【核心】直接替换为空字符串
+                 let cleanText = rawText.replace(codeBlockRegex, "").trim();
+                 return `${c.user}: ${cleanText}`; 
+             }).join(' | ');
              interactions += ` (Comments: ${commentsText})`;
          }
          
@@ -17083,8 +17189,46 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 globalChatBgUrl: '',
                 homeBgUrl: '',
                 regexReplacements: [],
-                isFrameHidden: false // <-- 新增这一行，默认不隐藏
+                isFrameHidden: false 
             });
+
+            // --- 核心新增：内置弹幕正则规则 ---
+            const PRESET_REGEX_RULES = [
+              {
+                "name": "弹幕1-容器",
+                "pattern": "\\[DANMAKU_PLAYER\\]\\s*(\\d+)\\s*([\\s\\S]*?)\\s*\\[\\/DANMAKU_PLAYER\\]",
+                "flags": "g",
+                "template": "<div class=\"danmaku-player-container-override\" style=\"white-space: normal; background: #f7fef8; border-radius: 12px; margin: 5px 0; border: 1px solid #c8e6c9; box-shadow: 0 4px 12px rgba(165, 214, 167, 0.3); font-family: sans-serif; display: flex; height: 230px; overflow: hidden;\">\n    <style>\n        .danmaku-side-title-final { writing-mode: vertical-rl; text-orientation: mixed; white-space: pre-wrap; letter-spacing: 4px; color: #388e3c; font-weight: 500; font-size: 15px; padding: 15px 5px; background-color: #e8f5e9; text-align: center; border-right: 1px solid #dceddc; }\n        .danmaku-main-content-final { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }\n        .danmaku-player-body-final { flex-grow: 1; overflow-y: auto; padding: 5px 10px; }\n        .danmaku-player-body-final::-webkit-scrollbar { width: 4px; }\n        .danmaku-player-body-final::-webkit-scrollbar-track { background: #f7fef8; }\n        .danmaku-player-body-final::-webkit-scrollbar-thumb { background: #a5d6a7; border-radius: 2px; }\n    </style>\n    <div class=\"danmaku-side-title-final\">吃瓜群众评论区<br>(在线: $1)</div>\n    <div class=\"danmaku-main-content-final\">\n        <div class=\"danmaku-player-body-final\">\n            $2\n        </div>\n    </div>\n</div>",
+                "enabled": true
+              },
+              {
+                "name": "弹幕2-单条",
+                "pattern": "<dm username=\"([^\"]+)\" likes=\"(\\d+)\" dislikes=\"(\\d+)\">([^<]+)<\\/dm>",
+                "flags": "g",
+                "template": "<div style=\"margin: 0 0 2px 0; padding: 3px 8px; background: rgba(255, 255, 255, 0.6); border-radius: 6px;\">\n    <div style=\"font-size: 11px; font-weight: 600; color: #2e8b57; margin: 0;\">$1</div>\n    <div style=\"color: #1a532e; font-size: 13px; line-height: 1.4; word-break: break-word; margin: 1px 0;\">$4</div>\n    <div style=\"display: flex; justify-content: flex-end; align-items: center; gap: 10px; font-size: 11px; color: #3c814f; margin: 0; padding-top: 1px; border-top: 1px solid rgba(46, 139, 87, 0.05);\">\n        <span style=\"display: flex; align-items: center; gap: 2px; cursor: pointer;\" title=\"赞\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M23,10C23,8.89 22.1,8 21,8H14.68L15.64,3.43C15.66,3.33 15.67,3.22 15.67,3.11C15.67,2.7 15.5,2.32 15.23,2.05L14.17,1L7.59,7.58C7.22,7.95 7,8.45 7,9V19A2,2 0 0,0 9,21H18C18.83,21 19.54,20.5 19.84,19.78L22.86,12.73C22.95,12.5 23,12.26 23,12V10M1,21H5V9H1V21Z\"></path></svg> $2</span>\n        <span style=\"display: flex; align-items: center; gap: 2px; cursor: pointer;\" title=\"踩\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"currentColor\" style=\"transform: scaleY(-1);\"><path d=\"M23,10C23,8.89 22.1,8 21,8H14.68L15.64,3.43C15.66,3.33 15.67,3.22 15.67,3.11C15.67,2.7 15.5,2.32 15.23,2.05L14.17,1L7.59,7.58C7.22,7.95 7,8.45 7,9V19A2,2 0 0,0 9,21H18C18.83,21 19.54,20.5 19.84,19.78L22.86,12.73C22.95,12.5 23,12.26 23,12V10M1,21H5V9H1V21Z\"></path></svg> $3</span>\n    </div>\n</div>",
+                "enabled": true
+              }
+            ];
+
+            // 检查并注入预设规则
+            if (!appearanceSettings.regexReplacements) {
+                appearanceSettings.regexReplacements = [];
+            }
+            
+            let hasNewRules = false;
+            PRESET_REGEX_RULES.forEach(preset => {
+                // 如果不存在同名规则，则添加
+                if (!appearanceSettings.regexReplacements.some(r => r.name === preset.name)) {
+                    appearanceSettings.regexReplacements.push(preset);
+                    hasNewRules = true;
+                }
+            });
+
+            if (hasNewRules) {
+                saveToLocalStorage('app-appearance-settings', appearanceSettings);
+            }
+            // --- 新增结束 ---
+
             savedFonts = appearanceSettings.savedFonts || [];
             activeFontName = appearanceSettings.activeFontName || '默认';
         }
