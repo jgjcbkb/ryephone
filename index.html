@@ -46,6 +46,10 @@
         margin: 0; padding: 0; background-color: #f0f2f5; 
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
         display: flex; align-items: center; justify-content: center; min-height: 100vh;
+        /* 【核心修复1】：强制开启全局点击手型，激活 iOS PWA 的点击穿透逻辑 */
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        overscroll-behavior: none; /* 禁止整体橡皮筋效果，防止干扰内部滚动 */
     }
     .phone {
         height: 850px;
@@ -59,11 +63,18 @@
         overflow: hidden; background: #fff; border-radius: 45px; 
         border: 10px solid var(--phone-outer-border); box-sizing: border-box; 
         box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        /* 【核心修复】：强制开启 iOS 硬件加速，修复圆角内的点击失效问题 */
+        transform: translate3d(0, 0, 0);
+        -webkit-transform: translate3d(0, 0, 0);
+        -webkit-mask-image: -webkit-radial-gradient(white, black); /* 修复圆角溢出遮罩 */
     }
     .screen::before {
         content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
         border: 3px solid var(--phone-inner-border); border-radius: 35px;
         pointer-events: none; z-index: 100;
+        /* 【核心修复2】：给遮挡层开启硬件加速，确保 pointer-events: none 生效 */
+        transform: translate3d(0, 0, 0);
+        -webkit-transform: translate3d(0, 0, 0);
     }
     .status-bar { 
         position: absolute; top: 8px; left: 0; width: 100%; height: 28px;
@@ -87,8 +98,17 @@
         flex-grow: 1; display: flex; flex-direction: column; position: relative;
         border-radius: 35px;
         overflow: hidden;
+        /* 【核心修复】：同上，确保内部应用容器也能正确接收点击 */
+        transform: translate3d(0, 0, 0);
+        -webkit-transform: translate3d(0, 0, 0);
+        z-index: 1; /* 确保内容层级明确 */
     }
-    .page { width: 100%; height: 100%; display: none; flex-direction: column; box-sizing: border-box; padding-top: 30px; }
+    .page { 
+        width: 100%; height: 100%; display: none; flex-direction: column; box-sizing: border-box; padding-top: 30px;
+        /* 【修复】：确保页面层级不会被 iOS 的渲染层级覆盖 */
+        position: relative; 
+        z-index: 2; 
+    }
     .page.active { display: flex; }
     #page-conversation, #page-moments, #page-video-call { padding-top: 0; }
 
@@ -6094,14 +6114,17 @@ You are allowed to use HTML snippets (e.g., \`<snippet>...</snippet>\`) to creat
             const isGroupChatEntity = (targetChat || {}).type === '群聊';
             const contextChatInfo = loadFromLocalStorage(`chat_info_${targetChatId}`, {});
 
+              let baseSystemPrompt = profile.prompt || '';
+
             if (isGroupChatEntity && contextChatInfo.mode === 'offline') {
                 const minWordCount = parseInt(contextChatInfo.wordcountMin || 50, 10);
                 const maxWordCount = parseInt(contextChatInfo.wordcountMax || 300, 10);
-                finalSystemPrompt = GROUP_OFFLINE_DIRECTOR_HANDBOOK_TEXT
+                // 将基础提示拼接在导演手册之前或之后，这里建议放在最前面作为基调
+                finalSystemPrompt = baseSystemPrompt + '\n\n' + GROUP_OFFLINE_DIRECTOR_HANDBOOK_TEXT
                     .replace('[MIN_WORD_COUNT]', minWordCount)
                     .replace('[MAX_WORD_COUNT]', maxWordCount);
             } else {
-                finalSystemPrompt = profile.prompt || '';
+                finalSystemPrompt = baseSystemPrompt;
             }
             
             // 将终极心理引擎作为最高优先级指令注入
@@ -6730,7 +6753,12 @@ ${processedChatHistory}
             });
             // 新代码块到此结束
 
+            // --- 核心修复：注入基础系统提示 ---
+            const baseSystemPrompt = profile.prompt || '';
+
             const instruction = `
+${baseSystemPrompt}
+
 # [ULTIMATE IDENTITY LOCK-IN - UNBREAKABLE RULE]
 **FOR THIS SPECIFIC ACTION, YOUR IDENTITY IS LOCKED. YOU ARE, AND ONLY ARE, "${senderName}".**
 - **Your Persona:** ${personaText}
@@ -6909,8 +6937,13 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
             });
             // 新代码块到此结束
 
+            // --- 核心修复：注入基础系统提示 ---
+            const baseSystemPrompt = profile.prompt || '';
+
             // --- 核心修正：注入身份锁定指令 ---
             const identityLockInPrompt = `
+${baseSystemPrompt}
+
 # [ULTIMATE IDENTITY LOCK-IN - UNBREAKABLE RULE]
 **FOR THIS SPECIFIC ACTION, YOUR IDENTITY IS LOCKED. YOU ARE, AND ONLY ARE, "${senderName}".**
 - **Your Persona:** ${personaText}
@@ -7014,7 +7047,8 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                     }
                 }
 
-                const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message|forward_moment):\s*({[\s\S]*?})\]/g;
+                // --- 核心修复：把正则改宽，允许匹配任意内容，不强制要求是 JSON 对象 ---
+const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message|forward_moment):\s*([\s\S]*?)\]/g;
                 let match;
                 let commandsFound = 0;
 
@@ -7026,7 +7060,15 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                     console.log(`[诊断日志] 角色 "${senderName}": 找到指令 #${commandsFound}: ${command}`);
 
                     if (command === 'like_moment') {
-                        momentsManager.handleInteractionFromAI(senderName, 'like', { postId: value.trim() });
+                        let targetPostId = value.trim();
+                        // 尝试解析，万一AI发神经有时候用JSON有时候用纯文本
+                        if (targetPostId.startsWith('{')) {
+                            try {
+                                const parsed = JSON.parse(targetPostId);
+                                if (parsed.postId) targetPostId = parsed.postId;
+                            } catch (e) {}
+                        }
+                        momentsManager.handleInteractionFromAI(senderName, 'like', { postId: targetPostId });
                     } else if (command === 'comment_moment') {
                         try {
                             // 【【【【【【 终极、绝对、根本性的修复 】】】】】】
@@ -7138,6 +7180,18 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                                         logMessage = `群聊角色 "${senderName}" 尝试发送私信，但未找到其源群聊，操作取消。`;
                                     }
                                 }
+
+                                // --- 核心修复：保底机制 ---
+                                // 如果经过上面一通分析还是没找到 ID (finalTargetChatId 为 null)，
+                                // 但这个角色其实就在 chatList 里（名字匹配），那就直接发给那个 chat。
+                                if (!finalTargetChatId) {
+                                    const fallbackChat = chatList.find(c => c.name === senderName && c.type === '私聊');
+                                    if (fallbackChat) {
+                                        finalTargetChatId = fallbackChat.id;
+                                        logMessage = `[保底触发] 角色 "${senderName}" 的私信被路由到已存在的私聊窗口。`;
+                                    }
+                                }
+                                // --- 修复结束 ---
 
                                 // 统一的日志输出和发送执行
                                 console.log(`[诊断日志] ${logMessage}`);
@@ -7554,16 +7608,16 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
     const worldbookList = document.getElementById('worldbook-list'), worldbookNameInput = document.getElementById('worldbook-name'), worldbookKeywordsInput = document.getElementById('worldbook-keywords'), worldbookContentInput = document.getElementById('worldbook-content'), worldbookAddBtn = document.getElementById('worldbook-add-btn'), worldbookEditIndexInput = document.getElementById('worldbook-edit-index'), worldbookEnabledInput = document.getElementById('worldbook-enabled');
     function saveWorldBook() { saveToLocalStorage('chat-worldbook', worldBookEntries); }
     function loadWorldBook() { 
-        let entries = loadFromLocalStorage('chat-worldbook', []);
-        
-        // --- 核心新增：内置弹幕世界书 ---
-        const DANMAKU_PRESET = {
-            name: "弹幕模式 (Danmaku Mode)",
-            keywords: "弹幕,danmaku,直播",
-            triggerMode: "keyword", 
-            useInMoments: false,
-            enabled: true,
-            content: `---
+            let entries = loadFromLocalStorage('chat-worldbook', []);
+            
+            // --- 核心新增：内置弹幕世界书 ---
+            const DANMAKU_PRESET = {
+                name: "弹幕模式 (Danmaku Mode)(VC-IGNORE)",
+                keywords: "",
+                triggerMode: "always", 
+                useInMoments: false,
+                enabled: true,
+                content: `---
 [ULTIMATE DIRECTIVE: THE FOURTH WALL - DANMAKU PLAYER COMMENTARY]
 
 **THIS IS A CRITICAL, CREATIVE TASK THAT YOU MUST PERFORM IN EVERY RESPONSE.**
@@ -7630,33 +7684,33 @@ You MUST use the custom \`<dm>\` tag format.
 </block>
 
 **CRITICAL FAILURE:** Any response that does not start with \`<block type="command">\` and end with \`</block>\` will be rejected. This is your final quality control step. Execute it perfectly.`
-        };
+            };
 
-        // 检查并注入预设世界书
-        if (!entries.some(e => e.name === DANMAKU_PRESET.name)) {
-            entries.push(DANMAKU_PRESET);
+            // 检查并注入预设世界书
+            if (!entries.some(e => e.name === DANMAKU_PRESET.name)) {
+                entries.push(DANMAKU_PRESET);
+            }
+            // --- 新增结束 ---
+
+            worldBookEntries = entries.map(e => {
+                if (typeof e.name === 'undefined') { 
+                    return { 
+                        name: e.key, 
+                        keywords: e.key, 
+                        content: e.content, 
+                        enabled: e.enabled !== false, 
+                        // --- 核心修改：旧数据如果没有 triggerMode，默认为 always ---
+                        triggerMode: e.triggerMode || 'always', 
+                        useInMoments: e.useInMoments || false 
+                    } 
+                }
+                if (typeof e.useInMoments === 'undefined') {
+                    e.useInMoments = false;
+                }
+                return e;
+            });
+            saveWorldBook();
         }
-        // --- 新增结束 ---
-
-        worldBookEntries = entries.map(e => {
-            if (typeof e.name === 'undefined') { 
-                return { 
-                    name: e.key, 
-                    keywords: e.key, 
-                    content: e.content, 
-                    enabled: e.enabled !== false, 
-                    // --- 核心修改：旧数据如果没有 triggerMode，默认为 always ---
-                    triggerMode: e.triggerMode || 'always', 
-                    useInMoments: e.useInMoments || false 
-                } 
-            }
-            if (typeof e.useInMoments === 'undefined') {
-                e.useInMoments = false;
-            }
-            return e;
-        });
-        saveWorldBook();
-    }
     function renderWorldBook() {
         worldbookList.innerHTML = '';
         worldBookEntries.forEach((entry, index) => {
@@ -9511,6 +9565,10 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
                 
 
                 // 3. 根据聊天模式选择基础指令
+                
+                // --- 核心修复：无论如何先获取基础提示 ---
+                let basePrompt = profile.prompt || '';
+
                 if (chatInfo.mode === 'offline') {
                     let directorHandbook = '';
                     let characterDefinition = '';
@@ -9529,7 +9587,7 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
 
                     } else {
                         // --- 剧本A：单聊的线下模式 ---
-                        directorHandbook = OFFLINE_DIRECTOR_HANDBOOK; // <--- 在这里，我们正确加载了“剧本A”
+                        directorHandbook = OFFLINE_DIRECTOR_HANDBOOK; 
 
                         characterDefinition = `
 ---
@@ -9546,8 +9604,8 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
 `;
                     }
                     
-                    // 将选择好的剧本和角色定义拼接起来
-                    finalSystemPrompt = directorHandbook + characterDefinition;
+                    // 将基础提示、剧本和角色定义拼接起来
+                    finalSystemPrompt = basePrompt + '\n\n' + directorHandbook + characterDefinition;
                 } else if (contactInfo.isGroup) {
     // 【第二优先级判断】：如果不是线下模式，再判断是不是群聊
     const GROUP_CHAT_DIRECTOR_PROMPT = `
@@ -9807,7 +9865,7 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 > [remove_member: {"actor":"周瑜", "target":"诸葛亮", "reason":"此人妖言惑众，留之必为大患！"}]
 > 孙尚香: 公瑾！你又在胡闹什么！
 `;
-    finalSystemPrompt = GROUP_CHAT_DIRECTOR_PROMPT;
+    finalSystemPrompt = basePrompt + '\n\n' + GROUP_CHAT_DIRECTOR_PROMPT;
     finalSystemPrompt += ONLINE_COMMAND_INSTRUCTIONS;
 
 } else {
@@ -9899,7 +9957,7 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     *   **最终执行指令：** 你现在拥有了一个包含【直白陈述】、【行为外化】、【感官与比喻】、【侧面烘托】的创作工具箱。面对每一个需要描写的瞬间，你【必须】根据**叙事节奏**和**角色性格**，从工具箱中选择**最恰当**的工具，而不是永远依赖同一种。
 `;
     
-    finalSystemPrompt = profile.prompt || '';
+    finalSystemPrompt = basePrompt;
     finalSystemPrompt += ONLINE_COMMAND_INSTRUCTIONS;
     const PROACTIVE_ACTION_SCENARIOS = `
 ---
@@ -14558,25 +14616,36 @@ document.getElementById('exit-group-btn').addEventListener('click', async () => 
             showNotificationBanner(chatId, { text: `群聊已${actionText}`, side: 'system' });
         }
     });
-async function handleProactiveAIMessage(targetChatId, senderName, line) {
-            // 找出目标聊天是私聊还是群聊
-            const targetChatInfo = chatList.find(c => c.id === targetChatId);
-            const isGroupChat = targetChatInfo && targetChatInfo.type === '群聊';
+async function handleProactiveAIMessage(targetChatId, senderName, content) {
+    const targetChatInfo = chatList.find(c => c.id === targetChatId);
+    const isGroupChat = targetChatInfo && targetChatInfo.type === '群聊';
 
-            // 创建消息对象
-            const newMessage = {
-                type: 'text',
-                text: line,
-                side: 'received',
-                // *** 核心修改：只有在目标是群聊时，才明确设置 sender 字段 ***
-                sender: isGroupChat ? senderName : null,
-                timestamp: Date.now()
-            };
+    // 1. 如果 content 是数组，就把它变成数组；如果是字符串，也变成数组方便统一处理
+    const messages = Array.isArray(content) ? content : [content];
 
-            // 直接调用我们重写后的、更智能的 addMessage 函数
-            // 并把消息应该去往的 targetChatId 传递给它
-            await conversationManager.addMessage(newMessage, targetChatId);
+    for (const msgText of messages) {
+        // 2. 安全检查：确保每一条都是字符串
+        let finalSafeText = msgText;
+        if (typeof finalSafeText !== 'string') {
+            // 万一进来了奇怪的东西（比如对象），强制转成字符串，防止崩坏
+            finalSafeText = JSON.stringify(finalSafeText);
         }
+
+        // 跳过空消息
+        if (!finalSafeText.trim()) continue;
+
+        const newMessage = {
+            type: 'text',
+            text: finalSafeText,
+            side: 'received',
+            sender: isGroupChat ? senderName : null,
+            timestamp: Date.now()
+        };
+        
+        // 逐条发送
+        await conversationManager.addMessage(newMessage, targetChatId);
+    }
+}
 
     
 async function showBranchHistoryModal(chatId) {
@@ -16285,7 +16354,19 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
                 }
                 // 【修改结束】
 
-                const privacyInfo = `(Privacy: ${post.privacy.type})`;
+                let privacyInfo = `(Privacy: ${post.privacy.type})`;
+                
+                // --- 核心修复：私密帖子警告 ---
+                if (post.privacy.type === 'private' && post.userName !== senderName) {
+                    privacyInfo += ` [PRIVATE POST]
+*** WARNING: This post is PRIVATE. ***
+1. You can SEE it.
+2. You can send a PRIVATE MESSAGE about it using [send_private_message].
+3. BUT: Any [like_moment] or [comment_moment] command for this post will be BLOCKED and VOIDED by the system. DO NOT WASTE TOKENS GENERATING THEM.`;
+                }
+                // --- 修复结束 ---
+                // --- 修复结束 ---
+
                 return `Post #${i + 1} (ID: ${post.id}) by ${authorLabel} ${privacyInfo}: "${contentDescription}" ${imageInfo}\n  Recent Comments:\n${commentsPreview || '  - No comments yet.'}`;
             }).join('\n\n');
 
@@ -16320,6 +16401,13 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
         function handleInteractionFromAI(characterName, action, data) {
             const post = feedData.find(p => p.id === data.postId);
             if (!post) return;
+
+            // --- 核心修复：如果是私密帖子，且操作者不是作者本人，直接强制中止 ---
+            if (post.privacy.type === 'private' && post.userName !== characterName) {
+                console.warn(`[Dynamics] Blocked interaction on private post ${post.id} from ${characterName}`);
+                return;
+            }
+            // --- 修复结束 ---
 
             if (action === 'like') {
                 if (!post.reactions['点赞']) post.reactions['点赞'] = [];
@@ -17225,7 +17313,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         let activeFontName = '';
 
         function loadSettings() {
-            appearanceSettings = loadFromLocalStorage('app-appearance-settings', {
+            // 定义默认设置结构，确保所有属性都有一个初始值
+            const defaultSettings = {
                 globalFontSize: '',
                 savedFonts: [],
                 activeFontName: '默认',
@@ -17237,9 +17326,16 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 homeBgUrl: '',
                 regexReplacements: [],
                 isFrameHidden: false 
-            });
+            };
+            
+            // 从 localStorage 加载数据，如果不存在或为空，则 loaded 为 {}
+            const loaded = loadFromLocalStorage('app-appearance-settings', {});
 
-            // --- 核心新增：内置弹幕正则规则 ---
+            // 【【【【【【【【【【 核心修复：将加载的数据与默认设置合并 】】】】】】】】】】
+            // 这样无论 loaded 是空对象还是残缺对象，appearanceSettings 都会是一个完整的对象
+            appearanceSettings = { ...defaultSettings, ...loaded };
+
+            // --- 内置弹幕正则规则 (逻辑保持不变) ---
             const PRESET_REGEX_RULES = [
               {
                 "name": "弹幕1-容器",
@@ -17257,14 +17353,12 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
               }
             ];
 
-            // 检查并注入预设规则
             if (!appearanceSettings.regexReplacements) {
                 appearanceSettings.regexReplacements = [];
             }
             
             let hasNewRules = false;
             PRESET_REGEX_RULES.forEach(preset => {
-                // 如果不存在同名规则，则添加
                 if (!appearanceSettings.regexReplacements.some(r => r.name === preset.name)) {
                     appearanceSettings.regexReplacements.push(preset);
                     hasNewRules = true;
@@ -17274,8 +17368,9 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             if (hasNewRules) {
                 saveToLocalStorage('app-appearance-settings', appearanceSettings);
             }
-            // --- 新增结束 ---
+            // --- 内置逻辑结束 ---
 
+            // 从合并后的、完整的 appearanceSettings 对象中安全地读取属性
             savedFonts = appearanceSettings.savedFonts || [];
             activeFontName = appearanceSettings.activeFontName || '默认';
         }
