@@ -4707,7 +4707,31 @@ input:checked + .slider:before {
                     </div>
                 </div>
                 <!-- PAGE 4: API Settings -->
-                <div id="page-settings" class="page"><div class="app-header"><button class="back-btn" data-target="home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button><h1>API 设置</h1></div><div class="content-wrapper"><h2>已保存的配置</h2><div id="api-profiles-list"></div><button id="add-new-profile-btn" class="btn-primary" style="margin-bottom: 20px;">添加新配置</button><div id="api-form-container" style="display: none;"><h3 id="api-form-title"></h3><div class="form-group"><label for="api-name">配置名称</label><input type="text" id="api-name"></div><div class="form-group"><label for="api-key">API Key</label><input type="password" id="api-key"></div><div class="form-group"><label for="api-url">API Endpoint URL</label><input type="text" id="api-url"></div><button id="fetch-models-btn" class="btn-primary btn-secondary" style="width: auto; padding: 8px 15px; margin-bottom: 10px;">获取模型列表</button><p id="api-fetch-status"></p><div class="form-group" id="model-select-group" style="display: none;"><label for="api-model-select">选择模型</label><select id="api-model-select"></select></div><div class="form-group"><label for="system-prompt">系统提示</label><textarea id="system-prompt"></textarea></div>
+                <div id="page-settings" class="page"><div class="app-header"><button class="back-btn" data-target="home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button><h1>API 设置</h1></div><div class="content-wrapper"><h2>已保存的配置</h2><div id="api-profiles-list"></div><button id="add-new-profile-btn" class="btn-primary" style="margin-bottom: 20px;">添加新配置</button><div id="api-form-container" style="display: none;"><h3 id="api-form-title"></h3><div class="form-group"><label for="api-name">配置名称</label><input type="text" id="api-name"></div><div class="form-group"><label for="api-key">API Key</label><input type="password" id="api-key"></div>
+
+<!-- ******** 插入新代码开始 ******** -->
+<div class="form-group">
+    <label for="api-provider">服务商 (快捷填地址)</label>
+    <select id="api-provider" class="modal-input modal-select">
+        <option value="custom">自定义 / 其他</option>
+        <option value="deepseek">DeepSeek (官方)</option>
+    </select>
+</div>
+<!-- ******** 插入新代码结束 ******** -->
+
+<div class="form-group"><label for="api-url">API Endpoint URL</label><input type="text" id="api-url"></div><button id="fetch-models-btn" class="btn-primary btn-secondary" style="width: auto; padding: 8px 15px; margin-bottom: 10px;">获取模型列表</button><p id="api-fetch-status"></p><div class="form-group" id="model-select-group" style="display: none;"><label for="api-model-select">选择模型</label><select id="api-model-select"></select></div><div class="form-group"><label for="system-prompt">系统提示</label><textarea id="system-prompt"></textarea></div>
+                        
+                        <!-- ******** 从这里开始插入新代码 ******** -->
+                        <div class="form-group">
+                            <label for="api-temperature">API 温度 (Temperature)</label>
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <input type="range" id="api-temperature-slider" min="0" max="2" step="0.1" style="width: 70%;">
+                                <input type="number" id="api-temperature" min="0" max="2" step="0.1" style="width: 30%;">
+                            </div>
+                            <p class="form-hint">值越高，回复越随机；值越低，回复越稳定。推荐 0.7 ~ 1.2。</p>
+                        </div>
+                        <!-- ******** 新代码到此结束 ******** -->
+
                         <div class="form-buttons-spaced">
                             <button id="save-api-profile-btn" class="btn-primary">保存</button>
                             <button id="cancel-api-form-btn" class="btn-primary btn-secondary">取消</button>
@@ -5114,6 +5138,20 @@ input:checked + .slider:before {
                             </div>
                         </div>
                         <!-- ******** 新代码到此结束 ******** -->
+
+                        <!-- ******** 从这里开始插入全新的代码 ******** -->
+                        <div class="form-section">
+                            <h3>调试选项</h3>
+                            <div class="form-group-toggle">
+                                <label for="toggle-raw-output" class="toggle-label">显示AI原始输出弹窗</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-raw-output">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <p class="form-hint" style="padding: 0 15px 15px;">开启后，当AI主动发消息或生成复杂HTML时，会弹出包含其完整原始回复的窗口，方便调试。</p>
+                        </div>
+                        <!-- ******** 全新代码到此结束 ******** -->
 
                         <div class="form-section">
                             <h3>主页图标</h3>
@@ -6967,7 +7005,7 @@ ${baseSystemPrompt}
         const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-            body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false })
+            body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
         });
 
         if (!response.ok) {
@@ -6983,13 +7021,24 @@ ${baseSystemPrompt}
         if (aiResponse && aiResponse.trim()) {
 
             // --- 【【【在这里插入下面的新代码块】】】 ---
-            if (actionType === 'message') {
-                await conversationManager.showCustomModal({
-                    title: 'AI 原始输出 (主动发消息)',
-                    // 使用 <textarea> 并设置为 readonly，方便您复制全部内容
-                    html: `<textarea readonly style="width: 100%; height: 250px; white-space: pre; word-wrap: normal; overflow-x: scroll;">${escapeHtml(aiResponse)}</textarea>`,
-                    buttons: [{ text: '关闭', value: 'close', class: 'secondary' }]
+            if (actionType === 'message' && appearanceSettings.showRawOutput) {
+                const result = await conversationManager.showCustomModal({
+                    title: '修改 AI 原始输出 (主动发消息)',
+                    // 1. 去掉 readonly 2. 加个 id
+                    html: `<textarea id="raw-output-editor-proactive" style="width: 100%; height: 250px; white-space: pre; word-wrap: normal; overflow-x: scroll; font-family: monospace; border: 1px solid #ccc; border-radius: 5px; padding: 10px;">${escapeHtml(aiResponse)}</textarea>`,
+                    buttons: [
+                        { text: '直接处理 (不改)', value: 'skip', class: 'secondary' },
+                        { text: '确认修改', value: 'confirm', class: 'primary' }
+                    ]
                 });
+
+                // 如果点击了“确认修改”，就读取输入框里的新内容覆盖原变量
+                if (result && result.value === 'confirm') {
+                    const editor = result.target.closest('.modal-box').querySelector('#raw-output-editor-proactive');
+                    if (editor) {
+                        aiResponse = editor.value; // <--- 核心：用修改后的内容替换原始回复
+                    }
+                }
             }
             // --- 【【【新代码块到此结束】】】 ---
 
@@ -7773,7 +7822,63 @@ You MUST use the custom \`<dm>\` tag format.
     function saveApiSettings() { saveToLocalStorage('chat-api-profiles', apiProfiles); localStorage.setItem('chat-active-profile-index', activeProfileIndex); }
     function loadApiSettings() { apiProfiles = loadFromLocalStorage('chat-api-profiles'); activeProfileIndex = JSON.parse(localStorage.getItem('chat-active-profile-index') || 'null'); }
     function renderApiProfiles() { apiProfilesList.innerHTML = ''; if (apiProfiles.length === 0) { apiProfilesList.innerHTML = '<p>无配置</p>'; return; } apiProfiles.forEach((profile, index) => { const item = document.createElement('div'); item.className = `api-profile-item ${index === activeProfileIndex ? 'active' : ''}`; item.innerHTML = `<strong>${profile.name}</strong><div class="api-profile-actions"><button onclick="window.app.selectProfile(${index})">激活</button><button onclick="window.app.editProfile(${index})">编辑</button><button onclick="window.app.deleteProfile(${index})">删除</button></div>`; apiProfilesList.appendChild(item); }); }
-    function showApiForm(isEdit = false, index = null) { modelSelectGroup.style.display = 'none'; apiFetchStatus.textContent = ''; apiFormContainer.style.display = 'block'; if (isEdit) { const profile = apiProfiles[index]; apiFormTitle.textContent = '编辑配置'; apiNameInput.value = profile.name; apiKeyInput.value = profile.key; apiUrlInput.value = profile.url; systemPromptInput.value = profile.prompt; apiEditIndexInput.value = index; if (profile.url && profile.key) fetchModels(profile.model); } else { apiFormTitle.textContent = '添加新配置'; apiNameInput.value = ''; apiKeyInput.value = ''; apiUrlInput.value = ''; systemPromptInput.value = 'You are a helpful assistant.'; apiEditIndexInput.value = ''; } }
+    function showApiForm(isEdit = false, index = null) { 
+        const tempSlider = document.getElementById('api-temperature-slider');
+        const tempInput = document.getElementById('api-temperature');
+        const providerSelect = document.getElementById('api-provider');
+        
+        tempSlider.oninput = () => tempInput.value = tempSlider.value;
+        tempInput.oninput = () => tempSlider.value = tempInput.value;
+
+        // ******** 修改后的逻辑：彻底移除 Gemini ********
+        providerSelect.onchange = () => {
+            switch(providerSelect.value) {
+                case 'deepseek':
+                    apiUrlInput.value = 'https://api.deepseek.com/v1/';
+                    break;
+                case 'custom':
+                    break;
+            }
+        };
+
+        modelSelectGroup.style.display = 'none'; 
+        apiFetchStatus.textContent = ''; 
+        apiFormContainer.style.display = 'block'; 
+        
+        if (isEdit) { 
+            const profile = apiProfiles[index]; 
+            apiFormTitle.textContent = '编辑配置'; 
+            apiNameInput.value = profile.name; 
+            apiKeyInput.value = profile.key; 
+            apiUrlInput.value = profile.url; 
+            systemPromptInput.value = profile.prompt; 
+            
+            // ******** 自动回显逻辑也同步移除 Gemini ********
+            if (profile.url.includes('api.deepseek.com')) {
+                providerSelect.value = 'deepseek';
+            } else {
+                providerSelect.value = 'custom';
+            }
+
+            const temperature = (profile.temperature !== undefined && profile.temperature !== null) ? profile.temperature : 0.7;
+            tempSlider.value = temperature;
+            tempInput.value = temperature;
+            apiEditIndexInput.value = index; 
+            if (profile.url && profile.key) fetchModels(profile.model); 
+        } else { 
+            apiFormTitle.textContent = '添加新配置'; 
+            apiNameInput.value = ''; 
+            apiKeyInput.value = ''; 
+            apiUrlInput.value = ''; 
+            systemPromptInput.value = 'You are a helpful assistant.'; 
+            
+            providerSelect.value = 'custom';
+            
+            tempSlider.value = 0.7;
+            tempInput.value = 0.7;
+            apiEditIndexInput.value = ''; 
+        } 
+    }
     function hideApiForm() { apiFormContainer.style.display = 'none'; }
     async function fetchModels(profileToSelectModel = null) { const apiKey = apiKeyInput.value.trim(); let apiUrl = apiUrlInput.value.trim(); if (!apiKey || !apiUrl) { apiFetchStatus.textContent = '请先输入 API Endpoint 和 Key。'; apiFetchStatus.className = 'status-error'; return; } apiFetchStatus.textContent = '正在获取模型...'; apiFetchStatus.className = 'status-loading'; modelSelectGroup.style.display = 'none'; try { const modelsUrl = `${new URL(apiUrl).protocol}//${new URL(apiUrl).host}/v1/models`; const response = await fetch(modelsUrl, { headers: { 'Authorization': `Bearer ${apiKey}` } }); if (!response.ok) throw new Error(`服务器错误: ${response.status}`); const data = await response.json(); const models = data.data || data; apiModelSelect.innerHTML = ''; 
 if (models && models.length > 0) { 
@@ -7791,7 +7896,7 @@ modelSelectGroup.style.display = 'block'; apiFetchStatus.textContent = `成功�
     addNewProfileBtn.addEventListener('click', () => showApiForm());
     cancelApiFormBtn.addEventListener('click', hideApiForm);
     fetchModelsBtn.addEventListener('click', () => fetchModels());
-    saveApiProfileBtn.addEventListener('click', () => { const name = apiNameInput.value.trim(); if (!name) return; const profileData = { name: name, key: apiKeyInput.value.trim(), url: apiUrlInput.value.trim(), prompt: systemPromptInput.value.trim(), model: modelSelectGroup.style.display === 'block' ? apiModelSelect.value : null }; const editIndex = apiEditIndexInput.value; if (editIndex !== '') apiProfiles[editIndex] = profileData; else apiProfiles.push(profileData); saveApiSettings(); renderApiProfiles(); hideApiForm(); });
+    saveApiProfileBtn.addEventListener('click', () => { const name = apiNameInput.value.trim(); if (!name) return; const profileData = { name: name, key: apiKeyInput.value.trim(), url: apiUrlInput.value.trim(), prompt: systemPromptInput.value.trim(), model: modelSelectGroup.style.display === 'block' ? apiModelSelect.value : null, temperature: parseFloat(document.getElementById('api-temperature').value) }; const editIndex = apiEditIndexInput.value; if (editIndex !== '') apiProfiles[editIndex] = profileData; else apiProfiles.push(profileData); saveApiSettings(); renderApiProfiles(); hideApiForm(); });
     window.app.selectProfile = (index) => { activeProfileIndex = index; saveApiSettings(); renderApiProfiles(); };
     window.app.editProfile = (index) => showApiForm(true, index);
     window.app.deleteProfile = (index) => { if (confirm('确认删除?')) { apiProfiles.splice(index, 1); if (activeProfileIndex === index) activeProfileIndex = null; saveApiSettings(); renderApiProfiles(); } };
@@ -9084,9 +9189,9 @@ if (chatState.chatId === originatingChatId) {
                 if (interrogationPrompt) {
                     const profile = apiProfiles[activeProfileIndex];
                     if (!profile) throw new Error("No active API profile for interrogation.");
-                    const messages = [{ role: "system", content: interrogationPrompt }];
+                    const finalMessages = [{ role: "system", content: interrogationPrompt }];
                     
-                    const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` }, body: JSON.stringify({ model: profile.model, messages, stream: false }) });
+                    const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` }, body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) }) });
                     if (!response.ok) throw new Error(`API Error in interrogation: ${response.status}`);
                     
                     const data = await response.json();
@@ -10639,14 +10744,10 @@ Okay, that's all the context and rules. Now, generate your full response.
 
                 const chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
                 const response = await fetch(chatUrl, {
-                
-                
-                
-                
-                
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false })
+                    // 【核心修正】：必须是 messages: finalMessages
+                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) })
                 });
         
                 if (!response.ok) {
@@ -10655,15 +10756,27 @@ Okay, that's all the context and rules. Now, generate your full response.
                 }
         
                 const data = await response.json();
-                const aiResponse = data.choices[0]?.message?.content;
+                let aiResponse = data.choices[0]?.message?.content; // <--- 这里的 const 必须改成 let
 
                 // --- 【【【请在这里插入新的诊断代码】】】 ---
-                if (aiResponse && aiResponse.includes('<div')) {
-                    await conversationManager.showCustomModal({
-                        title: 'AI 原始输出 (请复制全部内容)',
-                        html: `<textarea readonly style="width: 100%; height: 250px; white-space: pre; word-wrap: normal; overflow-x: scroll;">${escapeHtml(aiResponse)}</textarea>`,
-                        buttons: [{ text: '关闭', value: 'close', class: 'secondary' }]
+                if (aiResponse && aiResponse.includes('<div') && appearanceSettings.showRawOutput) {
+                    const result = await conversationManager.showCustomModal({
+                        title: '修改 AI 原始输出',
+                        // 1. 去掉 readonly 2. 加个 id 方便获取内容
+                        html: `<textarea id="raw-output-editor-continuation" style="width: 100%; height: 250px; white-space: pre; word-wrap: normal; overflow-x: scroll; font-family: monospace; border: 1px solid #ccc; border-radius: 5px; padding: 10px;">${escapeHtml(aiResponse)}</textarea>`,
+                        buttons: [
+                            { text: '直接处理 (不改)', value: 'skip', class: 'secondary' },
+                            { text: '确认修改', value: 'confirm', class: 'primary' }
+                        ]
                     });
+
+                    // 如果点击了“确认修改”，就读取输入框里的新内容覆盖原变量
+                    if (result && result.value === 'confirm') {
+                        const editor = result.target.closest('.modal-box').querySelector('#raw-output-editor-continuation');
+                        if (editor) {
+                            aiResponse = editor.value; // <--- 核心：用修改后的内容替换原始回复
+                        }
+                    }
                 }
                 // --- 【【【诊断代码结束】】】 ---
         
@@ -10894,7 +11007,7 @@ What do you do?`
                 const response = await fetch(chatUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false })
+                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
                 });
 
                 if (!response.ok) {
@@ -10947,7 +11060,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 const response = await fetch(chatUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false })
+                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
                 });
 
                 if (!response.ok) return;
@@ -10993,7 +11106,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 const response = await fetch(chatUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false })
+                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
                 });
 
                 if (!response.ok) {
@@ -11031,7 +11144,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false })
+                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
                 });
                 // 只是通知，不需要处理回复
             } catch (error) {
@@ -11065,7 +11178,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false })
+                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
                 });
                 // 我们不需要处理回复，只是通知AI
 
@@ -12747,7 +12860,7 @@ async function getAiGeneratedReplyForMe(targetChatId, messageToReply, stance) {
                 const response = await fetch(chatUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false })
+                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
                 });
 
                 closeLoadingModal(); // 无论成功失败，先关弹窗
@@ -17115,11 +17228,11 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                                     // 最终的 system prompt = 完整的上下文 + 场景执导任务
                                     const finalSystemPrompt = fullContextPrompt + scenePrompt;
 
-                                    const messages = [{ role: "system", content: finalSystemPrompt }];
+                                    const finalMessages = [{ role: "system", content: finalSystemPrompt }];
                                     const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                                        body: JSON.stringify({ model: profile.model, messages, stream: false })
+                                        body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) })
                                     });
 
                                     if (!response.ok) throw new Error(`API Error ${response.status}`);
@@ -17325,7 +17438,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 globalChatBgUrl: '',
                 homeBgUrl: '',
                 regexReplacements: [],
-                isFrameHidden: false 
+                isFrameHidden: false,
+                showRawOutput: false // 新增这一行，默认关闭
             };
             
             // 从 localStorage 加载数据，如果不存在或为空，则 loaded 为 {}
@@ -17456,6 +17570,15 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 frameToggle.checked = !appearanceSettings.isFrameHidden;
             }
             // --- 新代码到此结束 ---
+
+            // ******** 从这里开始插入全新的代码 ********
+            const rawOutputToggle = document.getElementById('toggle-raw-output');
+            if (rawOutputToggle) {
+                // 如果 showRawOutput 是 true (显示), 开关应为 ON (checked).
+                // 如果 showRawOutput 是 false (不显示), 开关应为 OFF (unchecked).
+                rawOutputToggle.checked = appearanceSettings.showRawOutput;
+            }
+            // ******** 全新代码到此结束 ********
 
 // ...函数剩余部分
             
@@ -17678,6 +17801,18 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 });
             }
             // --- 新代码到此结束 ---
+
+            // ******** 从这里开始插入全新的代码 ********
+            const rawOutputToggle = document.getElementById('toggle-raw-output');
+            if (rawOutputToggle) {
+                rawOutputToggle.addEventListener('change', () => {
+                    // 这个开关逻辑很简单，勾选就是 true
+                    appearanceSettings.showRawOutput = rawOutputToggle.checked;
+                    saveSettings();
+                    // 这个设置不需要重新应用，因为它只在JS逻辑里用
+                });
+            }
+            // ******** 全新代码到此结束 ********
 
              // START: 新增正则替换的事件监听
 // ...
@@ -20580,7 +20715,7 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false }) 
+                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) }) 
                 });
 
                 if (!response.ok) {
@@ -20687,7 +20822,7 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false }) 
+                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) }) 
                 });
 
                 if (!response.ok) throw new Error('API request failed');
@@ -20816,7 +20951,7 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false }) 
+                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) }) 
                 });
 
                 if (!response.ok) throw new Error('API request failed');
@@ -22558,7 +22693,7 @@ Your optional message to the user about the update.
             const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                body: JSON.stringify({ model: profile.model, messages: [personaPrompt, taskPrompt], stream: false })
+                body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false })
             });
 
             if (!response.ok) {
