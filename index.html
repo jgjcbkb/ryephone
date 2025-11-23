@@ -252,6 +252,8 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
+    /* 核心修复：强制让内部内容（如HTML卡片）水平居中，防止贴边 */
+    align-items: center; 
 }
     #page-conversation .message.sent { 
         background: #9eea6a; 
@@ -6033,30 +6035,46 @@ input:checked + .slider:before {
   - **WHY IT'S RIGHT:** This is a public status update. It shares a feeling with a general audience.
 
 ---
+**[HTML SNIPPET SAFETY PROTOCOL - READ CAREFULLY]**
+
+You are allowed to use HTML snippets (e.g., \`<snippet>...</snippet>\`) to create rich content, BUT ONLY in specific fields.
+
+*   **ALLOWED FIELDS (SAFE):**
+    *   **"text" (in "text" type posts):** YES. You can put HTML here.
+    *   **"content" (in comments):** YES. You can put HTML here.
+
+*   **FORBIDDEN FIELDS (DANGER ZONE):**
+    *   **"content" (in "photo-description", "text-on-image", "video" type posts):** **NO! ABSOLUTELY FORBIDDEN.** These fields are rendered as plain text inside a card. HTML will break them.
+    *   **"signer", "date" (in "statement" type posts):** **NO!** Pure text only.
+
+**RULE:** If you want to post an HTML card, you MUST use **type: "text"**. Do NOT try to put it inside a photo or video card.
+
+---
 **YOUR TASK**: You have decided to post on Moments. First, review the "KEY MENTAL SHIFT" above. Then, choose the SINGLE most appropriate post type from the library below. Finally, output the command in the exact format required.
 
 **[AVAILABLE POST TYPE LIBRARY & DECISION GUIDE]**
 
 **1. Pure Text (type: "text")**
-   - **USE CASE**: Best for sharing a direct thought, a public status update, a question to the world, or a simple feeling.
+   - **USE CASE**: Best for sharing a direct thought, a public status update, a question to the world, or a simple feeling. **ALSO USE THIS for HTML snippets.**
    - **FORMAT**: \`[post_moment: {"type":"text", "text":"Your public, self-contained text content here."}]\`
    - **GOOD EXAMPLES**:
      - A simple status: \`[post_moment: {"type":"text", "text":"收工。今天有点累。"}]\`
-     - A public question: \`[post_moment: {"type":"text", "text":"下雨天适合听什么歌？"}]\`
-     - A short reflection: \`[post_moment: {"type":"text", "text":"突然发现，安静也是一种力量。"}]\`
+     - An HTML card: \`[post_moment: {"type":"text", "text":"<snippet><div...>...</div></snippet>"}]\`
 
 **2. Photo Description Card (type: "photo-description")**
    - **USE CASE**: Use this ONLY when you want to "show" a specific visual scene. Your words will describe a picture.
    - **FORMAT**: \`[post_moment: {"type":"photo-description", "content":"A detailed, descriptive paragraph about the visual scene."}]\`
-   - **GOOD EXAMPLE**: \`[post_moment: {"type":"photo-description", "content":"傍晚的阳光透过百叶窗，在木地板上投下斑驳的光影，一杯喝了一半的咖啡静静地放在旁边。"}]\`
+   - **CONSTRAINT**: Pure text only. No HTML allowed.
 
 **3. Video Description Card (type: "video")**
    - **USE CASE**: Use this for describing a scene with movement, sound, or a sequence of events.
    - **FORMAT**: \`[post_moment: {"type":"video", "content":"A detailed description of the video scene."}]\`
+   - **CONSTRAINT**: Pure text only. No HTML allowed.
 
 **4. Statement (type: "statement")**
    - **USE CASE**: Only for very formal, official announcements.
    - **FORMAT**: \`[post_moment: {"type":"statement", "content":"The statement body.", "signer":"Signature", "date":"Date"}]\`
+   - **CONSTRAINT**: Pure text only. No HTML allowed.
 
 ---
 **CRITICAL THINKING PROCESS:**
@@ -9990,9 +10008,19 @@ Your entire focus MUST be on your own actions, thoughts, and interactions with O
                         identityPrompt += `SYSTEM NOTE: The user has set a remark/nickname for you: "${chatInfo.remark}". This is how they see you or have saved you in their contacts. This does NOT change your actual name. You should continue to refer to yourself as "${charNameForPrompt}".\n`;
                     }
                     
-                    // 如果存在【AI给用户的备注】，也提醒AI (这部分逻辑是正确的，保持不变)
-                    if (chatInfo.ai_remark_for_user) {
-                        identityPrompt += `You have given the user a remark: "${chatInfo.ai_remark_for_user}". Remember to use this name when addressing them, as it reflects your personal relationship and feelings towards them.\n`;
+                    // 核心升级：读取备注逻辑
+                    let currentRemark = null;
+                    // 1. 优先从新结构中读取
+                    if (chatInfo.ai_remarks && chatInfo.ai_remarks[charNameForPrompt]) {
+                        currentRemark = chatInfo.ai_remarks[charNameForPrompt];
+                    } 
+                    // 2. 如果没有，回退读取旧结构
+                    else if (chatInfo.ai_remark_for_user) {
+                        currentRemark = chatInfo.ai_remark_for_user;
+                    }
+
+                    if (currentRemark) {
+                        identityPrompt += `You have given the user a remark: "${currentRemark}". Remember to use this name when addressing them, as it reflects your personal relationship and feelings towards them.\n`;
                     }
                     
                     identityPrompt += `In all rules, {{char}} refers to you ("${charNameForPrompt}"), and {{user}} refers to the user you are interacting with, whose name is "${userNameForPrompt}".\n\n`;
@@ -10171,7 +10199,14 @@ You are responsible for playing every AI character in the "Active Cast" list abo
                         }
 
                         if (persona) {
-                            groupPersonasPrompt += `\n- **${memberName}**: ${persona}`;
+                            // --- 核心升级：检查该角色是否有对用户的特殊备注 ---
+                            let remarkPrompt = "";
+                            if (chatInfo.ai_remarks && chatInfo.ai_remarks[memberName]) {
+                                remarkPrompt = ` (Note: This character refers to user "${userNameForPrompt}" as "${chatInfo.ai_remarks[memberName]}")`;
+                            }
+                            // --- 升级结束 ---
+
+                            groupPersonasPrompt += `\n- **${memberName}**: ${persona}${remarkPrompt}`;
                             individualPersonasFound = true;
                         }
                     });
@@ -11206,16 +11241,28 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 case 'set_user_remark': {
                     const newRemark = cmd.value.trim();
                     const chatId = conversationManager.getCurrentChatId();
-                    if (chatId && newRemark) {
+                    // 核心：获取是谁发出的这个指令
+                    const remarkSender = sender || chatState.chatName; 
+
+                    if (chatId && newRemark && remarkSender) {
                         const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
-                        // 关键：这里保存的是AI为你设置的备注
-                        chatInfo.ai_remark_for_user = newRemark;
-                        saveToLocalStorage(`chat_info_${chatId}`, chatInfo); // 修正：应该是保存更新后的 chatInfo 对象
                         
-                        // 显示系统提示
-                        await addMessage({ type: 'system', side: 'system', text: `对方将给你的备注修改为“${newRemark}”` }, targetChatId);
+                        // --- 核心升级：使用对象来存储，格式为 { "角色名": "备注名" } ---
+                        if (!chatInfo.ai_remarks) {
+                            chatInfo.ai_remarks = {};
+                        }
+                        chatInfo.ai_remarks[remarkSender] = newRemark;
                         
-                        // 标记消息已处理，清空剩余文本，防止它被当作普通消息显示
+                        // 兼容旧数据：如果是单聊，顺便更新一下旧字段，防止逻辑断裂
+                        if (!contactInfo.isGroup) {
+                            chatInfo.ai_remark_for_user = newRemark;
+                        }
+
+                        saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+                        
+                        // 显示系统提示，明确是谁改的
+                        await addMessage({ type: 'system', side: 'system', text: `“${remarkSender}”将给你的备注修改为“${newRemark}”` }, targetChatId);
+                        
                         messageSent = true; 
                         regularText = ''; 
                     }
