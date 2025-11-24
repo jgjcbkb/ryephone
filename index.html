@@ -16316,7 +16316,63 @@ const momentsManager = (function() {
 
         async function showPrivacySelectionModal(initialPrivacy, callback) { privacyModalOverlay.classList.add('visible'); const handler = async (e) => { const targetOption = e.target.closest('.privacy-option'); if (e.target === privacyModalOverlay || targetOption) { privacyModalOverlay.removeEventListener('click', handler); privacyModalOverlay.classList.remove('visible'); } if (!targetOption) return; const type = targetOption.dataset.privacy; let newPrivacy = { type, list: [] }; if (type === 'include' || type === 'exclude') { const currentList = initialPrivacy.type === type ? initialPrivacy.list.join(', ') : ''; const names = await conversationManager.showContentInputModal({ title: type === 'include' ? '仅谁可见' : '不给谁看', placeholder: '请输入好友昵称，用逗号隔开', value: currentList }); if (names !== null) newPrivacy.list = names.split(',').map(n => n.trim()).filter(Boolean); else return; } callback(newPrivacy); }; privacyModalOverlay.addEventListener('click', handler); }
         
-        async function editPost(postId) { const post = feedData.find(p => p.id === postId); if (!post) return; const isSpecialType = post.type === 'video' || post.type === 'statement' || post.type === 'text-on-image'; const textToEdit = isSpecialType ? (post.content || '') : (post.text || ''); const newText = await conversationManager.showContentInputModal({ title: '编辑朋友圈', value: textToEdit, isTextarea: true }); if (newText !== null) { if(isSpecialType) post.content = newText.trim(); else post.text = newText.trim(); saveFeed(); renderFeed(); showNotification('朋友圈已更新'); } }
+        async function editPost(postId) {
+        const post = feedData.find(p => p.id === postId);
+        if (!post) return;
+
+        // 【【【【【【 全新的、智能的编辑逻辑 】】】】】】
+        let textToEdit = '';
+        let fieldToUpdate = '';
+
+        // 1. 根据帖子类型，决定要编辑哪个字段的内容
+        switch (post.type) {
+            case 'photo':
+                // 如果是纯图片帖，我们优先编辑AI生成的图片描述
+                textToEdit = post.imageDescription || post.text || ''; // 如果没有描述，再尝试编辑附带的文字
+                fieldToUpdate = 'imageDescription'; // 告诉程序，保存时要更新这个字段
+                break;
+            case 'video':
+            case 'statement':
+            case 'text-on-image':
+            case 'photo-description':
+                // 对于这些卡片类型，编辑它们的核心内容
+                textToEdit = post.content || '';
+                fieldToUpdate = 'content';
+                break;
+            default: // 'text', 'forward', etc.
+                // 对于普通文本帖或转发帖，编辑它们的附文
+                textToEdit = post.text || '';
+                fieldToUpdate = 'text';
+                break;
+        }
+
+        // 2. 打开编辑弹窗，并将我们智能获取到的内容填进去
+        const newText = await conversationManager.showContentInputModal({
+            title: '编辑朋友圈内容',
+            value: textToEdit,
+            isTextarea: true
+        });
+
+        // 3. 用户点击保存后，根据我们之前确定的字段，更新对应的数据
+        if (newText !== null) {
+            post[fieldToUpdate] = newText.trim();
+            
+            // 一个特殊处理：如果用户在编辑纯图片帖时，清空了附文和描述，
+            // 我们需要确保两个字段都被清空，避免残留旧数据。
+            if (post.type === 'photo') {
+                if (fieldToUpdate === 'imageDescription') {
+                    post.text = ''; // 顺便清空附文
+                } else if (fieldToUpdate === 'text') {
+                    post.imageDescription = ''; // 顺便清空描述
+                }
+            }
+            
+            saveFeed();
+            renderFeed();
+            showNotification('朋友圈已更新');
+        }
+        // 【【【【【【 修复结束 】】】】】】
+    }
         
         async function deletePost(postId) { if (await conversationManager.customConfirm('确定要删除这条朋友圈吗？')) { feedData = feedData.filter(p => p.id !== postId); saveFeed(); renderFeed(); showNotification('已删除朋友圈'); } }
         
