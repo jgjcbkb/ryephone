@@ -6890,9 +6890,10 @@ Based on the posts above, your persona, and your relationship with the authors, 
          1.  **Responsiveness:** The HTML **MUST be responsive**. Do not use fixed widths.
          2.  **Whitespace Curse:** Comment bubbles inherit a "preserve whitespace" rule. To prevent your HTML block from having huge empty spaces due to newlines in your code, you **MUST** add \`white-space: normal;\` to the style of your outermost \`<div>\`.
 
-**2. PRIVATE MESSAGE IMPULSE (Use Sparingly)**
-   *   **Use Case:** Only when a post makes you want to start a **private, one-on-one conversation** that is not suitable for a public comment section.
-   *   **Format:** \`[send_private_message: Your message content here.]\`
+// triggerProactiveAI -> actionType === 'browse_moments' -> instruction
+   *   **SEND MOMENT IMAGE TO CHAT (A Special Private Action)**
+   *   **Use Case:** When you see an image on Moments (posted by anyone, including the user) that you find particularly interesting, funny, or relevant, and you want to privately send it to the user to start a conversation about it.
+   *   **Format:** \`[send_moment_image_to_chat: {"postId":"the_post_id"}]\`
    *   **(Optional Multi-Message):** Use \`|||\` to separate multiple messages for a natural flow. (e.g., \`Hello|||How are you?\`)
 
 ---
@@ -7005,7 +7006,8 @@ ${baseSystemPrompt}
         const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-            body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
+            // 【【【 核心修复：将变量名 messages 修正为 finalMessages 】】】
+            body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) })
         });
 
         if (!response.ok) {
@@ -7097,7 +7099,7 @@ ${baseSystemPrompt}
                 }
 
                 // --- 核心修复：把正则改宽，允许匹配任意内容，不强制要求是 JSON 对象 ---
-const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message|forward_moment):\s*([\s\S]*?)\]/g;
+const momentInteractionRegex = /\[(send_moment_image_to_chat|like_moment|comment_moment|post_moment|send_private_message|forward_moment):\s*([\s\S]*?)\]/g;
                 let match;
                 let commandsFound = 0;
 
@@ -7120,31 +7122,40 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                         momentsManager.handleInteractionFromAI(senderName, 'like', { postId: targetPostId });
                     } else if (command === 'comment_moment') {
                         try {
-                            // 【【【【【【 终极、绝对、根本性的修复 】】】】】】
-                            // 我之前让你改的都是垃圾，这才是正确的。
-                            // 我们不再用脆弱的正则表达式去一点点“抠”数据，
-                            // 而是直接把AI返回的指令内容 value 当作一个完整的JSON对象来解析。
-                            // 这能从根本上解决所有问题，无论内容是什么。
-                            const commentPayload = JSON.parse(value);
+                            // 【【【【【【 终极、绝对、根本性的修复 V2.0 - 健壮解析法 】】】】】】
+                            
+                            // 步骤 1: 使用正则表达式，分别“挖”出 postId, content, 和 replyTo 的值。
+                            // 这个正则表达式非常宽容，即使 content 内部包含换行和引号也能正确匹配。
+                            const postIdMatch = value.match(/"postId"\s*:\s*"([^"]+)"/);
+                            const contentMatch = value.match(/"content"\s*:\s*"([\s\S]*?)"\s*(?:,\s*"replyTo"|,|})/)
+                            const replyToMatch = value.match(/"replyTo"\s*:\s*"([^"]+)"/);
 
-                            if (commentPayload.postId && commentPayload.content) {
+                            const postId = postIdMatch ? postIdMatch[1] : null;
+                            
+                            // 关键修复：处理JSON字符串中的转义字符
+                            let content = contentMatch ? contentMatch[1] : null;
+                            if (content) {
+                                content = content.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+                            }
+
+                            const replyTo = replyToMatch ? replyToMatch[1] : null;
+
+                            // 步骤 2: 只要挖出了 postId 和 content，就认为指令是有效的
+                            if (postId && content) {
                                 const commentData = {
-                                    postId: commentPayload.postId,
-                                    content: commentPayload.content
+                                    postId: postId,
+                                    content: content,
+                                    replyTo: replyTo // 如果没挖到 replyTo，这里就是 null，完全正确
                                 };
-                                
-                                if (commentPayload.replyTo) {
-                                    commentData.replyTo = commentPayload.replyTo;
-                                }
 
-                                // 把干净、正确的数据交给朋友圈管理器去处理
+                                // 步骤 3: 将干净、正确的数据交给朋友圈管理器去处理
                                 momentsManager.handleInteractionFromAI(senderName, 'comment', commentData);
                             } else {
-                                // 如果解析成功，但缺少关键字段，也记录错误
-                                throw new Error("AI返回的评论JSON缺少 postId 或 content 字段。");
+                                // 如果连最关键的 postId 或 content 都没挖到，才抛出错误
+                                throw new Error("无法从AI的响应中提取出有效的 postId 或 content。");
                             }
                         } catch (e) {
-                            // 如果JSON.parse失败，或者上面的throw new Error被触发，就在这里捕获
+                            // 捕获所有可能的错误（正则匹配失败、字段缺失等）
                             console.error(`[诊断日志] 角色 "${senderName}": 解析评论指令失败`, e, value);
                         }
                     } else if (command === 'forward_moment') { // 【核心新增：处理转发指令】
@@ -7173,15 +7184,10 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                             const messagesArray = messageContent.split('|||').map(msg => msg.trim()).filter(Boolean);
 
                             if (messagesArray.length > 0) {
-                                // ... (后续的路由逻辑保持不变)
+                                // ... (send_private_message 的路由逻辑) ...
                                 let finalTargetChatId = null;
                                 let logMessage = '';
 
-                                // =================================================================
-                                // 【【【【【【 全新的、严格遵守您规则的路由逻辑 】】】】】】
-                                // =================================================================
-
-                                // 规则 1: 单聊角色 -> 返回其专属单聊窗口
                                 const isPrivateCharacter = !isNpc && !isGroupPersona && !isEnsemblePersona;
                                 if (isPrivateCharacter) {
                                     const privateChat = chatList.find(chat => chat.type === '私聊' && chat.name === senderName);
@@ -7192,7 +7198,6 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                         logMessage = `单聊角色 "${senderName}" 尝试发送私信，但未找到其专属单聊窗口，操作取消。`;
                                     }
                                 }
-                                // 规则 2: NPC -> 返回与关联角色的【共同群聊】
                                 else if (isNpc) {
                                     const associatedChar = npcSettings.associations[senderName];
                                     if (associatedChar) {
@@ -7211,7 +7216,6 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                         logMessage = `NPC "${senderName}" 尝试发送私信，但未设置关联角色，操作取消。`;
                                     }
                                 }
-                                // 规则 3: 群演人设 或 群聊主角 -> 返回其【源群聊】
                                 else if (isEnsemblePersona || isGroupPersona) {
                                     const sourceGroupChat = chatList.find(chat => {
                                         if (chat.type !== '群聊') return false;
@@ -7230,9 +7234,6 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                     }
                                 }
 
-                                // --- 核心修复：保底机制 ---
-                                // 如果经过上面一通分析还是没找到 ID (finalTargetChatId 为 null)，
-                                // 但这个角色其实就在 chatList 里（名字匹配），那就直接发给那个 chat。
                                 if (!finalTargetChatId) {
                                     const fallbackChat = chatList.find(c => c.name === senderName && c.type === '私聊');
                                     if (fallbackChat) {
@@ -7240,27 +7241,21 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                         logMessage = `[保底触发] 角色 "${senderName}" 的私信被路由到已存在的私聊窗口。`;
                                     }
                                 }
-                                // --- 修复结束 ---
 
-                                // 统一的日志输出和发送执行
                                 console.log(`[诊断日志] ${logMessage}`);
 
                                 if (finalTargetChatId) {
-                                // --- 核心新增：在发送前进行资格审查 ---
                                 const targetChatForCheck = chatList.find(c => c.id === finalTargetChatId);
                                 if (targetChatForCheck && targetChatForCheck.type === '群聊') {
                                     const targetChatInfo = loadFromLocalStorage(`chat_info_${finalTargetChatId}`, {});
                                     const softRemovedInTarget = targetChatInfo.softRemovedMembers || [];
                                     if (softRemovedInTarget.includes(senderName)) {
                                         console.warn(`[诊断日志] 角色 "${senderName}" 的私信行为被中止，因为它已被从目标群聊 "${targetChatForCheck.name}" 中软移出。`);
-                                        // 直接终止，不发送消息
                                     } else {
-                                        // 资格审查通过，正常发送
                                         console.log(`[诊断日志] 准备向 Chat ID "${finalTargetChatId}" 发送 ${messagesArray.length} 条消息。`);
                                         await conversationManager.handleProactiveAIMessage(finalTargetChatId, senderName, messagesArray);
                                     }
                                 } else {
-                                    // 如果目标不是群聊（即私聊），则不受影响，正常发送
                                     console.log(`[诊断日志] 准备向 Chat ID "${finalTargetChatId}" 发送 ${messagesArray.length} 条消息。`);
                                     await conversationManager.handleProactiveAIMessage(finalTargetChatId, senderName, messagesArray);
                                 }
@@ -7269,8 +7264,37 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                         } catch (e) {
                             console.error(`[诊断日志] 角色 "${senderName}": 处理私信指令时发生未知错误`, e, value);
                         }
+                // ===== 这就是您要添加的新代码块 =====
+                } else if (command === 'send_moment_image_to_chat') {
+                    try {
+                        const payload = JSON.parse(value);
+                        const postId = payload.postId;
+                        const post = feedData.find(p => p.id === postId);
+
+                        if (post && post.image) {
+                            // 找到了帖子和图片
+                            const imageRef = post.image;
+                            
+                            // 找到AI角色与用户的私聊窗口ID
+                            const targetChat = chatList.find(c => c.type === '私聊' && c.name === senderName);
+                            if (targetChat) {
+                                // 以AI的身份，向私聊窗口发送这张图片
+                                await conversationManager.addMessage({
+                                    type: 'photo',
+                                    text: imageRef,
+                                    side: 'received',
+                                    sender: senderName 
+                                }, targetChat.id); // 明确指定发送到私聊窗口
+
+                                console.log(`[Dynamics] ${senderName} sent image from post ${postId} to chat.`);
+                            }
+                        }
+                    } catch (e) {
+                        console.error(`[Dynamics] 解析 send_moment_image_to_chat 指令失败`, e, value);
                     }
                 }
+                // ===== 新代码块到此结束 =====
+                } // end of while loop
 
                 if (commandsFound === 0) {
                     console.warn(`[诊断日志] 角色 "${senderName}": API返回了内容，但没有找到任何有效的指令。内容:`, cleanedResponse);
@@ -8993,7 +9017,7 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
                                 const base64DataUrl = await blobToBase64(blob);
                                 contentParts.push({ type: 'image_url', image_url: { "url": base64DataUrl } });
                                 
-                                // --- 核心修改：在这里注入指令 ---
+                                // conversationManager -> prepareApiPayload -> case 'photo'
                                 if (role === 'user') { // 只在用户发送图片时注入
                                     const imageDescriptionInstruction = `
 [SYSTEM IMAGE PROMPT]
@@ -9003,15 +9027,29 @@ The user has just sent an image. Your task is to perform two actions in a single
 
 **RULES FOR THE DESCRIPTION BLOCK:**
 -   It MUST be wrapped in \`<private_note type="image_description">...\</private_note>\` tags.
--   The description MUST be **objective and detailed**. Describe what you see factually (objects, colors, setting, actions, text).
--   The description MUST NOT be short or subjective (e.g., avoid "a beautiful cat", instead use "a long-haired, calico cat is sleeping on a sunlit windowsill").
+-   The description MUST be **objective and detailed**.
 -   This block is for your own memory and will not be visible to the user.
 
-**EXAMPLE RESPONSE FORMAT:**
-Oh, what a cute cat! Where did you take this picture?
+---
+**[ADDITIONAL ACTIONS - Optional & In-Character]**
+In addition to your text response, you have the option to perform **ONE** of the following special actions if it strongly fits your character's personality and the current situation. Use these sparingly to make them more impactful.
+
+*   **Action 1: Set as Your Avatar**
+    *   **Use Case:** If the image is particularly meaningful, beautiful, or funny to your character, you might impulsively set it as your new avatar.
+    *   **Command:** On a new, separate line, add \`[set_avatar]\`.
+
+*   **Action 2: Post to Your Moments**
+    *   **Use Case:** If the image is something your character would want to share publicly with their own commentary.
+    *   **Command:** On a new, separate line, add \`[post_moment_with_image: {"text":"Your commentary for the Moments post."}]\`.
+
+**EXAMPLE RESPONSE (Using an Action):**
+哇，这张照片拍得真好！太有感觉了，我拿来当头像啦！
+[set_avatar]
 <private_note type="image_description">
-A detailed, objective description of the cat image goes here. For example: A fluffy, long-haired calico cat with green eyes is curled up asleep on a wooden windowsill. Sunlight is streaming in from the left, highlighting its fur.
+A detailed description of the image...
 </private_note>
+
+**Final Mandate:** Your primary task is still to respond conversationally. The additional actions are a creative choice, not a requirement for every image.
 `;
                                     // 将指令作为文本部分添加到 contentParts
                                     contentParts.push({ type: 'text', text: imageDescriptionInstruction });
@@ -11370,7 +11408,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
 
 
             // --- 如果上面没有处理表情，则执行旧的指令逻辑 ---
-            const commandsRegex = /\[(set_user_remark|pay_for_user|claim_red_packet|accept_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?::\s*([^\]]+))?\]/g;
+            const commandsRegex = /\[(set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?::\s*([^\]]+))?\]/g;
             
             // --- 【核心重构：高级引用逻辑】 ---
             const advancedReplyMatch = textContent.match(/^\[reply_to:\s*"([\s\S]+?)"\]([\s\S]*)/);
@@ -11409,6 +11447,55 @@ You were receiving a video call from {{user}}, but they hung up before you could
             let regularText = textContent.replace(commandsRegex, '').trim();
             for (const cmd of commandsToExecute) {
                 switch(cmd.command) {
+                                    // ===== 从这里开始添加新代码 =====
+                    case 'set_avatar': {
+                        // 从后往前找到用户最近发送的一张图片
+                        const lastUserImageMsg = [...chatState.messages].reverse().find(m => m.side === 'sent' && m.type === 'photo');
+                        if (lastUserImageMsg && lastUserImageMsg.text) {
+                            const newAvatarRef = lastUserImageMsg.text;
+                            
+                            // 保存新头像
+                            saveToLocalStorage(`chat_avatar_${chatState.chatId}`, newAvatarRef);
+                            
+                            // 更新当前会话状态
+                            contactInfo.avatarUrl = newAvatarRef;
+                            
+                            // 发送系统通知
+                            await addMessage({ type: 'system', side: 'system', text: `“${chatState.chatName}”已将你发送的图片设为新头像。` }, targetChatId);
+                            
+                            // 重新渲染UI以显示新头像
+                            reRenderMessages();
+                            renderChatList(); // 确保主列表也更新
+                            
+                            messageSent = true; 
+                            regularText = ''; 
+                        }
+                        break;
+                    }
+
+                    case 'post_moment_with_image': {
+                        const lastUserImageMsg = [...chatState.messages].reverse().find(m => m.side === 'sent' && m.type === 'photo');
+                        if (lastUserImageMsg && lastUserImageMsg.text) {
+                            try {
+                                const postData = JSON.parse(cmd.value);
+                                const postPayload = {
+                                    type: 'photo',
+                                    text: postData.text || '',
+                                    image: lastUserImageMsg.text // 使用用户发送的图片引用
+                                };
+                                // 调用朋友圈管理器来创建帖子
+                                momentsManager.createPostFromAI(sender, postPayload);
+                                messageSent = true;
+                                regularText = '';
+                            } catch (e) {
+                                console.error("解析 post_moment_with_image 指令失败:", e);
+                            }
+                        }
+                        break;
+                    }
+                    // ===== 新代码到这里结束 =====
+
+                
                 case 'set_user_remark': {
                     const newRemark = cmd.value.trim();
                     const chatId = conversationManager.getCurrentChatId();
