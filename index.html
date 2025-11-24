@@ -6890,9 +6890,7 @@ Based on the posts above, your persona, and your relationship with the authors, 
          2.  **Whitespace Curse:** Comment bubbles inherit a "preserve whitespace" rule. To prevent your HTML block from having huge empty spaces due to newlines in your code, you **MUST** add \`white-space: normal;\` to the style of your outermost \`<div>\`.
 
 // triggerProactiveAI -> actionType === 'browse_moments' -> instruction
-   *   **SEND MOMENT IMAGE TO CHAT (A Special Private Action)**
-   *   **Use Case:** When you see an image on Moments (posted by anyone, including the user) that you find particularly interesting, funny, or relevant, and you want to privately send it to the user to start a conversation about it.
-   *   **Format:** \`[send_moment_image_to_chat: {"postId":"the_post_id"}]\`
+   
    *   **(Optional Multi-Message):** Use \`|||\` to separate multiple messages for a natural flow. (e.g., \`Hello|||How are you?\`)
 
 ---
@@ -7190,7 +7188,7 @@ ${baseSystemPrompt}
                 }
 
                 // --- 核心修复：把正则改宽，允许匹配任意内容，不强制要求是 JSON 对象 ---
-const momentInteractionRegex = /\[(send_moment_image_to_chat|like_moment|comment_moment|post_moment|send_private_message|forward_moment):\s*([\s\S]*?)\]/g;
+const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message|forward_moment):\s*([\s\S]*?)\]/g;
                 let match;
                 let commandsFound = 0;
 
@@ -7259,22 +7257,32 @@ const momentInteractionRegex = /\[(send_moment_image_to_chat|like_moment|comment
                             console.error(`[诊断日志] 角色 "${senderName}": 解析转发指令失败`, e, value);
                         }
                     } else if (command === 'send_private_message') {
-                        try {
-                            let messageContent = value.trim();
-                            
-                            // 检查AI返回的是否是一个JSON对象，如果是，则提取text属性
-                            if (messageContent.startsWith('{') && messageContent.endsWith('}')) {
-                                try {
-                                    const jsonData = JSON.parse(messageContent);
-                                    if (jsonData.text) {
-                                        messageContent = jsonData.text;
-                                    }
-                                } catch(e) { /* 解析失败则忽略，按纯文本处理 */ }
+                    try {
+                        let messageContent = value.trim();
+                        
+                        // 【【【【【【 全新的、增强的JSON解析逻辑 】】】】】】
+                        if (messageContent.startsWith('{') && messageContent.endsWith('}')) {
+                            try {
+                                const jsonData = JSON.parse(messageContent);
+                                // 优先检查是否存在 "content" 字段
+                                if (jsonData.content) {
+                                    messageContent = jsonData.content;
+                                } 
+                                // 其次检查是否存在 "text" 字段，作为兼容
+                                else if (jsonData.text) {
+                                    messageContent = jsonData.text;
+                                }
+                                // 如果JSON里有 target 字段，可以忽略，因为我们的路由逻辑会自动处理目标
+                            } catch(e) { 
+                                // 解析失败说明它可能不是一个真正的JSON，按纯文本处理
+                                console.warn("[私信解析] 看起来像JSON，但解析失败:", e);
                             }
-                            
-                            const messagesArray = messageContent.split('|||').map(msg => msg.trim()).filter(Boolean);
+                        }
+                        // 【【【【【【 解析逻辑结束 】】】】】】
+                        
+                        const messagesArray = messageContent.split('|||').map(msg => msg.trim()).filter(Boolean);
 
-                            if (messagesArray.length > 0) {
+                        if (messagesArray.length > 0) {
                                 // ... (send_private_message 的路由逻辑) ...
                                 let finalTargetChatId = null;
                                 let logMessage = '';
@@ -7355,36 +7363,7 @@ const momentInteractionRegex = /\[(send_moment_image_to_chat|like_moment|comment
                         } catch (e) {
                             console.error(`[诊断日志] 角色 "${senderName}": 处理私信指令时发生未知错误`, e, value);
                         }
-                // ===== 这就是您要添加的新代码块 =====
-                } else if (command === 'send_moment_image_to_chat') {
-                    try {
-                        const payload = JSON.parse(value);
-                        const postId = payload.postId;
-                        const post = feedData.find(p => p.id === postId);
-
-                        if (post && post.image) {
-                            // 找到了帖子和图片
-                            const imageRef = post.image;
-                            
-                            // 找到AI角色与用户的私聊窗口ID
-                            const targetChat = chatList.find(c => c.type === '私聊' && c.name === senderName);
-                            if (targetChat) {
-                                // 以AI的身份，向私聊窗口发送这张图片
-                                await conversationManager.addMessage({
-                                    type: 'photo',
-                                    text: imageRef,
-                                    side: 'received',
-                                    sender: senderName 
-                                }, targetChat.id); // 明确指定发送到私聊窗口
-
-                                console.log(`[Dynamics] ${senderName} sent image from post ${postId} to chat.`);
-                            }
-                        }
-                    } catch (e) {
-                        console.error(`[Dynamics] 解析 send_moment_image_to_chat 指令失败`, e, value);
-                    }
-                }
-                // ===== 新代码块到此结束 =====
+                
                 } // end of while loop
 
                 if (commandsFound === 0) {
