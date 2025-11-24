@@ -4709,19 +4709,19 @@ input:checked + .slider:before {
                 <!-- PAGE 4: API Settings -->
                 <div id="page-settings" class="page"><div class="app-header"><button class="back-btn" data-target="home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button><h1>API 设置</h1></div><div class="content-wrapper"><h2>已保存的配置</h2><div id="api-profiles-list"></div><button id="add-new-profile-btn" class="btn-primary" style="margin-bottom: 20px;">添加新配置</button><div id="api-form-container" style="display: none;"><h3 id="api-form-title"></h3><div class="form-group"><label for="api-name">配置名称</label><input type="text" id="api-name"></div><div class="form-group"><label for="api-key">API Key</label><input type="password" id="api-key"></div>
 
-<!-- ******** 插入新代码开始 ******** -->
+
 <div class="form-group">
     <label for="api-provider">服务商 (快捷填地址)</label>
     <select id="api-provider" class="modal-input modal-select">
         <option value="custom">自定义 / 其他</option>
+        <option value="gemini">Gemini (官方)</option> {/* 新增：Gemini 选项 */}
         <option value="deepseek">DeepSeek (官方)</option>
     </select>
 </div>
-<!-- ******** 插入新代码结束 ******** -->
+
 
 <div class="form-group"><label for="api-url">API Endpoint URL</label><input type="text" id="api-url"></div><button id="fetch-models-btn" class="btn-primary btn-secondary" style="width: auto; padding: 8px 15px; margin-bottom: 10px;">获取模型列表</button><p id="api-fetch-status"></p><div class="form-group" id="model-select-group" style="display: none;"><label for="api-model-select">选择模型</label><select id="api-model-select"></select></div><div class="form-group"><label for="system-prompt">系统提示</label><textarea id="system-prompt"></textarea></div>
                         
-                        <!-- ******** 从这里开始插入新代码 ******** -->
                         <div class="form-group">
                             <label for="api-temperature">API 温度 (Temperature)</label>
                             <div style="display: flex; align-items: center; gap: 15px;">
@@ -4730,7 +4730,6 @@ input:checked + .slider:before {
                             </div>
                             <p class="form-hint">值越高，回复越随机；值越低，回复越稳定。推荐 0.7 ~ 1.2。</p>
                         </div>
-                        <!-- ******** 新代码到此结束 ******** -->
 
                         <div class="form-buttons-spaced">
                             <button id="save-api-profile-btn" class="btn-primary">保存</button>
@@ -6911,12 +6910,34 @@ Even if nothing seems immediately interesting, you must find a reason to act, ba
 **Your task is to analyze the situation and CHOOSE an action, not to decide IF you should act. You MUST act.**
 `;
 
-            const systemMessageContent = [{ type: 'text', text: instruction }];
+            // =================================================================
+        // ================= START: GEMINI COMPATIBILITY FIX V2 ===============
+        // =================================================================
+        // 核心修复：确保 system_instruction 和 contents 被正确分离和填充
+        
+        // 1. 将系统指令和对话历史（如果有）分开
+        const systemMessage = { role: "system", content: instruction };
+        
+        // 2. `finalMessages` 现在只包含用户和模型的对话历史。
+        //    由于朋友圈动态不需要历史记录，这里它是一个空数组。
+        finalMessages = []; 
+        
+        // 3. 如果有图片需要AI识别，将其作为一条独立的'user'消息添加到对话历史中
+        if (imagePayloads.length > 0) {
+            const userImageMessageContent = [
+                { type: 'text', text: "Please analyze the following image(s) as part of the context." },
+                ...imagePayloads
+            ];
+            finalMessages.push({ role: "user", content: userImageMessageContent });
+        }
 
-            if (imagePayloads.length > 0) {
-                systemMessageContent.push(...imagePayloads);
-            }
-            finalMessages = [{ role: "system", content: systemMessageContent }];
+        // 4. 在发送给Gemini之前，将系统指令和对话历史组合起来
+        //    这将确保 `finalMessages` 传递给OpenAI时是完整的，
+        //    而在Gemini的逻辑块中，systemInstruction 和 contents 能被正确分离。
+        finalMessages.unshift(systemMessage);
+        // =================================================================
+        // =================== END: GEMINI COMPATIBILITY FIX V2 ================
+        // =================================================================
         
         } else if (actionType === 'post_moment') {
             // 【第四步：为发朋友圈的行为，也注入上下文】
@@ -7003,11 +7024,73 @@ ${baseSystemPrompt}
         }
 
         console.log(`[诊断日志] 角色 "${senderName}": 正在向API发送请求...`);
-        const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
+        // =================================================================
+        // ================= START: GEMINI COMPATIBILITY BLOCK (FINAL) ==========
+        // =================================================================
+        let chatUrl, requestBody, requestHeaders;
+
+        if (profile.url.includes('googleapis.com')) {
+            // --- Gemini API Logic ---
+            chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:generateContent?key=${profile.key}`;
+            requestHeaders = { 'Content-Type': 'application/json' };
+            
+            const systemInstruction = finalMessages.find(m => m.role === 'system');
+            
+            let contents = finalMessages
+                .filter(m => m.role !== 'system')
+                .map(msg => {
+                    const role = msg.role === 'assistant' ? 'model' : 'user';
+                    
+                    let parts;
+                    if (Array.isArray(msg.content)) {
+                        parts = msg.content.map(part => {
+                            if (part.type === 'text') {
+                                return { text: part.text };
+                            }
+                            if (part.type === 'image_url') {
+                                const base64Data = part.image_url.url.split(',')[1];
+                                const mimeType = part.image_url.url.match(/data:(.*?);/)[1];
+                                return { inline_data: { mime_type: mimeType, data: base64Data } };
+                            }
+                            return null;
+                        }).filter(Boolean);
+                    } else {
+                        parts = [{ text: msg.content }];
+                    }
+                    return { role, parts };
+                });
+
+            // 【【【【【【 核心、决定性的修复 】】】】】】
+            // 如果经过过滤后，contents数组变空了（常见于朋友圈动态这种没有对话历史的场景），
+            // 我们必须手动添加一个“启动”消息，否则Gemini会报错。
+            if (contents.length === 0) {
+                contents.push({
+                    role: 'user',
+                    parts: [{ text: 'Please proceed with your action based on the provided system instructions and context.' }]
+                });
+            }
+            
+            requestBody = { contents };
+            if (systemInstruction && systemInstruction.content) { // 增加安全检查
+                // Gemini的system_instruction不能包含图片，必须是纯文本
+                const systemText = Array.isArray(systemInstruction.content) ? systemInstruction.content.find(p => p.type === 'text')?.text || '' : systemInstruction.content;
+                requestBody.system_instruction = { parts: [{ text: systemText }] };
+            }
+            if (profile.temperature !== undefined) {
+                requestBody.generationConfig = { temperature: profile.temperature };
+            }
+
+        } else {
+            // --- OpenAI Compatible API Logic ---
+            chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
+            requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
+            requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
+        }
+        
+        const response = await fetch(chatUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-            // 【【【 核心修复：将变量名 messages 修正为 finalMessages 】】】
-            body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) })
+            headers: requestHeaders,
+            body: JSON.stringify(requestBody)
         });
 
         if (!response.ok) {
@@ -7017,7 +7100,15 @@ ${baseSystemPrompt}
         }
 
         const data = await response.json();
-        aiResponse = data.choices[0]?.message?.content;
+        
+        if (profile.url.includes('googleapis.com')) {
+            aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        } else {
+            aiResponse = data.choices?.[0]?.message?.content;
+        }
+        // =================================================================
+        // =================== END: GEMINI COMPATIBILITY BLOCK (FINAL) ===========
+        // =================================================================
 
         console.log(`[诊断日志] 角色 "${senderName}": API已返回内容。`);
         if (aiResponse && aiResponse.trim()) {
@@ -7854,9 +7945,12 @@ You MUST use the custom \`<dm>\` tag format.
         tempSlider.oninput = () => tempInput.value = tempSlider.value;
         tempInput.oninput = () => tempSlider.value = tempInput.value;
 
-        // ******** 修改后的逻辑：彻底移除 Gemini ********
+        // ******** 核心修改区域 #2 开始 ********
         providerSelect.onchange = () => {
             switch(providerSelect.value) {
+                case 'gemini': // 新增：处理 Gemini 选项
+                    apiUrlInput.value = 'https://generativelanguage.googleapis.com/v1beta/';
+                    break;
                 case 'deepseek':
                     apiUrlInput.value = 'https://api.deepseek.com/v1/';
                     break;
@@ -7864,6 +7958,7 @@ You MUST use the custom \`<dm>\` tag format.
                     break;
             }
         };
+        // ******** 核心修改区域 #2 结束 ********
 
         modelSelectGroup.style.display = 'none'; 
         apiFetchStatus.textContent = ''; 
@@ -7877,12 +7972,15 @@ You MUST use the custom \`<dm>\` tag format.
             apiUrlInput.value = profile.url; 
             systemPromptInput.value = profile.prompt; 
             
-            // ******** 自动回显逻辑也同步移除 Gemini ********
-            if (profile.url.includes('api.deepseek.com')) {
+            // ******** 核心修改区域 #3 开始 ********
+            if (profile.url.includes('googleapis.com')) { // 新增：识别 Gemini URL
+                providerSelect.value = 'gemini';
+            } else if (profile.url.includes('api.deepseek.com')) {
                 providerSelect.value = 'deepseek';
             } else {
                 providerSelect.value = 'custom';
             }
+            // ******** 核心修改区域 #3 结束 ********
 
             const temperature = (profile.temperature !== undefined && profile.temperature !== null) ? profile.temperature : 0.7;
             tempSlider.value = temperature;
@@ -7904,19 +8002,73 @@ You MUST use the custom \`<dm>\` tag format.
         } 
     }
     function hideApiForm() { apiFormContainer.style.display = 'none'; }
-    async function fetchModels(profileToSelectModel = null) { const apiKey = apiKeyInput.value.trim(); let apiUrl = apiUrlInput.value.trim(); if (!apiKey || !apiUrl) { apiFetchStatus.textContent = '请先输入 API Endpoint 和 Key。'; apiFetchStatus.className = 'status-error'; return; } apiFetchStatus.textContent = '正在获取模型...'; apiFetchStatus.className = 'status-loading'; modelSelectGroup.style.display = 'none'; try { const modelsUrl = `${new URL(apiUrl).protocol}//${new URL(apiUrl).host}/v1/models`; const response = await fetch(modelsUrl, { headers: { 'Authorization': `Bearer ${apiKey}` } }); if (!response.ok) throw new Error(`服务器错误: ${response.status}`); const data = await response.json(); const models = data.data || data; apiModelSelect.innerHTML = ''; 
-if (models && models.length > 0) { 
-    // 【【【核心新增代码从这里开始】】】
-    models.sort((a, b) => a.id.localeCompare(b.id)); // 按模型ID（名字）进行字母/数字排序
-    // 【【【核心新增代码到这里结束】】】
-    
-    models.forEach(model => { 
-        const option = document.createElement('option'); 
-        option.value = model.id; 
-        option.textContent = model.id; 
-        apiModelSelect.appendChild(option); 
-    });
-modelSelectGroup.style.display = 'block'; apiFetchStatus.textContent = `成功获取 ${models.length} 个模型！`; apiFetchStatus.className = 'status-success'; if (profileToSelectModel) apiModelSelect.value = profileToSelectModel; } else { apiFetchStatus.textContent = '未找到模型。'; apiFetchStatus.className = 'status-error'; } } catch (error) { apiFetchStatus.textContent = `获取失败: ${error.message}`; apiFetchStatus.className = 'status-error'; } }
+    async function fetchModels(profileToSelectModel = null) { 
+        const apiKey = apiKeyInput.value.trim(); 
+        let apiUrl = apiUrlInput.value.trim(); 
+        if (!apiKey || !apiUrl) { 
+            apiFetchStatus.textContent = '请先输入 API Endpoint 和 Key。'; 
+            apiFetchStatus.className = 'status-error'; 
+            return; 
+        } 
+        apiFetchStatus.textContent = '正在获取模型...'; 
+        apiFetchStatus.className = 'status-loading'; 
+        modelSelectGroup.style.display = 'none'; 
+        try { 
+            // ******** 核心修改区域 #4 开始 ********
+            let modelsUrl;
+            let headers;
+
+            // 根据URL判断是Gemini还是OpenAI兼容API
+            if (apiUrl.includes('googleapis.com')) {
+                // Gemini 的模型列表URL和请求头
+                modelsUrl = `${apiUrl.endsWith('/') ? apiUrl : apiUrl + '/'}models?key=${apiKey}`;
+                headers = { 'Content-Type': 'application/json' };
+            } else {
+                // OpenAI 兼容API的模型列表URL和请求头
+                modelsUrl = `${new URL(apiUrl).protocol}//${new URL(apiUrl).host}/v1/models`; 
+                headers = { 'Authorization': `Bearer ${apiKey}` };
+            }
+            // ******** 核心修改区域 #4 结束 ********
+
+            const response = await fetch(modelsUrl, { headers: headers }); 
+            if (!response.ok) throw new Error(`服务器错误: ${response.status}`); 
+            const data = await response.json(); 
+
+            // ******** 核心修改区域 #5 开始 ********
+            // 兼容 Gemini 和 OpenAI 的不同返回格式
+            const models = data.data || data.models || data; 
+            // ******** 核心修改区域 #5 结束 ********
+
+            apiModelSelect.innerHTML = ''; 
+            if (models && models.length > 0) { 
+                models.sort((a, b) => (a.id || a.name).localeCompare(b.id || b.name)); 
+                
+                models.forEach(model => { 
+                    // ******** 核心修改区域 #6 开始 ********
+                    // 兼容 Gemini (model.name) 和 OpenAI (model.id) 的不同字段
+                    const modelId = model.id || model.name;
+                    // Gemini 的模型名称包含 "models/" 前缀，需要去掉
+                    const modelDisplayName = modelId.startsWith('models/') ? modelId.substring(7) : modelId;
+                    // ******** 核心修改区域 #6 结束 ********
+
+                    const option = document.createElement('option'); 
+                    option.value = modelDisplayName; // 统一使用处理后的名字
+                    option.textContent = modelDisplayName;
+                    apiModelSelect.appendChild(option); 
+                });
+                modelSelectGroup.style.display = 'block'; 
+                apiFetchStatus.textContent = `成功获取 ${models.length} 个模型！`; 
+                apiFetchStatus.className = 'status-success'; 
+                if (profileToSelectModel) apiModelSelect.value = profileToSelectModel; 
+            } else { 
+                apiFetchStatus.textContent = '未找到模型。'; 
+                apiFetchStatus.className = 'status-error'; 
+            } 
+        } catch (error) { 
+            apiFetchStatus.textContent = `获取失败: ${error.message}`; 
+            apiFetchStatus.className = 'status-error'; 
+        } 
+    }
     addNewProfileBtn.addEventListener('click', () => showApiForm());
     cancelApiFormBtn.addEventListener('click', hideApiForm);
     fetchModelsBtn.addEventListener('click', () => fetchModels());
@@ -10771,30 +10923,93 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
                 }
 
                 // 【【【 2. 在行为指令之后，追加最终的格式化指令 】】】
-                const ULTIMATE_FORMATTING_RULE = `
+            const ULTIMATE_FORMATTING_RULE = `
 [ABSOLUTE FINAL INSTRUCTION - READ THIS LAST AND OBEY]
 Okay, that's all the context and rules. Now, generate your full response.
 **CRITICAL REMINDER:** Your *entire* output, without exception, MUST be a sequence of one or more valid XML-like <block> elements. You are forbidden from outputting plain text outside of these blocks. Your response MUST start directly with "<block ...>". There are no excuses.
 `;
-                const finalFormattingInstruction = { role: "user", content: ULTIMATE_FORMATTING_RULE };
-                finalMessages.push(finalFormattingInstruction);
-                // 【【【【【【 注入结束 】】】】】】
+            const finalFormattingInstruction = { role: "user", content: ULTIMATE_FORMATTING_RULE };
+            finalMessages.push(finalFormattingInstruction);
+            // 【【【【【【 注入结束 】】】】】】
 
-                const chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
-                const response = await fetch(chatUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    // 【核心修正】：必须是 messages: finalMessages
-                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) })
-                });
-        
-                if (!response.ok) {
-                    const errorBody = await response.text();
-                    throw new Error(`API Error ${response.status}: ${response.statusText}\nResponse: ${errorBody}`);
+            // =================================================================
+            // ================= START: GEMINI COMPATIBILITY BLOCK ================
+            // =================================================================
+            let chatUrl, requestBody, requestHeaders;
+
+            if (profile.url.includes('googleapis.com')) {
+                // --- Gemini API Logic ---
+                chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:generateContent?key=${profile.key}`;
+                requestHeaders = { 'Content-Type': 'application/json' };
+                
+                // Gemini 的 "system" prompt 需要单独处理
+                const systemInstruction = finalMessages.find(m => m.role === 'system');
+                
+                // 将 OpenAI 格式转换为 Gemini 格式
+                const contents = finalMessages
+                    .filter(m => m.role !== 'system') // 过滤掉 system 角色的消息
+                    .map(msg => {
+                        // Gemini 的 role 只能是 'user' 或 'model'
+                        const role = msg.role === 'assistant' ? 'model' : 'user';
+                        
+                        // Gemini 的 content 是一个包含 parts 数组的对象
+                        let parts;
+                        if (Array.isArray(msg.content)) {
+                            parts = msg.content.map(part => {
+                                if (part.type === 'text') {
+                                    return { text: part.text };
+                                }
+                                if (part.type === 'image_url') {
+                                    const base64Data = part.image_url.url.split(',')[1];
+                                    const mimeType = part.image_url.url.match(/data:(.*?);/)[1];
+                                    return { inline_data: { mime_type: mimeType, data: base64Data } };
+                                }
+                                return null;
+                            }).filter(Boolean);
+                        } else {
+                            parts = [{ text: msg.content }];
+                        }
+                        return { role, parts };
+                    });
+                    
+                requestBody = { contents };
+                if (systemInstruction) {
+                    requestBody.system_instruction = { parts: [{ text: systemInstruction.content }] };
                 }
-        
-                const data = await response.json();
-                let aiResponse = data.choices[0]?.message?.content; // <--- 这里的 const 必须改成 let
+                if (profile.temperature !== undefined) {
+                    requestBody.generationConfig = { temperature: profile.temperature };
+                }
+
+            } else {
+                // --- OpenAI Compatible API Logic ---
+                chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
+                requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
+                requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
+            }
+
+            const response = await fetch(chatUrl, {
+                method: 'POST',
+                headers: requestHeaders,
+                body: JSON.stringify(requestBody)
+            });
+    
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(`API Error ${response.status}: ${response.statusText}\nResponse: ${errorBody}`);
+            }
+    
+            const data = await response.json();
+
+            // 兼容 Gemini 和 OpenAI 的不同返回格式
+            let aiResponse;
+            if (profile.url.includes('googleapis.com')) {
+                aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            } else {
+                aiResponse = data.choices?.[0]?.message?.content;
+            }
+            // =================================================================
+            // =================== END: GEMINI COMPATIBILITY BLOCK =================
+            // =================================================================
 
                 // --- 【【【请在这里插入新的诊断代码】】】 ---
                 if (aiResponse && aiResponse.includes('<div') && appearanceSettings.showRawOutput) {
@@ -11040,28 +11255,61 @@ What do you do?`
                 const recentMessages = memoryLength > 0 ? chatState.messages.slice(-memoryLength) : chatState.messages;
                 const apiPayloadMessages = await prepareApiPayload(recentMessages);
                 const finalMessages = [...apiPayloadMessages, callInstruction];
-                
-                const chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
-                const response = await fetch(chatUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
-                });
+            
+            // =================================================================
+            // ================= START: GEMINI COMPATIBILITY BLOCK ================
+            // =================================================================
+            let chatUrl, requestBody, requestHeaders;
 
-                if (!response.ok) {
-                    const errorBody = await response.text();
-                    throw new Error(`API Error ${response.status}: ${response.statusText}\nResponse: ${errorBody}`);
-                }
+            if (profile.url.includes('googleapis.com')) {
+                chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:generateContent?key=${profile.key}`;
+                requestHeaders = { 'Content-Type': 'application/json' };
                 
-                const data = await response.json();
-                
-                // 3. 再次检查呼叫是否已取消
-                if (callAttemptState.callId !== callId) {
-                    console.log("Call was cancelled while API was responding.");
-                    return null; // 返回 null 表示已取消
+                const contents = finalMessages.map(msg => ({
+                    role: msg.role === 'assistant' ? 'model' : 'user',
+                    parts: [{ text: msg.content }]
+                }));
+                    
+                requestBody = { contents };
+                if (profile.temperature !== undefined) {
+                    requestBody.generationConfig = { temperature: profile.temperature };
                 }
+            } else {
+                chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
+                requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
+                requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
+            }
 
-                return data.choices[0]?.message?.content || ""; // 返回AI的回复
+            const response = await fetch(chatUrl, {
+                method: 'POST',
+                headers: requestHeaders,
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(`API Error ${response.status}: ${response.statusText}\nResponse: ${errorBody}`);
+            }
+            
+            const data = await response.json();
+            
+            // 3. 再次检查呼叫是否已取消
+            if (callAttemptState.callId !== callId) {
+                console.log("Call was cancelled while API was responding.");
+                return null; // 返回 null 表示已取消
+            }
+            
+            let aiResponse;
+            if (profile.url.includes('googleapis.com')) {
+                aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            } else {
+                aiResponse = data.choices?.[0]?.message?.content;
+            }
+
+            return aiResponse || ""; // 返回AI的回复
+            // =================================================================
+            // =================== END: GEMINI COMPATIBILITY BLOCK =================
+            // =================================================================
 
             } catch (error) {
                 console.error("Outgoing call API request failed:", error);
@@ -12938,27 +13186,68 @@ async function getAiGeneratedReplyForMe(targetChatId, messageToReply, stance) {
                 const apiPayloadMessages = await prepareApiPayload(recentMessages);
 
                 const finalMessages = [
-                    { role: "system", content: fullSystemPrompt },
-                    ...apiPayloadMessages,
-                    { role: "user", content: taskPrompt }
-                ];
+                { role: "system", content: fullSystemPrompt },
+                ...apiPayloadMessages,
+                { role: "user", content: taskPrompt }
+            ];
 
-                const chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
-                const response = await fetch(chatUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
-                });
+            // =================================================================
+            // ================= START: GEMINI COMPATIBILITY BLOCK ================
+            // =================================================================
+            let chatUrl, requestBody, requestHeaders;
 
-                closeLoadingModal(); // 无论成功失败，先关弹窗
-
-                if (!response.ok) {
-                    const errorBody = await response.text();
-                    throw new Error(`API 错误 ${response.status}: ${errorBody}`);
-                }
+            if (profile.url.includes('googleapis.com')) {
+                chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:generateContent?key=${profile.key}`;
+                requestHeaders = { 'Content-Type': 'application/json' };
                 
-                const data = await response.json();
-                return data.choices[0]?.message?.content || "";
+                const systemInstruction = finalMessages.find(m => m.role === 'system');
+                const contents = finalMessages
+                    .filter(m => m.role !== 'system')
+                    .map(msg => ({
+                        role: msg.role === 'assistant' ? 'model' : 'user',
+                        parts: [{ text: msg.content }]
+                    }));
+                    
+                requestBody = { contents };
+                if (systemInstruction) {
+                    requestBody.system_instruction = { parts: [{ text: systemInstruction.content }] };
+                }
+                if (profile.temperature !== undefined) {
+                    requestBody.generationConfig = { temperature: profile.temperature };
+                }
+
+            } else {
+                chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
+                requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
+                requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
+            }
+
+            const response = await fetch(chatUrl, {
+                method: 'POST',
+                headers: requestHeaders,
+                body: JSON.stringify(requestBody)
+            });
+
+            closeLoadingModal(); // 无论成功失败，先关弹窗
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(`API 错误 ${response.status}: ${errorBody}`);
+            }
+            
+            const data = await response.json();
+            
+            let aiResponse;
+            if (profile.url.includes('googleapis.com')) {
+                aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            } else {
+                aiResponse = data.choices?.[0]?.message?.content;
+            }
+
+            return aiResponse || "";
+            // =================================================================
+            // =================== END: GEMINI COMPATIBILITY BLOCK =================
+            // =================================================================
 
             } catch (error) {
                 closeLoadingModal(); // 确保出错时也关闭弹窗
@@ -19315,7 +19604,7 @@ async function handleRemoveMember() {
         // ============================================================
         const PRESET_BUBBLES = [
             {
-                name: "滑板大耳狗右",
+                name: "滑板布丁狗右",
                 css: `/* 完全拉伸 */
 /* 1. 画框 (@parent) */
 @parent {
@@ -19363,7 +19652,7 @@ async function handleRemoveMember() {
 }`
             },
             {
-                name: "滑板大耳狗左",
+                name: "滑板布丁狗左",
                 css: `/* 完全拉伸 */
 /* 1. 画框 (@parent) */
 @parent {
@@ -21029,26 +21318,63 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const finalMessages = [systemMessage];
 
                 // <<< 核心修改2：注入主聊天记录的上下文 >>>
-                const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
-                const recentChatHistory = memoryLength > 0 ? loadFromLocalStorage(`conversation_${chatId}`, []).slice(-memoryLength) : loadFromLocalStorage(`conversation_${chatId}`, []);
-                const apiPayloadHistory = await conversationManager.prepareApiPayload(recentChatHistory);
-                finalMessages.push(...apiPayloadHistory);
+            const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
+            const recentChatHistory = memoryLength > 0 ? loadFromLocalStorage(`conversation_${chatId}`, []).slice(-memoryLength) : loadFromLocalStorage(`conversation_${chatId}`, []);
+            const apiPayloadHistory = await conversationManager.prepareApiPayload(recentChatHistory);
+            finalMessages.push(...apiPayloadHistory);
 
+            // =================================================================
+            // ================= START: GEMINI COMPATIBILITY BLOCK ================
+            // =================================================================
+            let chatUrl, requestBody, requestHeaders;
 
-                const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) }) 
-                });
-
-                if (!response.ok) throw new Error('API request failed');
+            if (profile.url.includes('googleapis.com')) {
+                chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:generateContent?key=${profile.key}`;
+                requestHeaders = { 'Content-Type': 'application/json' };
                 
-                const data = await response.json();
-                const aiResponse = data.choices[0]?.message?.content;
-
-                if (aiResponse && aiResponse.trim()) {
-                    addAiDialogue(aiResponse.trim());
+                const systemInstruction = finalMessages.find(m => m.role === 'system');
+                const contents = finalMessages
+                    .filter(m => m.role !== 'system')
+                    .map(msg => ({
+                        role: msg.role === 'assistant' ? 'model' : 'user',
+                        parts: [{ text: msg.content }]
+                    }));
+                    
+                requestBody = { contents };
+                if (systemInstruction) {
+                    requestBody.system_instruction = { parts: [{ text: systemInstruction.content }] };
                 }
+                if (profile.temperature !== undefined) {
+                    requestBody.generationConfig = { temperature: profile.temperature };
+                }
+            } else {
+                chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
+                requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
+                requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
+            }
+
+            const response = await fetch(chatUrl, {
+                method: 'POST',
+                headers: requestHeaders,
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) throw new Error('API request failed');
+            
+            const data = await response.json();
+            let aiResponse;
+            if (profile.url.includes('googleapis.com')) {
+                aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            } else {
+                aiResponse = data.choices?.[0]?.message?.content;
+            }
+            // =================================================================
+            // =================== END: GEMINI COMPATIBILITY BLOCK =================
+            // =================================================================
+
+            if (aiResponse && aiResponse.trim()) {
+                addAiDialogue(aiResponse.trim());
+            }
             } catch (error) {
                 console.error("Failed to get initial AI greeting:", error);
             }
