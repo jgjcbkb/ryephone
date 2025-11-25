@@ -6502,7 +6502,7 @@ ${commandInstructions}
               // 将所有内容合并到最终的系统提示中
             finalSystemPrompt += messageInstruction;
             
-            // 【【【【【【【【【【 终极、绝对核心的导演指令注入 】】】】】】】】】】
+                        // 【【【【【【【【【【 终极、绝对核心的导演指令注入 】】】】】】】】】】
             const directorMandate = `
 ---
 [ULTIMATE DIRECTOR'S MANDATE FOR THIS ACTION - UNBREAKABLE]
@@ -6517,7 +6517,12 @@ For this specific task, you have been cast to play **ONLY ONE ROLE**: **"${sende
 
 **ABSOLUTE FORBIDDANCE:**
 You are **STRICTLY FORBIDDEN** from speaking, thinking, or acting as any other character in this response. Even though you can see other personas like "唐唐", "张三", etc., they are merely background context for you. **IGNORE THEM as potential speakers.** Your voice is "${senderName}", and only "${senderName}".
+
 ---
+**[FINAL, ABSOLUTE OUTPUT REQUIREMENT - NON-NEGOTIABLE]**
+Your entire output, starting from the very first character, MUST be the in-character response of "${senderName}".
+You are **STRICTLY FORBIDDEN** from producing any pre-response commentary, confirmations, or meta-analysis (e.g., "好的，我明白了...", "收到！", "我会继续扮演...").
+Your first word must be part of the dialogue or action.
 `;
             finalSystemPrompt += directorMandate;
             // 【【【【【【【【【【 导演指令注入结束 】】】】】】】】】】
