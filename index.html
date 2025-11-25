@@ -11803,22 +11803,32 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         break;
                     }
                     case 'video_call':
+                        // 【核心修复】：计算用于显示的有效发送者名称
+                        // 1. sender: 如果是普通回复且解析到了名字，用这个。
+                        // 2. forcedSender: 如果是主动触发且 sender 被置为 null，用这个找回原名。
+                        // 3. targetChat.name: 单聊场景下的兜底。
+                        // 4. chatState.chatName: 最后的兜底。
+                        const effectiveSenderForCall = sender || forcedSender || (targetChat ? targetChat.name : chatState.chatName);
+
                         if (regularText) {
-                    await addMessage({ type: 'text', sender, text: regularText, side: 'received' }, targetChatId);
-                    messageSent = true;
-        }
-                        await addMessage({ type: 'system', side: 'system', text: `“${sender}”向你发起了视频通话。` }, targetChatId);
+                            await addMessage({ type: 'text', sender, text: regularText, side: 'received' }, targetChatId);
+                            messageSent = true;
+                        }
+                        
+                        // 使用 effectiveSenderForCall 替代 sender
+                        await addMessage({ type: 'system', side: 'system', text: `“${effectiveSenderForCall}”向你发起了视频通话。` }, targetChatId);
+                        
                         showCallingUI({
                             mode: 'incoming',
-                            callerName: sender,
+                            callerName: effectiveSenderForCall, // <--- 关键修改：这里不再会是 null
                             avatarUrl: contactInfo.avatarUrl,
                             onAccept: async () => {
                                 await addMessage({ type: 'system', side: 'system', text: '你接通了通话。'}, targetChatId);
-                                videoCallManager.startCall(targetChatId, 'ai', { autoGreet: true }); // <<< 核心、决定性的修复
+                                videoCallManager.startCall(targetChatId, 'ai', { autoGreet: true }); 
                             },
                             onDecline: async () => {
-                                await addMessage({ type: 'system', side: 'system', text: '你拒接了通话。' }, targetChatId);
-                                await handleCallRejectionByUser(targetChatId); // <<< 核心修改：将发起通话的聊天ID (targetChatId) 传递下去
+                                await addMessage({ type: 'system', side: 'system', text: '你拒接了通话。'});
+                                await handleCallRejectionByUser(targetChatId); 
                             }
                         });
                         break;
