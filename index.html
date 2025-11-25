@@ -11499,21 +11499,15 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 // 优先使用 block 中指定的 sender，其次是函数传入的 forcedSender
                 const finalSender = senderFromBlock || forcedSender;
 
-                if (type === 'text' || type === 'html') {
-                    // 如果是文本或HTML块，直接将其内容作为消息发送，然后结束处理。
-                    await addMessage({
-                        type: 'text', // 统一作为文本类型消息，由渲染器决定如何显示HTML
-                        text: content,
-                        side: 'received',
-                        sender: finalSender || null,
-                    }, targetChatId);
-                    return; // 处理完毕，必须立即返回
-                } else if (type === 'command') {
-                    // 如果是命令块，则将内部的命令内容提取出来，交给后续的逻辑处理。
-                    chatContent = content;
-                    // 更新 forcedSender，确保后续逻辑能正确识别发送者
-                    forcedSender = finalSender;
-                }
+                // 【核心修复】：无论 type 是 text, html 还是 command，
+                // 我们都不在这里直接发送，而是把它们“剥壳”后，
+                // 交给下面的标准指令解析器去处理。
+                // 这样，嵌在 text block 里的 [photo-description] 就能被识别了。
+                
+                chatContent = content; // 将内容提取出来，覆盖掉原始的带标签文本
+                forcedSender = finalSender; // 更新发送者信息，供后续逻辑使用
+                
+                // 注意：这里删除了 return，让代码继续向下流转！
             }
             // <<< 新增：区块解析逻辑 结束 >>>
 
