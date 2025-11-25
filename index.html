@@ -11660,7 +11660,9 @@ You were receiving a video call from {{user}}, but they hung up before you could
             const commandsRegex = /\[(set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?::\s*([^\]]+))?\]/g;
             
             // --- 【核心重构：高级引用逻辑】 ---
-            const advancedReplyMatch = textContent.match(/^\[reply_to:\s*"([\s\S]+?)"\]([\s\S]*)/);
+            // 核心修复：正则改为兼容带引号("")、带中文引号(“”)、或完全不带引号的三种格式
+            const advancedReplyMatch = textContent.match(/^\[reply_to:\s*(?:["'“])?([\s\S]+?)(?:["'”])?\]([\s\S]*)/);
+            
             if (advancedReplyMatch) {
                 const quotedText = advancedReplyMatch[1].trim();
                 const replyText = advancedReplyMatch[2].trim();
