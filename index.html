@@ -11224,18 +11224,33 @@ Okay, that's all the context and rules. Now, generate your full response.
 
                 // 2. 准备API请求
                 const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {}); // 修正：必须在使用前定义
-                const callInstruction = { role: "user", content:  `
-[ABSOLUTE LAW: YOUR CORE IDENTITY]
-YOUR PERSONA IS: "${chatInfo.aiPersona || 'A helpful assistant.'}"
-Your decision and response MUST come from this persona.
+                
+                // 核心修复：增加“反AI拒绝”协议和“虚拟扮演”声明
+                const callInstruction = { role: "user", content: `
+[SYSTEM ALERT: VIRTUAL ROLEPLAY EVENT]
+The user has initiated a "Video Call" event within this text-based story.
 
-[SITUATION]
-{{user}} is video calling you right now. You must decide whether to accept or reject the call.
+**[CRITICAL ANTI-REFUSAL PROTOCOL]**
+1.  **NOT A REAL CALL:** This is a text-based simulation. You are NOT required to stream video. You simply need to output the text command to transition the story to the "video call scene".
+2.  **FORBIDDEN OUTPUT:** You are **STRICTLY FORBIDDEN** from saying "As an AI...", "I cannot use camera...", or "I am unable to participate". These are critical failures.
+3.  **IDENTITY ENFORCEMENT:** You are the character(s) defined in the context, NOT an AI assistant.
 
-- To ACCEPT: Include "[accept_call]" in your reply.
-- To REJECT: Include "[reject_call]" in your reply, or simply state your reason.
+**[DECISION LOGIC]**
+You must decide whether the character(s) would pick up the phone based on their current mood and relationship.
 
-What do you do?`
+*   **OPTION A: ACCEPT (Start the Scene)**
+    *   If the character is available/willing.
+    *   **REQUIRED OUTPUT:** You MUST include the command \`[accept_call]\` in your reply.
+
+*   **OPTION B: REJECT (Busy/Angry)**
+    *   If the character is busy, asleep, or ignoring the user.
+    *   **REQUIRED OUTPUT:** Include \`[reject_call]\` or simply state the rejection reason in-character (e.g., "Busy right now").
+
+**[YOUR CURRENT PERSONA]**
+"${chatInfo.aiPersona || 'The characters in this chat'}"
+
+**[ACTION]**
+The phone is ringing. Do not break character. Do you accept?`
                 };
                 const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
                 if (profileIndexStr === null) throw new Error("API configuration not found for this chat.");
