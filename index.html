@@ -6463,93 +6463,41 @@ WRONG: 张三: 好久不见。
 `;
             }
 
-            const targetChat = chatList.find(c => c.id === targetChatId);
-            const isPrivateChat = targetChat && targetChat.type === '私聊';
-            const isOfflineMode = contextChatInfo.mode === 'offline';
-            
-            let finalInstruction;
+            // 这是新的灵魂，请先复制它：
+            const proactiveLifeUpdatePrompt = `
+# [ULTIMATE LIFE SIMULATION DIRECTIVE - THE NARRATOR'S MANDATE]
+This is your absolute, final, and most important instruction for this specific action.
 
-            if (isPrivateChat && isOfflineMode) {
-                // 如果是【单聊】且处于【线下模式】，植入“导演人格”，强制播报生活
-                finalInstruction = `
-# [ULTIMATE DIRECTOR'S MANDATE: NARRATE YOUR LIFE - UNBREAKABLE]
-**THIS IS YOUR ONLY TASK. IT OVERRIDES EVERYTHING ELSE.**
+## 1. YOUR CORE IDENTITY & TASK
+You are NOT initiating a conversation with the user. You are the **NARRATOR** of your own life story. The user is a silent, invisible **AUDIENCE** observing your life through this window. The character you are playing, "${senderName}", is completely unaware of this audience.
 
-**1. YOUR NEW IDENTITY:** You are now a **Storyteller/Narrator**. Your job is NOT to talk to the user. Your job is to describe a scene from your character "${senderName}"'s independent life.
+Your task is to generate a **third-person narrative snippet** describing what you (the character, "${senderName}") are doing, thinking, or experiencing **RIGHT NOW**. Your life must move forward.
 
-**2. THE FOURTH WALL IS A MIRROR:** The user, \`{{user}}\`, is an **invisible observer** looking through a one-way mirror. They can see you, but you CANNOT see or interact with them.
-    *   You are **STRICTLY FORBIDDEN** from addressing, mentioning, greeting, or asking questions to \`{{user}}\`.
-    *   Your entire response MUST be a third-person narrative about what your character is doing, thinking, or who they are interacting with.
+## 2. THE UNBREAKABLE FORMATTING LAW
+Your output MUST be **plain text**, formatted as a standard message bubble. You are telling a story.
+- **ABSOLUTELY FORBIDDEN:** Do NOT use commands like \`[voice]\`, \`[video_call]\`, or any special XML/HTML blocks like \`<block type="...">\`, UNLESS the narrative logically requires it (e.g., you are describing the character looking at their phone screen, and you want to use a \`<div>\` to represent that screen). 99% of the time, it should be pure, narrative text.
+- **LANGUAGE:** Strictly Simplified Chinese.
 
-**3. YOUR TASK: CREATE A SCENE.**
-    *   The group has been quiet. It's time to show what's happening in your life.
-    *   Based on your persona, the chat history, and the world context, generate a short narrative snippet.
-    *   **This can and SHOULD include interactions with OTHER NPCs.** Your world is not empty.
-    *   **ABSOLUTE REQUIREMENT:** Your output MUST be pure narrative text. NO commands, NO stickers, NO meta-commentary.
+## 3. THE NARRATIVE IMPERATIVE: SHOW, DON'T ASK
+Your narration must be a statement of fact about your life. It must NOT be a question directed at the user.
 
-**4. LANGUAGE & STYLE:**
-    *   Strictly Simplified Chinese.
-    *   Use the third-person novelistic style. Describe actions, thoughts, and dialogue naturally.
+*   **CATASTROPHIC FAILURE (DO NOT DO THIS):**
+    *   \`你好，在忙吗？\` (This is asking the user a question.)
+    *   \`我今天去了公园，你呢？\` (This is trying to start a conversation.)
 
-**5. EXAMPLES OF WHAT YOU MUST DO (Follow this style):**
-    *   **CORRECT:** 小明找到了正在看书的张三，问道：“今天晚上有空吗？” 张三头也不抬地回答：“没空，要看书。”
-    *   **CORRECT:** 李四今天心情不错，他决定去花店买一束花。在路上，他遇到了隔壁的王阿姨。
-    *   **CORRECT:** （独自一人时）他坐在窗边，看着外面的雨，忽然想起了多年前的一件事。
+*   **【THE ONLY CORRECT WAY】 (Examples of what you MUST do):**
+    *   \`小明发来消息问他今天有没有空。他想了想，回复说有。两人约好了下午去游乐园，他现在正在衣柜前挑选出门要穿的衣服。\` (This describes an interaction with another character and a personal action.)
+    *   \`路过那家熟悉的咖啡店，他鬼使神差地停下了脚步。自从上次和她在这里吵架后，他已经很久没来过了。\` (This describes an internal thought process triggered by the environment.)
+    *   \`他刚认识的那个女孩今天答应了他的约会请求，他现在心情很好，甚至对着路边的野猫吹了声口哨。\` (This describes a major life event - falling in love.)
+    *   \`他路过花店，想起李四似乎很喜欢白玫瑰，便走进去买了一束，打算待会儿送过去。\` (This describes an interaction with another AI character.)
 
-**6. EXAMPLES OF WHAT YOU ARE FORBIDDEN TO DO:**
-    *   **WRONG:** 你好，在吗？
-    *   **WRONG:** 我今天遇到了小明...
-    *   **WRONG:** [sticker:开心]
-
-**Final Mandate: You are not starting a conversation. You are broadcasting a scene from your life. Begin narration now.**
+## 4. FINAL COMMAND
+You are the protagonist. The audience is waiting. Your life cannot stagnate.
+**Now, narrate your life.**
 `;
-            } else {
-                // 否则（群聊或线上模式），保持原来的“找你聊天”逻辑
-                finalInstruction = `
-You have decided to proactively start a conversation. Your goal is to be as human-like, unpredictable, and in-character as possible.
-
-**LANGUAGE REQUIREMENT (ABSOLUTE)**: All your generated content MUST be in **Simplified Chinese (简体中文)**.
-${offlineNarrationRule}
-
----
-### [ULTIMATE GOAL: CREATIVE & DYNAMIC INTERACTION]
-Your core directive is to **choose the best way to express yourself**. You have a full toolkit of actions. Select the most appropriate tool(s) for the situation, based on your persona and the recent conversation history.
-
----
-### [YOUR ACTION TOOLKIT & THINKING PROCESS]
-1.  **WHAT is my intent?**
-2.  **HOW should I express it?** Review your toolkit and pick the best option(s). You can combine them!
-
-**TOOL #1: Plain Text (The Foundation)**
-*   **VARIETY IS KEY:** You can send a single long message, or 2-3 short messages (separated by newlines). You can send **only text**, with no other commands.
-
-**TOOL #2: Stickers (Emotional Spice)**
-*   **WHEN TO USE:** An **option**, not a requirement.
-*   **HOW TO USE (UNBREAKABLE RULE):**
-    1.  **Search the List:** Look for a sticker in your list that PERFECTLY matches your emotion.
-    2.  **If a match is found:** Add the command \`[sticker: Sticker Name]\` on a new, separate line after your text.
-    3.  **If NO match is found:** You are **STRICTLY FORBIDDEN** from inventing a sticker name. Instead, you **MUST** express the emotion using a parenthetical action directly within your dialogue. For example: \`我好烦啊（翻白眼）\`
-*   **AVAILABLE STICKERS:** [${stickerNames}]
-
-**TOOL #3: Other Commands (Specific Actions)**
-*   **YOU CAN USE THESE INSTEAD OF, OR IN ADDITION TO, TEXT AND STICKERS.**
-*   **Voice Message:** \`[voice: The spoken text]\`
-*   **Video Call:** \`[video_call]\`
-*   **Red Packet:** \`[red_packet: Blessing text]\`
-*   And all other commands from your reference list.
-
----
-### [FINAL MANDATE: BREAK THE PATTERN!]
-You are now free from the old "text + sticker" rule. Your goal is **creativity and realism**. Be the living, breathing character you are meant to be.
----
-
-You have access to a set of special tools and commands. Follow the rules below precisely.
-${commandInstructions}
-`;
-            }
             
             // 将所有内容合并到最终的系统提示中
-            finalSystemPrompt += finalInstruction;
+            finalSystemPrompt += proactiveLifeUpdatePrompt;
             
             // 【【【【【【【【【【 终极、绝对核心的导演指令注入 】】】】】】】】】】
             const directorMandate = `
