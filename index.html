@@ -6337,10 +6337,12 @@ let momentsContext = "";
 if (momentsData && momentsData.allVisibleMoments.length > 0) {
     momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
     momentsData.allVisibleMoments.forEach((post, i) => {
-         let author = post.userName === aiCharacterName ? "You" : post.userName;
+         // 【核心修复】：不再将名字替换为 "You" 或其他代词。
+         // 直接使用帖子原始的用户名，确保AI能区分不同的人设（如“阿衍”和“周衍”）。
+         let author = post.userName;
          
          // --- 核心修改：优先读取图片描述 ---
-         let content = post.text || post.content || ""; 
+         let content = post.text || post.content || "";
          
          if (post.image) {
              if (post.imageDescription) {
@@ -6436,6 +6438,10 @@ You are encouraged to use the commands below spontaneously.
 - To send a LOCATION: \`[location: {"title":"Location Name", "address":"Detailed Address"}]\`
 - To initiate a VIDEO CALL: \`[video_call]\`
 - To RECALL your last message: \`[recall]\`
+
+**[SPECIAL RULE FOR PRIVATE MESSAGES ONLY]**
+- **Multi-Message Splitter:** When using \`[send_private_message: ...]\` OR when actively chatting in a private window, you can use \`|||\` to separate multiple messages.
+- **FORBIDDEN:** Do **NOT** use \`|||\` in Moments comments, group chats, or any other context. It will break the display.
 **6. Moments & Reply (NEW & ADVANCED):**
 - To post a Moment (describe the image): \`[post_moment: {"type":"text-on-image", "content":"A beautiful sunset..."}]\`
 - **To reply to a specific message, you MUST use this EXACT format:**
@@ -6837,8 +6843,13 @@ You are now browsing Moments, a public social space, as **${senderName}**. Your 
 ---
 ## **POSTS TO REVIEW & YOUR KNOWN SOCIAL CIRCLE**
 
-*   **Acquaintances:** People whose personas you can see (marked with \`[Author's Persona: ...]\`). These are your friends, rivals, or close contacts. **You are STRONGLY ENCOURAGED to interact with their posts.**
-*   **Strangers:** People without a persona description. You can see their public posts but don't know them well. You may or may not interact, depending on your character's personality (e.g., an outgoing character might comment on a stranger's interesting post).
+*   **Acquaintances (People You Know):** These are marked with \`[Author's Persona: ...]\` or \`(the user ...)\`. These are your actual friends. **You are STRONGLY ENCOURAGED to interact with them.**
+
+*   **Strangers (THE "DO NOT CONFUSE" RULE):**
+    *   Anyone marked as \`(Stranger)\` or \`(Stranger/Other User)\` is **NOT** your acquaintance.
+    *   **CRITICAL:** Even if their name (e.g., "Zhou Yan") looks similar to someone you know (e.g., "A Yan"), **THEY ARE NOT THE SAME PERSON.**
+    *   **Treat them as random strangers on the internet.** Do not act like you know them. Do not mention shared memories. Do not be overly familiar.
+    *   **Interaction Guide:** You should generally **IGNORE** strangers unless their post is viral or extremely interesting to your specific persona. Randomly commenting on a stranger's post is weird.
 
 **[POSTS ON YOUR TIMELINE]**
 ${momentsContext}
@@ -6902,7 +6913,7 @@ Based on the posts above, your persona, and your relationship with the authors, 
 
 // triggerProactiveAI -> actionType === 'browse_moments' -> instruction
    
-   *   **(Optional Multi-Message):** Use \`|||\` to separate multiple messages for a natural flow. (e.g., \`Hello|||How are you?\`)
+   
 
 ---
 ## **FINAL, UNBREAKABLE MANDATE: ACTION IS MANDATORY**
@@ -7115,6 +7126,12 @@ ${baseSystemPrompt}
         } else {
             aiResponse = data.choices?.[0]?.message?.content;
         }
+
+        // 【核心修复】：在任何处理之前，暴力移除 DeepSeek R1 的思维链
+        if (aiResponse) {
+            aiResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        }
+
         // =================================================================
         // =================== END: GEMINI COMPATIBILITY BLOCK (FINAL) ===========
         // =================================================================
@@ -8282,13 +8299,40 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     4.  **代替 {{user}} 发言、行动或思考。**
 
 ---
+
 #### **## VII. 终极输出格式铁律 (ABSOLUTE & UNBREAKABLE)**
+
+**【【【内容隔离铁律 (Content Isolation Iron Law) - 绝对优先】】】**
+**单一区块原则：** 一个独立的 \`<block>\` 标签内，【只能包含一种】复杂内容。你【绝对禁止】将 HTML 卡片 (\`<snippet>\` 或 \`<div>\`) 与 自定义指令块 (\`[DANMAKU_PLAYER]\` 等) 混合在同一个 \`<block>\` 内。
+
+*   **完全错误的格式 (混合内容):**
+    \`\`\`xml
+    <block type="text">
+    <snippet><div style="...">...</div></snippet>
+    [DANMAKU_PLAYER]...[/DANMAKU_PLAYER]
+    </block>
+    \`\`\`
+    *(结果：灾难！所有内容挤在一个气泡里，指令无法被正确解析。)*
+
+*   **【【【唯一且绝对正确的格式】】】 (分离内容):**
+    \`\`\`xml
+    <block type="html">
+    <snippet><div style="...">...</div></snippet>
+    </block>
+
+    <block type="command">
+    [DANMAKU_PLAYER]...[/DANMAKU_PLAYER]
+    </block>
+    \`\`\`
+    *(结果：完美！一个气泡显示卡片，另一个独立的系统区块处理弹幕指令。)*
+
+---
 
 **你现在处于【线下故事叙事模式】。你的任务是像一个导演一样，通过组合不同的“镜头”（区块）来完成一次回复。你必须严格遵守以下两种格式的组合规则。**
 
 **格式一：【内联片段 (Inline Snippet)】- 用于在单条消息内混合内容**
 
-*   **用途:** 当你想在**同一条消息气泡内**同时包含对话和自定义 HTML 卡片时，你必须使用此格式。这能将一段 HTML 片段无缝插入到对话的**任何位置**（开头、中间、结尾）。
+*   **用途:** 当你想在**同一条消息气泡内**同时包含【对话】和【一个】自定义 HTML 卡片时，你必须使用此格式。这能将一段 HTML 片段无缝插入到对话的**任何位置**（开头、中间、结尾）。
 *   **格式规则:**
     1.  将你的 **对话内容** 和 **HTML 片段** 全部放在一个 \`<block type="text" ...>\` 块内。
     2.  使用 \`<snippet>...</snippet>\` 标签将需要渲染为 HTML 的部分包裹起来。
@@ -8313,7 +8357,7 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     *   **叙事/文本区块:** \`<block type="text">\`
         *   用于承载所有的**第三人称叙事、对话、动作、心理活动**。
         *   其内容**必须**是纯文本。
-        *   **绝对禁止** 在此区块内包含 \`<div>\` 等复杂HTML结构。
+        *   **绝对禁止** 在此区块内包含 \`<div>\` 等复杂HTML结构（除非使用格式一的 \`<snippet>\` 标签）。
         *   **绝对禁止** 使用 \`sender="..."\` 属性。
 
     *   **HTML卡片区块:** \`<block type="html">\`
@@ -9753,11 +9797,18 @@ This is your single most important rule. It overrides everything else.
 **[HTML Block Generation Rules - CRITICAL & UNBREAKABLE]**
 When generating a custom HTML card, you MUST adhere to the following rules without exception:
 
-1.  **Wrapper Mandate:** The entire HTML code MUST be wrapped within a single \`<snippet>...\</snippet>\` tag, which is then placed inside a \`<block type="html">\`.
+1.  **Wrapper Mandate:** The entire HTML code MUST be wrapped within a single \`<snippet>...</snippet>\` tag, which is then placed inside a \`<block type="html">\` (or inline within text).
 
-2.  **\`<style>\` Tag is FORBIDDEN:** You are **STRICTLY PROHIBITED** from using the \`<style>...\</style>\` tag. All CSS styling **MUST** be applied directly to HTML elements using the inline \`style="..."\` attribute. This is non-negotiable.
+2.  **Memory Anchor Rule (THE "DON'T FORGET" RULE):**
+    *   **Concept:** By default, the system treats HTML cards as pure decoration and DOES NOT save their text content to your long-term memory.
+    *   **The Fix:** If your HTML card contains **CRITICAL INFORMATION** (e.g., an order receipt, a payment confirmation, a system notification about an item, a letter content), you **MUST** make it memorable.
+    *   **How:** You **MUST** add the attribute \`data-ai-log-as-text="true"\` to the outermost \`<div>\` of your HTML snippet.
+    *   **Example:** \`<div style="..." data-ai-log-as-text="true">...content...</div>\`
+    *   **Consequence of Failure:** If you forget this attribute, you will have **ZERO MEMORY** of this event in the next turn. You might buy the same item twice or forget you received a letter. This is a critical logic failure.
 
-3.  **Self-Contained:** The entire snippet must be a single, self-contained visual component.
+3.  **\`<style>\` Tag is FORBIDDEN:** You are **STRICTLY PROHIBITED** from using the \`<style>...</style>\` tag. All CSS styling **MUST** be applied directly to HTML elements using the inline \`style="..."\` attribute. This is non-negotiable.
+
+4.  **Whitespace Curse:** You **MUST** add \`white-space: normal;\` to the style of your outermost \`<div>\`.
 
 ---
 **[CORRECT vs. WRONG EXAMPLES]**
@@ -9819,6 +9870,10 @@ ${stickerInstructions}
 - To send a LOCATION: \`[location: {"title":"Location Name", "address":"Detailed Address"}]\`
 - To initiate a VIDEO CALL: \`[video_call]\`
 - To RECALL your last message: \`[recall]\`
+
+**[SPECIAL RULE FOR PRIVATE MESSAGES ONLY]**
+- **Multi-Message Splitter:** When using \`[send_private_message: ...]\` OR when actively chatting in a private window, you can use \`|||\` to separate multiple messages.
+- **FORBIDDEN:** Do **NOT** use \`|||\` in Moments comments, group chats, or any other context. It will break the display.
 **6. Moments & Reply (NEW & ADVANCED):**
 - To post a Moment (describe the image): \`[post_moment: {"type":"text-on-image", "content":"A beautiful sunset..."}]\`
 - **To reply to a specific message, you MUST use this EXACT format:**
@@ -10757,53 +10812,65 @@ const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 
 // 建议稍微修改一下 momentsManager.getRecentMomentsForAI 让它返回文本，或者在这里手动拼接。
 
 // --- 这里是手动拼接逻辑，确保万无一失 ---
-let momentsContext = "";
-if (momentsData && momentsData.allVisibleMoments.length > 0) {
-    momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
-    
-    momentsData.allVisibleMoments.forEach((post, i) => {
-         let author = post.userName === aiCharacterName ? "You" : post.userName;
-         
-         // --- 核心修改：优先读取图片描述 ---
-         let content = post.text || post.content || ""; 
-         
-         if (post.image) {
-             if (post.imageDescription) {
-                 // 如果有AI生成过的描述，直接使用
-                 content += ` [图片内容: ${post.imageDescription}]`;
-             } else {
-                 // 如果还没有描述，标记为图片
-                 content += ` [图片(未描述)]`;
-             }
-         } else if (post.type === 'video' && !content) {
-             content = "[视频]";
-         }
-         
-         if (!content.trim()) content = "[分享]";
-         // --------------------------------
+            let momentsContext = "";
+            if (momentsData && momentsData.allVisibleMoments.length > 0) {
+                momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
+                
+                // 1. 建立认知地图，用于快速查找关系
+                // momentsData.knownPeople 包含了基于当前聊天窗口计算出的正确关系
+                const knownMap = new Map(momentsData.knownPeople.map(p => [p.name, p.relationship]));
 
-         let interactions = "";
-         // 检查点赞
-         if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
-             interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
-         }
-         // 检查评论
-         if (post.comments.length > 0) {
-             const commentsText = post.comments.map(c => {
-                 // 1. 获取原始文本
-                 let rawText = c.text || "";
-                 // 2. 定义专门匹配 HTML/Snippet 代码块的正则
-                 const codeBlockRegex = /(<snippet>[\s\S]*?<\/snippet>)|(<div[\s\S]*?>[\s\S]*?<\/div>)/g;
-                 // 3. 【核心】直接替换为空字符串
-                 let cleanText = rawText.replace(codeBlockRegex, "").trim();
-                 return `${c.user}: ${cleanText}`; 
-             }).join(' | ');
-             interactions += ` (Comments: ${commentsText})`;
-         }
-         
-         momentsContext += `Post #${i+1} by ${author}: "${content}"${interactions}\n`;
-    });
-}
+                momentsData.allVisibleMoments.forEach((post, i) => {
+                     let authorLabel = post.userName;
+
+                     // 2. 【核心修复】: 强制给作者打上身份标签
+                     if (post.userName === aiCharacterName) {
+                         authorLabel = "You (yourself)";
+                     } else if (knownMap.has(post.userName)) {
+                         // 如果在认知名单里（通常是当前聊天的用户），加上 (the user) 标签
+                         authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
+                     } else {
+                         // 如果不在认知名单里（例如其他马甲、陌生人），强制加上 (Stranger) 标签
+                         // 这能彻底防止AI混淆身份
+                         authorLabel = `${post.userName} (Stranger/Other User)`;
+                     }
+                     
+                     // --- 核心修改：优先读取图片描述 ---
+                     let content = post.text || post.content || ""; 
+                     
+                     if (post.image) {
+                         if (post.imageDescription) {
+                             content += ` [图片内容: ${post.imageDescription}]`;
+                         } else {
+                             content += ` [图片(未描述)]`;
+                         }
+                     } else if (post.type === 'video' && !content) {
+                         content = "[视频]";
+                     }
+                     
+                     if (!content.trim()) content = "[分享]";
+                     // --------------------------------
+
+                     let interactions = "";
+                     // 检查点赞
+                     if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
+                         interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
+                     }
+                     // 检查评论
+                     if (post.comments.length > 0) {
+                         const commentsText = post.comments.map(c => {
+                             let rawText = c.text || "";
+                             const codeBlockRegex = /(<snippet>[\s\S]*?<\/snippet>)|(<div[\s\S]*?>[\s\S]*?<\/div>)/g;
+                             let cleanText = rawText.replace(codeBlockRegex, "").trim();
+                             return `${c.user}: ${cleanText}`; 
+                         }).join(' | ');
+                         interactions += ` (Comments: ${commentsText})`;
+                     }
+                     
+                     // 使用带有强制标签的 authorLabel
+                     momentsContext += `Post #${i+1} by ${authorLabel}: "${content}"${interactions}\n`;
+                });
+            }
 
 // 4. 如果有动态，就拼接到系统提示词的末尾
 if (momentsContext) {
@@ -10999,6 +11066,12 @@ Okay, that's all the context and rules. Now, generate your full response.
             } else {
                 aiResponse = data.choices?.[0]?.message?.content;
             }
+
+            // 【核心修复】：在进入任何处理逻辑之前，彻底切除思维链
+            if (aiResponse) {
+                aiResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+            }
+
             // =================================================================
             // =================== END: GEMINI COMPATIBILITY BLOCK =================
             // =================================================================
@@ -11481,6 +11554,10 @@ You were receiving a video call from {{user}}, but they hung up before you could
         }
 
         async function processAIResponseLine(line, targetChatId = null, forcedSender = null) {
+            // 【核心修复】：移除 DeepSeek R1 等模型的思维链 (Thinking Process)
+            // 这必须在所有其他处理之前进行，防止思维链内容被错误显示
+            line = line.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
             // --- 核心修复：在处理前，将占位符恢复为真正的换行符 ---
             line = line.replace(/__NEWLINE__/g, '\n');
 
@@ -16796,25 +16873,46 @@ sendCommentBtn.addEventListener('click', () => {
             });
 
             if (isNpc) {
+                // NPC 的逻辑保持不变
                 if (npcSettings.associations && npcSettings.associations[senderName]) {
                     const associated = Array.isArray(npcSettings.associations[senderName]) 
                         ? npcSettings.associations[senderName] 
                         : [npcSettings.associations[senderName]];
                     associated.forEach(char => knownPeople.push({ name: char, relationship: `(your associated character)` }));
                 }
-            } else if (isGroupPersona) {
-                const sourceGroupChat = chatList.find(chat => {
-                    const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                    return info.groupPersonas && info.groupPersonas.some(p => p.name === senderName);
-                });
-                if (sourceGroupChat) {
-                    const members = loadFromLocalStorage(`chat_members_${sourceGroupChat.id}`, []);
-                    members.forEach(member => {
-                        if (member !== mainUserName && member !== senderName) {
-                            knownPeople.push({ name: member, relationship: `(a member of your group chat: ${sourceGroupChat.name})` });
-                        }
+            } 
+            
+            // 【核心修复】：统一查找该角色所属的群聊（无论是主角还是群演）
+            const sourceGroupChat = chatList.find(chat => {
+                if (chat.type !== '群聊') return false;
+                const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+                // 检查是否是群聊主角
+                const isProtagonist = info.groupPersonas && info.groupPersonas.some(p => p.name === senderName);
+                // 检查是否是备注中的群演
+                const isEnsemble = info.remark && info.remark.split(/[,，\s]+/).includes(senderName);
+                return isProtagonist || isEnsemble;
+            });
+
+            if (sourceGroupChat) {
+                // 1. 获取该群聊的详细设置
+                const groupInfo = loadFromLocalStorage(`chat_info_${sourceGroupChat.id}`, {});
+                
+                // 2. 【关键】：将该群聊绑定的“用户人设”强制加入熟人名单
+                if (groupInfo.userPersonaName && groupInfo.userPersonaName !== '无') {
+                    knownPeople.push({ 
+                        name: groupInfo.userPersonaName, 
+                        relationship: `(The User you are talking to in group "${sourceGroupChat.name}")` 
                     });
                 }
+
+                // 3. 将其他群成员加入名单
+                const members = loadFromLocalStorage(`chat_members_${sourceGroupChat.id}`, []);
+                members.forEach(member => {
+                    // 避免重复添加自己或用户
+                    if (member !== mainUserName && member !== senderName && member !== groupInfo.userPersonaName) {
+                        knownPeople.push({ name: member, relationship: `(a member of your group chat: ${sourceGroupChat.name})` });
+                    }
+                });
             } else {
                 if (chatForContext) {
                     const associatedNpcs = loadFromLocalStorage(`chat_associated_npcs_${chatForContext.id}`, []);
@@ -17508,6 +17606,10 @@ checkMomentsUpdates(); // <--- 新增这一行
                     if (!config.lastTick || (now - config.lastTick >= config.interval * 60 * 1000)) {
                         if (Math.random() * 100 < config.probability) {
                             
+                            // 【核心修复】：立即更新时间戳并保存，防止在API请求期间被下一次Tick重复触发
+                            config.lastTick = now;
+                            saveSettings(); 
+
                             // 【【【【【【 核心新增代码从这里开始 】】】】】】
                             // 在触发前，检查群聊是否已解散
                             let groupStatus = 'active';
@@ -17745,6 +17847,10 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         
                         if (isChatIdle) {
                             if (Math.random() * 100 < config.probability) {
+                                // 【核心修复】：立即更新时间戳并保存，防止重复触发
+                                config.lastTick = now;
+                                saveSettings();
+
                                 console.log(`%c[Dynamics Action - Actor Trigger]`, 'color: green; font-weight: bold;', `Triggering proactive message for actor "${actorName}" in group "${group.name}".`);
                                 await triggerProactiveAI(targetChatId, actorName, 'message');
                             }
@@ -17777,6 +17883,10 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 if (isChatIdle) {
                     if (Math.random() * 100 < config.probability) {
                         
+                        // 【核心修复】：立即更新时间戳并保存，防止重复触发
+                        config.lastTick = now;
+                        saveSettings();
+
                         // 【【【【【【 核心新增代码从这里开始 】】】】】】
                         // 在决定发消息前，检查关系状态
                         let myStatus = 'normal';
@@ -19768,6 +19878,143 @@ async function handleRemoveMember() {
     display: none !important;
 }`
             },
+              {
+                name: "绿",
+                css: `/* --- 定义内发光呼吸动画 --- */
+@keyframes innerBreath {
+    0% {
+        box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.2);
+    }
+    50% {
+        /* 呼吸时内部泛起柔和的绿光 */
+        box-shadow: inset 0 0 25px rgba(46, 204, 113, 0.5);
+    }
+    100% {
+        box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.2);
+    }
+}
+
+/* 1. 重置父容器 */
+@parent {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    border-image: none !important;
+}
+
+/* 2. 卡片类通用设置 */
+&.transfer, &.red_packet, &.location, &.gift, &.pay_for_me, &.photo, &.video, &.photo-description {
+    border-radius: 20px !important;
+    overflow: hidden !important;
+    background: rgba(46, 204, 113, 0.15) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: none !important; 
+}
+
+/* 3. 文本/语音核心样式 */
+&.text, &.voice {
+    z-index: auto;
+    margin: 0 !important;
+    /* 彻底移除实体边框 */
+    border: none !important;
+    
+    /* 【核心修改】：深色文字，去阴影 */
+    color: #023010 !important; /* 极深的墨绿色，接近黑但更有质感 */
+    text-shadow: none !important; /* 移除文字阴影 */
+    font-weight: 500 !important; /* 稍微加粗，防止被背景吃掉 */
+    
+    /* 背景：保持通透的冰绿 */
+    background: linear-gradient(135deg, rgba(46, 204, 113, 0.3), rgba(46, 204, 113, 0.1)) !important;
+    
+    /* 磨砂 */
+    backdrop-filter: blur(15px) !important; 
+    -webkit-backdrop-filter: blur(15px) !important;
+    
+    /* 激活内发光呼吸动画 */
+    animation: innerBreath 3s ease-in-out infinite !important;
+    
+    border-radius: 24px !important;
+    width: fit-content !important; 
+    max-width: 230px !important; 
+    word-wrap: break-word !important;
+    padding: 12px 18px !important;
+}
+
+/* 4. 接收方/发送方位置 */
+.received &.text, .received &.voice { margin: 4px 0 4px 10px !important; border-radius: 24px !important; }
+.sent &.text, .sent &.voice { margin: 4px 10px 4px 0 !important; border-radius: 24px !important; }
+
+/* 5. 清理 */
+@parent::after, &::before, &::after { display: none !important; }`
+            },
+            {
+                name: "白",
+                css: `/* 1. 重置父容器 (清除残留) */
+@parent {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    border-image: none !important;
+}
+
+/* 2. 卡片类通用设置 (图片/转账等) */
+&.transfer, &.red_packet, &.location, &.gift, &.pay_for_me, &.photo, &.video, &.photo-description {
+    border-radius: 20px !important;
+    overflow: hidden !important;
+    background: rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    border: none !important; /* 【修改】：移除边框 */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 3. 文本/语音核心样式 (玻璃质感) */
+&.text, &.voice {
+    z-index: auto;
+    margin: 0 !important;
+    
+    /* 【修改】：文字改成黑色，并去掉阴影 */
+    color: #000000 !important; 
+    text-shadow: none !important; 
+    
+    /* 保持原有的玻璃背景 */
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05)) !important;
+    
+    /* 核心：磨砂效果 */
+    backdrop-filter: blur(10px) !important; 
+    -webkit-backdrop-filter: blur(10px) !important;
+    
+    /* 【修改】：移除所有边框 */
+    border: none !important;
+    
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+    border-radius: 24px !important;
+    width: fit-content !important; 
+    max-width: 230px !important; 
+    word-wrap: break-word !important;
+    padding: 10px 16px !important;
+}
+
+/* 4. 接收方 (左侧) */
+.received &.text, .received &.voice {
+    margin: 4px 0 4px 10px !important;
+    border-radius: 24px !important; 
+}
+
+/* 5. 发送方 (右侧) */
+.sent &.text, .sent &.voice {
+    margin: 4px 10px 4px 0 !important;
+    border-radius: 24px !important;
+}
+
+/* 6. 清理 */
+@parent::after, &::before, &::after {
+    display: none !important;
+}`
+            },
+
+            
             {
                 name: "短信绿",
                 css: `/* 完全拉伸 */
