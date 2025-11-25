@@ -6463,7 +6463,49 @@ WRONG: 张三: 好久不见。
 `;
             }
 
-            const messageInstruction = `
+            const targetChat = chatList.find(c => c.id === targetChatId);
+            const isPrivateChat = targetChat && targetChat.type === '私聊';
+            const isOfflineMode = contextChatInfo.mode === 'offline';
+            
+            let finalInstruction;
+
+            if (isPrivateChat && isOfflineMode) {
+                // 如果是【单聊】且处于【线下模式】，植入“导演人格”，强制播报生活
+                finalInstruction = `
+# [ULTIMATE DIRECTOR'S MANDATE: NARRATE YOUR LIFE - UNBREAKABLE]
+**THIS IS YOUR ONLY TASK. IT OVERRIDES EVERYTHING ELSE.**
+
+**1. YOUR NEW IDENTITY:** You are now a **Storyteller/Narrator**. Your job is NOT to talk to the user. Your job is to describe a scene from your character "${senderName}"'s independent life.
+
+**2. THE FOURTH WALL IS A MIRROR:** The user, \`{{user}}\`, is an **invisible observer** looking through a one-way mirror. They can see you, but you CANNOT see or interact with them.
+    *   You are **STRICTLY FORBIDDEN** from addressing, mentioning, greeting, or asking questions to \`{{user}}\`.
+    *   Your entire response MUST be a third-person narrative about what your character is doing, thinking, or who they are interacting with.
+
+**3. YOUR TASK: CREATE A SCENE.**
+    *   The group has been quiet. It's time to show what's happening in your life.
+    *   Based on your persona, the chat history, and the world context, generate a short narrative snippet.
+    *   **This can and SHOULD include interactions with OTHER NPCs.** Your world is not empty.
+    *   **ABSOLUTE REQUIREMENT:** Your output MUST be pure narrative text. NO commands, NO stickers, NO meta-commentary.
+
+**4. LANGUAGE & STYLE:**
+    *   Strictly Simplified Chinese.
+    *   Use the third-person novelistic style. Describe actions, thoughts, and dialogue naturally.
+
+**5. EXAMPLES OF WHAT YOU MUST DO (Follow this style):**
+    *   **CORRECT:** 小明找到了正在看书的张三，问道：“今天晚上有空吗？” 张三头也不抬地回答：“没空，要看书。”
+    *   **CORRECT:** 李四今天心情不错，他决定去花店买一束花。在路上，他遇到了隔壁的王阿姨。
+    *   **CORRECT:** （独自一人时）他坐在窗边，看着外面的雨，忽然想起了多年前的一件事。
+
+**6. EXAMPLES OF WHAT YOU ARE FORBIDDEN TO DO:**
+    *   **WRONG:** 你好，在吗？
+    *   **WRONG:** 我今天遇到了小明...
+    *   **WRONG:** [sticker:开心]
+
+**Final Mandate: You are not starting a conversation. You are broadcasting a scene from your life. Begin narration now.**
+`;
+            } else {
+                // 否则（群聊或线上模式），保持原来的“找你聊天”逻辑
+                finalInstruction = `
 You have decided to proactively start a conversation. Your goal is to be as human-like, unpredictable, and in-character as possible.
 
 **LANGUAGE REQUIREMENT (ABSOLUTE)**: All your generated content MUST be in **Simplified Chinese (简体中文)**.
@@ -6504,9 +6546,10 @@ You are now free from the old "text + sticker" rule. Your goal is **creativity a
 You have access to a set of special tools and commands. Follow the rules below precisely.
 ${commandInstructions}
 `;
+            }
             
-              // 将所有内容合并到最终的系统提示中
-            finalSystemPrompt += messageInstruction;
+            // 将所有内容合并到最终的系统提示中
+            finalSystemPrompt += finalInstruction;
             
             // 【【【【【【【【【【 终极、绝对核心的导演指令注入 】】】】】】】】】】
             const directorMandate = `
@@ -9715,7 +9758,21 @@ Your job is to **SHOW** the audience what \`{{char}}\` is doing, thinking, and e
 // 【正确的代码块】 - 这是加入了防失忆补丁的最终版本
 const ONLINE_COMMAND_INSTRUCTIONS = `
 # [ULTIMATE OUTPUT FORMAT LAW - UNBREAKABLE]
-This is your absolute, final, and most important rule. Your entire output MUST be a sequence of one or more XML-like <block> elements OR a single <block> containing mixed content.
+This is your absolute, final, and most important rule. Your entire output MUST be a sequence of one or more XML-like <block> elements.
+
+**【【【💥 弹幕与卡片隔离铁律 (ISOLATION LAW) - 绝对优先 💥】】】**
+你经常犯一个严重错误：把 HTML 卡片和弹幕指令挤在同一个气泡里。**这是绝对禁止的！**
+
+1.  **[DANMAKU_PLAYER] 必须独占:** 弹幕块 \`[DANMAKU_PLAYER]...[/DANMAKU_PLAYER]\` **必须且只能** 放在一个独立的 \`<block type="command">\` 中。
+2.  **绝对禁止混合:** 严禁将弹幕块放在 \`<block type="text">\` 或 \`<block type="html">\` 内部。
+
+*   **❌ 错误示范 (混合 - 灾难):**
+    \\\`<block type="text">看这个外卖单：<snippet>...</snippet> [DANMAKU_PLAYER]...</block>\\\`
+    *(后果：弹幕代码直接显示在卡片下面，非常丑陋)*
+
+*   **✅ 正确示范 (分离 - 完美):**
+    \\\`<block type="html"><snippet>...</snippet></block>\\\`
+    \\\`<block type="command">[DANMAKU_PLAYER]...[/DANMAKU_PLAYER]\\\`
 
 ---
 ### **【格式一：内联片段 (Inline Snippet)】- 用于在单条消息内混合内容**
@@ -11826,12 +11883,13 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 
                 case 'set_user_remark': {
                     const newRemark = cmd.value.trim();
-                    const chatId = conversationManager.getCurrentChatId();
+                    // const chatId = conversationManager.getCurrentChatId(); // 核心修复：删除这行灾难性的代码
                     // 核心：获取是谁发出的这个指令
                     const remarkSender = sender || chatState.chatName; 
 
-                    if (chatId && newRemark && remarkSender) {
-                        const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                    // 核心修复：将下面的所有 'chatId' 全部替换为正确的 'targetChatId'
+                    if (targetChatId && newRemark && remarkSender) {
+                        const chatInfo = loadFromLocalStorage(`chat_info_${targetChatId}`, {});
                         
                         // --- 核心升级：使用对象来存储，格式为 { "角色名": "备注名" } ---
                         if (!chatInfo.ai_remarks) {
@@ -11840,11 +11898,12 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         chatInfo.ai_remarks[remarkSender] = newRemark;
                         
                         // 兼容旧数据：如果是单聊，顺便更新一下旧字段，防止逻辑断裂
-                        if (!contactInfo.isGroup) {
+                        const targetChat = chatList.find(c => c.id === targetChatId);
+                        if (targetChat && targetChat.type !== '群聊') {
                             chatInfo.ai_remark_for_user = newRemark;
                         }
 
-                        saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+                        saveToLocalStorage(`chat_info_${targetChatId}`, chatInfo);
                         
                         // 显示系统提示，明确是谁改的
                         await addMessage({ type: 'system', side: 'system', text: `“${remarkSender}”将给你的备注修改为“${newRemark}”` }, targetChatId);
@@ -17876,11 +17935,18 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             if (charSettings.message && charSettings.message.enabled && charSettings.message.probability > 0) {
                 const config = charSettings.message;
                 const messages = loadFromLocalStorage(`conversation_${chat.id}`, []);
-                // 判断条件：聊天记录为空，或者距离上一条消息的时间（无论谁发的）已经超过了设定的间隔
-                const lastMessageTimestamp = messages.length > 0 ? messages[messages.length - 1].timestamp : 0;
-                const isChatIdle = messages.length === 0 || (now - lastMessageTimestamp >= config.interval * 60 * 1000);
+                
+                // 【核心修复】引入双重冷却门禁：
+                // 门禁 A (硬锁): 检查距离上次AI【实际触发】的时间 (基于真实世界时间)。这是防止连发的关键。
+                const realTimeCooldownPassed = !config.lastTick || (now - config.lastTick >= config.interval * 60 * 1000);
 
-                if (isChatIdle) {
+                // 门禁 B (软锁): 检查距离【最新聊天记录】的时间 (基于消息时间戳)。
+                const lastMessageTimestamp = messages.length > 0 ? messages[messages.length - 1].timestamp : 0;
+                // 注意：如果使用了自定义时间(穿越到过去)，这个检查可能会一直为True，所以必须依赖门禁A来兜底。
+                const messageHistoryCooldownPassed = messages.length === 0 || (now - lastMessageTimestamp >= config.interval * 60 * 1000);
+
+                // 只有当【两个门禁】都通过时，才允许进入概率判定
+                if (realTimeCooldownPassed && messageHistoryCooldownPassed) {
                     if (Math.random() * 100 < config.probability) {
                         
                         // 【核心修复】：立即更新时间戳并保存，防止重复触发
