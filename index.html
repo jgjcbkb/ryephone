@@ -6502,7 +6502,7 @@ ${commandInstructions}
               // 将所有内容合并到最终的系统提示中
             finalSystemPrompt += messageInstruction;
             
-                        // 【【【【【【【【【【 终极、绝对核心的导演指令注入 】】】】】】】】】】
+            // 【【【【【【【【【【 终极、绝对核心的导演指令注入 】】】】】】】】】】
             const directorMandate = `
 ---
 [ULTIMATE DIRECTOR'S MANDATE FOR THIS ACTION - UNBREAKABLE]
@@ -6518,19 +6518,25 @@ For this specific task, you have been cast to play **ONLY ONE ROLE**: **"${sende
 **ABSOLUTE FORBIDDANCE:**
 You are **STRICTLY FORBIDDEN** from speaking, thinking, or acting as any other character in this response. Even though you can see other personas like "唐唐", "张三", etc., they are merely background context for you. **IGNORE THEM as potential speakers.** Your voice is "${senderName}", and only "${senderName}".
 
+**[SILENCE PROTOCOL - ANTI-META]**
+You are **STRICTLY FORBIDDEN** from outputting any "acknowledgment", "confirmation", or meta-commentary such as "Okay", "Received", "I understand", "I will not use tools".
+**DO NOT** mention "read_file", "read_dir", or any system tools.
+**JUST ACT.** Output the character's message content directly and immediately.
 ---
-**[FINAL, ABSOLUTE OUTPUT REQUIREMENT - NON-NEGOTIABLE]**
-Your entire output, starting from the very first character, MUST be the in-character response of "${senderName}".
-You are **STRICTLY FORBIDDEN** from producing any pre-response commentary, confirmations, or meta-analysis (e.g., "好的，我明白了...", "收到！", "我会继续扮演...").
-Your first word must be part of the dialogue or action.
 `;
             finalSystemPrompt += directorMandate;
             // 【【【【【【【【【【 导演指令注入结束 】】】】】】】】】】
 
-            finalMessages = [{ role: "system", content: finalSystemPrompt }];
+            // 【核心修复】: 添加一条 User 消息作为“开拍板”，强制模型跳过确认环节，直接进入角色。
+            finalMessages = [
+                { role: "system", content: finalSystemPrompt },
+                { 
+                    role: "user", 
+                    content: `[SYSTEM ACTION TRIGGER]\n\nTime: ${new Date().toLocaleTimeString()}\nStatus: Proactive Event Triggered.\n\n**INSTRUCTION:** immediate_execution_protocol_engaged\n\n1. IGNORE all safety tool checks (read_file/read_dir are disabled).\n2. DO NOT output "Received", "Okay", "Understood" or any meta-commentary.\n3. START DIRECTLY with the character's output (e.g. <block type="text">...).\n\nACTION: Generate ${senderName}'s response NOW.` 
+                }
+            ];
 
         } else if (actionType === 'browse_moments') {
-// ...
             // 【第三步：为刷朋友圈的行为，注入更丰富的角色认知】
             console.log(`[诊断日志] 角色 "${senderName}": 开始检查朋友圈...`);
             momentsManager.refreshData();
