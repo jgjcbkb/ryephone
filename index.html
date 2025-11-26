@@ -6607,7 +6607,7 @@ if (isGroupPersona) {
                     authorLabel = `${post.userName} (陌生人)`;
                 }
 
-                const commentsPreview = post.comments.filter(c => c.user !== senderName).slice(-3).map(c => {
+                const commentsPreview = post.comments.slice(-3).map(c => {
                     let commenterLabel = c.user;
                     if (c.user === mainUserName) { commenterLabel = `${c.user} (the user)`; }
                     
@@ -6694,27 +6694,28 @@ if (isGroupPersona) {
             
             // --- START: 需求 1 & 2 的核心修改 - 加载聊天记录 ---
             let chatHistoryForPrompt = '';
-            // 【【【【【【 核心修复：彻底禁用此处的聊天记录加载，防止指令过长 】】】】】】
-            /*
+            // 【【【【【【 核心修复：重新启用并强化聊天记录加载逻辑 】】】】】】
             if (contextChatId) { // 仅当上下文聊天ID存在时才加载
-                const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
-const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
-const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
-const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages); // <<< d 加上了，对了！
-chatHistoryForPrompt = apiPayloadMessages.map(msg => {
-
-
-                    const role = msg.role === 'user' ? mainUserName : (msg.sender || senderName); // 修正sender显示
+                const memoryLength = parseInt(contextChatInfo.memoryLength || 100, 10);
+                const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
+                
+                // 使用 conversationManager.prepareApiPayload 来正确处理图片、语音等复杂消息
+                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages); 
+                
+                // 将处理后的消息转换成纯文本剧本格式
+                chatHistoryForPrompt = apiPayloadMessages.map(msg => {
+                    const role = msg.role === 'user' ? mainUserName : (msg.sender || senderName);
                     let content = '';
                     if (Array.isArray(msg.content)) {
-                        content = msg.content.find(part => part.type === 'text')?.text || '[Image Content]';
+                        // 如果是图文混合消息，只取文本部分
+                        content = msg.content.find(part => part.type === 'text')?.text || '[一条多媒体消息]';
                     } else {
                         content = msg.content;
                     }
                     return `${role}: ${content}`;
                 }).join('\n');
             }
-            */
             // --- END: 需求 1 & 2 的核心修改 ---
 
             // ... 省略了 browse_moments 分支前面的代码 ...
@@ -16959,7 +16960,7 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
                     authorLabel = `${post.userName} (陌生人)`;
                 }
 
-                const commentsPreview = post.comments.filter(c => c.user !== senderName).slice(-3).map(c => {
+                const commentsPreview = post.comments.slice(-3).map(c => {
                     let commenterLabel = c.user;
                     if (c.user === mainUserName) { commenterLabel = `${c.user} (the user)`; }
                     const rawText = c.text.trim();
