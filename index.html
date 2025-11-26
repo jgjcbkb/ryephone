@@ -12882,7 +12882,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         return; // 提前结束 addMessageToDOM 函数
                     }
                 }
-                // 【【【【【【 表情包处理逻辑到这里结束，如果不是表情包，代码会继续往下执行 】】】】】】
+                // 【【【【【【 表情包处理逻辑到这里结束 】】】】】】
                 
                 // 新增：定义一个辅助函数，用于应用正则并返回安全的HTML
                 const applyRegexAndRender = (rawText) => {
@@ -12910,7 +12910,6 @@ You were receiving a video call from {{user}}, but they hung up before you could
                                     if (textBefore !== processedText) {
                                         hasBeenReplaced = true;
                                     }
-                                    // 关键修正：移除这里的 break; 语句，以允许链式处理
                                 } catch (e) {
                                     console.error(`正则规则 "${rule.name}" 在渲染时无效或执行出错:`, e);
                                 }
@@ -12920,102 +12919,94 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     
                     // 如果没有任何替换发生，说明是纯文本
                     if (hasBeenReplaced) {
-                        // 如果发生了替换，我们相信结果已经是HTML，直接返回
                         return processedText;
                     } else {
-                        // --- 【核心修正】在这里加入斜体/加粗处理 ---
                         // 1. 先对原始文本进行HTML转义，防止XSS攻击
                         let safeText = escapeHtml(rawText);
                         // 2. 在转义后的安全文本上，应用我们的简单格式化
                         let formattedText = simpleMarkdownToHtml(safeText);
                         // 3. 最后再处理换行符
                         return formattedText.replace(/\n/g, '<br>');
-                        // --- 修正结束 ---
                     }
                 };
 
-                const trimmedText = msg.text.trim();
-                // ... (后续的 if/else 判断保持不变)
-                    // AI生成的HTML卡片（如<snippet>包裹的内容）仍然直接渲染
-                    const isGeneratedHtmlBlock = trimmedText.startsWith('<div') || trimmedText.startsWith('<snippet>');
+                // 【核心修复步骤 1】: 在处理之前，先暴力清洗掉可能残留的 <block> 标签
+                // 这样即使你手动输入了 <block type="html"> 而没有闭合，或者正则解析失败，
+                // 这里也会把它删得干干净净，不会显示在气泡里。
+                let cleanText = msg.text.replace(/<block[^>]*>/g, '').replace(/<\/block>/g, '');
+                const trimmedText = cleanText.trim();
 
-                    if (isGeneratedHtmlBlock) {
-                        // Case 1: Pure snippet/HTML block (treated as one unit, original logic)
-                        div.innerHTML = msg.text.replace('<snippet>', '').replace('</snippet>', '');
-                    } 
+                // 【核心修复步骤 2】: 逻辑重构
+                // 以前是只要以 <snippet> 开头就认为是纯HTML，导致后面的弹幕被忽略。
+                // 现在改为：只要包含了 <snippet>，就无条件走分割逻辑。
+                
+                if (trimmedText.includes('<snippet>')) {
+                    // === 混合内容处理逻辑 (HTML + 弹幕/文本) ===
+                    const parts = trimmedText.split(/<snippet>([\s\S]*?)<\/snippet>/);
+                    let finalHtml = '';
                     
-                    // === START NEW LOGIC: Handling Mixed Content (Dialogue + Snippet/HTML) ===
-                    else if (trimmedText.includes('<snippet>')) {
-                        // 使用正则表达式将内容分割成 [文本, HTML, 文本, HTML, ...] 数组
-                        // 注意：我们只分割 <snippet>...</snippet> 内部的内容
-                        const parts = trimmedText.split(/<snippet>([\s\S]*?)<\/snippet>/);
-                        let finalHtml = '';
-                        
-                        // parts 数组结构：[文本1, HTML1, 文本2, HTML2, ...]
-                        for (let i = 0; i < parts.length; i++) {
-                            const part = parts[i];
-                            if (!part) continue;
+                    for (let i = 0; i < parts.length; i++) {
+                        const part = parts[i];
+                        if (!part) continue;
 
-                            if (i % 2 === 0) {
-                                // 偶数索引是文本（需要安全处理：正则、转义、Markdown）
-                                const safeHtmlText = applyRegexAndRender(part.trim());
-                                if (safeHtmlText) {
-                                    // 确保对话部分保留换行，并应用样式
-                                    finalHtml += `<div style="white-space: pre-wrap; word-wrap: break-word;">${safeHtmlText}</div>`;
-                                }
-                            } else {
-                                // 奇数索引是 HTML 片段（直接注入，不转义）
-                                finalHtml += part;
+                        if (i % 2 === 0) {
+                            // 偶数部分是文本（包括弹幕指令），必须经过正则渲染！
+                            // 这里的 part 就是 "[DANMAKU_PLAYER]..."
+                            // 经过 applyRegexAndRender 后，它就会变成漂亮的弹幕HTML
+                            const safeHtmlText = applyRegexAndRender(part.trim());
+                            if (safeHtmlText) {
+                                finalHtml += `<div style="white-space: pre-wrap; word-wrap: break-word;">${safeHtmlText}</div>`;
                             }
-                        }
-                        // 如果有回复上下文，将其添加到最前面
-                        if (msg.replyTo) {
-                             const originalMsg = chatState.messages.find(m => m.id === msg.replyTo);
-                             let previewHTML = '';
-                             if (originalMsg) {
-                                 const senderName = originalMsg.side === 'sent' ? '{{user}}' : (originalMsg.sender || chatState.chatName);
-                                 let contentPreview = originalMsg.text || `[${originalMsg.type}]`;
-                                 previewHTML = `<div class="quoted-message-preview"><span class="quoted-sender">${escapeHtml(senderName)}</span><span class="quoted-text">${escapeHtml(contentPreview)}</span></div>`;
-                             }
-                             div.innerHTML = `${previewHTML}${finalHtml}`;
                         } else {
-                             div.innerHTML = finalHtml;
+                            // 奇数部分是 <snippet> 里的内容，直接显示
+                            finalHtml += part;
                         }
-
-                    } 
-                    // === END NEW LOGIC ===
-                    
-                    else if (msg.replyTo) {
-                        // Case 3: Reply message (原纯回复逻辑)
-                        const originalMsg = chatState.messages.find(m => m.id === msg.replyTo);
-                        let previewHTML = '';
-                        if (originalMsg) {
-                            const senderName = originalMsg.side === 'sent' ? '{{user}}' : (originalMsg.sender || chatState.chatName);
-                            let contentPreview = '';
-                            switch(originalMsg.type) {
-                                case 'text': contentPreview = originalMsg.text; break;
-                                case 'photo': contentPreview = '[图片]'; break;
-                                default: contentPreview = `[${originalMsg.type}]`;
-                            }
-                            // 对预览内容进行转义，防止XSS
-                            previewHTML = `<div class="quoted-message-preview"><span class="quoted-sender">${escapeHtml(senderName)}</span><span class="quoted-text">${escapeHtml(contentPreview)}</span></div>`;
-                        } else {
-                            previewHTML = `<div class="quoted-message-preview"><span class="quoted-text">[原始消息已不存在]</span></div>`;
-                        }
-                        // 对回复的正文应用正则渲染
-                        div.innerHTML = `${previewHTML}<div>${applyRegexAndRender(msg.text)}</div>`;
-                    } else {
-                        // Case 4: Pure text/simple message (原纯文本逻辑)
-                        // --- 【核心修改：集成 @ 提及渲染】 ---
-                        let processedHtml = applyRegexAndRender(msg.text);
-                        processedHtml = processedHtml.replace(/@(\S+)(?![^<]*>|[^<>]*<\/)/g, (match, name) => {
-                            return `<span class="mention">@${escapeHtml(name)}</span>`;
-                        });
-                        // 3. 最后再处理换行符
-                        div.innerHTML = processedHtml;
-                        // --- 修改结束 ---
                     }
+                    
+                    if (msg.replyTo) {
+                         const originalMsg = chatState.messages.find(m => m.id === msg.replyTo);
+                         let previewHTML = '';
+                         if (originalMsg) {
+                             const senderName = originalMsg.side === 'sent' ? '{{user}}' : (originalMsg.sender || chatState.chatName);
+                             let contentPreview = originalMsg.text || `[${originalMsg.type}]`;
+                             previewHTML = `<div class="quoted-message-preview"><span class="quoted-sender">${escapeHtml(senderName)}</span><span class="quoted-text">${escapeHtml(contentPreview)}</span></div>`;
+                         }
+                         div.innerHTML = `${previewHTML}${finalHtml}`;
+                    } else {
+                         div.innerHTML = finalHtml;
+                    }
+
+                } else if (trimmedText.startsWith('<div')) {
+                    // Case 2: 纯 HTML 块 (兼容旧数据，不含 snippet 标签的情况)
+                    div.innerHTML = cleanText;
+                
+                } else if (msg.replyTo) {
+                    // Case 3: 回复消息
+                    const originalMsg = chatState.messages.find(m => m.id === msg.replyTo);
+                    let previewHTML = '';
+                    if (originalMsg) {
+                        const senderName = originalMsg.side === 'sent' ? '{{user}}' : (originalMsg.sender || chatState.chatName);
+                        let contentPreview = '';
+                        switch(originalMsg.type) {
+                            case 'text': contentPreview = originalMsg.text; break;
+                            case 'photo': contentPreview = '[图片]'; break;
+                            default: contentPreview = `[${originalMsg.type}]`;
+                        }
+                        previewHTML = `<div class="quoted-message-preview"><span class="quoted-sender">${escapeHtml(senderName)}</span><span class="quoted-text">${escapeHtml(contentPreview)}</span></div>`;
+                    } else {
+                        previewHTML = `<div class="quoted-message-preview"><span class="quoted-text">[原始消息已不存在]</span></div>`;
+                    }
+                    div.innerHTML = `${previewHTML}<div>${applyRegexAndRender(cleanText)}</div>`;
+                } else {
+                    // Case 4: 纯文本/弹幕 (经过清洗后的)
+                    // 核心修改：集成 @ 提及渲染
+                    let processedHtml = applyRegexAndRender(cleanText);
+                    processedHtml = processedHtml.replace(/@(\S+)(?![^<]*>|[^<>]*<\/)/g, (match, name) => {
+                        return `<span class="mention">@${escapeHtml(name)}</span>`;
+                    });
+                    div.innerHTML = processedHtml;
                 }
+            }
                 else if (msg.type === 'location') { try { const data = JSON.parse(msg.text); div.innerHTML = `<div class="location-text"><div class="title">${data.title}</div><div class="address">${data.address}</div></div><div class="card-map-area"><div class="card-pin-icon"></div></div>`; } catch (e) { div.textContent = '[位置消息格式错误]'; } }
                 else if (msg.type === 'gift') { let statusText = ''; const isFinished = msg.giftStatus === 'finished'; const isExpired = msg.giftStatus === 'expired'; if (isFinished) { statusText = '已领取'; } else if (isExpired) { statusText = '已过期'; } div.innerHTML = `<div class="gift-bubble ${isFinished || isExpired ? 'finished' : ''}"><div class="gift-content"><div class="gift-icon"></div><div class="gift-text"><div class="gift-name">${msg.text}</div>${statusText ? `<div class="gift-status">${statusText}</div>` : ''}</div></div><div class="gift-footer">礼物</div></div>`; }
                 else if (msg.type === 'pay_for_me') { const isPaid = msg.payStatus === 'paid'; div.classList.toggle('paid', isPaid); div.classList.add(`pay-for-me-${msg.itemType}`); const iconHtmlMap = { 'plane': `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`, 'train': `<img src="https://i.postimg.cc/Jz3MpMyh/IMG-0044.png" alt="高铁">`, 'ship': `<img src="https://i.postimg.cc/1z9PT26r/IMG-0043.png" alt="轮船">`, 'takeout': `<img src="https://i.postimg.cc/wMV55hCm/IMG-0001.png" alt="外卖">`, 'shopping': `<img src="https://i.postimg.cc/nVY1tJXt/IMG-9999.png" alt="购物">`, }; let iconHtml, footerText; if (msg.itemType === 'travel') { iconHtml = iconHtmlMap[msg.details.type] || ''; footerText = '出行代付'; } else if (msg.itemType === 'takeout') { iconHtml = iconHtmlMap.takeout; footerText = '外卖代付'; } else { iconHtml = iconHtmlMap.shopping; footerText = '购物代付'; } let detailsHtml = ''; if (msg.itemType === 'travel' && msg.details) { detailsHtml = `<div class="pay-for-me-details-travel"><div class="travel-info-row"><strong>从</strong><span>${msg.details.from || 'N/A'}</span></div><div class="travel-info-row"><strong>到</strong><span>${msg.details.to || 'N/A'}</span></div>${msg.details.time ? `<div class="travel-info-row"><strong>时间</strong><span>${msg.details.time}</span></div>` : ''}${msg.details.duration ? `<div class="travel-info-row"><strong>用时</strong><span>${msg.details.duration}</span></div>` : ''}</div>`; } else if (msg.itemType === 'takeout' && msg.details && msg.details.reviews) { detailsHtml = '<div class="pay-for-me-details-takeout">' + msg.details.reviews.map(r => `<div class="takeout-review">“${r.trim()}”</div>`).join('') + '</div>'; } else if (msg.itemType === 'shopping' && msg.details && msg.details.description) { detailsHtml = `<div class="pay-for-me-details-shopping">${msg.details.description.replace(/\\n/g, '<br>')}</div>`; } const statusText = isPaid ? '已代付' : (msg.side === 'sent' ? '等待对方代付' : '请为我代付'); div.innerHTML = `<div class="pay-for-me-header"><div class="pay-for-me-icon">${iconHtml}</div><div class="pay-for-me-text"><div class="title">${msg.text}</div><div class="amount">¥ ${msg.details.amount || '0.00'}</div></div></div>${detailsHtml ? `<div class="pay-for-me-details-container">${detailsHtml}</div>` : ''}<div class="pay-for-me-footer"><span>${footerText}</span><span class="status">${statusText}</span></div>`;}
