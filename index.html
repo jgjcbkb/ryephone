@@ -10728,17 +10728,20 @@ finalSystemPrompt += timeManager.getAITimeContext();
 
 
                 // --- 核心修正：在这里注入“关联NPC”的信息！---
-                const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${chatState.chatId}`, []);
-if (associatedNpcNames.length > 0) {
-    let npcInfoPrompt = '\n\n[Associated NPCs]\nYou are associated with the following characters. Their details are:\n';
-    
-    const npcSettings = loadFromLocalStorage('app-npc-settings', {});
-    associatedNpcNames.forEach(name => {
-        const persona = (npcSettings.personas && npcSettings.personas[name]) || 'No specific persona defined.';
-        npcInfoPrompt += `- **${name}**: ${persona}\n`;
-    });
-    finalSystemPrompt += npcInfoPrompt;
-}
+                // 【修复】只在非群聊模式下执行此操作，避免在群聊中重复注入
+                if (!contactInfo.isGroup) {
+                    const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${chatState.chatId}`, []);
+                    if (associatedNpcNames.length > 0) {
+                        let npcInfoPrompt = '\n\n[Associated NPCs]\nYou are associated with the following characters. Their details are:\n';
+                        
+                        const npcSettings = loadFromLocalStorage('app-npc-settings', {});
+                        associatedNpcNames.forEach(name => {
+                            const persona = (npcSettings.personas && npcSettings.personas[name]) || 'No specific persona defined.';
+                            npcInfoPrompt += `- **${name}**: ${persona}\n`;
+                        });
+                        finalSystemPrompt += npcInfoPrompt;
+                    }
+                }
                 
                 // --- 【核心修复】】】重新注入正确的后台任务生成逻辑 ---
                 // 这一步是让AI在回复的同时，有机会生成心事或备忘录的关键
@@ -10755,20 +10758,25 @@ if (associatedNpcNames.length > 0) {
                 const backgroundTaskPrompt = await triggerBackgroundDataUpdate(combinedUserTextForBgTask, chatState.chatName, originatingChatId);
                 finalSystemPrompt += backgroundTaskPrompt;
                 // --- 修复结束 ---
-                const memoryLength = parseInt(chatInfo.memoryLength || 100, 10); // 这里 memoryLength 现在代表“轮次”
+                // 【核心修复】：必须从完整历史记录中获取上下文，不能只用 chatState.messages (因为它可能只包含最近40条)
+                // 1. 重新加载完整历史记录
+                const fullHistoryForContext = loadFromLocalStorage(`conversation_${originatingChatId}`, []);
+                
+                // 2. 获取用户设置的轮次 (默认为100轮)
+                const memoryRoundLimit = parseInt(chatInfo.memoryLength || 100, 10);
                 
                 let recentMessages;
-                if (memoryLength > 0) {
-                    const allMessages = chatState.messages;
+
+                if (memoryRoundLimit > 0) {
                     const selectedMessages = [];
                     let roundCount = 0;
                     let lastSide = null;
 
-                    // 从后往前遍历所有消息
-                    for (let i = allMessages.length - 1; i >= 0; i--) {
-                        const msg = allMessages[i];
+                    // 3. 从后往前倒序遍历完整历史
+                    for (let i = fullHistoryForContext.length - 1; i >= 0; i--) {
+                        const msg = fullHistoryForContext[i];
                         
-                        // 跳过系统消息和时间分割线
+                        // 跳过系统消息和时间分割线，不计入轮次
                         if (msg.side === 'system' || msg.type === 'time_divider') {
                             continue;
                         }
@@ -10780,19 +10788,21 @@ if (associatedNpcNames.length > 0) {
                         }
                         
                         // 如果当前轮次已经超过了设定的记忆长度，就停止遍历
-                        if (roundCount >= memoryLength) {
+                        if (roundCount >= memoryRoundLimit) {
                             break;
                         }
 
-                        // 将符合条件的消息添加到数组的开头（因为我们是倒序遍历）
+                        // 将符合条件的消息添加到数组的开头
                         selectedMessages.unshift(msg);
                         lastSide = msg.side;
                     }
                     recentMessages = selectedMessages;
                 } else {
-                    // 如果 memoryLength 为 0 或负数，则代表不限制，发送所有消息
-                    recentMessages = chatState.messages;
+                    // 0 或负数表示不限制，发送全部历史
+                    recentMessages = fullHistoryForContext;
                 }
+                
+                console.log(`[上下文构建] 用户设置: ${memoryRoundLimit} 轮。实际提取: ${recentMessages.length} 条消息。`);
                 
                 const apiPayloadMessages = await prepareApiPayload(recentMessages);
 
