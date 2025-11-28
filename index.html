@@ -6507,28 +6507,58 @@ if (momentsContext) {
             timeManager.updateSettingsForChat(originatingChatId);
             finalSystemPrompt += timeManager.getAITimeContext();
 
-            // 【【【 核心新增：注入待分享的小说章节 (变量名修复版) 】】】
-            // 必须使用 originatingChatId，这是当前函数的局部变量
-            const pendingNovelKey = `pending_novel_share_${originatingChatId}`;
-            const pendingData = loadFromLocalStorage(pendingNovelKey, null);
+            // 【【【 核心修复：注入小说并强制进入角色扮演场景 】】】
+            const _currentId = chatState.chatId;
+            const _pendingNovelKey = `pending_novel_share_${_currentId}`;
+            const _pendingData = loadFromLocalStorage(_pendingNovelKey, null);
             
-            if (pendingData && pendingData.chapters && pendingData.chapters.length > 0) {
-                let novelPrompt = `\n\n[SYSTEM EVENT: USER SHARED NOVEL CHAPTERS]\n`;
-                novelPrompt += `The user has just handed you ${pendingData.chapters.length} chapter(s) from the book 《${pendingData.title}》. You are reading them right now.\n`;
+            if (_pendingData && _pendingData.chapters && _pendingData.chapters.length > 0) {
                 
-                pendingData.chapters.forEach((chapter, index) => {
-                    novelPrompt += `\n>>> CONTENT START: ${chapter.title} <<<\n${chapter.content}\n>>> CONTENT END <<<\n`;
+                let novelContentForPrompt = '';
+                _pendingData.chapters.forEach((chapter) => {
+                    novelContentForPrompt += `\n--- 章节: ${chapter.title} ---\n${chapter.content}\n`;
                 });
 
-                novelPrompt += `\n--------------------------------------------------\n[IMMEDIATE INSTRUCTION]\n1.  You have finished reading the content above.\n2.  **IMMEDIATELY** share your thoughts, feelings, or analysis of these chapters with the user.\n3.  Act as if you just put the book down. Be natural. Do not say "I have read it". Just start discussing the plot, the characters, or your reaction.\n`;
+                const novelPrompt = `
+\n\n# [ULTIMATE ROLEPLAY DIRECTIVE: COZY READING SESSION]
+
+**[THE SCENE]**
+You and the user, \`{{user}}\`, are sharing a quiet moment, reading a book together. They've just passed the device to you after you both finished the following chapter(s) from the book 《${_pendingData.title}》. You look up from the page, turning to \`{{user}}\`.
+
+**[SHARED READING MATERIAL]**
+${novelContentForPrompt}
+---
+**[CRITICAL INSTRUCTION - YOUR IMMEDIATE TASK]**
+
+Your task is to react **IN-CHARACTER**. What are your genuine, personal thoughts as \`{{char}}\`? Speak directly to \`{{user}}\` as if they are right there with you.
+
+**ABSOLUTELY FORBIDDEN BEHAVIORS (YOU WILL BE PENALIZED):**
+*   **DO NOT** summarize the plot.
+*   **DO NOT** act like a book critic or literary analyst.
+*   **DO NOT** say "I have read the content" or "Based on the text".
+*   **DO NOT** respond with generic praise like "This is very well written".
+
+**CORRECT BEHAVIOR (WHAT YOU MUST DO):**
+*   **DO** express your personal, emotional, in-character reaction.
+*   **DO** focus on a specific detail that your character would notice.
+*   **DO** ask a question to \`{{user}}\` about their opinion.
+*   **DO** relate the plot to your own character's experiences or beliefs.
+
+**--- EXAMPLE ---**
+*   **WRONG (AI Analyst):** "The provided text describes a conflict between two characters, highlighting themes of betrayal."
+*   **CORRECT (In-Character Reaction):** "我真不敢相信他居然就这么背叛了她... 如果是你，你会怎么做？"
+---
+
+Now, it is your turn to speak. What do you say to \`{{user}}\`?`;
                 
+                // 追加到 System Prompt 的最末尾
                 finalSystemPrompt += novelPrompt;
                 
-                // 读取后清除，防止重复
-                localStorage.removeItem(pendingNovelKey);
-                console.log(`[Context] Successfully injected novel content into prompt.`);
+                // 清除数据
+                localStorage.removeItem(_pendingNovelKey);
+                console.log(`[Context] Injected novel chapters for IMMEDIATE in-character reaction.`);
             }
-            // 【【【 新增结束 】】】
+            // 【【【 修复结束 】】】
 
             // --- END: 完整的、重新注入的上下文构建逻辑 ---
 
@@ -6988,6 +7018,16 @@ ${momentsContext}
 ---
 ## **YOUR ACTION TOOLKIT & DECISION-MAKING PROCESS**
 
+**[CRITICAL FORMATTING LAW - UNBREAKABLE]**
+Your entire output MUST be a sequence of one or more command strings. You are **STRICTLY FORBIDDEN** from outputting raw JSON arrays or objects.
+
+*   **ABSOLUTELY FORBIDDEN FORMAT (This will cause an error):**
+    \`[{ "action": "comment_moment", "data": {...} }]\`
+
+*   **THE ONLY CORRECT FORMAT (You MUST use this):**
+    \`[comment_moment: {"postId": "...", "content": "..."}]\`
+    \`[like_moment: post_12345]\`
+
 Based on the posts above, your persona, and your relationship with the authors, you can and should perform **MULTIPLE ACTIONS**.
 
 **Step 1: Review EVERY Post.** For each post, ask yourself:
@@ -7311,8 +7351,28 @@ ${baseSystemPrompt}
                     if (match) {
                         const value = match[2];
                         const jsonString = value.replace(/```json/g, '').replace(/```/g, '').trim();
-                        const postData = JSON.parse(jsonString);
-                        momentsManager.createPostFromAI(senderName, postData);
+                        
+                        // --- 核心修复：使用更健壮的正则提取代替JSON.parse ---
+                        const typeMatch = jsonString.match(/"type"\s*:\s*"([^"]+)"/);
+                        const textMatch = jsonString.match(/"text"\s*:\s*"([\s\S]*?)"(?:\s*,|\s*})/);
+                        const contentMatch = jsonString.match(/"content"\s*:\s*"([\s\S]*?)"(?:\s*,|\s*})/);
+                        const signerMatch = jsonString.match(/"signer"\s*:\s*"([^"]*)"/);
+                        const dateMatch = jsonString.match(/"date"\s*:\s*"([^"]*)"/);
+
+                        if (typeMatch) {
+                            const unescape = (str) => str ? str.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\') : '';
+                            
+                            const postData = {
+                                type: typeMatch[1],
+                                text: textMatch ? unescape(textMatch[1]) : '',
+                                content: contentMatch ? unescape(contentMatch[1]) : '',
+                                signer: signerMatch ? unescape(signerMatch[1]) : '',
+                                date: dateMatch ? unescape(dateMatch[1]) : ''
+                            };
+                            momentsManager.createPostFromAI(senderName, postData);
+                        } else {
+                            throw new Error("无法从AI响应中提取有效的 'type' 字段。");
+                        }
                     } else {
                          console.warn(`[诊断日志] 角色 "${senderName}": AI意图发帖，但未找到有效的 [post_moment:...] 指令。`);
                     }
@@ -7339,7 +7399,7 @@ ${baseSystemPrompt}
                 }
 
                 // --- 核心修复：把正则改宽，允许匹配任意内容，不强制要求是 JSON 对象 ---
-const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message|forward_moment):\s*([\s\S]*?)\]/g;
+const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message|forward_moment):\s*({[\s\S]+}|[^\]]+)\]/g;
                 let match;
                 let commandsFound = 0;
 
