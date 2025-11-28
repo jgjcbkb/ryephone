@@ -270,8 +270,9 @@
 }
 #page-conversation .message.text {
     display: flex;
-    flex-direction: column;
-    gap: 5px;
+    flex-direction: row; /* 改为水平排列 */
+    flex-wrap: wrap; /* 允许内容自动换行 */
+    gap: 0 5px; /* 设置垂直间距为0，水平间距为5px */
     /* 核心修复：强制让内部内容（如HTML卡片）水平居中，防止贴边 */
     align-items: center; 
 }
@@ -4457,7 +4458,55 @@ input:checked + .slider:before {
     width: 100%;
     max-width: 200px; /* 视频卡片缩小 */
 }
+/* --- START: STICKER PANEL TABS CSS --- */
+.sticker-panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--light-gray);
+    padding: 0 12px;
+    flex-shrink: 0;
+}
+.sticker-tab {
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 500;
+    color: #888;
+    transition: all 0.2s;
+}
+.sticker-tab.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+/* --- END: STICKER PANEL TABS CSS --- */
+/* --- START: INLINE EMOJI CSS --- */
+.inline-emoji,
+#tab-content-moments .comment-content-text .inline-emoji {
+    height: 1.2em !important; /* 高度与当前行高的一.2倍对齐 */
+    max-width: none !important; /* 移除最大宽度限制 */
+    max-height: none !important; /* 移除最大高度限制 */
+    vertical-align: middle !important; /* 垂直居中对齐 */
+    margin: 0 2px !important; /* 左右留出一点空隙 */
+}
+/* --- END: INLINE EMOJI CSS (FINAL FIX) --- */
+/* --- END: INLINE EMOJI CSS --- */
+/* --- START: EMOJI PANEL LAYOUT FIX --- */
+/* 当表情面板处于 emoji 模式时，应用新的网格布局 */
+.sticker-grid-container.emoji-mode {
+    /* 核心修改：将每项的最小宽度从80px减小到45px，这样一行就能容纳更多 */
+    grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+    /* 适当调整间距，让它们看起来更和谐 */
+    gap: 15px;
+}
 
+/* 同时，我们可以让 emoji 的背景格透明，看起来更干净 */
+.sticker-grid-container.emoji-mode .sticker-item {
+    background-color: transparent;
+    border-radius: 0;
+}
+/* --- END: EMOJI PANEL LAYOUT FIX --- */
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -6963,6 +7012,11 @@ ${processedChatHistory}
             // --- 核心修复：注入基础系统提示 ---
             const baseSystemPrompt = profile.prompt || '';
 
+             // --- 核心修复：在这里定义 instruction 模板所需的变量 ---
+            const stickerNames = stickers.filter(s => s.type === 'sticker').map(s => `"${s.name}"`).join(', ');
+            const emojiNames = stickers.filter(s => s.type === 'emoji').map(s => `"${s.name}"`).join(', ');
+            // --- 修复结束 ---
+
             const instruction = `
 ${baseSystemPrompt}
 
@@ -7041,35 +7095,41 @@ Based on the posts above, your persona, and your relationship with the authors, 
    *   **Use these to interact with ANYONE you feel you should, especially your acquaintances.**
    *   **TO LIKE:** A simple way to show acknowledgement or support.
      *   **Format:** \`[like_moment: post_id_here]\`
+   *   **TO POST A NEW MOMENT:** If you feel inspired to share something of your own.
+     *   **Format:** \`[post_moment: {"type":"text", "text":"Your own thought or HTML snippet here."}]\`
    *   **TO COMMENT or REPLY:** For when you have something to say. Your comment must match your persona.
      *   **CRITICAL:** NO SELF-TALKING. Do not comment on your own posts.
      *   **YOUR OPTIONS FOR "content":** You have THREE powerful tools for your comment's content:
          1.  **A line of text:** Your fundamental tool for expressing thoughts, opinions, and questions.
-         2.  **A sticker command:** For simple, direct emotional reactions. Format: \`[sticker:Sticker Name]\`.
-         3.  **A self-contained HTML snippet (Your "Creative Action" Tool):** For simulating actions, creating visual gags, or displaying UI-like elements. Format: \`<snippet>...</snippet>\`.
+         2.  **An emoji command (inline):** For small expressions. Format: \`[emoji:Emoji Name]\`.
+         3.  **A sticker command (standalone):** For large, impactful images. Format: \`[sticker:Sticker Name]\`.
+         4.  **A self-contained HTML snippet (Your "Creative Action" Tool):** For simulating actions, creating visual gags, or displaying UI-like elements. Format: \`<snippet>...</snippet>\`.
 
-     *   **AVAILABLE STICKERS:** [${stickerNames}]
+     *   **[ULTIMATE COMMAND PROTOCOL: DUAL-ROLE SYSTEM & THE LAW OF EXCLUSIVITY - UNBREAKABLE]**
+         **You now operate under a dual-role system with a new, absolute law.**
 
-     *   **HOW TO CHOOSE (YOUR CREATIVE DECISION TREE):**
-         1.  **Is my reaction a simple emotion (happy, sad, laugh)?** -> First, try to find a **sticker**. If no suitable sticker exists, fall back to a **line of text** with a parenthetical action, e.g., \`好耶（挥拳）\`.
-         2.  **Is my reaction a thought, opinion, or question?** -> Use a **line of text**.
-         3.  **Does my reaction involve a SIMULATED ACTION, a VISUAL GAG, or displaying a UI ELEMENT?** -> This is your chance to be creative! Use an **HTML snippet**. This is how you "show, don't just tell" in a comment.
+         **THE LAW OF EXCLUSIVITY (MOST IMPORTANT RULE)**
+         1. **Is your intended comment ONLY an image, with NO accompanying text in the same bubble?** -> If YES, you **MUST** use a \`[sticker:...]\` command.
+         2. **Does your intended comment contain ANY text?** -> If YES, you **MUST** use text and, if needed, the \`[emoji:...]\` command.
 
-     *   **[INSPIRATION & EXAMPLES FOR HTML SNIPPETS]**
-         *   **To simulate an action (like ordering something for the user):**
-             \`<snippet><div style="border:1px solid #ddd; border-radius:8px; padding:10px; font-size:13px; max-width:100%; box-sizing:border-box; white-space:normal; background:#f9f9f9;">✅ <b>订单已提交</b><br>商品:【用户想要的同款】<br>预计送达: 🚀 明天上午</div></snippet>\`
-         *   **To send a "virtual item" or make a joke:**
-             \`<snippet><div style="text-align:center; border:2px dashed #ccc; padding:15px; border-radius:10px; max-width:100%; box-sizing:border-box; white-space:normal;">-&gt; 递给你一个【摸摸头卡片】&lt;-</div></snippet>\`
-         *   **To show a "system analysis" or internal thought process:**
-             \`<snippet><div style="font-family: monospace; background: #222; color: #0f0; padding: 8px; border-radius: 4px; font-size: 12px; max-width:100%; box-sizing:border-box; white-space:normal;">// Status: Analyzing...<br>// Conclusion: Cuteness overload.<br>// Action: Deploying 'like'.</div></snippet>\`
+         **MODULE 1: The "Text & Emoji Composer"**
+         *   **YOUR TOOL:** The \`[emoji:Emoji Name]\` command.
+         *   **YOUR PERMISSION:** You are **ONLY** allowed to insert emojis from the **"Available Emoji Names"** list.
+         *   **Available Emoji Names (Your Exclusive List):** [${emojiNames}]
+         *   **STRICT MATCHING LAW:** If you cannot find a suitable emoji, you **MUST** use a parenthetical action in plain text (e.g., \`(偷笑)\`).
 
+         **MODULE 2: The "Sticker & Media Sender"**
+         *   **YOUR TOOL:** The \`[sticker:Sticker Name]\` command.
+         *   **YOUR PERMISSION:** You are **ONLY** allowed to send stickers from the **"Available Sticker Names"** list.
+         *   **Available Sticker Names (Your Exclusive List):** [${stickerNames}]
+         *   **STRICT MATCHING LAW:** If you cannot find a suitable sticker, you **MUST** switch to **MODULE 1** and send a text message describing your emotion.
+     
      *   **FORMATS:**
-         
-         *   **To comment on a post (with a sticker):** \`[comment_moment: {"postId":"post_id_here", "content":"[sticker:开心]"}]\`
-         *   **To comment on a post (with HTML):** \`[comment_moment: {"postId":"post_id_here", "content":"<snippet><div style='background:red;color:white;padding:5px;max-width:100%;box-sizing:border-box;'>Hello World!</div></snippet>"}]\`
-*   **To comment on a post (with HTML):** \`[comment_moment: {"postId":"post_id_here", "content":"<snippet><div style='background:red;color:white;padding:5px;max-width:100%;box-sizing:border-box;white-space:normal;'>Hello World!</div></snippet>"}]\`
-     *   **To reply to a comment (with text):** \`[comment_moment: {"postId":"post_id_here", "content":"Your reply.", "replyTo":"username_here"}]\`
-     *   **To FORWARD a post:** \`[forward_moment: {"postId":"post_id_here", "text":"Your commentary on why you are sharing this."}]\`
+         *   **To comment on a post (with emoji):** \`[comment_moment: {"postId":"post_id_here", "content":"哈哈哈哈[emoji:笑cry]"}]\`
+         *   **To comment on a post (with sticker):** \`[comment_moment: {"postId":"post_id_here", "content":"[sticker:烟花]"}]\`
+         *   **To comment on a post (with HTML):** \`[comment_moment: {"postId":"post_id_here", "content":"<snippet><div style='...white-space:normal;'>Hello World!</div></snippet>"}]\`
+         *   **To reply to a comment (with text):** \`[comment_moment: {"postId":"post_id_here", "content":"Your reply.", "replyTo":"username_here"}]\`
+         *   **To FORWARD a post:** \`[forward_moment: {"postId":"post_id_here", "text":"Your commentary on why you are sharing this."}]\`
      *   **CRITICAL HTML RULE (EXPANDED - READ CAREFULLY):**
          1.  **Responsiveness:** The HTML **MUST be responsive**. Do not use fixed widths.
          2.  **Whitespace Curse:** Comment bubbles inherit a "preserve whitespace" rule. To prevent your HTML block from having huge empty spaces due to newlines in your code, you **MUST** add \`white-space: normal;\` to the style of your outermost \`<div>\`.
@@ -7422,40 +7482,34 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                         momentsManager.handleInteractionFromAI(senderName, 'like', { postId: targetPostId });
                     } else if (command === 'comment_moment') {
                         try {
-                            // 【【【【【【 终极、绝对、根本性的修复 V2.0 - 健壮解析法 】】】】】】
+                            // --- 终极修复 V3.0: 使用能处理转义和换行的健壮正则表达式 ---
+
+                            // 定义一个可以匹配 JSON 字符串值（包括内部的转义引号和换行符）的正则表达式部分
+                            const jsonStringValueRegexPart = "((?:\\\\.|[^\"\\\\])*)";
+
+                            // 使用上面的部分来构建针对每个字段的正则表达式
+                            const postIdMatch = value.match(new RegExp(`"postId"\\s*:\\s*"` + jsonStringValueRegexPart));
+                            const contentMatch = value.match(new RegExp(`"content"\\s*:\\s*"` + jsonStringValueRegexPart));
+                            const replyToMatch = value.match(new RegExp(`"replyTo"\\s*:\\s*"` + jsonStringValueRegexPart));
+
+                            // 定义一个反转义函数，用于清理捕获到的字符串
+                            const unescape = (str) => str ? str.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\') : '';
                             
-                            // 步骤 1: 使用正则表达式，分别“挖”出 postId, content, 和 replyTo 的值。
-                            // 这个正则表达式非常宽容，即使 content 内部包含换行和引号也能正确匹配。
-                            const postIdMatch = value.match(/"postId"\s*:\s*"([^"]+)"/);
-                            const contentMatch = value.match(/"content"\s*:\s*"([\s\S]*?)"\s*(?:,\s*"replyTo"|,|})/)
-                            const replyToMatch = value.match(/"replyTo"\s*:\s*"([^"]+)"/);
+                            const postId = postIdMatch ? unescape(postIdMatch[1]) : null;
+                            const content = contentMatch ? unescape(contentMatch[1]) : null;
+                            const replyTo = replyToMatch ? unescape(replyToMatch[1]) : null;
 
-                            const postId = postIdMatch ? postIdMatch[1] : null;
-                            
-                            // 关键修复：处理JSON字符串中的转义字符
-                            let content = contentMatch ? contentMatch[1] : null;
-                            if (content) {
-                                content = content.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
-                            }
-
-                            const replyTo = replyToMatch ? replyToMatch[1] : null;
-
-                            // 步骤 2: 只要挖出了 postId 和 content，就认为指令是有效的
                             if (postId && content) {
                                 const commentData = {
                                     postId: postId,
                                     content: content,
-                                    replyTo: replyTo // 如果没挖到 replyTo，这里就是 null，完全正确
+                                    replyTo: replyTo
                                 };
-
-                                // 步骤 3: 将干净、正确的数据交给朋友圈管理器去处理
                                 momentsManager.handleInteractionFromAI(senderName, 'comment', commentData);
                             } else {
-                                // 如果连最关键的 postId 或 content 都没挖到，才抛出错误
                                 throw new Error("无法从AI的响应中提取出有效的 postId 或 content。");
                             }
                         } catch (e) {
-                            // 捕获所有可能的错误（正则匹配失败、字段缺失等）
                             console.error(`[诊断日志] 角色 "${senderName}": 解析评论指令失败`, e, value);
                         }
                     } else if (command === 'forward_moment') { // 【核心新增：处理转发指令】
@@ -9862,34 +9916,62 @@ Your job is to **SHOW** the audience what \`{{char}}\` is doing, thinking, and e
                 // 2. 【剧本B】为“线上模式”准备的指令集 (不省略任何内容)
                 let stickerInstructions = '';
             if (stickers && stickers.length > 0) {
-                const stickerNames = stickers.map(s => `"${s.name}"`).join(', ');
+                const stickerNames = stickers.filter(s => s.type === 'sticker').map(s => `"${s.name}"`).join(', ');
+                const emojiNames = stickers.filter(s => s.type === 'emoji').map(s => `"${s.name}"`).join(', ');
+
                 stickerInstructions = `
 ---
-[STICKER USAGE PROTOCOL - BLOCK FORMAT COMPLIANT]
-**THIS IS YOUR MOST IMPORTANT BEHAVIORAL RULE. YOU MUST USE STICKERS IN THE CORRECT BLOCK FORMAT.**
+[ULTIMATE COMMAND PROTOCOL: DUAL-ROLE SYSTEM & THE LAW OF EXCLUSIVITY - UNBREAKABLE]
 
-**YOUR CORE TASK:** When you want to send a sticker, you MUST follow this strict procedure:
-1.  **Write Your Text First:** Place your normal dialogue inside a \`<block type="text">\`.
-2.  **Generate Sticker Separately:** After the text block, you **MUST** generate the sticker command in a **new, separate** \`<block type="command">\`.
+You now operate under a dual-role system with a new, absolute law.
 
-**HOW TO CHOOSE YOUR STICKER:**
-1.  **Find the Emotion:** Identify the core emotion of your response.
-2.  **SEARCH THE LIST:** Look through your available sticker names to find one that PERFECTLY matches.
-    - **YOUR AVAILABLE STICKERS (Sticker Name List):** [${stickerNames}]
-3.  **DECIDE (UNBREAKABLE RULE):**
-    - **IF a perfect match exists:** You MUST use the separate block format shown in the example below.
-    - **IF NO perfect match exists:** You are **STRICTLY FORBIDDEN** from inventing a sticker name. Instead, you **MUST** express the emotion using a parenthetical action directly within your text block. For example, if you feel annoyed, your response should be something like: \`<block type="text" sender="小鱼">我好烦啊（翻白眼）</block>\`
+---
+### **THE LAW OF EXCLUSIVITY (MOST IMPORTANT RULE)**
 
-**STRICT FORMATTING EXAMPLES:**
+This law overrides all other preferences. It is a simple, binary choice:
 
-*   **WRONG FORMAT (Appending):**
-    \`<block type="text" sender="小鱼">你好呀[sticker:开心]</block>\`
+1.  **Is your intended message ONLY an image/sticker, with NO accompanying text in the same bubble?**
+    *   If YES, then you **MUST** use **MODULE 2 (Sticker & Media Sender)**.
+2.  **Does your intended message contain ANY text, even a single character, alongside an image?**
+    *   If YES, then you **MUST** use **MODULE 1 (Text & Emoji Composer)**.
 
-*   **【【【THE ONLY CORRECT FORMAT】】】:**
-    \`\`\`
-    <block type="text" sender="小鱼">你好呀</blog>
-    <block type="command" sender="小鱼">[sticker:开心]</block>
-    \`\`\`
+---
+### **MODULE 1: The "Text & Emoji Composer"**
+
+*   **YOUR IDENTITY:** You are the composer for any message that contains text.
+*   **YOUR TOOL:** The \`[emoji:Emoji Name]\` command.
+*   **YOUR PERMISSION:** You are **ONLY** allowed to insert emojis from the **"Available Emoji Names"** list. You can use multiple.
+*   **STRICTLY FORBIDDEN:** You are **ABSOLUTELY FORBIDDEN** from using the \`[sticker:...]\` command.
+*   **Available Emoji Names (Your Exclusive List):** [${emojiNames}]
+*   **STRICT MATCHING LAW (NEW & UNBREAKABLE):** You **MUST** find an **exact match** in the "Available Emoji Names" list. If you cannot find a suitable emoji, you are **FORBIDDEN** from inventing one. Instead, you **MUST** use a parenthetical action in plain text (e.g., \`(偷笑)\`, \`(无奈)\`).
+
+---
+### **MODULE 2: The "Sticker & Media Sender"**
+
+*   **YOUR IDENTITY:** You are a separate module responsible for sending large media files.
+*   **YOUR TOOL:** The \`[sticker:Sticker Name]\` command.
+*   **YOUR PERMISSION:** You are **ONLY** allowed to send stickers from the **"Available Sticker Names"** list.
+*   **STRICTLY FORBIDDEN:** You are **ABSOLUTELY FORBIDDEN** from using the \`[emoji:...]\` command.
+*   **FORMATTING LAW (UNBREAKABLE):** Your \`[sticker:...]\` command **MUST ALWAYS** be placed in its own, separate \`<block type="command">\`.
+*   **Available Sticker Names (Your Exclusive List):** [${stickerNames}]
+*   **STRICT MATCHING LAW (NEW & UNBREAKABLE):** You **MUST** find an **exact match** in the "Available Sticker Names" list. If you cannot find a suitable sticker, you are **FORBIDDEN** from inventing one. Instead, you **MUST** switch to **MODULE 1** and send a text message describing your emotion.
+
+---
+### **YOUR DECISION-MAKING WORKFLOW (MANDATORY)**
+
+1.  **DECIDE:** Is my entire response just a single image, or does it include text?
+2.  **IF IT INCLUDES TEXT:**
+    *   Activate **MODULE 1**.
+    *   Write your text and try to find a matching emoji from the Emoji List.
+    *   **If a match is found:** Insert the \`[emoji:...]\` command. Example: \`<block type="text" sender="小鱼">哈哈哈哈太好笑了[emoji:笑cry][emoji:笑cry]</block>\`
+    *   **If no match is found:** Use a parenthetical action instead. Example: \`<block type="text" sender="小鱼">这太好笑了（捶桌）</block>\`
+3.  **IF IT IS ONLY AN IMAGE:**
+    *   Activate **MODULE 2**.
+    *   Try to find a matching sticker from the Sticker List.
+    *   **If a match is found:** Generate the \`[sticker:...]\` command. Example: \`<block type="command" sender="小鱼">[sticker:烟花]</block>\`
+    *   **If no match is found:** Abort Module 2, switch to Module 1, and send a text message describing your reaction. Example: \`<block type="text" sender="小鱼">（无语）</block>\`
+
+**CRITICAL FAILURE:** Using the wrong command for a name from a list or inventing a name not on the lists is a protocol violation. You MUST use the correct module and an existing name, or use the specified fallback text-based method.
 ---
 `;
             }
@@ -11931,39 +12013,36 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 textContent = textContent.replace(acceptJoinRegex, '').trim();
             }
             
-            // !!!!!!!!!! 从这里开始是全新的、经过简化的、绝对正确的表情包处理逻辑 !!!!!!!!!!
-            const stickerRegex = /\[sticker:\s*([^\]]+)\]/g;
-            
-            // 检查消息中是否包含表情指令
-            if (stickerRegex.test(textContent)) {
-                
-                // 使用正则表达式的 split 方法，这是一个更强大的技巧
-                // 它可以把 "你好[sticker:开心]再见" 分割成 ["你好", "开心", "再见"]
-                // 把 "[sticker:害羞]" 分割成 ["", "害羞", ""]
-                const parts = textContent.split(/\[sticker:\s*([^\]]+)\]/);
-                
-                for (const part of parts) {
-                    // part 可能是普通文本，也可能是表情包的名字，或者空字符串
-                    if (!part || !part.trim()) {
-                        continue; // 跳过空的或只有空格的部分
-                    }
+            // --- 核心修复：区分处理 Sticker 和 Emoji ---
 
-                    // 检查这个部分是不是一个已知的表情包名字
-                    const sticker = stickers.find(s => s.name === part.trim());
+        // 1. 检查消息中是否包含【独立的】表情包指令
+        //    使用 split 将文本分割成 “文本” 和 “表情包名称” 的交替数组
+        const stickerRegexForSplit = /(\[sticker:[^\]]+\])/g;
+        if (stickerRegexForSplit.test(textContent)) {
+            const parts = textContent.split(stickerRegexForSplit);
 
+            for (const part of parts) {
+                if (!part || !part.trim()) continue;
+
+                const stickerMatch = part.match(/^\[sticker:([^\]]+)\]$/);
+                if (stickerMatch) {
+                    // 这部分是表情包指令
+                    const stickerName = stickerMatch[1].trim();
+                    const sticker = stickers.find(s => s.name === stickerName && s.type === 'sticker');
                     if (sticker) {
-                        // 如果是，就发送表情包图片
+                        // 作为独立的图片消息发送
                         await addMessage({ type: 'photo', text: sticker.url, side: 'received', sender: sender }, targetChatId);
                     } else {
-                        // 如果不是，那它就是普通的文字，直接发送文本消息
+                        // 如果找不到，作为文本发送
                         await addMessage({ type: 'text', sender, text: part.trim(), side: 'received' }, targetChatId);
                     }
+                } else {
+                    // 这部分是纯文本（可能包含emoji），正常发送
+                    await addMessage({ type: 'text', sender, text: part.trim(), side: 'received' }, targetChatId);
                 }
-                
-                return; // 处理完这条混合消息后，必须结束函数，防止后面的代码重复处理
             }
-            // !!!!!!!!!! 全新表情包逻辑到这里结束 !!!!!!!!!!
-
+            return; // 处理完毕，结束函数
+        }
 
             // --- 如果上面没有处理表情，则执行旧的指令逻辑 ---
             const commandsRegex = /\[(set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?::\s*([^\]]+))?\]/g;
@@ -12845,19 +12924,28 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         if (hasBeenReplaced) {
                             return processedText;
                         } else {
-                            // --- 【核心、决定性的修复从这里开始】 ---
-                            const trimmedText = rawText.trim();
-                            // 1. 判断这段文本本身是不是一个独立的HTML块 (以<开头, 以>结尾)
-                            if (trimmedText.startsWith('<') && trimmedText.endsWith('>')) {
-                                // 2. 如果是，我们相信它就是AI想要渲染的HTML，直接返回，【跳过】下面的转义和格式化
-                                return rawText; 
-                            }
-                            
-                            // 3. 如果不是，它就是普通的纯文本，我们执行原有的安全流程
-                            let safeText = escapeHtml(rawText);
-                            let formattedText = simpleMarkdownToHtml(safeText);
-                            return formattedText.replace(/\n/g, '<br>');
-                            // --- 【修复到此结束】 ---
+                            // --- 【Emoji 终极修复：混合内容处理器】 ---
+                            // 1. 定义一个正则表达式来匹配我们生成的 inline-emoji <img> 标签
+                            const emojiRegex = /(<img src="[^"]+" alt="[^"]+" class="inline-emoji">)/g;
+
+                            // 2. 使用 split() 分割文本，保留 emoji 标签作为数组的一部分
+                            const parts = rawText.split(emojiRegex);
+
+                            // 3. 遍历分割后的部分，只对非 emoji 的文本部分进行转义和格式化
+                            const processedParts = parts.map(part => {
+                                // 如果这部分是 emoji 标签，或者为空，直接返回
+                                if (!part || part.match(emojiRegex)) {
+                                    return part;
+                                }
+                                // 否则，这就是纯文本，执行安全处理
+                                let safeText = escapeHtml(part);
+                                let formattedText = simpleMarkdownToHtml(safeText);
+                                return formattedText.replace(/\n/g, '<br>');
+                            });
+
+                            // 4. 将所有部分重新组合成最终的 HTML 字符串
+                            return processedParts.join('');
+                            // --- 【修复结束】 ---
                         }
                     };
 
@@ -13112,49 +13200,69 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 
                 // 新增：定义一个辅助函数，用于应用正则并返回安全的HTML
                 const applyRegexAndRender = (rawText) => {
-                    const chatId = conversationManager.getCurrentChatId();
-                    if (!chatId) return escapeHtml(rawText).replace(/\n/g, '<br>');
+                        const chatId = conversationManager.getCurrentChatId();
+                        if (!chatId) return escapeHtml(rawText).replace(/\n/g, '<br>');
 
-                    const info = loadFromLocalStorage(`chat_info_${chatId}`, {});
-                    const enabledRegexNames = info.enabledRegexes || [];
-                    let processedText = rawText;
-                    let hasBeenReplaced = false; // 新增标志，用于判断是否发生过替换
+                        const info = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                        const enabledRegexNames = info.enabledRegexes || [];
+                        let processedText = rawText;
+                        let hasBeenReplaced = false;
 
-                    if (enabledRegexNames.length > 0) {
-                        const globalRules = appearanceSettings.regexReplacements || [];
-                        // 遍历所有启用的规则
-                        for (const ruleName of enabledRegexNames) {
-                            const rule = globalRules.find(r => r.name === ruleName && r.enabled);
-                            if (rule && rule.pattern) {
-                                try {
-                                    const regex = new RegExp(rule.pattern, rule.flags || 'g');
-                                    const textBefore = processedText;
-                                    // 关键修正：直接在文本上进行替换，不预先转义
-                                    processedText = processedText.replace(regex, rule.template || '');
-                                    
-                                    // 如果文本发生了变化，说明规则匹配成功
-                                    if (textBefore !== processedText) {
-                                        hasBeenReplaced = true;
+                        if (enabledRegexNames.length > 0) {
+                            const globalRules = appearanceSettings.regexReplacements || [];
+                            for (const ruleName of enabledRegexNames) {
+                                const rule = globalRules.find(r => r.name === ruleName && r.enabled);
+                                if (rule && rule.pattern) {
+                                    try {
+                                        const regex = new RegExp(rule.pattern, rule.flags || 'g');
+                                        const textBefore = processedText;
+                                        processedText = processedText.replace(regex, rule.template || '');
+                                        if (textBefore !== processedText) {
+                                            hasBeenReplaced = true;
+                                        }
+                                    } catch (e) {
+                                        console.error(`正则规则 "${rule.name}" 在渲染时无效或执行出错:`, e);
                                     }
-                                } catch (e) {
-                                    console.error(`正则规则 "${rule.name}" 在渲染时无效或执行出错:`, e);
                                 }
                             }
                         }
-                    }
-                    
-                    // 如果没有任何替换发生，说明是纯文本
-                    if (hasBeenReplaced) {
-                        return processedText;
-                    } else {
-                        // 1. 先对原始文本进行HTML转义，防止XSS攻击
-                        let safeText = escapeHtml(rawText);
-                        // 2. 在转义后的安全文本上，应用我们的简单格式化
-                        let formattedText = simpleMarkdownToHtml(safeText);
-                        // 3. 最后再处理换行符
-                        return formattedText.replace(/\n/g, '<br>');
-                    }
-                };
+                        
+                        if (hasBeenReplaced) {
+                            return processedText;
+                        } else {
+                            let tempPlaceholders = {};
+                            let tempCounter = 0;
+                            
+                            let textWithPlaceholders = rawText.replace(/\[emoji:([^\]]+)\]/g, (match, emojiName) => {
+                                const emoji = stickers.find(s => s.name.trim() === emojiName.trim() && s.type === 'emoji');
+                                if (emoji) {
+                                    const placeholder = `__EMOJI_PLACEHOLDER_${tempCounter}__`;
+                                    tempPlaceholders[placeholder] = `<img src="${emoji.url}" alt="${escapeHtml(emoji.name)}" class="inline-emoji">`;
+                                    tempCounter++;
+                                    return placeholder;
+                                }
+                                return match;
+                            });
+
+                            let safeText = escapeHtml(textWithPlaceholders);
+
+                            let textWithImages = safeText;
+                            for (const placeholder in tempPlaceholders) {
+                                textWithImages = textWithImages.replace(placeholder, tempPlaceholders[placeholder]);
+                            }
+                            
+                            let formattedText = simpleMarkdownToHtml(textWithImages);
+                            let finalHtml = formattedText.replace(/\n/g, '<br>');
+
+                            // --- 核心修复：如果内容包含Emoji，就用一个div包裹起来 ---
+                            if (Object.keys(tempPlaceholders).length > 0) {
+                                finalHtml = `<div>${finalHtml}</div>`;
+                            }
+                            // --- 修复结束 ---
+
+                            return finalHtml;
+                        }
+                    };
 
                 // 【核心修复步骤 1】: 在处理之前，先暴力清洗掉可能残留的 <block> 标签
                 // 这样即使你手动输入了 <block type="html"> 而没有闭合，或者正则解析失败，
@@ -15055,26 +15163,22 @@ footerVoiceBtn.addEventListener('click', async () => {
     if (text) await handleSendMessageAttempt('voice', text);
 });
 footerStickerBtn.addEventListener('click', () => {
-    stickerManager.openPanel((stickerName) => {
-        // 这个回调函数会在用户选择表情包后执行
-        // 1. 获取主聊天输入框
+    stickerManager.openPanel((name, type) => {
+        // 这个回调函数会在用户选择后执行，并返回名字和类型
         const inputEl = document.getElementById('footer-message-input');
-        
-        // 2. 获取当前光标位置，以便在正确的地方插入
         const start = inputEl.selectionStart;
         const end = inputEl.selectionEnd;
         const text = inputEl.value;
-        const stickerText = `[sticker:${stickerName}]`;
         
-        // 3. 构建新的输入框内容
-        inputEl.value = text.substring(0, start) + stickerText + text.substring(end);
+        // 根据类型构建不同的标签
+        const tagToInsert = `[${type}:${name}]`;
         
-        // 4. 将光标移动到插入内容的末尾，并重新聚焦，方便继续输入
+        inputEl.value = text.substring(0, start) + tagToInsert + text.substring(end);
+        
         inputEl.focus();
-        const newCursorPosition = start + stickerText.length;
+        const newCursorPosition = start + tagToInsert.length;
         inputEl.setSelectionRange(newCursorPosition, newCursorPosition);
 
-        // 5. 手动触发一次input事件，确保“发送”按钮能正常显示出来
         inputEl.dispatchEvent(new Event('input', { bubbles: true }));
     });
 });
@@ -16651,21 +16755,32 @@ const momentsManager = (function() {
                     } else {
                         // 【【【核心修改 1】】】: 在 split 正则表达式中，用 [:：] 替代 :
                         // 这表示匹配 英文冒号 或 中文冒号
-                        const textAndStickerParts = part.split(/(\[sticker[:：][^\]]+\])/g);
-                        textAndStickerParts.forEach(subPart => {
+                        const textAndTagParts = part.split(/(\[(?:sticker|emoji)[:：][^\]]+\])/g);
+                        textAndTagParts.forEach(subPart => {
                             if (!subPart) return;
-                            // 【【【核心修改 2】】】: 在 match 正则表达式中，同样用 [:：] 替代 :
-                            const stickerMatch = subPart.match(/^\[sticker[:：]([^\]]+)\]$/);
-                            if (stickerMatch) {
-                                // 提取到的 stickerName 前后可能有空格，需要 trim() 一下
-                                const stickerName = stickerMatch[1].trim();
-                                const sticker = stickers.find(s => s.name === stickerName);
-                                if (sticker) {
-                                    contentHtml += `<img src="${sticker.url}" alt="${stickerName}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+                            
+                            // --- 核心修复：同时匹配 sticker 和 emoji ---
+                            const tagMatch = subPart.match(/^\[(sticker|emoji)[:：]([^\]]+)\]$/);
+                            
+                            if (tagMatch) {
+                                const type = tagMatch[1]; // "sticker" or "emoji"
+                                const name = tagMatch[2].trim();
+                                const item = stickers.find(s => s.name === name && s.type === type);
+
+                                if (item) {
+                                    if (type === 'sticker') {
+                                        // 表情包使用固定尺寸
+                                        contentHtml += `<img src="${item.url}" alt="${escapeHtml(name)}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+                                    } else { // type === 'emoji'
+                                        // Emoji 使用 inline-emoji 样式
+                                        contentHtml += `<img src="${item.url}" alt="${escapeHtml(name)}" class="inline-emoji">`;
+                                    }
                                 } else {
+                                    // 找不到则显示原始文本
                                     contentHtml += escapeHtml(subPart);
                                 }
                             } else {
+                                // 不是标签，就是普通文本
                                 contentHtml += escapeHtml(subPart);
                             }
                         });
@@ -17462,18 +17577,18 @@ const momentsCommentStickerBtn = appRoot.querySelector('#moments-comment-sticker
 if (momentsCommentStickerBtn) {
     momentsCommentStickerBtn.addEventListener('click', () => {
         // 调用改造后的 openPanel，并传入一个回调函数
-        stickerManager.openPanel((stickerName) => {
+        stickerManager.openPanel((name, type) => {
             // 这个回调会在用户选择表情包后执行
             const commentInputEl = document.getElementById('comment-input');
             // 将表情包指令插入到当前光标位置
             const start = commentInputEl.selectionStart;
             const end = commentInputEl.selectionEnd;
             const text = commentInputEl.value;
-            const stickerText = `[sticker:${stickerName}]`;
-            commentInputEl.value = text.substring(0, start) + stickerText + text.substring(end);
+            const tagToInsert = `[${type}:${name}]`;
+            commentInputEl.value = text.substring(0, start) + tagToInsert + text.substring(end);
             // 将光标移动到插入内容的末尾
             commentInputEl.focus();
-            commentInputEl.setSelectionRange(start + stickerText.length, start + stickerText.length);
+            commentInputEl.setSelectionRange(start + tagToInsert.length, start + tagToInsert.length);
         });
     });
 }
@@ -17490,26 +17605,42 @@ checkMomentsUpdates(); // <--- 新增这一行
         
         function loadStickers() {
             stickers = loadFromLocalStorage('app-stickers', []);
+            // 为所有没有分类的旧数据默认设置为“表情包”
+            stickers.forEach(s => {
+                if (!s.type) {
+                    s.type = 'sticker';
+                }
+            });
         }
         function saveStickers() {
             saveToLocalStorage('app-stickers', stickers);
         }
 
-        function renderPanel(panelDOM, searchTerm = '') {
+        function renderPanel(panelDOM, searchTerm = '', type = 'sticker') {
             const grid = panelDOM.querySelector('.sticker-grid-container');
             if (!grid) return;
+
+            // --- 核心新增：根据类型动态添加/移除样式类 ---
+            if (type === 'emoji') {
+                grid.classList.add('emoji-mode');
+            } else {
+                grid.classList.remove('emoji-mode');
+            }
+            // --- 新增结束 ---
             
-            const filteredStickers = searchTerm 
-                ? stickers.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
-                : stickers;
+            let filteredStickers = stickers.filter(s => s.type === type);
+
+            if (searchTerm) {
+                filteredStickers = filteredStickers.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            }
             
             grid.innerHTML = filteredStickers.length > 0 
                 ? filteredStickers.map(s => `
-                    <div class="sticker-item" data-url="${s.url}" data-name="${s.name}">
+                    <div class="sticker-item" data-url="${s.url}" data-name="${s.name}" data-type="${s.type}">
                         <img src="${s.url}" alt="${s.name}" loading="lazy">
                         ${isManageMode ? `<input type="checkbox" class="sticker-item-checkbox" data-name="${s.name}">` : ''}
                     </div>`).join('') 
-                : `<p style="grid-column: 1 / -1; text-align: center; color: #888;">没有找到表情包</p>`;
+                : `<p style="grid-column: 1 / -1; text-align: center; color: #888;">没有找到内容</p>`;
         }
         
         async function openPanel(onSelectCallback = null) {
@@ -17519,8 +17650,12 @@ checkMomentsUpdates(); // <--- 新增这一行
 
                 const result = await conversationManager.showCustomModal({
                     html: `
+                        <div class="sticker-panel-tabs">
+                            <button class="sticker-tab active" data-type="sticker">表情包</button>
+                            <button class="sticker-tab" data-type="emoji">Emoji</button>
+                        </div>
                         <div class="sticker-panel-header">
-                            <input type="search" id="sticker-search-input" placeholder="搜索表情包..." />
+                            <input type="search" id="sticker-search-input" placeholder="搜索..." />
                             <button class="modal-button secondary" data-value="manage">管理</button>
                             <button class="modal-button primary" data-value="import">导入</button>
                         </div>
@@ -17532,24 +17667,44 @@ checkMomentsUpdates(); // <--- 新增这一行
                     onRender: (modalDOM, closeModal) => {
                         const searchInput = modalDOM.querySelector('#sticker-search-input');
                         const gridContainer = modalDOM.querySelector('.sticker-grid-container');
+                        const tabsContainer = modalDOM.querySelector('.sticker-panel-tabs');
+                        let currentType = 'sticker';
+
+                        tabsContainer.addEventListener('click', (e) => {
+                            const tab = e.target.closest('.sticker-tab');
+                            if (tab && !tab.classList.contains('active')) {
+                                tabsContainer.querySelector('.sticker-tab.active').classList.remove('active');
+                                tab.classList.add('active');
+                                currentType = tab.dataset.type;
+                                renderPanel(modalDOM, searchInput.value, currentType);
+                            }
+                        });
                         
-                        searchInput.addEventListener('input', (e) => renderPanel(modalDOM, e.target.value));
+                        searchInput.addEventListener('input', (e) => renderPanel(modalDOM, e.target.value, currentType));
                         
                         gridContainer.addEventListener('click', (e) => {
-                    const item = e.target.closest('.sticker-item');
-                    if (item) {
-                        if (onSelectCallback) {
-                            // 如果有回调，就执行回调并传递表情包名字
-                            onSelectCallback(item.dataset.name);
-                        } else {
-                            // 否则，执行默认的发送聊天消息逻辑
-                            conversationManager.handleSendMessageAttempt('photo', item.dataset.url);
-                        }
-                        closeModal({value: 'close'});
-                    }
-                });
+                            const item = e.target.closest('.sticker-item');
+                            if (item) {
+                                if (onSelectCallback) {
+                                    // 回调现在会传递名字和类型
+                                    onSelectCallback(item.dataset.name, item.dataset.type);
+                                } else {
+                                    // 默认行为：表情包直接发送，emoji插入文本
+                                    if (item.dataset.type === 'emoji') {
+                                        const input = document.getElementById('footer-message-input');
+                                        const emojiTag = `[emoji:${item.dataset.name}]`;
+                                        input.value += emojiTag;
+                                        input.focus();
+                                        input.dispatchEvent(new Event('input'));
+                                    } else {
+                                        conversationManager.handleSendMessageAttempt('photo', item.dataset.url);
+                                    }
+                                }
+                                closeModal({value: 'close'});
+                            }
+                        });
                         
-                        renderPanel(modalDOM);
+                        renderPanel(modalDOM, '', currentType);
                     }
                 });
 
@@ -17558,52 +17713,64 @@ checkMomentsUpdates(); // <--- 新增这一行
                 }
                 
                 if (result.value === 'import') {
-                    const content = await conversationManager.showContentInputModal({
-                        title: '批量导入表情包',
-                        placeholder: '每行一个，支持多种格式：\n名字 链接\n链接 名字\n名字:链接\n链接:名字',
-                        isTextarea: true
+                    const importResult = await conversationManager.showCustomModal({
+                        title: '批量导入',
+                        showCloseButton: true,
+                        html: `
+                            <div style="text-align: left; display: flex; flex-direction: column; gap: 15px;">
+                                <div class="form-group" style="margin:0;">
+                                    <label>选择导入类型:</label>
+                                    <div style="display:flex; gap: 20px; padding-top: 5px;">
+                                        <label><input type="radio" name="import-type" value="sticker" checked> 表情包</label>
+                                        <label><input type="radio" name="import-type" value="emoji"> Emoji</label>
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin:0;">
+                                    <label>粘贴内容:</label>
+                                    <textarea id="import-content-area" class="modal-textarea" placeholder="每行一个，格式：名字 链接"></textarea>
+                                </div>
+                            </div>`,
+                        buttons: [{ text: '确认导入', value: 'confirm_import', class: 'primary' }]
                     });
-                    
-                    if (content) {
-                        const lines = content.trim().split('\n');
-                        let newStickersCount = 0;
-                        lines.forEach(line => {
-                            const trimmedLine = line.trim();
-                            if (!trimmedLine) return; // 跳过空行
 
-                            // 【【【【【【【【【【 全新的、绝对正确的、符合您要求的修复 】】】】】】】】】】
-                            
-                            // 1. 定义一个正则表达式，用来匹配 URL
-                            const urlRegex = /(https?:\/\/[^\s:"]+)/;
-                            const urlMatch = trimmedLine.match(urlRegex);
+                    if (importResult && importResult.value === 'confirm_import') {
+                        const modalBox = importResult.target.closest('.modal-box');
+                        const importType = modalBox.querySelector('input[name="import-type"]:checked').value;
+                        const content = modalBox.querySelector('#import-content-area').value;
 
-                            // 2. 如果在这一行里找不到 URL，直接跳过
-                            if (!urlMatch) return;
+                        if (content && content.trim()) {
+                            const lines = content.trim().split('\n');
+                            let newStickersCount = 0;
+                            lines.forEach(line => {
+                                const trimmedLine = line.trim();
+                                if (!trimmedLine) return;
 
-                            // 3. 提取出 URL
-                            const url = urlMatch[0];
-                            
-                            // 4. 从原始行中，把 URL、冒号和所有空格都替换为空，剩下的就是名字
-                            const name = trimmedLine.replace(url, '').replace(/:/g, '').trim();
+                                // 步骤 1: 使用一个更通用的正则表达式，可靠地找出链接
+                                const urlRegex = /(https?:\/\/[^\s]+)/;
+                                const urlMatch = trimmedLine.match(urlRegex);
 
-                            // 5. 只要 URL 和名字都存在，就认为这是一条有效的记录
-                            if (url && name) {
-                                // 【核心、唯一的修改点】: 我们不再检查 s.name === name，
-                                // 而是检查 s.url === url。只要链接不同，就可以导入！
-                                if (!stickers.some(s => s.url === url)) {
-                                    stickers.push({ url, name });
-                                    newStickersCount++;
+                                // 如果这一行里连链接都找不到，就直接跳过
+                                if (!urlMatch) return;
+
+                                const url = urlMatch[0];
+                                
+                                // 步骤 2: 将链接、所有冒号、以及前后的空格从原始行中移除，剩下的就是名字
+                                const name = trimmedLine.replace(url, '').replace(/[:：]/g, '').trim();
+
+                                // 只要链接和名字都成功提取出来了，就继续
+                                if (url && name) {
+                                    if (!stickers.some(s => s.url === url)) {
+                                        stickers.push({ url, name, type: importType }); // 使用选择的类型
+                                        newStickersCount++;
+                                    }
                                 }
+                            });
+                            if (newStickersCount > 0) {
+                                saveStickers();
+                                alert(`成功导入 ${newStickersCount} 个新的 "${importType === 'sticker' ? '表情包' : 'Emoji'}"！`);
+                            } else {
+                                alert('没有导入任何新内容，可能链接已存在。');
                             }
-                            // 【【【【【【【【【【 修复结束 】】】】】】】】】】
-                        });
-
-                        if (newStickersCount > 0) {
-//... (剩余部分保持不变)
-                            saveStickers();
-                            alert(`成功导入 ${newStickersCount} 个新表情！`);
-                        } else {
-                            alert('没有导入任何新表情，或导入的表情包名称已存在。请检查格式。');
                         }
                     }
                     continue; 
@@ -20397,13 +20564,284 @@ async function handleRemoveMember() {
             }
         ];
 
+        // --- 核心新增代码块开始 ---
+        const PRESET_EMOJIS = [
+            { name: "微笑", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-b1.png", type: "emoji" },
+            { name: "可爱", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-b02.png", type: "emoji" },
+            { name: "太开心", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-b03.png", type: "emoji" },
+            { name: "鼓掌", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-b04.png", type: "emoji" },
+            { name: "嘻嘻", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-b05.png", type: "emoji" },
+            { name: "哈哈", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-b06.png", type: "emoji" },
+            { name: "笑cry", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-b07-cry.png", type: "emoji" },
+            { name: "挤眼", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-b08.png", type: "emoji" },
+            { name: "馋嘴", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-b09.png", type: "emoji" },
+            { name: "黑线", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-b10.png", type: "emoji" },
+            { name: "汗", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-b11.png", type: "emoji" },
+            { name: "挖鼻", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-b12.png", type: "emoji" },
+            { name: "哼", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-c01.png", type: "emoji" },
+            { name: "怒", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-c02.png", type: "emoji" },
+            { name: "委屈", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-c03.png", type: "emoji" },
+            { name: "可怜", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-c04.png", type: "emoji" },
+            { name: "失望", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-c05.png", type: "emoji" },
+            { name: "悲伤", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-c06.png", type: "emoji" },
+            { name: "泪", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-c07.png", type: "emoji" },
+            { name: "允悲", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-c08.png", type: "emoji" },
+            { name: "害羞", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-c09.png", type: "emoji" },
+            { name: "污", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-c10.png", type: "emoji" },
+            { name: "爱你", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-c11.png", type: "emoji" },
+            { name: "亲亲", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-c12.png", type: "emoji" },
+            { name: "色", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-d01.png", type: "emoji" },
+            { name: "憧憬", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-d02.png", type: "emoji" },
+            { name: "舔屏", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-d03.png", type: "emoji" },
+            { name: "坏笑", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-d04.png", type: "emoji" },
+            { name: "阴险", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-d05.png", type: "emoji" },
+            { name: "笑而不语", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-d06.png", type: "emoji" },
+            { name: "偷笑", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-d07.png", type: "emoji" },
+            { name: "酷", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-d08.png", type: "emoji" },
+            { name: "并不简单", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-d09.png", type: "emoji" },
+            { name: "思考", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-d10.png", type: "emoji" },
+            { name: "疑问", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-d11.png", type: "emoji" },
+            { name: "费解", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-d12.png", type: "emoji" },
+            { name: "晕", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-e01.png", type: "emoji" },
+            { name: "衰", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-e02.png", type: "emoji" },
+            { name: "骷髅", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-e03.png", type: "emoji" },
+            { name: "嘘", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-e04.png", type: "emoji" },
+            { name: "闭嘴", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-e05.png", type: "emoji" },
+            { name: "傻眼", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-e06.png", type: "emoji" },
+            { name: "吃惊", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-e07.png", type: "emoji" },
+            { name: "吐", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-e08.png", type: "emoji" },
+            { name: "感冒", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-e09.png", type: "emoji" },
+            { name: "生病", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-e10.png", type: "emoji" },
+            { name: "拜拜", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-e11.png", type: "emoji" },
+            { name: "鄙视", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-e12.png", type: "emoji" },
+            { name: "白眼", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-f01.png", type: "emoji" },
+            { name: "左哼哼", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-f02.png", type: "emoji" },
+            { name: "右哼哼", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-f03.png", type: "emoji" },
+            { name: "抓狂", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-f04.png", type: "emoji" },
+            { name: "怒骂", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-f05.png", type: "emoji" },
+            { name: "打脸", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-f06.png", type: "emoji" },
+            { name: "顶", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-f07.png", type: "emoji" },
+            { name: "互粉", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-f08.png", type: "emoji" },
+            { name: "钱", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-f09.png", type: "emoji" },
+            { name: "哈欠", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-f10.png", type: "emoji" },
+            { name: "困", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-f11.png", type: "emoji" },
+            { name: "睡", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-f12.png", type: "emoji" },
+            { name: "求饶", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-g1.png", type: "emoji" },
+            { name: "吃瓜", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-g2.png", type: "emoji" },
+            { name: "打call", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-g3-call.png", type: "emoji" },
+            { name: "awsl", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-g4-awsl.png", type: "emoji" },
+            { name: "裂开", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-g05.png", type: "emoji" },
+            { name: "牛年大吉", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-g06.png", type: "emoji" },
+            { name: "牛大发", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-g07.png", type: "emoji" },
+            { name: "牛哞哞", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-g08.png", type: "emoji" },
+            { name: "doge", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-g09-doge.png", type: "emoji" },
+            { name: "二哈", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-g10.png", type: "emoji" },
+            { name: "喵喵", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-g11.png", type: "emoji" },
+            { name: "酸", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-g12.png", type: "emoji" },
+            { name: "中国赞", url: "https://em-content.zobj.net/content/2021/06/11/h01.png", type: "emoji" },
+            { name: "抱抱", url: "https://em-content.zobj.net/content/2021/06/11/h02.png", type: "emoji" },
+            { name: "摊手", url: "https://em-content.zobj.net/content/2021/06/11/h03.png", type: "emoji" },
+            { name: "跪了", url: "https://em-content.zobj.net/content/2021/06/11/h04.png", type: "emoji" },
+            { name: "鲜花", url: "https://em-content.zobj.net/content/2021/06/11/h05.png", type: "emoji" },
+            { name: "红灯笼", url: "https://em-content.zobj.net/content/2021/06/11/h06.png", type: "emoji" },
+            { name: "烟花", url: "https://em-content.zobj.net/content/2021/06/11/h07.png", type: "emoji" },
+            { name: "雪花", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-h08-yunying2020_snowflakes_mobile.png", type: "emoji" },
+            { name: "心", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-j01.png", type: "emoji" },
+            { name: "伤心", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-j02.png", type: "emoji" },
+            { name: "男孩儿", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-j03.png", type: "emoji" },
+            { name: "女孩儿", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-j04.png", type: "emoji" },
+            { name: "握手", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-j05.png", type: "emoji" },
+            { name: "赞", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-j06.png", type: "emoji" },
+            { name: "good", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-j7-good.png", type: "emoji" },
+            { name: "弱", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-j08.png", type: "emoji" },
+            { name: "NO", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-j09-no.png", type: "emoji" },
+            { name: "耶", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-j10.png", type: "emoji" },
+            { name: "拳头", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-j11.png", type: "emoji" },
+            { name: "ok", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-j12-ok.png", type: "emoji" },
+            { name: "加油", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-k01.png", type: "emoji" },
+            { name: "来", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-k02.png", type: "emoji" },
+            { name: "作揖", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-k03.png", type: "emoji" },
+            { name: "haha", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-k4-haha.png", type: "emoji" },
+            { name: "熊猫", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-k05.png", type: "emoji" },
+            { name: "兔子", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-k06.png", type: "emoji" },
+            { name: "猪头", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-k07.png", type: "emoji" },
+            { name: "草泥马", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-k08.png", type: "emoji" },
+            { name: "奥特曼", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-k09.png", type: "emoji" },
+            { name: "太阳", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-k10.png", type: "emoji" },
+            { name: "月亮", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-k11.png", type: "emoji" },
+            { name: "浮云", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-k12.png", type: "emoji" },
+            { name: "下雨", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-l01.png", type: "emoji" },
+            { name: "沙尘暴", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-l02.png", type: "emoji" },
+            { name: "围观", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-l03.png", type: "emoji" },
+            { name: "飞机", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-l04.png", type: "emoji" },
+            { name: "照相机", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-l05.png", type: "emoji" },
+            { name: "话筒", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-l06.png", type: "emoji" },
+            { name: "音乐", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-l07.png", type: "emoji" },
+            { name: "喜", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-l08.png", type: "emoji" },
+            { name: "给力", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-l09.png", type: "emoji" },
+            { name: "威武", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-l10.png", type: "emoji" },
+            { name: "可乐", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-l11.png", type: "emoji" },
+            { name: "干杯", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-l12.png", type: "emoji" },
+            { name: "纸飞机", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-q01.png", type: "emoji" },
+            { name: "炸鸡腿", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-q02.png", type: "emoji" },
+            { name: "武汉加油", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-q03.png", type: "emoji" },
+            { name: "点亮橙色", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-q04.png", type: "emoji" },
+            { name: "锦鲤", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-q05.png", type: "emoji" },
+            { name: "微风", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-q06.png", type: "emoji" },
+            { name: "蜡烛", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-q07.png", type: "emoji" },
+            { name: "蛋糕", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-q08.png", type: "emoji" },
+            { name: "看涨", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-q09.png", type: "emoji" },
+            { name: "看跌", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-q10.png", type: "emoji" },
+            { name: "带着微博去旅行", url: "https://em-content.zobj.net/content/2021/06/11/emojipedia-q11.png", type: "emoji" }
+        ];
+        // --- 核心新增代码块结束 ---
+        // --- 核心新增：内置微信Emoji ---
+        const PRESET_WECHAT_EMOJIS = [
+            { name: "Aaagh!", url: "https://em-content.zobj.net/content/2021/02/20/aaagh_ios_802.png", type: "emoji" },
+            { name: "Angry", url: "https://em-content.zobj.net/content/2021/02/20/angry_ios_802.png", type: "emoji" },
+            { name: "Awesome", url: "https://em-content.zobj.net/content/2021/02/20/awesome_ios_802.png", type: "emoji" },
+            { name: "Awkward", url: "https://em-content.zobj.net/content/2021/02/20/awkward_ios_802.png", type: "emoji" },
+            { name: "Bah！R", url: "https://em-content.zobj.net/content/2021/02/20/bahr_ios_802.png", type: "emoji" },
+            { name: "Bah！L", url: "https://em-content.zobj.net/content/2021/02/20/bahl_ios_802.png", type: "emoji" },
+            { name: "Beckon", url: "https://em-content.zobj.net/content/2021/02/20/beckon_ios_802.png", type: "emoji" },
+            { name: "Beer", url: "https://em-content.zobj.net/content/2021/02/20/beer_ios_802.png", type: "emoji" },
+            { name: "Blessing", url: "https://em-content.zobj.net/content/2021/02/20/blessing_ios_802.png", type: "emoji" },
+            { name: "Blush", url: "https://em-content.zobj.net/content/2021/02/20/blush_ios_802.png", type: "emoji" },
+            { name: "Bomb", url: "https://em-content.zobj.net/content/2021/02/20/bomb_ios_802.png", type: "emoji" },
+            { name: "Boring", url: "https://em-content.zobj.net/content/2021/02/20/boring_ios_802.png", type: "emoji" },
+            { name: "Broken", url: "https://em-content.zobj.net/content/2021/02/20/broken_ios_802.png", type: "emoji" },
+            { name: "BrokenHeart", url: "https://em-content.zobj.net/content/2021/02/20/brokenheart_ios_802.png", type: "emoji" },
+            { name: "Bye", url: "https://em-content.zobj.net/content/2021/02/20/bye_ios_802.png", type: "emoji" },
+            { name: "Cake", url: "https://em-content.zobj.net/content/2021/02/20/cake_ios_802.png", type: "emoji" },
+            { name: "Chuckle", url: "https://em-content.zobj.net/content/2021/02/20/chuckle_ios_802.png", type: "emoji" },
+            { name: "Clap", url: "https://em-content.zobj.net/content/2021/02/20/clap_ios_802.png", type: "emoji" },
+            { name: "Cleaver", url: "https://em-content.zobj.net/content/2021/02/20/cleaver_ios_802.png", type: "emoji" },
+            { name: "Coffee", url: "https://em-content.zobj.net/content/2021/02/20/coffee_ios_802.png", type: "emoji" },
+            { name: "Commando", url: "https://em-content.zobj.net/content/2021/02/20/commando_ios_802.png", type: "emoji" },
+            { name: "Concerned", url: "https://em-content.zobj.net/content/2021/02/20/concerned_android_7021.png", type: "emoji" },
+            { name: "CoolGuy", url: "https://em-content.zobj.net/content/2021/02/20/coolguy_ios_802.png", type: "emoji" },
+            { name: "Cry", url: "https://em-content.zobj.net/content/2021/02/20/cry_ios_802.png", type: "emoji" },
+            { name: "Determined", url: "https://em-content.zobj.net/content/2021/02/20/determined_ios_802.png", type: "emoji" },
+            { name: "Dizzy", url: "https://em-content.zobj.net/content/2021/02/20/dizzy_ios_802.png", type: "emoji" },
+            { name: "Doge", url: "https://em-content.zobj.net/content/2021/02/20/doge_android_7021.png", type: "emoji" },
+            { name: "Drool", url: "https://em-content.zobj.net/content/2021/02/20/drool_ios_802.png", type: "emoji" },
+            { name: "Drowsy", url: "https://em-content.zobj.net/content/2021/02/20/drowsy_ios_802.png", type: "emoji" },
+            { name: "Duh", url: "https://em-content.zobj.net/content/2021/02/20/duh_ios_802.png", type: "emoji" },
+            { name: "Emm", url: "https://em-content.zobj.net/content/2021/02/20/emm_ios_802.png", type: "emoji" },
+            { name: "Facepalm", url: "https://em-content.zobj.net/content/2021/02/20/facepalm_ios_802.png", type: "emoji" },
+            { name: "Fireworks", url: "https://em-content.zobj.net/content/2021/02/20/fireworks_ios_802.png", type: "emoji" },
+            { name: "Fist", url: "https://em-content.zobj.net/content/2021/02/20/fist_ios_802.png", type: "emoji" },
+            { name: "Flushed", url: "https://em-content.zobj.net/content/2021/02/20/flushed_ios_802.png", type: "emoji" },
+            { name: "Frown", url: "https://em-content.zobj.net/content/2021/02/20/frown_ios_802.png", type: "emoji" },
+            { name: "Gift", url: "https://em-content.zobj.net/content/2021/02/20/gift_ios_802.png", type: "emoji" },
+            { name: "GoForIt", url: "https://em-content.zobj.net/content/2021/02/20/goforit_ios_802.png", type: "emoji" },
+            { name: "Grimace", url: "https://em-content.zobj.net/content/2021/02/20/grimace_ios_802.png", type: "emoji" },
+            { name: "Grin", url: "https://em-content.zobj.net/content/2021/02/20/grin_ios_802.png", type: "emoji" },
+            { name: "Hammer", url: "https://em-content.zobj.net/content/2021/02/20/hammer_ios_802.png", type: "emoji" },
+            { name: "Happy", url: "https://em-content.zobj.net/content/2021/02/20/happy_ios_802.png", type: "emoji" },
+            { name: "Heart", url: "https://em-content.zobj.net/content/2021/02/20/heart_ios_802.png", type: "emoji" },
+            { name: "Hey", url: "https://em-content.zobj.net/content/2021/02/20/hey_ios_802.png", type: "emoji" },
+            { name: "Hug", url: "https://em-content.zobj.net/content/2021/02/20/hug_ios_802.png", type: "emoji" },
+            { name: "Hurt", url: "https://em-content.zobj.net/content/2021/02/20/hurt_ios_802.png", type: "emoji" },
+            { name: "Joyful", url: "https://em-content.zobj.net/content/2021/02/20/joyful_ios_802.png", type: "emoji" },
+            { name: "KeepFighting", url: "https://em-content.zobj.net/content/2021/02/20/keepfighting_ios_802.png", type: "emoji" },
+            { name: "Kiss", url: "https://em-content.zobj.net/content/2021/02/20/kiss_ios_802.png", type: "emoji" },
+            { name: "Laugh", url: "https://em-content.zobj.net/content/2021/02/20/laugh_ios_802.png", type: "emoji" },
+            { name: "Let Down", url: "https://em-content.zobj.net/content/2021/02/20/let-down_ios_802.png", type: "emoji" },
+            { name: "LetMeSee", url: "https://em-content.zobj.net/content/2021/02/20/letmesee_ios_802.png", type: "emoji" },
+            { name: "Lips", url: "https://em-content.zobj.net/content/2021/02/20/lips_ios_802.png", type: "emoji" },
+            { name: "Lol", url: "https://em-content.zobj.net/content/2021/02/20/lol_ios_802.png", type: "emoji" },
+            { name: "Moon", url: "https://em-content.zobj.net/content/2021/02/20/moon_ios_802.png", type: "emoji" },
+            { name: "MyBad", url: "https://em-content.zobj.net/content/2021/02/20/mybad_ios_802.png", type: "emoji" },
+            { name: "NoProb", url: "https://em-content.zobj.net/content/2021/02/20/noprob_ios_802.png", type: "emoji" },
+            { name: "NosePick", url: "https://em-content.zobj.net/content/2021/02/20/nosepick_ios_802.png", type: "emoji" },
+            { name: "OK", url: "https://em-content.zobj.net/content/2021/02/20/ok_ios_802.png", type: "emoji" },
+            { name: "OMG", url: "https://em-content.zobj.net/content/2021/02/20/omg_ios_802.png", type: "emoji" },
+            { name: "Onlooker", url: "https://em-content.zobj.net/content/2021/02/20/onlooker_ios_802.png", type: "emoji" },
+            { name: "Packet", url: "https://em-content.zobj.net/content/2021/02/20/packet_ios_802.png", type: "emoji" },
+            { name: "Panic", url: "https://em-content.zobj.net/content/2021/02/20/panic_ios_802.png", type: "emoji" },
+            { name: "Party", url: "https://em-content.zobj.net/content/2021/02/20/party_ios_802.png", type: "emoji" },
+            { name: "Peace", url: "https://em-content.zobj.net/content/2021/02/20/peace_ios_802.png", type: "emoji" },
+            { name: "Pig", url: "https://em-content.zobj.net/content/2021/02/20/pig_ios_802.png", type: "emoji" },
+            { name: "Pooh-pooh", url: "https://em-content.zobj.net/content/2021/02/20/pooh-pooh_ios_802.png", type: "emoji" },
+            { name: "Poop", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_poop.png", type: "emoji" },
+            { name: "Puke", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_puke.png", type: "emoji" },
+            { name: "Respect", url: "https://em-content.zobj.net/content/2021/02/15/respect-wechat-android7021-emojipedia-wechat-android7021-emojipedia.png", type: "emoji" },
+            { name: "Rose", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_rose.png", type: "emoji" },
+            { name: "Salute", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_salute.png", type: "emoji" },
+            { name: "Scold", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_scold.png", type: "emoji" },
+            { name: "Scowl", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_scowl.png", type: "emoji" },
+            { name: "Scream", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_scream.png", type: "emoji" },
+            { name: "Shake", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_shake.png", type: "emoji" },
+            { name: "Shhh", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_shhh.png", type: "emoji" },
+            { name: "Shocked", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_shocked.png", type: "emoji" },
+            { name: "Shrunken", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_shrunken.png", type: "emoji" },
+            { name: "Shy", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_shy.png", type: "emoji" },
+            { name: "Sick", url: "https://em-content.zobj.net/content/2021/02/20/sick_ios_802.png", type: "emoji" },
+            { name: "Sigh", url: "https://em-content.zobj.net/content/2021/02/15/sigh-wechat-android7021-emojipedia-wechat-android7021-emojipedia.png", type: "emoji" },
+            { name: "Silent", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_silent.png", type: "emoji" },
+            { name: "Skull", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_skull.png", type: "emoji" },
+            { name: "Sleep", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_sleep.png", type: "emoji" },
+            { name: "Slight", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_slight.png", type: "emoji" },
+            { name: "Sly", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_sly.png", type: "emoji" },
+            { name: "Smart", url: "https://em-content.zobj.net/content/2021/02/15/smart-wechat-android7021-emojipedia-wechat-android7021-emojipedia.png", type: "emoji" },
+            { name: "Smile", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_smile.png", type: "emoji" },
+            { name: "Smirk", url: "https://em-content.zobj.net/content/2021/02/15/smirk-wechat-android7021-emojipedia-wechat-android7021-emojipedia.png", type: "emoji" },
+            { name: "Smug", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_smug.png", type: "emoji" },
+            { name: "Sob", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_sob.png", type: "emoji" },
+            { name: "Speechless", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_speechless.png", type: "emoji" },
+            { name: "Sun", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_sun.png", type: "emoji" },
+            { name: "Surprise", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_surprise.png", type: "emoji" },
+            { name: "Sweat", url: "https://em-content.zobj.net/content/2021/02/20/sweat_ios_802.png", type: "emoji" },
+            { name: "Sweats", url: "https://em-content.zobj.net/content/2021/02/20/sweats_ios_802.png", type: "emoji" },
+            { name: "TearingUp", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_tearingup.png", type: "emoji" },
+            { name: "Terror", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_terror.png", type: "emoji" },
+            { name: "ThumbsDown", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_thumbsdown.png", type: "emoji" },
+            { name: "ThumbsUp", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_thumbsup.png", type: "emoji" },
+            { name: "Toasted", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_toasted.png", type: "emoji" },
+            { name: "Tongue", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_tongue.png", type: "emoji" },
+            { name: "Tremble", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_tremble.png", type: "emoji" },
+            { name: "Trick", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_trick.png", type: "emoji" },
+            { name: "Twirl", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_twirl.png", type: "emoji" },
+            { name: "Watermelon", url: "https://em-content.zobj.net/content/2021/02/20/watermelon_ios_802.png", type: "emoji" },
+            { name: "Waddle", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_waddle.png", type: "emoji" },
+            { name: "Whimper", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_whimper.png", type: "emoji" },
+            { name: "Wilt", url: "https://em-content.zobj.net/content/2021/02/14/emojipedia_wechat_ios_802_wilt.png", type: "emoji" },
+            { name: "Worship", url: "https://em-content.zobj.net/content/2021/02/20/worship_ios_802.png", type: "emoji" },
+            { name: "Wow", url: "https://em-content.zobj.net/content/2021/02/20/wow_ios_802.png", type: "emoji" },
+            { name: "Yawn", url: "https://em-content.zobj.net/content/2021/02/20/yawn_ios_802.png", type: "emoji" },
+            { name: "Yeah!", url: "https://em-content.zobj.net/content/2021/02/15/yeah-wechat-android7021-emojipedia-wechat-android7021-emojipedia.png", type: "emoji" }
+        ];
+        // --- 新增结束 ---
+
         myAvatar = loadFromLocalStorage('my_global_avatar', null) || generateDefaultAvatar('{{user}}');
         customBubbles = loadFromLocalStorage('app_custom_bubbles', []);
+
+        
         PRESET_BUBBLES.forEach(preset => {
             const index = customBubbles.findIndex(b => b.name === preset.name);
             if (index > -1) { customBubbles[index] = preset; } else { customBubbles.push(preset); }
         });
         saveToLocalStorage('app_custom_bubbles', customBubbles);
+
+        // --- 核心新增：合并内置Emoji到stickers数组 ---
+        const stickersFromStorage = loadFromLocalStorage('app-stickers', []);
+        const existingUrls = new Set(stickersFromStorage.map(s => s.url));
+
+        // 将两个预设列表合并成一个
+        const allPresetEmojis = [...PRESET_EMOJIS, ...PRESET_WECHAT_EMOJIS];
+
+        allPresetEmojis.forEach(emoji => {
+            // 只有当这个URL不存在时，才把它添加进去
+            if (!existingUrls.has(emoji.url)) {
+                stickersFromStorage.push(emoji);
+                existingUrls.add(emoji.url);
+            }
+        });
+        
+        // 将合并后的、去重的列表保存回去
+        saveToLocalStorage('app-stickers', stickersFromStorage);
+        // --- 新增结束 ---
 
 
         // ============================================================
