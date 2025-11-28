@@ -6552,8 +6552,8 @@ if (momentsContext) {
             });
              
             // 拼接时间
-            // 修正：在 triggerAIContinuation 中，当前聊天的ID变量名是 originatingChatId
-            timeManager.updateSettingsForChat(originatingChatId);
+            // 修正：在此函数中，当前聊天的ID变量名是 chatId
+            timeManager.updateSettingsForChat(chatId);
             finalSystemPrompt += timeManager.getAITimeContext();
 
             // 【【【 核心修复：注入小说并强制进入角色扮演场景 】】】
@@ -7410,51 +7410,29 @@ ${baseSystemPrompt}
                     const match = commandRegex.exec(aiResponse);
                     if (match) {
                         const value = match[2];
-                        const dirtyJsonString = value.replace(/```json/g, '').replace(/```/g, '').trim();
+                        const jsonString = value.replace(/```json/g, '').replace(/```/g, '').trim();
                         
-                        // --- 终极手术刀式解析器 ---
-                        // 1. 提取 type 字段 (保持不变)
-                        const typeMatch = dirtyJsonString.match(/"type"\s*:\s*"([^"]+)"/);
-                        if (!typeMatch) {
-                            throw new Error("无法从AI响应中提取 'type' 字段。");
-                        }
-                        const postType = typeMatch[1];
-                        
-                        // 2. 暴力提取 "text" 字段的内容
-                        // 这个正则会从 "text":" 开始，一直匹配到整个字符串的末尾，然后捕获中间的所有内容
-                        const textMatch = dirtyJsonString.match(/"text"\s*:\s*"([\s\S]*)/);
-                        let postText = '';
-                        
-                        if (textMatch && textMatch[1]) {
-                            let rawTextContent = textMatch[1];
+                        // --- 核心修复：使用更健壮的正则提取代替JSON.parse ---
+                        const typeMatch = jsonString.match(/"type"\s*:\s*"([^"]+)"/);
+                        const textMatch = jsonString.match(/"text"\s*:\s*"([\s\S]*?)"(?:\s*,|\s*})/);
+                        const contentMatch = jsonString.match(/"content"\s*:\s*"([\s\S]*?)"(?:\s*,|\s*})/);
+                        const signerMatch = jsonString.match(/"signer"\s*:\s*"([^"]*)"/);
+                        const dateMatch = jsonString.match(/"date"\s*:\s*"([^"]*)"/);
+
+                        if (typeMatch) {
+                            const unescape = (str) => str ? str.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\') : '';
                             
-                            // 3. 从捕获到的内容中，找到最后一个有效的结束标志 "
-                            //    这能处理AI在末尾添加了多余字符的情况
-                            const lastQuoteIndex = rawTextContent.lastIndexOf('"');
-                            if (lastQuoteIndex > -1) {
-                                postText = rawTextContent.substring(0, lastQuoteIndex);
-                            } else {
-                                postText = rawTextContent; // 作为备用
-                            }
-
-                            // 4. 反转义，清理内容
-                            postText = postText.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\');
+                            const postData = {
+                                type: typeMatch[1],
+                                text: textMatch ? unescape(textMatch[1]) : '',
+                                content: contentMatch ? unescape(contentMatch[1]) : '',
+                                signer: signerMatch ? unescape(signerMatch[1]) : '',
+                                date: dateMatch ? unescape(dateMatch[1]) : ''
+                            };
+                            momentsManager.createPostFromAI(senderName, postData);
+                        } else {
+                            throw new Error("无法从AI响应中提取有效的 'type' 字段。");
                         }
-                        
-                        // 提取其他字段 (逻辑保持不变)
-                        const signerMatch = dirtyJsonString.match(/"signer"\s*:\s*"([^"]*)"/);
-                        const dateMatch = dirtyJsonString.match(/"date"\s*:\s*"([^"]*)"/);
-
-                        const postData = {
-                            type: postType,
-                            text: postText,
-                            content: '', // 因为您的例子主要是text类型，我们暂时忽略content
-                            signer: signerMatch ? signerMatch[1] : '',
-                            date: dateMatch ? dateMatch[1] : ''
-                        };
-
-                        momentsManager.createPostFromAI(senderName, postData);
-                        
                     } else {
                          console.warn(`[诊断日志] 角色 "${senderName}": AI意图发帖，但未找到有效的 [post_moment:...] 指令。`);
                     }
@@ -7481,7 +7459,7 @@ ${baseSystemPrompt}
                 }
 
                 // --- 核心修复：把正则改宽，允许匹配任意内容，不强制要求是 JSON 对象 ---
-const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message|forward_moment):\s*({[\s\S]+}|[^\]]+)\]/g;
+const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message|forward_moment):\s*({[\s\S]+?}|[^\]]+?)\]/g;
                 let match;
                 let commandsFound = 0;
 
@@ -10111,8 +10089,16 @@ When generating a custom HTML card, you MUST adhere to the following rules witho
 
 4.  **Whitespace Curse:** You **MUST** add \`white-space: normal;\` to the style of your outermost \`<div>\`.
 
+// ******** 从这里开始插入全新的代码块 ********
+5.  **Command Isolation (ABSOLUTE LAW):** You are **STRICTLY PROHIBITED** from placing \`[sticker:...]\` or \`[emoji:...]\` commands **inside** any HTML block (\`<snippet>\`, \`<div>\`, etc.).
+    *   **Rationale:** The system cannot parse commands embedded within HTML. They will be displayed as ugly, broken text.
+    *   **Correct Method:** If you want to send an HTML card AND a sticker, you MUST generate them in **two separate \`<block>\` elements**, one after the other.
+// ******** 全新代码块到此结束 ********
+
 ---
 **[CORRECT vs. WRONG EXAMPLES]**
+
+// ... (后面是示例代码) ...
 
 *   **【THE ONLY CORRECT FORMAT】(All styles are inline):**
     \\\`\`\`
@@ -10137,11 +10123,36 @@ When generating a custom HTML card, you MUST adhere to the following rules witho
     </snippet>
     </block>
     \\\`\`\`
+
+// ******** 从这里开始插入全新的代码块 ********
+*   **【CRITICAL FAILURE EXAMPLE】(Command trapped inside HTML):**
+    \\\`\`\`xml
+    <block type="html">
+    <snippet>
+      <div style="white-space: normal;">
+        Here is my card... [sticker:炸毛生气]
+      </div>
+    </snippet>
+    </block>
+    \\\`\`\`
+
+*   **【THE ONLY CORRECT FORMAT】(Commands are isolated in their own block):**
+    \\\`\`\`xml
+    <block type="html" sender="CharacterName">
+      <snippet><div style="white-space: normal;">Here is my card...</div></snippet>
+    </block>
+    <block type="command" sender="CharacterName">
+      [sticker:炸毛生气]
+    </block>
+    \\\`\`\`
+// ******** 全新代码块到此结束 ********
+
 ---
 
 
 
 **THE NATURE OF A COMMAND: A command is a single, unbroken line of code.**
+// ... (后面是其他指令) ...
 - A command ALWAYS starts with \`[\` and ENDS with \`]\`.
 - The ENTIRE command, from the opening \`[\` to the final closing \`]\`, MUST be on a SINGLE LINE.
 - **NO line breaks are EVER allowed inside a command.**
@@ -16504,10 +16515,21 @@ const momentsManager = (function() {
                     
                     const postBody = postCard.querySelector('.post-body');
                     if (post.text && post.text.trim() !== '') {
-                        const textDiv = document.createElement('div');
-                        textDiv.className = 'post-content-text';
-                        textDiv.innerHTML = post.text;
-                        postBody.appendChild(textDiv);
+                        const textContent = post.text.trim();
+                        // 检查内容是否为自包含的HTML代码块 (以 <snippet> 或 <div 开头)
+                        const isHtmlBlock = textContent.startsWith('<snippet>') || textContent.startsWith('<div');
+
+                        if (isHtmlBlock) {
+                            // 如果是HTML块，直接将其内容设置为 postBody 的内容。
+                            // 这样做可以避免被外层带有冲突样式的 div 包裹。
+                            postBody.innerHTML = textContent;
+                        } else {
+                            // 如果是纯文本，则使用原来的方法，将其包裹在带样式的 div 中。
+                            const textDiv = document.createElement('div');
+                            textDiv.className = 'post-content-text';
+                            textDiv.innerHTML = textContent;
+                            postBody.appendChild(textDiv);
+                        }
                     }
                 switch (post.type) {
                    
