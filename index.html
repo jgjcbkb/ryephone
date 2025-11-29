@@ -809,7 +809,7 @@
     display: flex;
     flex-direction: column;
 }
-    .sticker-panel-header { padding: 12px 48px 12px 12px; display: flex; gap: 10px; border-bottom: 1px solid var(--light-gray); flex-shrink: 0; align-items: center; position: relative; }
+    .sticker-panel-header { padding: 12px 12px 12px 12px; display: flex; gap: 10px; border-bottom: 1px solid var(--light-gray); flex-shrink: 0; align-items: center; position: relative; }
     #sticker-search-input { flex-grow: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #ddd; }
     .sticker-panel-header .modal-button { padding: 8px 12px; font-size: 14px; flex-grow: 0; flex-basis: auto; }
     .sticker-grid-container { flex-grow: 1; overflow-y: auto; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; }
@@ -4507,6 +4507,10 @@ input:checked + .slider:before {
     border-radius: 0;
 }
 /* --- END: EMOJI PANEL LAYOUT FIX --- */
+/* --- 核心修复：强制隐藏表情包面板右上角的 X 按钮 --- */
+.sticker-panel-modal .modal-close-btn {
+    display: none !important;
+}
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -4535,7 +4539,7 @@ input:checked + .slider:before {
             <div class="status-bar"><div class="notch"><div class="earpiece"></div><div class="camera"></div></div><div class="status-info"></div></div>
             <div class="app-container">
                 <!-- 【核心修复】静态输入框 (iOS专用配置) -->
-                <input type="file" id="novel-upload-input" class="visually-hidden" accept=".txt">
+                <input type="file" id="novel-upload-input" class="visually-hidden" accept=".txt" multiple>
 
                 <!-- PAGE 1: Home -->
                 <div id="page-home" class="page active">
@@ -17702,9 +17706,14 @@ checkMomentsUpdates(); // <--- 新增这一行
                             <input type="search" id="sticker-search-input" placeholder="搜索..." />
                             <button class="modal-button secondary" data-value="manage">管理</button>
                             <button class="modal-button primary" data-value="import">导入</button>
+                            <button class="modal-button secondary" data-value="close">关闭</button>
                         </div>
                         <div class="sticker-grid-container"></div>
                     `,
+                    customClass: 'sticker-panel-modal',
+                    showCloseButton: false, // <--- 核心修改：改为 false，彻底隐藏右上角的 X
+                    style: 'padding: 0;',
+                    // ... 后面的代码
                     customClass: 'sticker-panel-modal',
                     showCloseButton: true,
                     style: 'padding: 0;',
@@ -20857,6 +20866,341 @@ async function handleRemoveMember() {
             { name: "Yeah!", url: "https://em-content.zobj.net/content/2021/02/15/yeah-wechat-android7021-emojipedia-wechat-android7021-emojipedia.png", type: "emoji" }
         ];
         // --- 新增结束 ---
+        // --- 核心新增：内置QQ/抖音 Emoji ---
+        const PRESET_DOUYIN_QQ_EMOJIS = [
+            // 抖音表情
+            { name: "V5", url: "https://www.emojiall.com/images/60/douyin/clv.png", type: "emoji" },
+            { name: "给力", url: "https://www.emojiall.com/images/60/douyin/clw.png", type: "emoji" },
+            { name: "嘿哈", url: "https://www.emojiall.com/images/60/douyin/cm8.png", type: "emoji" },
+            { name: "加好友", url: "https://www.emojiall.com/images/60/douyin/cm9.png", type: "emoji" },
+            { name: "勾引", url: "https://www.emojiall.com/images/60/douyin/cmt.png", type: "emoji" },
+            { name: "机智", url: "https://www.emojiall.com/images/60/douyin/cn0.png", type: "emoji" },
+            { name: "来看我", url: "https://www.emojiall.com/images/60/douyin/cn1.png", type: "emoji" },
+            { name: "灵机一动", url: "https://www.emojiall.com/images/60/douyin/cn2.png", type: "emoji" },
+            { name: "困", url: "https://www.emojiall.com/images/60/douyin/cna.png", type: "emoji" },
+            { name: "疑问", url: "https://www.emojiall.com/images/60/douyin/cnb.png", type: "emoji" },
+            { name: "泣不成声", url: "https://www.emojiall.com/images/60/douyin/cnc.png", type: "emoji" },
+            { name: "小鼓掌", url: "https://www.emojiall.com/images/60/douyin/cnd.png", type: "emoji" },
+            { name: "发呆", url: "https://www.emojiall.com/images/60/douyin/cnf.png", type: "emoji" },
+            { name: "吐血", url: "https://www.emojiall.com/images/60/douyin/cnj.png", type: "emoji" },
+            { name: "酷拽", url: "https://www.emojiall.com/images/60/douyin/cnq.png", type: "emoji" },
+            { name: "泪奔", url: "https://www.emojiall.com/images/60/douyin/cnv.png", type: "emoji" },
+            { name: "抠鼻", url: "https://www.emojiall.com/images/60/douyin/co1.png", type: "emoji" },
+            { name: "互粉", url: "https://www.emojiall.com/images/60/douyin/co3.png", type: "emoji" },
+            { name: "去污粉", url: "https://www.emojiall.com/images/60/douyin/co8.png", type: "emoji" },
+            { name: "666", url: "https://www.emojiall.com/images/60/douyin/co9.png", type: "emoji" },
+            { name: "舔屏", url: "https://www.emojiall.com/images/60/douyin/cof.png", type: "emoji" },
+            { name: "鄙视", url: "https://www.emojiall.com/images/60/douyin/cog.png", type: "emoji" },
+            { name: "紫薇别走", url: "https://www.emojiall.com/images/60/douyin/coj.png", type: "emoji" },
+            { name: "不失礼貌的微笑", url: "https://www.emojiall.com/images/60/douyin/cop.png", type: "emoji" },
+            { name: "吐舌", url: "https://www.emojiall.com/images/60/douyin/coq.png", type: "emoji" },
+            { name: "呆无辜", url: "https://www.emojiall.com/images/60/douyin/cor.png", type: "emoji" },
+            { name: "白眼", url: "https://www.emojiall.com/images/60/douyin/cot.png", type: "emoji" },
+            { name: "吃瓜群众", url: "https://www.emojiall.com/images/60/douyin/cox.png", type: "emoji" },
+            { name: "绿帽子", url: "https://www.emojiall.com/images/60/douyin/coz.png", type: "emoji" },
+            { name: "皱眉", url: "https://www.emojiall.com/images/60/douyin/cp2.png", type: "emoji" },
+            { name: "擦汗", url: "https://www.emojiall.com/images/60/douyin/cp3.png", type: "emoji" },
+            { name: "强", url: "https://www.emojiall.com/images/60/douyin/cp7.png", type: "emoji" },
+            { name: "如花", url: "https://www.emojiall.com/images/60/douyin/cp8.png", type: "emoji" },
+            { name: "奋斗", url: "https://www.emojiall.com/images/60/douyin/cpc.png", type: "emoji" },
+            { name: "微笑", url: "https://www.emojiall.com/images/60/douyin/1f642.png", type: "emoji" },
+            { name: "害羞", url: "https://www.emojiall.com/images/60/douyin/1f60a.png", type: "emoji" },
+            { name: "击掌", url: "https://www.emojiall.com/images/60/douyin/1f64c.png", type: "emoji" },
+            { name: "左上", url: "https://www.emojiall.com/images/60/douyin/1f446.png", type: "emoji" },
+            { name: "握手", url: "https://www.emojiall.com/images/60/douyin/1f91d.png", type: "emoji" },
+            { name: "18禁", url: "https://www.emojiall.com/images/60/douyin/1f51e.png", type: "emoji" },
+            { name: "菜刀", url: "https://www.emojiall.com/images/60/douyin/1f52a.png", type: "emoji" },
+            { name: "爱心", url: "https://www.emojiall.com/images/60/douyin/2764.png", type: "emoji" },
+            { name: "心碎", url: "https://www.emojiall.com/images/60/douyin/1f494.png", type: "emoji" },
+            { name: "便便", url: "https://www.emojiall.com/images/60/douyin/1f4a9.png", type: "emoji" },
+            { name: "惊讶", url: "https://www.emojiall.com/images/60/douyin/1f632.png", type: "emoji" },
+            { name: "调皮", url: "https://www.emojiall.com/images/60/douyin/1f61b.png", type: "emoji" },
+            { name: "礼物", url: "https://www.emojiall.com/images/60/douyin/1f381.png", type: "emoji" },
+            { name: "蛋糕", url: "https://www.emojiall.com/images/60/douyin/1f382.png", type: "emoji" },
+            { name: "派对", url: "https://www.emojiall.com/images/60/douyin/1f389.png", type: "emoji" },
+            { name: "不看", url: "https://www.emojiall.com/images/60/douyin/1f648.png", type: "emoji" },
+            { name: "炸弹", url: "https://www.emojiall.com/images/60/douyin/1f4a3.png", type: "emoji" },
+            { name: "憨笑", url: "https://www.emojiall.com/images/60/douyin/1f600.png", type: "emoji" },
+            { name: "悠闲", url: "https://www.emojiall.com/images/60/douyin/1f6ac.png", type: "emoji" },
+            { name: "晕", url: "https://www.emojiall.com/images/60/douyin/1f635.png", type: "emoji" },
+            { name: "囧", url: "https://www.emojiall.com/images/60/douyin/1f644.png", type: "emoji" },
+            { name: "阴险", url: "https://www.emojiall.com/images/60/douyin/1f60f.png", type: "emoji" },
+            { name: "惊恐", url: "https://www.emojiall.com/images/60/douyin/1f628.png", type: "emoji" },
+            { name: "难过", url: "https://www.emojiall.com/images/60/douyin/1f641.png", type: "emoji" },
+            { name: "斜眼", url: "https://www.emojiall.com/images/60/douyin/1f612.png", type: "emoji" },
+            { name: "左哼哼", url: "https://www.emojiall.com/images/60/douyin/1f624.png", type: "emoji" },
+            { name: "右哼哼", url: "https://www.emojiall.com/images/60/douyin/1f624-new.png", type: "emoji" },
+            { name: "咒骂", url: "https://www.emojiall.com/images/60/douyin/1f92c.png", type: "emoji" },
+            { name: "咖啡", url: "https://www.emojiall.com/images/60/douyin/2615.png", type: "emoji" },
+            { name: "西瓜", url: "https://www.emojiall.com/images/60/douyin/1f349.png", type: "emoji" },
+            { name: "衰", url: "https://www.emojiall.com/images/60/douyin/1f622.png", type: "emoji" },
+            { name: "太阳", url: "https://www.emojiall.com/images/60/douyin/1f31e.png", type: "emoji" },
+            { name: "月亮", url: "https://www.emojiall.com/images/60/douyin/1f31c.png", type: "emoji" },
+            { name: "发", url: "https://www.emojiall.com/images/60/douyin/1f005.png", type: "emoji" },
+            { name: "猪头", url: "https://www.emojiall.com/images/60/douyin/1f437.png", type: "emoji" },
+            { name: "凋谢", url: "https://www.emojiall.com/images/60/douyin/1f940.png", type: "emoji" },
+            { name: "红包", url: "https://www.emojiall.com/images/60/douyin/1f9e7.png", type: "emoji" },
+            { name: "拳头", url: "https://www.emojiall.com/images/60/douyin/270a.png", type: "emoji" },
+            { name: "胜利", url: "https://www.emojiall.com/images/60/douyin/270c.png", type: "emoji" },
+            { name: "抱拳", url: "https://www.emojiall.com/images/60/qq/1f64f.gif", type: "emoji" }, // QQ的抱拳
+            { name: "闭嘴", url: "https://www.emojiall.com/images/60/douyin/1f910.png", type: "emoji" },
+            { name: "弱", url: "https://www.emojiall.com/images/60/douyin/1f44e.png", type: "emoji" },
+            { name: "左边", url: "https://www.emojiall.com/images/60/douyin/1f448.png", type: "emoji" },
+            { name: "右边", url: "https://www.emojiall.com/images/60/douyin/1f449.png", type: "emoji" },
+            { name: "送心", url: "https://www.emojiall.com/images/60/douyin/1f970.png", type: "emoji" },
+            { name: "耶", url: "https://www.emojiall.com/images/60/douyin/270c-new.png", type: "emoji" },
+            { name: "捂脸", url: "https://www.emojiall.com/images/60/douyin/1f926.png", type: "emoji" },
+            { name: "色", url: "https://www.emojiall.com/images/60/douyin/1f60d.png", type: "emoji" },
+            { name: "打脸", url: "https://www.emojiall.com/images/60/douyin/1f915.png", type: "emoji" },
+            { name: "大笑", url: "https://www.emojiall.com/images/60/douyin/1f604.png", type: "emoji" },
+            { name: "哈欠", url: "https://www.emojiall.com/images/60/douyin/1f971.png", type: "emoji" },
+            { name: "震惊", url: "https://www.emojiall.com/images/60/douyin/1f92f.png", type: "emoji" },
+            { name: "大金牙", url: "https://www.emojiall.com/images/60/douyin/1f9b7.png", type: "emoji" },
+            { name: "偷笑", url: "https://www.emojiall.com/images/60/douyin/1f92d.png", type: "emoji" },
+            { name: "石化", url: "https://www.emojiall.com/images/60/douyin/1f630.png", type: "emoji" },
+            { name: "思考", url: "https://www.emojiall.com/images/60/douyin/1f914.png", type: "emoji" },
+            { name: "可怜", url: "https://www.emojiall.com/images/60/douyin/1f97a.png", type: "emoji" },
+            { name: "嘘", url: "https://www.emojiall.com/images/60/douyin/1f92b.png", type: "emoji" },
+            { name: "撇嘴", url: "https://www.emojiall.com/images/60/douyin/1f615.png", type: "emoji" },
+            { name: "尴尬", url: "https://www.emojiall.com/images/60/douyin/1f605.png", type: "emoji" },
+            { name: "笑哭", url: "https://www.emojiall.com/images/60/douyin/1f602.png", type: "emoji" },
+            { name: "生病", url: "https://www.emojiall.com/images/60/douyin/1f637.png", type: "emoji" },
+            { name: "奸笑", url: "https://www.emojiall.com/images/60/douyin/1f60f-new.png", type: "emoji" },
+            { name: "得意", url: "https://www.emojiall.com/images/60/douyin/1f60e.png", type: "emoji" },
+            { name: "坏笑", url: "https://www.emojiall.com/images/60/douyin/1f62c.png", type: "emoji" },
+            { name: "抓狂", url: "https://www.emojiall.com/images/60/douyin/1f62b.png", type: "emoji" },
+            { name: "钱", url: "https://www.emojiall.com/images/60/douyin/1f911.png", type: "emoji" },
+            { name: "亲亲", url: "https://www.emojiall.com/images/60/douyin/1f61a.png", type: "emoji" },
+            { name: "恐惧", url: "https://www.emojiall.com/images/60/douyin/1f631.png", type: "emoji" },
+            { name: "愉快", url: "https://www.emojiall.com/images/60/douyin/1f604-new.png", type: "emoji" },
+            { name: "玫瑰", url: "https://www.emojiall.com/images/60/douyin/1f339.png", type: "emoji" },
+            { name: "快哭了", url: "https://www.emojiall.com/images/60/douyin/1f625.png", type: "emoji" },
+            { name: "翻白眼", url: "https://www.emojiall.com/images/60/douyin/1f644-new.png", type: "emoji" },
+            { name: "赞", url: "https://www.emojiall.com/images/60/douyin/1f44d.png", type: "emoji" },
+            { name: "鼓掌", url: "https://www.emojiall.com/images/60/douyin/1f44f.png", type: "emoji" },
+            { name: "感谢", url: "https://www.emojiall.com/images/60/douyin/1f64f-new.png", type: "emoji" },
+            { name: "嘴唇", url: "https://www.emojiall.com/images/60/douyin/1f444.png", type: "emoji" },
+            { name: "胡瓜", url: "https://www.emojiall.com/images/60/douyin/1f952.png", type: "emoji" },
+            { name: "流泪", url: "https://www.emojiall.com/images/60/douyin/1f622-new.png", type: "emoji" },
+            { name: "啤酒", url: "https://www.emojiall.com/images/60/douyin/1f37a.png", type: "emoji" },
+            { name: "我想静静", url: "https://www.emojiall.com/images/60/douyin/1f611.png", type: "emoji" },
+            { name: "委屈", url: "https://www.emojiall.com/images/60/douyin/1f641-new.png", type: "emoji" },
+            { name: "飞吻", url: "https://www.emojiall.com/images/60/douyin/1f618.png", type: "emoji" },
+            { name: "再见", url: "https://www.emojiall.com/images/60/douyin/1f44b.png", type: "emoji" },
+            { name: "听歌", url: "https://www.emojiall.com/images/60/douyin/1f3a7.png", type: "emoji" },
+            { name: "发怒", url: "https://www.emojiall.com/images/60/douyin/1f621.png", type: "emoji" },
+            { name: "绝望的凝视", url: "https://www.emojiall.com/images/60/douyin/1f61e.png", type: "emoji" },
+            { name: "看", url: "https://www.emojiall.com/images/60/douyin/1f436.png", type: "emoji" },
+            { name: "熊吉", url: "https://www.emojiall.com/images/60/douyin/1f43b.png", type: "emoji" },
+            { name: "骷髅", url: "https://www.emojiall.com/images/60/douyin/1f480.png", type: "emoji" },
+            { name: "黑脸", url: "https://www.emojiall.com/images/60/douyin/1f31a.png", type: "emoji" },
+            { name: "呲牙", url: "https://www.emojiall.com/images/60/douyin/1f601.png", type: "emoji" },
+            { name: "吐", url: "https://www.emojiall.com/images/60/douyin/1f92e.png", type: "emoji" },
+            { name: "流汗", url: "https://www.emojiall.com/images/60/douyin/1f613.png", type: "emoji" },
+            { name: "摸头", url: "https://www.emojiall.com/images/60/douyin/1f60c.png", type: "emoji" },
+            { name: "红脸", url: "https://www.emojiall.com/images/60/douyin/1f633.png", type: "emoji" },
+            { name: "尬笑", url: "https://www.emojiall.com/images/60/douyin/1f605-new.png", type: "emoji" },
+            { name: "做鬼脸", url: "https://www.emojiall.com/images/60/douyin/1f61c.png", type: "emoji" },
+            { name: "睡", url: "https://www.emojiall.com/images/60/douyin/1f62a.png", type: "emoji" },
+            { name: "惊喜", url: "https://www.emojiall.com/images/60/douyin/1f929.png", type: "emoji" },
+            { name: "敲打", url: "https://www.emojiall.com/images/60/douyin/1f915-new.png", type: "emoji" },
+            { name: "吐彩虹", url: "https://www.emojiall.com/images/60/douyin/1f308.png", type: "emoji" },
+            { name: "大哭", url: "https://www.emojiall.com/images/60/douyin/1f62d.png", type: "emoji" },
+            { name: "比心", url: "https://www.emojiall.com/images/60/douyin/1f91e.png", type: "emoji" },
+            { name: "强壮", url: "https://www.emojiall.com/images/60/douyin/1f4aa.png", type: "emoji" },
+            { name: "碰拳", url: "https://www.emojiall.com/images/60/douyin/1f91b.png", type: "emoji" },
+            { name: "OK", url: "https://www.emojiall.com/images/60/douyin/1f44c.png", type: "emoji" },
+
+            // QQ表情
+            { name: "白眼笑", url: "https://www.emojiall.com/images/60/qq/209@2x.gif", type: "emoji" },
+            { name: "比心", url: "https://www.emojiall.com/images/60/qq/210@2x.gif", type: "emoji" },
+            { name: "不你不想", url: "https://www.emojiall.com/images/60/qq/211@2x.gif", type: "emoji" },
+            { name: "打call", url: "https://www.emojiall.com/images/60/qq/212@2x.gif", type: "emoji" },
+            { name: "滚", url: "https://www.emojiall.com/images/60/qq/213@2x.gif", type: "emoji" },
+            { name: "敬礼", url: "https://www.emojiall.com/images/60/qq/214@2x.gif", type: "emoji" },
+            { name: "考虑中", url: "https://www.emojiall.com/images/60/qq/215@2x.gif", type: "emoji" },
+            { name: "狂笑", url: "https://www.emojiall.com/images/60/qq/216@2x.gif", type: "emoji" },
+            { name: "没眼看", url: "https://www.emojiall.com/images/60/qq/217@2x.gif", type: "emoji" },
+            { name: "面无表情", url: "https://www.emojiall.com/images/60/qq/218@2x.gif", type: "emoji" },
+            { name: "摸鱼", url: "https://www.emojiall.com/images/60/qq/219@2x.gif", type: "emoji" },
+            { name: "魔鬼笑", url: "https://www.emojiall.com/images/60/qq/220@2x.gif", type: "emoji" },
+            { name: "哦", url: "https://www.emojiall.com/images/60/qq/221@2x.gif", type: "emoji" },
+            { name: "让我康康", url: "https://www.emojiall.com/images/60/qq/222@2x.gif", type: "emoji" },
+            { name: "哇哦", url: "https://www.emojiall.com/images/60/qq/223@2x.gif", type: "emoji" },
+            { name: "捂脸", url: "https://www.emojiall.com/images/60/qq/224@2x.gif", type: "emoji" },
+            { name: "尴尬", url: "https://www.emojiall.com/images/60/qq/010@2x.gif", type: "emoji" },
+            { name: "酷", url: "https://www.emojiall.com/images/60/qq/016@2x.gif", type: "emoji" },
+            { name: "奋斗", url: "https://www.emojiall.com/images/60/qq/029@2x.gif", type: "emoji" },
+            { name: "疑问", url: "https://www.emojiall.com/images/60/qq/031@2x.gif", type: "emoji" },
+            { name: "跳跳", url: "https://www.emojiall.com/images/60/qq/041@2x.gif", type: "emoji" },
+            { name: "擦汗", url: "https://www.emojiall.com/images/60/qq/071@2x.gif", type: "emoji" },
+            { name: "抠鼻", url: "https://www.emojiall.com/images/60/qq/072@2x.gif", type: "emoji" },
+            { name: "鄙视", url: "https://www.emojiall.com/images/60/qq/079@2x.gif", type: "emoji" },
+            { name: "勾引", url: "https://www.emojiall.com/images/60/qq/093@2x.gif", type: "emoji" },
+            { name: "差劲", url: "https://www.emojiall.com/images/60/qq/095@2x.gif", type: "emoji" },
+            { name: "NO", url: "https://www.emojiall.com/images/60/qq/097@2x.gif", type: "emoji" },
+            { name: "转圈", url: "https://www.emojiall.com/images/60/qq/099@2x.gif", type: "emoji" },
+            { name: "回头", url: "https://www.emojiall.com/images/60/qq/101@2x.gif", type: "emoji" },
+            { name: "跳绳", url: "https://www.emojiall.com/images/60/qq/102@2x.gif", type: "emoji" },
+            { name: "激动", url: "https://www.emojiall.com/images/60/qq/104@2x.gif", type: "emoji" },
+            { name: "左太极", url: "https://www.emojiall.com/images/60/qq/107@2x.gif", type: "emoji" },
+            { name: "右太极", url: "https://www.emojiall.com/images/60/qq/108@2x.gif", type: "emoji" },
+            { name: "泪奔", url: "https://www.emojiall.com/images/60/qq/146@2x.gif", type: "emoji" },
+            { name: "卖萌", url: "https://www.emojiall.com/images/60/qq/148@2x.gif", type: "emoji" },
+            { name: "喷血", url: "https://www.emojiall.com/images/60/qq/150@2x.gif", type: "emoji" },
+            { name: "骚扰", url: "https://www.emojiall.com/images/60/qq/154@2x.gif", type: "emoji" },
+            { name: "呃", url: "https://www.emojiall.com/images/60/qq/169@2x.gif", type: "emoji" },
+            { name: "好棒", url: "https://www.emojiall.com/images/60/qq/170@2x.gif", type: "emoji" },
+            { name: "拜托", url: "https://www.emojiall.com/images/60/qq/171@2x.gif", type: "emoji" },
+            { name: "点赞", url: "https://www.emojiall.com/images/60/qq/172@2x.gif", type: "emoji" },
+            { name: "无聊", url: "https://www.emojiall.com/images/60/qq/173@2x.gif", type: "emoji" },
+            { name: "托脸", url: "https://www.emojiall.com/images/60/qq/174@2x.gif", type: "emoji" },
+            { name: "吃", url: "https://www.emojiall.com/images/60/qq/175@2x.gif", type: "emoji" },
+            { name: "害怕", url: "https://www.emojiall.com/images/60/qq/177@2x.gif", type: "emoji" },
+            { name: "花痴", url: "https://www.emojiall.com/images/60/qq/178@2x.gif", type: "emoji" },
+            { name: "小样儿", url: "https://www.emojiall.com/images/60/qq/179@2x.gif", type: "emoji" },
+            { name: "飙泪", url: "https://www.emojiall.com/images/60/qq/180@2x.gif", type: "emoji" },
+            { name: "托腮", url: "https://www.emojiall.com/images/60/qq/182@2x.gif", type: "emoji" },
+            { name: "加油必胜", url: "https://www.emojiall.com/images/60/qq/191@2x.gif", type: "emoji" },
+            { name: "加油抱抱", url: "https://www.emojiall.com/images/60/qq/192@2x.gif", type: "emoji" },
+            { name: "脑壳疼", url: "https://www.emojiall.com/images/60/qq/196@2x.gif", type: "emoji" },
+            { name: "沧桑", url: "https://www.emojiall.com/images/60/qq/197@2x.gif", type: "emoji" },
+            { name: "辣眼睛", url: "https://www.emojiall.com/images/60/qq/199@2x.gif", type: "emoji" },
+            { name: "哦哟", url: "https://www.emojiall.com/images/60/qq/200@2x.gif", type: "emoji" },
+            { name: "问号脸", url: "https://www.emojiall.com/images/60/qq/202@2x.gif", type: "emoji" },
+            { name: "emm", url: "https://www.emojiall.com/images/60/qq/204@2x.gif", type: "emoji" },
+            { name: "吃瓜", url: "https://www.emojiall.com/images/60/qq/205@2x.gif", type: "emoji" },
+            { name: "惊讶", url: "https://www.emojiall.com/images/60/qq/1f632.gif", type: "emoji" },
+            { name: "撇嘴", url: "https://www.emojiall.com/images/60/qq/1f61f.gif", type: "emoji" },
+            { name: "色", url: "https://www.emojiall.com/images/60/qq/1f60d.gif", type: "emoji" },
+            { name: "发呆", url: "https://www.emojiall.com/images/60/qq/1f633.gif", type: "emoji" },
+            { name: "得意", url: "https://www.emojiall.com/images/60/qq/1f60e.gif", type: "emoji" },
+            { name: "流泪", url: "https://www.emojiall.com/images/60/qq/1f62d.gif", type: "emoji" },
+            { name: "害羞", url: "https://www.emojiall.com/images/60/qq/1f60a.gif", type: "emoji" },
+            { name: "闭嘴", url: "https://www.emojiall.com/images/60/qq/1f910.gif", type: "emoji" },
+            { name: "睡", url: "https://www.emojiall.com/images/60/qq/1f62a.gif", type: "emoji" },
+            { name: "大哭", url: "https://www.emojiall.com/images/60/qq/1f622.gif", type: "emoji" },
+            { name: "发怒", url: "https://www.emojiall.com/images/60/qq/1f621.gif", type: "emoji" },
+            { name: "调皮", url: "https://www.emojiall.com/images/60/qq/1f61b.gif", type: "emoji" },
+            { name: "呲牙", url: "https://www.emojiall.com/images/60/qq/1f601.gif", type: "emoji" },
+            { name: "微笑", url: "https://www.emojiall.com/images/60/qq/1f642.gif", type: "emoji" },
+            { name: "难过", url: "https://www.emojiall.com/images/60/qq/1f641.gif", type: "emoji" },
+            { name: "抓狂", url: "https://www.emojiall.com/images/60/qq/1f62b.gif", type: "emoji" },
+            { name: "吐", url: "https://www.emojiall.com/images/60/qq/1f92e.gif", type: "emoji" },
+            { name: "偷笑", url: "https://www.emojiall.com/images/60/qq/1f92d.gif", type: "emoji" },
+            { name: "可爱", url: "https://www.emojiall.com/images/60/qq/1f60a-new.gif", type: "emoji" },
+            { name: "白眼", url: "https://www.emojiall.com/images/60/qq/1f644.gif", type: "emoji" },
+            { name: "傲慢", url: "https://www.emojiall.com/images/60/qq/1f615.gif", type: "emoji" },
+            { name: "饥饿", url: "https://www.emojiall.com/images/60/qq/1f60b.gif", type: "emoji" },
+            { name: "困", url: "https://www.emojiall.com/images/60/qq/1f62a-new.gif", type: "emoji" },
+            { name: "惊恐", url: "https://www.emojiall.com/images/60/qq/1f628.gif", type: "emoji" },
+            { name: "流汗", url: "https://www.emojiall.com/images/60/qq/1f613.gif", type: "emoji" },
+            { name: "憨笑", url: "https://www.emojiall.com/images/60/qq/1f600.gif", type: "emoji" },
+            { name: "悠闲", url: "https://www.emojiall.com/images/60/qq/1f6ac.gif", type: "emoji" },
+            { name: "咒骂", url: "https://www.emojiall.com/images/60/qq/1f92c.gif", type: "emoji" },
+            { name: "嘘", url: "https://www.emojiall.com/images/60/qq/1f92b.gif", type: "emoji" },
+            { name: "晕", url: "https://www.emojiall.com/images/60/qq/1f635.gif", type: "emoji" },
+            { name: "折磨", url: "https://www.emojiall.com/images/60/qq/1f623.gif", type: "emoji" },
+            { name: "衰", url: "https://www.emojiall.com/images/60/qq/1f622-new.gif", type: "emoji" },
+            { name: "骷髅", url: "https://www.emojiall.com/images/60/qq/1f480.gif", type: "emoji" },
+            { name: "敲打", url: "https://www.emojiall.com/images/60/qq/1f915.gif", type: "emoji" },
+            { name: "再见", url: "https://www.emojiall.com/images/60/qq/1f44b.gif", type: "emoji" },
+            { name: "发抖", url: "https://www.emojiall.com/images/60/qq/1f976.gif", type: "emoji" },
+            { name: "爱情", url: "https://www.emojiall.com/images/60/qq/1f491.gif", type: "emoji" },
+            { name: "猪头", url: "https://www.emojiall.com/images/60/qq/1f437.gif", type: "emoji" },
+            { name: "拥抱", url: "https://www.emojiall.com/images/60/qq/1f917.gif", type: "emoji" },
+            { name: "蛋糕", url: "https://www.emojiall.com/images/60/qq/1f382.gif", type: "emoji" },
+            { name: "闪电", url: "https://www.emojiall.com/images/60/qq/26a1.gif", type: "emoji" },
+            { name: "炸弹", url: "https://www.emojiall.com/images/60/qq/1f4a3.gif", type: "emoji" },
+            { name: "刀", url: "https://www.emojiall.com/images/60/qq/2694.gif", type: "emoji" },
+            { name: "足", url: "https://www.emojiall.com/images/60/qq/26bd.gif", type: "emoji" },
+            { name: "便", url: "https://www.emojiall.com/images/60/qq/1f4a9.gif", type: "emoji" },
+            { name: "咖", url: "https://www.emojiall.com/images/60/qq/2615.gif", type: "emoji" },
+            { name: "饭", url: "https://www.emojiall.com/images/60/qq/1f35a.gif", type: "emoji" },
+            { name: "药", url: "https://www.emojiall.com/images/60/qq/1f48a.gif", type: "emoji" },
+            { name: "玫瑰", url: "https://www.emojiall.com/images/60/qq/1f339.gif", type: "emoji" },
+            { name: "凋谢", url: "https://www.emojiall.com/images/60/qq/1f940.gif", type: "emoji" },
+            { name: "爱心", url: "https://www.emojiall.com/images/60/qq/2764.gif", type: "emoji" },
+            { name: "心碎", url: "https://www.emojiall.com/images/60/qq/1f494.gif", type: "emoji" },
+            { name: "礼物", url: "https://www.emojiall.com/images/60/qq/1f381.gif", type: "emoji" },
+            { name: "太阳", url: "https://www.emojiall.com/images/60/qq/1f31e.gif", type: "emoji" },
+            { name: "月亮", url: "https://www.emojiall.com/images/60/qq/1f319.gif", type: "emoji" },
+            { name: "赞", url: "https://www.emojiall.com/images/60/qq/1f44d.gif", type: "emoji" },
+            { name: "踩", url: "https://www.emojiall.com/images/60/qq/1f44e.gif", type: "emoji" },
+            { name: "握手", url: "https://www.emojiall.com/images/60/qq/1f91d.gif", type: "emoji" },
+            { name: "胜利", url: "https://www.emojiall.com/images/60/qq/270c.gif", type: "emoji" },
+            { name: "飞吻", url: "https://www.emojiall.com/images/60/qq/1f618.gif", type: "emoji" },
+            { name: "怄火", url: "https://www.emojiall.com/images/60/qq/1f620.gif", type: "emoji" },
+            { name: "西瓜", url: "https://www.emojiall.com/images/60/qq/1f349.gif", type: "emoji" },
+            { name: "冷汗", url: "https://www.emojiall.com/images/60/qq/1f630.gif", type: "emoji" },
+            { name: "鼓掌", url: "https://www.emojiall.com/images/60/qq/1f44f.gif", type: "emoji" },
+            { name: "糗大了", url: "https://www.emojiall.com/images/60/qq/1f611.gif", type: "emoji" },
+            { name: "坏笑", url: "https://www.emojiall.com/images/60/qq/1f62c.gif", type: "emoji" },
+            { name: "左哼哼", url: "https://www.emojiall.com/images/60/qq/1f624.gif", type: "emoji" },
+            { name: "右哼哼", url: "https://www.emojiall.com/images/60/qq/1f624-new.gif", type: "emoji" },
+            { name: "哈欠", url: "https://www.emojiall.com/images/60/qq/1f971.gif", type: "emoji" },
+            { name: "委屈", url: "https://www.emojiall.com/images/60/qq/1f641-new.gif", type: "emoji" },
+            { name: "快哭了", url: "https://www.emojiall.com/images/60/qq/1f625.gif", type: "emoji" },
+            { name: "阴险", url: "https://www.emojiall.com/images/60/qq/1f60f.gif", type: "emoji" },
+            { name: "亲亲", url: "https://www.emojiall.com/images/60/qq/1f61a.gif", type: "emoji" },
+            { name: "吓", url: "https://www.emojiall.com/images/60/qq/1f631.gif", type: "emoji" },
+            { name: "可怜", url: "https://www.emojiall.com/images/60/qq/1f97a.gif", type: "emoji" },
+            { name: "菜刀", url: "https://www.emojiall.com/images/60/qq/1f52a.gif", type: "emoji" },
+            { name: "啤酒", url: "https://www.emojiall.com/images/60/qq/1f37a.gif", type: "emoji" },
+            { name: "篮球", url: "https://www.emojiall.com/images/60/qq/1f3c0.gif", type: "emoji" },
+            { name: "乒乓", url: "https://www.emojiall.com/images/60/qq/1f3d3.gif", type: "emoji" },
+            { name: "示爱", url: "https://www.emojiall.com/images/60/qq/1f444.gif", type: "emoji" },
+            { name: "瓢虫", url: "https://www.emojiall.com/images/60/qq/1f41e.gif", type: "emoji" },
+            { name: "抱拳", url: "https://www.emojiall.com/images/60/qq/1f64f.gif", type: "emoji" },
+            { name: "拳头", url: "https://www.emojiall.com/images/60/qq/270a.gif", type: "emoji" },
+            { name: "爱你", url: "https://www.emojiall.com/images/60/qq/1f91f.gif", type: "emoji" },
+            { name: "OK", url: "https://www.emojiall.com/images/60/qq/1f44c.gif", type: "emoji" },
+            { name: "磕头", url: "https://www.emojiall.com/images/60/qq/1f647.gif", type: "emoji" },
+            { name: "挥手", url: "https://www.emojiall.com/images/60/qq/1f44b-new.gif", type: "emoji" },
+            { name: "街舞", url: "https://www.emojiall.com/images/60/qq/1f483.gif", type: "emoji" },
+            { name: "献吻", url: "https://www.emojiall.com/images/60/qq/1f617.gif", type: "emoji" },
+            { name: "双喜", url: "https://www.emojiall.com/images/60/qq/1f264.gif", type: "emoji" },
+            { name: "鞭炮", url: "https://www.emojiall.com/images/60/qq/1f9e8.gif", type: "emoji" },
+            { name: "灯笼", url: "https://www.emojiall.com/images/60/qq/1f3ee.gif", type: "emoji" },
+            { name: "K歌", url: "https://www.emojiall.com/images/60/qq/1f3a4.gif", type: "emoji" },
+            { name: "喝彩", url: "https://www.emojiall.com/images/60/qq/1f389.gif", type: "emoji" },
+            { name: "祈祷", url: "https://www.emojiall.com/images/60/qq/1f56f.gif", type: "emoji" },
+            { name: "爆筋", url: "https://www.emojiall.com/images/60/qq/1f4a2.gif", type: "emoji" },
+            { name: "棒棒糖", url: "https://www.emojiall.com/images/60/qq/1f36d.gif", type: "emoji" },
+            { name: "喝奶", url: "https://www.emojiall.com/images/60/qq/1f37c.gif", type: "emoji" },
+            { name: "飞机", url: "https://www.emojiall.com/images/60/qq/2708.gif", type: "emoji" },
+            { name: "钞票", url: "https://www.emojiall.com/images/60/qq/1f4b5.gif", type: "emoji" },
+            { name: "手枪", url: "https://www.emojiall.com/images/60/qq/1f52b.gif", type: "emoji" },
+            { name: "茶", url: "https://www.emojiall.com/images/60/qq/1f375.gif", type: "emoji" },
+            { name: "眨眼睛", url: "https://www.emojiall.com/images/60/qq/1f609.gif", type: "emoji" },
+            { name: "无奈", url: "https://www.emojiall.com/images/60/qq/1f937.gif", type: "emoji" },
+            { name: "小纠结", url: "https://www.emojiall.com/images/60/qq/1f914.gif", type: "emoji" },
+            { name: "斜眼笑", url: "https://www.emojiall.com/images/60/qq/1f60f-new.gif", type: "emoji" },
+            { name: "doge", url: "https://www.emojiall.com/images/60/qq/1f624-new.gif", type: "emoji" },
+            { name: "惊喜", url: "https://www.emojiall.com/images/60/qq/1f929.gif", type: "emoji" },
+            { name: "笑哭", url: "https://www.emojiall.com/images/60/qq/1f602.gif", type: "emoji" },
+            { name: "我最美", url: "https://www.emojiall.com/images/60/qq/1f970.gif", type: "emoji" },
+            { name: "河蟹", url: "https://www.emojiall.com/images/60/qq/1f980.gif", type: "emoji" },
+            { name: "羊驼", url: "https://www.emojiall.com/images/60/qq/1f999.gif", type: "emoji" },
+            { name: "幽灵", url: "https://www.emojiall.com/images/60/qq/1f47b.gif", type: "emoji" },
+            { name: "蛋", url: "https://www.emojiall.com/images/60/qq/1f95a.gif", type: "emoji" },
+            { name: "菊花", url: "https://www.emojiall.com/images/60/qq/1f33c.gif", type: "emoji" },
+            { name: "红包", url: "https://www.emojiall.com/images/60/qq/1f9e7.gif", type: "emoji" },
+            { name: "大笑", url: "https://www.emojiall.com/images/60/qq/1f604.gif", type: "emoji" },
+            { name: "不开心", url: "https://www.emojiall.com/images/60/qq/2639.gif", type: "emoji" },
+            { name: "冷漠", url: "https://www.emojiall.com/images/60/qq/1f610.gif", type: "emoji" },
+            { name: "送花", url: "https://www.emojiall.com/images/60/qq/1f490.gif", type: "emoji" },
+            { name: "我不看", url: "https://www.emojiall.com/images/60/qq/1f648.gif", type: "emoji" },
+            { name: "口罩护体", url: "https://www.emojiall.com/images/60/qq/1f637.gif", type: "emoji" },
+            { name: "搬砖中", url: "https://www.emojiall.com/images/60/qq/1f9d1-200d-1f4bb.gif", type: "emoji" },
+            { name: "忙到飞起", url: "https://www.emojiall.com/images/60/qq/1f468-200d-1f4bb.gif", type: "emoji" },
+            { name: "捂脸", url: "https://www.emojiall.com/images/60/qq/1f926.gif", type: "emoji" },
+            { name: "头秃", url: "https://www.emojiall.com/images/60/qq/1f468-200d-1f9b2.gif", type: "emoji" },
+            { name: "暗中观察", url: "https://www.emojiall.com/images/60/qq/1f440.gif", type: "emoji" },
+            { name: "呵呵哒", url: "https://www.emojiall.com/images/60/qq/1f643.gif", type: "emoji" },
+            { name: "我酸了", url: "https://www.emojiall.com/images/60/qq/1f34b.gif", type: "emoji" },
+            { name: "太南了", url: "https://www.emojiall.com/images/60/qq/1f001.gif", type: "emoji" }
+        ];
 
         myAvatar = loadFromLocalStorage('my_global_avatar', null) || generateDefaultAvatar('{{user}}');
         customBubbles = loadFromLocalStorage('app_custom_bubbles', []);
@@ -20872,8 +21216,8 @@ async function handleRemoveMember() {
         const stickersFromStorage = loadFromLocalStorage('app-stickers', []);
         const existingUrls = new Set(stickersFromStorage.map(s => s.url));
 
-        // 将两个预设列表合并成一个
-        const allPresetEmojis = [...PRESET_EMOJIS, ...PRESET_WECHAT_EMOJIS];
+        // 将三个预设列表合并成一个
+        const allPresetEmojis = [...PRESET_EMOJIS, ...PRESET_WECHAT_EMOJIS, ...PRESET_DOUYIN_QQ_EMOJIS];
 
         allPresetEmojis.forEach(emoji => {
             // 只有当这个URL不存在时，才把它添加进去
@@ -24485,16 +24829,37 @@ Your optional message to the user about the update.
                         `;
 
                         staticInput.onchange = (e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                                const reader = new FileReader();
-                                reader.onload = (event) => {
-                                    const content = event.target.result;
-                                    const title = file.name.replace(/\.[^/.]+$/, "");
-                                    processAndSaveNovel(title, content);
-                                };
-                                reader.readAsText(file, 'utf-8');
+                            // 获取文件列表
+                            const files = e.target.files;
+                            
+                            if (files && files.length > 0) {
+                                // 将 FileList 转换为数组并遍历
+                                Array.from(files).forEach(file => {
+                                    const reader = new FileReader();
+                                    
+                                    reader.onload = (event) => {
+                                        const buffer = event.target.result;
+                                        let content = '';
+                                        
+                                        // 防乱码解码逻辑
+                                        try {
+                                            const decoder = new TextDecoder('utf-8', { fatal: true });
+                                            content = decoder.decode(buffer);
+                                        } catch (e) {
+                                            const decoder = new TextDecoder('gb18030');
+                                            content = decoder.decode(buffer);
+                                        }
+
+                                        const title = file.name.replace(/\.[^/.]+$/, "");
+                                        // 依次处理每本小说
+                                        processAndSaveNovel(title, content);
+                                    };
+                                    
+                                    // 读取为二进制流
+                                    reader.readAsArrayBuffer(file);
+                                });
                             }
+                            
                             // 无论成功与否，都要归位并关闭
                             returnInputToBody();
                             closeModal();
@@ -24539,7 +24904,17 @@ Your optional message to the user about the update.
 
                 const reader = new FileReader();
                 reader.onload = (event) => {
-                    const content = event.target.result;
+                    const buffer = event.target.result;
+                    let content = '';
+                    
+                    try {
+                        const decoder = new TextDecoder('utf-8', { fatal: true });
+                        content = decoder.decode(buffer);
+                    } catch (e) {
+                        const decoder = new TextDecoder('gb18030');
+                        content = decoder.decode(buffer);
+                    }
+
                     const title = file.name.replace(/\.[^/.]+$/, "");
                     processAndSaveNovel(title, content);
                     
@@ -24550,7 +24925,8 @@ Your optional message to the user about the update.
                     alert("文件读取失败！");
                     fileInput.value = '';
                 };
-                reader.readAsText(file, 'utf-8');
+                // 核心修改：读取为 ArrayBuffer
+                reader.readAsArrayBuffer(file);
             };
 
             // 直接触发点击，这在 iOS 上是绝对允许的
