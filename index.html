@@ -6572,7 +6572,7 @@ if (momentsContext) {
             finalSystemPrompt += timeManager.getAITimeContext();
 
             // 【【【 核心修复：注入小说并强制进入角色扮演场景 】】】
-            const _currentId = chatState.chatId;
+            const _currentId = targetChatId;
             const _pendingNovelKey = `pending_novel_share_${_currentId}`;
             const _pendingData = loadFromLocalStorage(_pendingNovelKey, null);
             
@@ -9566,7 +9566,14 @@ A detailed description of the image...
                         }
                     }).trim();
                 }
-                if (msg.side === 'sent' && msg.type === 'text') { mainText = mainText.replace(/@(\S+)/g, (match, username) => `[System Observation: The user is now specifically addressing and calling out "${username}". Your response should be directed towards this action.]\n${match}`); }
+                /*
+                // 【核心修改】: 注释掉整个@提及的系统观察注入逻辑
+                if (msg.side === 'sent' && msg.type === 'text') { 
+                    mainText = mainText.replace(/@(\S+)/g, (match, username) => {
+                        return `[System Observation: The user is now specifically addressing and calling out "${username}". Your response should be directed towards this action.]\n${match}`;
+                    }); 
+                }
+                */
                 if (msg.replyTo) { const originalMsg = allMessages.find(m => m.id === msg.replyTo); let originalContentText = `(a previous message)`; if(originalMsg) { if(originalMsg.text) originalContentText = `"${originalMsg.text}"`; else originalContentText = `a ${originalMsg.type}`; } mainText = `[Replying to ${originalContentText}] ${mainText}`; }
                 const stripRegex = /<div data-ai-strip="true"[\s\S]*?<\/div>/gm;
                 mainText = mainText.replace(stripRegex, '').trim();
