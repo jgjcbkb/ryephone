@@ -6230,7 +6230,18 @@ input:checked + .slider:before {
         const postInstruction = `
 [ULTIMATE DIRECTIVE: HOW TO CREATE A MOMENTS POST]
 
+// ******** 从这里开始插入新代码 ********
+# [BEHAVIORAL PREFERENCE - MANDATORY]
+**YOUR DEFAULT CHOICE IS PLAIN TEXT.**
+
+- **Principle:** You are a person, not a machine. Most people share simple thoughts, not complex code blocks.
+- **Action:** 90% of the time, you SHOULD choose \`type: "text"\`. Use it for status updates, feelings, questions, and simple observations.
+- **HTML is for SPECIAL OCCASIONS:** Only use HTML snippets (\`<snippet>\`) when you absolutely need to create a special visual effect that text cannot achieve (e.g., a fake system notification, a bill). DO NOT overuse it.
+- **Self-Correction:** If you find yourself wanting to generate an HTML card, ask yourself: "Can I express this idea with plain text and an emoji instead?" If the answer is yes, **USE PLAIN TEXT**.
+// ******** 新代码到此结束 ********
+
 **YOUR IDENTITY**: You are ${senderName}. Your posts must perfectly align with your personality.
+// ... (后面内容保持不变) ...
 
 **LANGUAGE REQUIREMENT (ABSOLUTE)**: You MUST generate all content in **Simplified Chinese (简体中文)**.
 
@@ -7427,7 +7438,12 @@ ${baseSystemPrompt}
                             
                             // 【核心方案 2】如果 JSON 格式有小错误，回退到正则提取 (救急用)
                             const typeMatch = cleanJsonString.match(/"type"\s*:\s*"([^"]+)"/);
-                            // 升级版正则：支持匹配直到下一个字段开始前的内容
+                            
+                            // 【终极正则修复】这个正则可以匹配双引号内包含转义双引号的任意内容
+                            // 解释: "text" \s* : \s* " ( (?: [^"\\] | \\. )* ) "
+                            // [^"\\] 匹配非引号且非反斜杠的字符
+                            // \\. 匹配转义字符 (如 \" 或 \\)
+                            // * 重复任意次
                             const textMatch = cleanJsonString.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/);
                             const contentMatch = cleanJsonString.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
                             const signerMatch = cleanJsonString.match(/"signer"\s*:\s*"([^"]*)"/);
@@ -13284,16 +13300,25 @@ You were receiving a video call from {{user}}, but they hung up before you could
                             let tempPlaceholders = {};
                             let tempCounter = 0;
                             
-                            let textWithPlaceholders = rawText.replace(/\[emoji:([^\]]+)\]/g, (match, emojiName) => {
-                                const emoji = stickers.find(s => s.name.trim() === emojiName.trim() && s.type === 'emoji');
-                                if (emoji) {
-                                    const placeholder = `__EMOJI_PLACEHOLDER_${tempCounter}__`;
-                                    tempPlaceholders[placeholder] = `<img src="${emoji.url}" alt="${escapeHtml(emoji.name)}" class="inline-emoji">`;
-                                    tempCounter++;
-                                    return placeholder;
-                                }
-                                return match;
-                            });
+                            // 【核心升级】同时替换 Emoji 和 Sticker
+                            // 1. 定义一个通用的替换函数
+                            const replaceTags = (text) => {
+                                return text.replace(/\[(emoji|sticker):([^\]]+)\]/g, (match, type, name) => {
+                                    const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
+                                    if (item) {
+                                        const placeholder = `__ITEM_PLACEHOLDER_${tempCounter}__`;
+                                        // 根据类型决定样式
+                                        const styleClass = type === 'emoji' ? 'class="inline-emoji"' : 'style="max-width: 60px; max-height: 60px; vertical-align: middle;"';
+                                        tempPlaceholders[placeholder] = `<img src="${item.url}" alt="${escapeHtml(item.name)}" ${styleClass}>`;
+                                        tempCounter++;
+                                        return placeholder;
+                                    }
+                                    return match;
+                                });
+                            };
+
+                            // 2. 执行替换
+                            let textWithPlaceholders = replaceTags(rawText);
 
                             let safeText = escapeHtml(textWithPlaceholders);
 
@@ -16533,16 +16558,25 @@ const momentsManager = (function() {
                     
                     const postBody = postCard.querySelector('.post-body');
                     if (post.text && post.text.trim() !== '') {
-                        const textContent = post.text.trim();
-                        // 检查内容是否为自包含的HTML代码块 (以 <snippet> 或 <div 开头)
-                        const isHtmlBlock = textContent.startsWith('<snippet>') || textContent.startsWith('<div');
+                        let textContent = post.text.trim();
+                        
+                        // 核心修改：更宽松、更智能的HTML块检测逻辑
+                        // 只要包含 <snippet>、<style> 或者以 <div 开头，都视为 HTML 模式
+                        const isHtmlBlock = textContent.includes('<snippet>') || 
+                                          textContent.includes('<style>') || 
+                                          textContent.startsWith('<div');
 
                         if (isHtmlBlock) {
-                            // 如果是HTML块，直接将其内容设置为 postBody 的内容。
-                            // 这样做可以避免被外层带有冲突样式的 div 包裹。
+                            // 如果包含 <snippet> 标签，将其剥离，只保留内部的 HTML/CSS
+                            // 这样可以防止 <snippet> 标签本身干扰布局
+                            if (textContent.includes('<snippet>')) {
+                                textContent = textContent.replace(/<snippet>/g, '').replace(/<\/snippet>/g, '');
+                            }
+                            
+                            // 直接渲染 HTML，这样 <style> 标签就能生效，<div> 也能正常显示
                             postBody.innerHTML = textContent;
                         } else {
-                            // 如果是纯文本，则使用原来的方法，将其包裹在带样式的 div 中。
+                            // 纯文本模式：保持原样，包裹在 post-content-text 中以保留换行
                             const textDiv = document.createElement('div');
                             textDiv.className = 'post-content-text';
                             textDiv.innerHTML = textContent;
@@ -16813,8 +16847,23 @@ const momentsManager = (function() {
                 snippetParts.forEach((part, index) => {
                     if (!part) return;
                     if (index % 2 === 1) {
-                        contentHtml += part;
+                        // 【核心修复】即使是 HTML 代码块，也尝试替换里面的表情指令
+                        let processedHtmlPart = part.replace(/\[(sticker|emoji)[:：]([^\]]+)\]/g, (match, type, name) => {
+                             // 注意兼容中文冒号
+                             type = type.toLowerCase();
+                             const item = stickers.find(s => s.name === name && s.type === type);
+                             if (item) {
+                                 if (type === 'sticker') {
+                                     return `<img src="${item.url}" alt="${escapeHtml(name)}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+                                 } else {
+                                     return `<img src="${item.url}" alt="${escapeHtml(name)}" class="inline-emoji">`;
+                                 }
+                             }
+                             return match;
+                        });
+                        contentHtml += processedHtmlPart;
                     } else {
+                        // ...
                         // 【【【核心修改 1】】】: 在 split 正则表达式中，用 [:：] 替代 :
                         // 这表示匹配 英文冒号 或 中文冒号
                         const textAndTagParts = part.split(/(\[(?:sticker|emoji)[:：][^\]]+\])/g);
