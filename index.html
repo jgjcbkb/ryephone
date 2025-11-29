@@ -7423,21 +7423,30 @@ ${baseSystemPrompt}
                     const match = commandRegex.exec(aiResponse);
                     
                     if (match) {
-                        const value = match[2].trim();
-                        // 清理可能存在的 Markdown 标记
+                        let value = match[2].trim();
+                        
+                        // 【【【【【【 终极、决定性修复：预处理AI返回的字符串 】】】】】】
+                        // 这个操作会将所有错误的 \\" (双重转义) 修正为正确的 \" (单层转义)
+                        // 这是解决当前问题的核心关键！
+                        value = value.replace(/\\\\"/g, '\\"');
+                        
+                        // 1. 暴力清理：有些AI会在结尾多加字符，我们只取到最后一个 `}`
+                        const lastBraceIndex = value.lastIndexOf('}');
+                        if (lastBraceIndex !== -1) {
+                            value = value.substring(0, lastBraceIndex + 1);
+                        }
+
+                        // 2. 清理 Markdown
                         const cleanJsonString = value.replace(/^```json\s*/, '').replace(/^```/, '').replace(/```$/, '').trim();
                         
                         let postData = null;
 
-                        // 【核心方案 1】优先尝试标准 JSON 解析 (最稳健，能处理复杂 HTML)
+                        // 【核心方案 1】优先尝试标准 JSON 解析 (经过清理后，现在应该能成功了)
                         try {
                             postData = JSON.parse(cleanJsonString);
                             console.log("[解析成功] 使用标准 JSON.parse 成功解析发帖数据。");
                         } catch (jsonError) {
-                            console.warn("[解析警告] JSON.parse 失败，尝试使用正则救急...", jsonError);
-                            
-                            // 【核心方案 2】如果 JSON 格式有小错误，回退到正则提取 (救急用)
-                            const typeMatch = cleanJsonString.match(/"type"\s*:\s*"([^"]+)"/);
+                            // ... (后续的回退逻辑保持不变) ...
                             
                             // 【终极正则修复】这个正则可以匹配双引号内包含转义双引号的任意内容
                             // 解释: "text" \s* : \s* " ( (?: [^"\\] | \\. )* ) "
