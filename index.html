@@ -7406,36 +7406,50 @@ ${baseSystemPrompt}
                 console.log(`[诊断日志] 角色 "${senderName}": 主动消息解析并执行完毕。`);
 
             } else if (actionType === 'post_moment') {
-
-                // 这个逻辑是专门用于发帖的，保持不变，但要确保它在自己的分支里。
                 console.log(`[诊断日志] 角色 "${senderName}": 开始解析【主动发帖】指令...`);
                 try {
                     const commandRegex = /\[(post_moment):\s*([\s\S]+?)\]/g;
                     const match = commandRegex.exec(aiResponse);
+                    
                     if (match) {
-                        const value = match[2];
-                        const jsonString = value.replace(/```json/g, '').replace(/```/g, '').trim();
+                        const value = match[2].trim();
+                        // 清理可能存在的 Markdown 标记
+                        const cleanJsonString = value.replace(/^```json\s*/, '').replace(/^```/, '').replace(/```$/, '').trim();
                         
-                        // --- 核心修复：使用更健壮的正则提取代替JSON.parse ---
-                        const typeMatch = jsonString.match(/"type"\s*:\s*"([^"]+)"/);
-                        const textMatch = jsonString.match(/"text"\s*:\s*"([\s\S]*?)"(?:\s*,|\s*})/);
-                        const contentMatch = jsonString.match(/"content"\s*:\s*"([\s\S]*?)"(?:\s*,|\s*})/);
-                        const signerMatch = jsonString.match(/"signer"\s*:\s*"([^"]*)"/);
-                        const dateMatch = jsonString.match(/"date"\s*:\s*"([^"]*)"/);
+                        let postData = null;
 
-                        if (typeMatch) {
-                            const unescape = (str) => str ? str.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\') : '';
+                        // 【核心方案 1】优先尝试标准 JSON 解析 (最稳健，能处理复杂 HTML)
+                        try {
+                            postData = JSON.parse(cleanJsonString);
+                            console.log("[解析成功] 使用标准 JSON.parse 成功解析发帖数据。");
+                        } catch (jsonError) {
+                            console.warn("[解析警告] JSON.parse 失败，尝试使用正则救急...", jsonError);
                             
-                            const postData = {
-                                type: typeMatch[1],
-                                text: textMatch ? unescape(textMatch[1]) : '',
-                                content: contentMatch ? unescape(contentMatch[1]) : '',
-                                signer: signerMatch ? unescape(signerMatch[1]) : '',
-                                date: dateMatch ? unescape(dateMatch[1]) : ''
-                            };
+                            // 【核心方案 2】如果 JSON 格式有小错误，回退到正则提取 (救急用)
+                            const typeMatch = cleanJsonString.match(/"type"\s*:\s*"([^"]+)"/);
+                            // 升级版正则：支持匹配直到下一个字段开始前的内容
+                            const textMatch = cleanJsonString.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                            const contentMatch = cleanJsonString.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+                            const signerMatch = cleanJsonString.match(/"signer"\s*:\s*"([^"]*)"/);
+                            const dateMatch = cleanJsonString.match(/"date"\s*:\s*"([^"]*)"/);
+
+                            if (typeMatch) {
+                                const unescape = (str) => str ? str.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\') : '';
+                                postData = {
+                                    type: typeMatch[1],
+                                    text: textMatch ? unescape(textMatch[1]) : '',
+                                    content: contentMatch ? unescape(contentMatch[1]) : '',
+                                    signer: signerMatch ? unescape(signerMatch[1]) : '',
+                                    date: dateMatch ? unescape(dateMatch[1]) : ''
+                                };
+                            }
+                        }
+
+                        // 如果成功获取到了数据，执行发帖
+                        if (postData && postData.type) {
                             momentsManager.createPostFromAI(senderName, postData);
                         } else {
-                            throw new Error("无法从AI响应中提取有效的 'type' 字段。");
+                            throw new Error("无法提取有效的发帖数据 (type字段缺失)。");
                         }
                     } else {
                          console.warn(`[诊断日志] 角色 "${senderName}": AI意图发帖，但未找到有效的 [post_moment:...] 指令。`);
