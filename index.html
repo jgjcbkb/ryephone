@@ -4511,6 +4511,49 @@ input:checked + .slider:before {
 .sticker-panel-modal .modal-close-btn {
     display: none !important;
 }
+.message-timestamp-footer {
+    font-size: 10px;
+    color: #b0b0b0;
+    margin-top: 2px;
+    padding: 0 4px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.message-wrapper.sent .message-timestamp-footer {
+    text-align: right;
+}
+
+.message-wrapper.received .message-timestamp-footer {
+    text-align: left;
+}
+/* 新增：气泡和时间的容器行 */
+.bubble-row {
+    display: flex;
+    /* 默认垂直排列 (时间在下) */
+    flex-direction: column; 
+}
+
+/* 模式 A: 时间在气泡旁边 (Beside) */
+.message-wrapper.received .bubble-row.layout-beside {
+    flex-direction: row;
+    align-items: flex-end; /* 底部对齐 */
+    gap: 5px;
+}
+.message-wrapper.sent .bubble-row.layout-beside {
+    flex-direction: row-reverse; /* 发送方反向排列：[时间] [气泡] */
+    align-items: flex-end;
+    gap: 5px;
+}
+
+/* 针对 Beside 模式微调时间戳样式，防止换行 */
+.bubble-row.layout-beside .message-timestamp-footer {
+    width: auto; 
+    margin: 0;
+    white-space: nowrap;
+    margin-bottom: 5px; /* 对齐微调 */
+    color: #ccc;
+}
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -5231,6 +5274,7 @@ input:checked + .slider:before {
                             </div>
                         </div>
                          <!-- ******** 从这里开始插入新代码 ******** -->
+                         
                         <div class="form-section">
                             <h3>手机框架</h3>
                             <div class="form-group-toggle">
@@ -5242,6 +5286,26 @@ input:checked + .slider:before {
                             </div>
                         </div>
                         <!-- ******** 新代码到此结束 ******** -->
+                        <!-- 新增：消息显示设置 -->
+                        <div class="form-section">
+                            <h3>消息显示</h3>
+                            <div class="form-group-toggle">
+                                <label for="toggle-msg-timestamps" class="toggle-label">每条消息显示时间戳</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-msg-timestamps">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            
+                            <!-- 新增：位置选择下拉框 -->
+                            <div class="form-group" id="timestamp-pos-group" style="padding: 0 15px 15px; border-bottom: none;">
+                                <label for="timestamp-pos-select" style="display:block; margin-bottom:8px; font-size:14px; color:#555;">时间戳位置</label>
+                                <select id="timestamp-pos-select" class="modal-input modal-select">
+                                    <option value="below">气泡下方 (默认)</option>
+                                    <option value="beside">气泡一侧</option>
+                                </select>
+                            </div>
+                        </div>
 
                         <!-- ******** 从这里开始插入全新的代码 ******** -->
                         <div class="form-section">
@@ -13323,7 +13387,32 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 } 
                 
                 mainContentWrapper.appendChild(div);
-                mainContentAndNameWrapper.appendChild(mainContentWrapper);
+                
+                // 1. 创建一个新的包裹容器 (Bubble Row)
+                const bubbleRow = document.createElement('div');
+                bubbleRow.className = 'bubble-row';
+                
+                // 2. 根据设置添加布局类名 (below 或 beside)
+                const posMode = appearanceSettings.timestampPosition || 'below';
+                bubbleRow.classList.add(posMode === 'beside' ? 'layout-beside' : 'layout-below');
+
+                // 3. 将气泡主体放入 Row
+                bubbleRow.appendChild(mainContentWrapper);
+
+                // 4. 插入时间戳 (如果开启)
+                if (appearanceSettings.showMessageTimestamps) {
+                    const timeFooter = document.createElement('div');
+                    timeFooter.className = 'message-timestamp-footer';
+                    const dateObj = new Date(msg.timestamp);
+                    const timeStr = dateObj.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    timeFooter.textContent = timeStr;
+                    // 放入 Row (和气泡在一起)
+                    bubbleRow.appendChild(timeFooter);
+                }
+
+                // 5. 将 Row 放入最外层 (这样 名字 依然在 Row 的上方)
+                mainContentAndNameWrapper.appendChild(bubbleRow);
+
                 contentRow.appendChild(mainContentAndNameWrapper);
                 wrapper.appendChild(contentRow);
             }
@@ -13665,7 +13754,32 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 } 
                 
                 mainContentWrapper.appendChild(div);
-                mainContentAndNameWrapper.appendChild(mainContentWrapper);
+                
+                // 1. 创建一个新的包裹容器 (Bubble Row)
+                const bubbleRow = document.createElement('div');
+                bubbleRow.className = 'bubble-row';
+                
+                // 2. 根据设置添加布局类名 (below 或 beside)
+                const posMode = appearanceSettings.timestampPosition || 'below';
+                bubbleRow.classList.add(posMode === 'beside' ? 'layout-beside' : 'layout-below');
+
+                // 3. 将气泡主体放入 Row
+                bubbleRow.appendChild(mainContentWrapper);
+
+                // 4. 插入时间戳 (如果开启)
+                if (appearanceSettings.showMessageTimestamps) {
+                    const timeFooter = document.createElement('div');
+                    timeFooter.className = 'message-timestamp-footer';
+                    const dateObj = new Date(msg.timestamp);
+                    const timeStr = dateObj.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    timeFooter.textContent = timeStr;
+                    // 放入 Row (和气泡在一起)
+                    bubbleRow.appendChild(timeFooter);
+                }
+
+                // 5. 将 Row 放入最外层 (这样 名字 依然在 Row 的上方)
+                mainContentAndNameWrapper.appendChild(bubbleRow);
+
                 contentRow.appendChild(mainContentAndNameWrapper);
                 wrapper.appendChild(contentRow);
             }
@@ -18034,15 +18148,192 @@ checkMomentsUpdates(); // <--- 新增这一行
     
     const stickerManager = (function() {
         let isManageMode = false;
+        async function processBatchStickerImport(files) {
+            // 1. 准备所有图片的 Base64 和 IndexedDB 存储
+            const imagePayloads = [];
+            const dbRecords = [];
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                // 加个随机数防止毫秒级冲突
+                const key = `sticker-local-${Date.now()}-${Math.random().toString(36).substr(2, 5)}-${i}`;
+                
+                await imageStore.setItem(key, file);
+                const dbUrl = `indexeddb:${key}`;
+
+                const base64Url = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(file);
+                });
+
+                imagePayloads.push({ 
+                    index: i, 
+                    base64: base64Url,
+                    dbUrl: dbUrl,
+                    originalName: file.name
+                });
+                
+                dbRecords.push({ dbUrl, originalName: file.name });
+            }
+
+            // --- 核心新增：确保名字唯一的辅助函数 ---
+            const getUniqueName = (baseName) => {
+                let unique = baseName;
+                let count = 1;
+                // 只要 sticker 数组里已经有这个名字，就加后缀 _1, _2...
+                while (stickers.some(s => s.name === unique)) {
+                    unique = `${baseName}_${count}`;
+                    count++;
+                }
+                return unique;
+            };
+            // ------------------------------------
+
+            let profileToUse = null;
+            const currentChatId = conversationManager.getCurrentChatId();
+            if (currentChatId) {
+                const chatInfo = loadFromLocalStorage(`chat_info_${currentChatId}`, {});
+                const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : null;
+                if (profileIndexStr !== null) profileToUse = apiProfiles[parseInt(profileIndexStr)];
+            }
+            if (!profileToUse && activeProfileIndex !== null) profileToUse = apiProfiles[activeProfileIndex];
+
+            if (!profileToUse) {
+                // 降级处理：使用文件名 (带重名检测)
+                dbRecords.forEach(rec => {
+                    let rawName = rec.originalName.split('.')[0].substring(0, 8);
+                    let finalName = getUniqueName(rawName); // 确保唯一
+                    stickers.push({ name: finalName, url: rec.dbUrl, type: 'sticker' });
+                });
+                saveStickers();
+                return;
+            }
+
+            const promptText = `I am sending you ${files.length} images. Please analyze each image and provide a very short, concise name (2-6 Chinese characters) for it. 
+            Strictly output a JSON array of strings, corresponding to the images in order. 
+            Example format: ["开心", "难过", "点赞"]
+            Do NOT output anything else.`;
+
+            const contentParts = [{ type: "text", text: promptText }];
+            imagePayloads.forEach(payload => {
+                contentParts.push({ type: "image_url", image_url: { url: payload.base64 } });
+            });
+
+            try {
+                let chatUrl, requestBody, requestHeaders;
+
+                if (profileToUse.url.includes('googleapis.com')) {
+                    // Gemini Logic
+                    chatUrl = `${profileToUse.url.endsWith('/') ? profileToUse.url : profileToUse.url + '/'}models/${profileToUse.model}:generateContent?key=${profileToUse.key}`;
+                    requestHeaders = { 'Content-Type': 'application/json' };
+                    const parts = [{ text: promptText }];
+                    imagePayloads.forEach(payload => {
+                         const base64Data = payload.base64.split(',')[1];
+                         const mimeType = payload.base64.match(/data:(.*?);/)[1];
+                         parts.push({ inline_data: { mime_type: mimeType, data: base64Data } });
+                    });
+                    requestBody = { contents: [{ role: 'user', parts: parts }] };
+                } else {
+                    // OpenAI Logic
+                    chatUrl = profileToUse.url.endsWith('/') ? `${profileToUse.url}chat/completions` : `${profileToUse.url}/chat/completions`;
+                    requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profileToUse.key}` };
+                    requestBody = {
+                        model: profileToUse.model,
+                        messages: [{ role: "user", content: contentParts }],
+                        max_tokens: 300
+                    };
+                }
+
+                const response = await fetch(chatUrl, {
+                    method: 'POST',
+                    headers: requestHeaders,
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    let rawContent = "";
+                    if (profileToUse.url.includes('googleapis.com')) {
+                        rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    } else {
+                        rawContent = data.choices?.[0]?.message?.content;
+                    }
+                    
+                    if (rawContent) {
+                        let jsonString = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+                        let namesArray = [];
+                        try {
+                            namesArray = JSON.parse(jsonString);
+                        } catch (e) {
+                            console.warn("JSON parse failed, trying fallback split", e);
+                            namesArray = jsonString.split(/[,，\n]/).map(s => s.trim().replace(/['"\[\]]/g, '')).filter(s => s);
+                        }
+
+                        // 5. 保存 (带重名检测)
+                        dbRecords.forEach((rec, index) => {
+                            let rawName = (namesArray[index] && typeof namesArray[index] === 'string') 
+                                ? namesArray[index].substring(0, 8) 
+                                : rec.originalName.split('.')[0].substring(0, 8);
+                            
+                            // 【核心修改】确保名字唯一
+                            let finalName = getUniqueName(rawName);
+                            
+                            stickers.push({ name: finalName, url: rec.dbUrl, type: 'sticker' });
+                        });
+                        saveStickers();
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.error("Batch AI Naming Failed", e);
+            }
+
+            // API 失败回退 (带重名检测)
+            dbRecords.forEach(rec => {
+                let rawName = rec.originalName.split('.')[0].substring(0, 8);
+                let finalName = getUniqueName(rawName); // 确保唯一
+                stickers.push({ name: finalName, url: rec.dbUrl, type: 'sticker' });
+            });
+            saveStickers();
+        }
         
         function loadStickers() {
             stickers = loadFromLocalStorage('app-stickers', []);
-            // 为所有没有分类的旧数据默认设置为“表情包”
+            
+            // 1. 兼容旧数据：补全 type
             stickers.forEach(s => {
-                if (!s.type) {
-                    s.type = 'sticker';
-                }
+                if (!s.type) s.type = 'sticker';
             });
+
+            // 2. 【核心新增】自动清洗重名数据
+            const nameCounts = {}; // 用于记录每个名字出现的次数
+            let hasChanges = false;
+
+            // 必须使用普通 for 循环以便修改
+            for (let i = 0; i < stickers.length; i++) {
+                const s = stickers[i];
+                // 如果这个名字已经出现过
+                if (nameCounts[s.name]) {
+                    // 获取当前是第几个重复的
+                    const count = nameCounts[s.name];
+                    // 修改当前这个表情的名字，加上后缀
+                    s.name = `${s.name}_${count}`;
+                    // 标记发生了修改
+                    hasChanges = true;
+                    // 更新计数器 (注意：虽然改名了，但在逻辑上它还是属于原名系列的下一个)
+                    nameCounts[s.name.split('_')[0]]++; 
+                } else {
+                    // 第一次出现，初始化计数为 1
+                    nameCounts[s.name] = 1;
+                }
+            }
+
+            // 如果有任何修改，立即保存回 localStorage
+            if (hasChanges) {
+                console.log("已自动修复重名表情包数据。");
+                saveStickers();
+            }
         }
         function saveStickers() {
             saveToLocalStorage('app-stickers', stickers);
@@ -18052,13 +18343,11 @@ checkMomentsUpdates(); // <--- 新增这一行
             const grid = panelDOM.querySelector('.sticker-grid-container');
             if (!grid) return;
 
-            // --- 核心新增：根据类型动态添加/移除样式类 ---
             if (type === 'emoji') {
                 grid.classList.add('emoji-mode');
             } else {
                 grid.classList.remove('emoji-mode');
             }
-            // --- 新增结束 ---
             
             let filteredStickers = stickers.filter(s => s.type === type);
 
@@ -18067,14 +18356,30 @@ checkMomentsUpdates(); // <--- 新增这一行
             }
             
             grid.innerHTML = filteredStickers.length > 0 
-                ? filteredStickers.map(s => `
-                    <div class="sticker-item" data-url="${s.url}" data-name="${s.name}" data-type="${s.type}">
-                        <img src="${s.url}" alt="${s.name}" loading="lazy">
+                ? filteredStickers.map(s => {
+                    const originalIndex = stickers.indexOf(s);
+                    
+                    // 【核心修复】判断是否为本地 IndexedDB 链接
+                    const isLocal = s.url.startsWith('indexeddb:');
+                    // 如果是本地图片，src 先留空，防止浏览器直接报错显示裂图；如果是网络图片，直接设置
+                    const srcAttr = isLocal ? '' : `src="${s.url}"`;
+                    
+                    return `
+                    <div class="sticker-item" data-url="${s.url}" data-name="${s.name}" data-type="${s.type}" data-index="${originalIndex}">
+                        <img ${srcAttr} alt="${s.name}" loading="lazy">
                         ${isManageMode ? `<input type="checkbox" class="sticker-item-checkbox" data-name="${s.name}">` : ''}
-                    </div>`).join('') 
+                    </div>`;
+                }).join('') 
                 : `<p style="grid-column: 1 / -1; text-align: center; color: #888;">没有找到内容</p>`;
+
+            // 【核心修复】HTML渲染完成后，专门找到所有本地图片，调用全局辅助函数加载 Blob
+            const localItems = grid.querySelectorAll('.sticker-item[data-url^="indexeddb:"] img');
+            localItems.forEach(img => {
+                const url = img.closest('.sticker-item').dataset.url;
+                // 这里的 setImageSrc 就是你代码里已经定义好的那个负责从数据库读图片的函数
+                setImageSrc(img, url);
+            });
         }
-        
         async function openPanel(onSelectCallback = null) {
             while (true) {
                 loadStickers();
@@ -18102,47 +18407,107 @@ checkMomentsUpdates(); // <--- 新增这一行
                     showCloseButton: true,
                     style: 'padding: 0;',
                     onRender: (modalDOM, closeModal) => {
-                        const searchInput = modalDOM.querySelector('#sticker-search-input');
-                        const gridContainer = modalDOM.querySelector('.sticker-grid-container');
-                        const tabsContainer = modalDOM.querySelector('.sticker-panel-tabs');
-                        let currentType = 'sticker';
+                            const searchInput = modalDOM.querySelector('#sticker-search-input');
+                            const gridContainer = modalDOM.querySelector('.sticker-grid-container');
+                            const tabsContainer = modalDOM.querySelector('.sticker-panel-tabs');
+                            let currentType = 'sticker';
 
-                        tabsContainer.addEventListener('click', (e) => {
-                            const tab = e.target.closest('.sticker-tab');
-                            if (tab && !tab.classList.contains('active')) {
-                                tabsContainer.querySelector('.sticker-tab.active').classList.remove('active');
-                                tab.classList.add('active');
-                                currentType = tab.dataset.type;
-                                renderPanel(modalDOM, searchInput.value, currentType);
-                            }
-                        });
-                        
-                        searchInput.addEventListener('input', (e) => renderPanel(modalDOM, e.target.value, currentType));
-                        
-                        gridContainer.addEventListener('click', (e) => {
-                            const item = e.target.closest('.sticker-item');
-                            if (item) {
-                                if (onSelectCallback) {
-                                    // 回调现在会传递名字和类型
-                                    onSelectCallback(item.dataset.name, item.dataset.type);
-                                } else {
-                                    // 默认行为：表情包直接发送，emoji插入文本
-                                    if (item.dataset.type === 'emoji') {
-                                        const input = document.getElementById('footer-message-input');
-                                        const emojiTag = `[emoji:${item.dataset.name}]`;
-                                        input.value += emojiTag;
-                                        input.focus();
-                                        input.dispatchEvent(new Event('input'));
-                                    } else {
-                                        conversationManager.handleSendMessageAttempt('photo', item.dataset.url);
+                            // --- 长按逻辑变量 ---
+                            let longPressTimer;
+                            let isLongPressHandled = false; // 标记是否触发了长按逻辑
+
+                            const startLongPress = (e) => {
+                                const item = e.target.closest('.sticker-item');
+                                if (!item) return;
+                                
+                                isLongPressHandled = false; // 重置标记
+                                
+                                // 500ms 后触发长按编辑
+                                longPressTimer = setTimeout(async () => {
+                                    isLongPressHandled = true; // 标记为已处理长按，拦截后续的 click
+                                    
+                                    const index = parseInt(item.dataset.index, 10);
+                                    const currentName = item.dataset.name;
+                                    
+                                    // 弹出重命名框
+                                    const newName = await conversationManager.showContentInputModal({
+                                        title: '重命名表情',
+                                        placeholder: '输入新名字',
+                                        value: currentName
+                                    });
+                                    
+                                    if (newName && newName.trim() !== '') {
+                                        if (stickers[index]) {
+                                            stickers[index].name = newName.trim();
+                                            saveStickers();
+                                            renderPanel(modalDOM, searchInput.value, currentType);
+                                            alert('修改成功！');
+                                        }
                                     }
+                                }, 600);
+                            };
+
+                            const cancelLongPress = () => {
+                                if (longPressTimer) {
+                                    clearTimeout(longPressTimer);
+                                    longPressTimer = null;
                                 }
-                                closeModal({value: 'close'});
-                            }
-                        });
-                        
-                        renderPanel(modalDOM, '', currentType);
-                    }
+                            };
+
+                            // 绑定长按事件 (兼容触摸和鼠标)
+                            gridContainer.addEventListener('touchstart', startLongPress, { passive: true });
+                            gridContainer.addEventListener('touchend', cancelLongPress);
+                            gridContainer.addEventListener('touchmove', cancelLongPress); // 滑动时取消长按
+                            gridContainer.addEventListener('mousedown', startLongPress);
+                            gridContainer.addEventListener('mouseup', cancelLongPress);
+                            gridContainer.addEventListener('mouseleave', cancelLongPress);
+
+                            // --------------------
+
+                            tabsContainer.addEventListener('click', (e) => {
+                                const tab = e.target.closest('.sticker-tab');
+                                if (tab && !tab.classList.contains('active')) {
+                                    tabsContainer.querySelector('.sticker-tab.active').classList.remove('active');
+                                    tab.classList.add('active');
+                                    currentType = tab.dataset.type;
+                                    renderPanel(modalDOM, searchInput.value, currentType);
+                                }
+                            });
+                            
+                            searchInput.addEventListener('input', (e) => renderPanel(modalDOM, e.target.value, currentType));
+                            
+                            gridContainer.addEventListener('click', (e) => {
+                                // 【核心修改】如果刚刚触发了长按，则拦截这次点击，不发送表情
+                                if (isLongPressHandled) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    isLongPressHandled = false; // 重置
+                                    return;
+                                }
+
+                                const item = e.target.closest('.sticker-item');
+                                if (item) {
+                                    if (onSelectCallback) {
+                                        // 回调现在会传递名字和类型
+                                        onSelectCallback(item.dataset.name, item.dataset.type);
+                                    } else {
+                                        // 默认行为：表情包直接发送，emoji插入文本
+                                        if (item.dataset.type === 'emoji') {
+                                            const input = document.getElementById('footer-message-input');
+                                            const emojiTag = `[emoji:${item.dataset.name}]`;
+                                            input.value += emojiTag;
+                                            input.focus();
+                                            input.dispatchEvent(new Event('input'));
+                                        } else {
+                                            conversationManager.handleSendMessageAttempt('photo', item.dataset.url);
+                                        }
+                                    }
+                                    closeModal({value: 'close'});
+                                }
+                            });
+                            
+                            renderPanel(modalDOM, '', currentType);
+                        }
                 });
 
                 if (!result || result.value === 'close') {
@@ -18151,26 +18516,242 @@ checkMomentsUpdates(); // <--- 新增这一行
                 
                 if (result.value === 'import') {
                     const importResult = await conversationManager.showCustomModal({
-                        title: '批量导入',
+                        title: '导入表情包',
                         showCloseButton: true,
                         html: `
-                            <div style="text-align: left; display: flex; flex-direction: column; gap: 15px;">
+                            <div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 70vh; overflow-y: auto; padding-right: 5px;">
+                                
+                                <!-- 方式 A: AI 智能导入 -->
+                                <div style="background: #f0f2f5; padding: 10px; border-radius: 8px; border: 1px solid #e1e4e8;">
+                                    <label style="font-weight:600; font-size:14px; display:block; margin-bottom:8px; color:#333;">方式 A: AI 智能识图 (推荐)</label>
+                                    <button id="smart-import-btn" class="modal-button primary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:5px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
+                                        选择图片 (自动命名)
+                                    </button>
+                                    <input type="file" id="smart-import-input" accept="image/*" multiple style="display:none;">
+                                </div>
+
+                                <!-- 方式 B: 手动顺序导入 -->
+                                <div style="background: #fff8e1; padding: 10px; border-radius: 8px; border: 1px solid #ffe082;">
+                                    <label style="font-weight:600; font-size:14px; display:block; margin-bottom:8px; color:#f57c00;">方式 B: 手动按序命名</label>
+                                    <div style="display:flex; gap:10px; margin-bottom:8px;">
+                                        <button id="manual-select-btn" class="modal-button secondary" style="flex:1; border-color:#ffcc80; background:white; color:#f57c00;">1. 选择图片</button>
+                                        <span id="manual-count-tip" style="align-self:center; font-size:12px; color:#666; min-width: 60px; text-align:right;">未选择</span>
+                                    </div>
+                                    <textarea id="manual-names-area" class="modal-textarea" placeholder="2.在此修改名字 (每行对应一张图)" style="height:80px; font-size:13px; margin-bottom:8px; white-space:pre; overflow-x:hidden;"></textarea>
+                                    <button id="manual-confirm-btn" class="modal-button primary" style="width:100%; background-color:#f57c00; border:none;">3. 确认导入</button>
+                                    <input type="file" id="manual-import-input" accept="image/*" multiple style="display:none;">
+                                </div>
+
+                                <div style="border-top: 1px dashed #ccc; margin: 5px 0;"></div>
+
+                                <!-- 方式 C: 链接导入 -->
                                 <div class="form-group" style="margin:0;">
-                                    <label>选择导入类型:</label>
+                                    <label style="font-weight:600; font-size:14px;">方式 C: 批量链接导入</label>
                                     <div style="display:flex; gap: 20px; padding-top: 5px;">
                                         <label><input type="radio" name="import-type" value="sticker" checked> 表情包</label>
                                         <label><input type="radio" name="import-type" value="emoji"> Emoji</label>
                                     </div>
                                 </div>
                                 <div class="form-group" style="margin:0;">
-                                    <label>粘贴内容:</label>
                                     <textarea id="import-content-area" class="modal-textarea" placeholder="每行一个，格式：名字 链接"></textarea>
                                 </div>
                             </div>`,
-                        buttons: [{ text: '确认导入', value: 'confirm_import', class: 'primary' }]
+                        buttons: [{ text: '确认链接导入', value: 'confirm_text_import', class: 'secondary' }],
+                        
+                        onRender: (modalDOM, closeModal) => {
+                            // --- 逻辑 A: AI 智能导入 ---
+                            const smartBtn = modalDOM.querySelector('#smart-import-btn');
+                            const smartInput = modalDOM.querySelector('#smart-import-input');
+
+                            if (smartBtn && smartInput) {
+                                smartBtn.addEventListener('click', () => smartInput.click());
+                                smartInput.addEventListener('change', (e) => {
+                                    if (e.target.files && e.target.files.length > 0) {
+                                        // 1. 立即关闭导入弹窗，释放主界面
+                                        closeModal();
+                                        
+                                        const files = Array.from(e.target.files);
+                                        const total = files.length;
+                                        
+                                        // 2. 创建一个非阻塞的右下角悬浮状态窗
+                                        const statusWidget = document.createElement('div');
+                                        statusWidget.id = `import-status-${Date.now()}`;
+                                        statusWidget.style.cssText = `
+                                            position: fixed; bottom: 20px; right: 20px; width: 220px;
+                                            background: rgba(0,0,0,0.8); color: white; 
+                                            border-radius: 12px; padding: 15px; z-index: 9000;
+                                            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                                            font-size: 13px; transition: opacity 0.3s;
+                                            display: flex; flex-direction: column; gap: 8px;
+                                        `;
+                                        
+                                        const title = document.createElement('div');
+                                        title.style.fontWeight = 'bold';
+                                        title.textContent = '正在后台导入表情包...';
+                                        
+                                        const progressBar = document.createElement('div');
+                                        progressBar.style.cssText = 'width: 100%; height: 4px; background: #555; border-radius: 2px; overflow: hidden;';
+                                        const progressFill = document.createElement('div');
+                                        progressFill.style.cssText = 'width: 0%; height: 100%; background: #4cd964; transition: width 0.3s;';
+                                        progressBar.appendChild(progressFill);
+                                        
+                                        const statusText = document.createElement('div');
+                                        statusText.textContent = `准备中 (0/${total})`;
+                                        
+                                        statusWidget.appendChild(title);
+                                        statusWidget.appendChild(progressBar);
+                                        statusWidget.appendChild(statusText);
+                                        document.body.appendChild(statusWidget);
+
+                                        // 3. 在后台启动异步处理流程 (IIFE)
+                                        (async () => {
+                                            // 【核心修改】将每批次处理数量从 4 改为 10
+                                            const BATCH_SIZE = 10; 
+                                            let processedCount = 0;
+                                            let successCount = 0;
+
+                                            try {
+                                                for (let i = 0; i < total; i += BATCH_SIZE) {
+                                                    const batchFiles = files.slice(i, i + BATCH_SIZE);
+                                                    
+                                                    // 更新悬浮窗状态
+                                                    statusText.textContent = `正在识别批次 ${Math.ceil((i+1)/BATCH_SIZE)}/${Math.ceil(total/BATCH_SIZE)}...`;
+                                                    
+                                                    // 调用批量处理函数
+                                                    await processBatchStickerImport(batchFiles);
+                                                    
+                                                    processedCount += batchFiles.length;
+                                                    successCount += batchFiles.length;
+                                                    
+                                                    // 更新进度条
+                                                    const percentage = Math.round((processedCount / total) * 100);
+                                                    progressFill.style.width = `${percentage}%`;
+                                                    statusText.textContent = `已完成 ${processedCount}/${total}`;
+                                                }
+                                                
+                                                // 完成状态
+                                                statusText.textContent = "✅ 全部完成！";
+                                                progressFill.style.background = "#4cd964";
+                                                
+                                                // 3秒后自动消失
+                                                setTimeout(() => {
+                                                    statusWidget.style.opacity = '0';
+                                                    setTimeout(() => statusWidget.remove(), 500);
+                                                }, 3000);
+
+                                            } catch (err) {
+                                                console.error("Background import error:", err);
+                                                statusText.textContent = "⚠️ 部分失败，请查看控制台";
+                                                statusText.style.color = "#ff6b6b";
+                                                // 出错时不自动消失，让用户看到
+                                                setTimeout(() => {
+                                                    statusWidget.style.opacity = '0';
+                                                    setTimeout(() => statusWidget.remove(), 500);
+                                                }, 5000);
+                                            }
+                                        })();
+                                    }
+                                });
+                            }
+
+                            // --- 逻辑 B: 手动顺序导入 (核心修复) ---
+                            const manualSelectBtn = modalDOM.querySelector('#manual-select-btn');
+                            const manualInput = modalDOM.querySelector('#manual-import-input');
+                            const manualNamesArea = modalDOM.querySelector('#manual-names-area');
+                            const manualConfirmBtn = modalDOM.querySelector('#manual-confirm-btn');
+                            const manualCountTip = modalDOM.querySelector('#manual-count-tip');
+                            let pendingManualFiles = []; // 暂存文件对象
+
+                            if (manualSelectBtn && manualInput) {
+                                // 1. 点击按钮触发文件选择
+                                manualSelectBtn.addEventListener('click', (e) => {
+                                    e.preventDefault(); // 防止可能的默认提交
+                                    e.stopPropagation();
+                                    manualInput.click();
+                                });
+
+                                // 2. 文件选择后的处理 (注意：绝对不要在这里调用 closeModal)
+                                manualInput.addEventListener('change', (e) => {
+                                    if (e.target.files && e.target.files.length > 0) {
+                                        pendingManualFiles = Array.from(e.target.files);
+                                        
+                                        // 更新界面提示
+                                        manualCountTip.textContent = `已选 ${pendingManualFiles.length} 张`;
+                                        manualCountTip.style.color = '#28a745';
+                                        manualCountTip.style.fontWeight = 'bold';
+                                        
+                                        // 预填充文件名
+                                        const names = pendingManualFiles.map(f => f.name.replace(/\.[^/.]+$/, ""));
+                                        manualNamesArea.value = names.join('\n');
+                                        
+                                        // 重点：这里什么都不做，让用户去修改文本框
+                                    }
+                                });
+
+                                // 3. 点击确认按钮才执行导入
+                                manualConfirmBtn.addEventListener('click', async (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+
+                                    if (pendingManualFiles.length === 0) {
+                                        alert("请先点击按钮选择图片！");
+                                        return;
+                                    }
+                                    
+                                    // 此时才关闭弹窗
+                                    closeModal();
+
+                                    const namesText = manualNamesArea.value.trim();
+                                    const names = namesText ? namesText.split('\n') : [];
+                                    
+                                    const getUniqueName = (baseName) => {
+                                        let unique = baseName.trim();
+                                        let count = 1;
+                                        while (stickers.some(s => s.name === unique)) {
+                                            unique = `${baseName.trim()}_${count}`;
+                                            count++;
+                                        }
+                                        return unique;
+                                    };
+                                    
+                                    // 显示简单进度提示
+                                    const loading = document.createElement('div');
+                                    loading.style.cssText = "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.7);color:white;padding:15px;border-radius:10px;z-index:9999;";
+                                    loading.textContent = "正在保存...";
+                                    document.body.appendChild(loading);
+
+                                    let successCount = 0;
+                                    try {
+                                        for (let i = 0; i < pendingManualFiles.length; i++) {
+                                            const file = pendingManualFiles[i];
+                                            const rawName = (names[i] && names[i].trim()) ? names[i] : file.name.replace(/\.[^/.]+$/, "");
+                                            const finalName = getUniqueName(rawName);
+                                            
+                                            const key = `sticker-manual-${Date.now()}-${i}`;
+                                            await imageStore.setItem(key, file);
+                                            
+                                            stickers.push({
+                                                name: finalName,
+                                                url: `indexeddb:${key}`,
+                                                type: 'sticker'
+                                            });
+                                            successCount++;
+                                        }
+                                        saveStickers();
+                                    } catch (err) {
+                                        console.error(err);
+                                    } finally {
+                                        loading.remove();
+                                        alert(`成功导入 ${successCount} 个表情包！`);
+                                    }
+                                });
+                            }
+                        }
                     });
 
-                    if (importResult && importResult.value === 'confirm_import') {
+                    // --- 逻辑 C: 链接导入 (原有逻辑) ---
+                    if (importResult && importResult.value === 'confirm_text_import') {
                         const modalBox = importResult.target.closest('.modal-box');
                         const importType = modalBox.querySelector('input[name="import-type"]:checked').value;
                         const content = modalBox.querySelector('#import-content-area').value;
@@ -18181,32 +18762,22 @@ checkMomentsUpdates(); // <--- 新增这一行
                             lines.forEach(line => {
                                 const trimmedLine = line.trim();
                                 if (!trimmedLine) return;
-
-                                // 步骤 1: 使用一个更通用的正则表达式，可靠地找出链接
                                 const urlRegex = /(https?:\/\/[^\s]+)/;
                                 const urlMatch = trimmedLine.match(urlRegex);
-
-                                // 如果这一行里连链接都找不到，就直接跳过
                                 if (!urlMatch) return;
-
                                 const url = urlMatch[0];
-                                
-                                // 步骤 2: 将链接、所有冒号、以及前后的空格从原始行中移除，剩下的就是名字
                                 const name = trimmedLine.replace(url, '').replace(/[:：]/g, '').trim();
 
-                                // 只要链接和名字都成功提取出来了，就继续
                                 if (url && name) {
                                     if (!stickers.some(s => s.url === url)) {
-                                        stickers.push({ url, name, type: importType }); // 使用选择的类型
+                                        stickers.push({ url, name, type: importType });
                                         newStickersCount++;
                                     }
                                 }
                             });
                             if (newStickersCount > 0) {
                                 saveStickers();
-                                alert(`成功导入 ${newStickersCount} 个新的 "${importType === 'sticker' ? '表情包' : 'Emoji'}"！`);
-                            } else {
-                                alert('没有导入任何新内容，可能链接已存在。');
+                                alert(`成功导入 ${newStickersCount} 个新的内容！`);
                             }
                         }
                     }
@@ -18882,7 +19453,9 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 homeBgUrl: '',
                 regexReplacements: [],
                 isFrameHidden: false,
-                showRawOutput: false // 新增这一行，默认关闭
+                showRawOutput: false,
+                showMessageTimestamps: false,
+                timestampPosition: 'below' // 新增这一行
             };
             
             // 从 localStorage 加载数据，如果不存在或为空，则 loaded 为 {}
@@ -19022,6 +19595,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 rawOutputToggle.checked = appearanceSettings.showRawOutput;
             }
             // ******** 全新代码到此结束 ********
+            
 
 // ...函数剩余部分
             
@@ -19256,6 +19830,42 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 });
             }
             // ******** 全新代码到此结束 ********
+            // --- 新增：时间戳开关与位置选择监听 ---
+            const timestampToggle = document.getElementById('toggle-msg-timestamps');
+            const posSelect = document.getElementById('timestamp-pos-select');
+            const posGroup = document.getElementById('timestamp-pos-group');
+            
+            if (timestampToggle && posSelect && posGroup) {
+                // 1. 初始化开关状态
+                timestampToggle.checked = appearanceSettings.showMessageTimestamps;
+                
+                // 2. 初始化下拉框值
+                posSelect.value = appearanceSettings.timestampPosition || 'below';
+                
+                // 3. 定义显隐控制函数
+                const updateVisibility = () => {
+                    posGroup.style.display = timestampToggle.checked ? 'block' : 'none';
+                };
+                
+                // 4. 执行一次初始化显隐
+                updateVisibility();
+
+                // 5. 绑定开关点击事件
+                timestampToggle.addEventListener('change', () => {
+                    appearanceSettings.showMessageTimestamps = timestampToggle.checked;
+                    saveSettings();
+                    updateVisibility(); // 切换显隐
+                    conversationManager.reRenderMessages(); // 立即重绘
+                });
+
+                // 6. 绑定下拉框选择事件
+                posSelect.addEventListener('change', () => {
+                    appearanceSettings.timestampPosition = posSelect.value;
+                    saveSettings();
+                    conversationManager.reRenderMessages(); // 立即重绘
+                });
+            }
+            // --- 结束 ---
 
              // START: 新增正则替换的事件监听
 // ...
