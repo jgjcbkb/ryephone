@@ -11265,57 +11265,77 @@ const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 
                 // 1. 建立认知地图，用于快速查找关系
                 // momentsData.knownPeople 包含了基于当前聊天窗口计算出的正确关系
                 const knownMap = new Map(momentsData.knownPeople.map(p => [p.name, p.relationship]));
+            // 【【【 核心修复：在这里获取所有用户人设的名称列表 】】】
+            const allUserPersonaNames = userPersonas.map(p => p.name);
 
-                momentsData.allVisibleMoments.forEach((post, i) => {
-                     let authorLabel = post.userName;
+            momentsData.allVisibleMoments.forEach((post, i) => {
+                 let authorLabel = post.userName;
 
-                     // 2. 【核心修复】: 强制给作者打上身份标签
-                     if (post.userName === aiCharacterName) {
-                         authorLabel = "You (yourself)";
-                     } else if (knownMap.has(post.userName)) {
-                         // 如果在认知名单里（通常是当前聊天的用户），加上 (the user) 标签
-                         authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
+                 // =================================================================
+                 // 【【【【【【 全新的、绝对严格的身份识别逻辑 】】】】】】
+                 // =================================================================
+                 // 这是我们解决问题的核心。它遵循一个绝对严格的优先级顺序来判断身份。
+
+                 // 优先级 1：是不是AI自己发的？
+                 if (post.userName === aiCharacterName) {
+                     authorLabel = "You (yourself)";
+                 } 
+                 // 优先级 2：是不是【当前正在和我聊天的这个你】？
+                 else if (knownMap.has(post.userName) && knownMap.get(post.userName).includes('(the user')) {
+                     authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
+                 } 
+                 // 优先级 3 (最关键的一步)：是不是【你的其他马甲】？
+                 // 如果是，就强制打上“(陌生人)”标签，让AI彻底失忆！
+                 else if (allUserPersonaNames.includes(post.userName)) {
+                     authorLabel = `${post.userName} (Stranger/Other User)`;
+                 }
+                 // 优先级 4：是不是AI认识的其他熟人（比如NPC、群友）？
+                 else if (knownMap.has(post.userName)) {
+                     authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
+                 } 
+                 // 优先级 5：如果以上都不是，那它就是个纯路人。
+                 else {
+                     authorLabel = `${post.userName} (Stranger/Other User)`;
+                 }
+                 // =================================================================
+                 // 【【【【【【 身份识别逻辑结束 】】】】】】
+                 // =================================================================
+                 
+                 // --- 核心修改：优先读取图片描述 ---
+                 let content = post.text || post.content || ""; 
+                 
+                 if (post.image) {
+                     if (post.imageDescription) {
+                         content += ` [图片内容: ${post.imageDescription}]`;
                      } else {
-                         // 如果不在认知名单里（例如其他马甲、陌生人），强制加上 (Stranger) 标签
-                         // 这能彻底防止AI混淆身份
-                         authorLabel = `${post.userName} (Stranger/Other User)`;
+                         content += ` [图片(未描述)]`;
                      }
-                     
-                     // --- 核心修改：优先读取图片描述 ---
-                     let content = post.text || post.content || ""; 
-                     
-                     if (post.image) {
-                         if (post.imageDescription) {
-                             content += ` [图片内容: ${post.imageDescription}]`;
-                         } else {
-                             content += ` [图片(未描述)]`;
-                         }
-                     } else if (post.type === 'video' && !content) {
-                         content = "[视频]";
-                     }
-                     
-                     if (!content.trim()) content = "[分享]";
-                     // --------------------------------
+                 } else if (post.type === 'video' && !content) {
+                     content = "[视频]";
+                 }
+                 
+                 if (!content.trim()) content = "[分享]";
+                 // --------------------------------
 
-                     let interactions = "";
-                     // 检查点赞
-                     if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
-                         interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
-                     }
-                     // 检查评论
-                     if (post.comments.length > 0) {
-                         const commentsText = post.comments.map(c => {
-                             let rawText = c.text || "";
-                             const codeBlockRegex = /(<snippet>[\s\S]*?<\/snippet>)|(<div[\s\S]*?>[\s\S]*?<\/div>)/g;
-                             let cleanText = rawText.replace(codeBlockRegex, "").trim();
-                             return `${c.user}: ${cleanText}`; 
-                         }).join(' | ');
-                         interactions += ` (Comments: ${commentsText})`;
-                     }
-                     
-                     // 使用带有强制标签的 authorLabel
-                     momentsContext += `Post #${i+1} by ${authorLabel}: "${content}"${interactions}\n`;
-                });
+                 let interactions = "";
+                 // 检查点赞
+                 if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
+                     interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
+                 }
+                 // 检查评论
+                 if (post.comments.length > 0) {
+                     const commentsText = post.comments.map(c => {
+                         let rawText = c.text || "";
+                         const codeBlockRegex = /(<snippet>[\s\S]*?<\/snippet>)|(<div[\s\S]*?>[\s\S]*?<\/div>)/g;
+                         let cleanText = rawText.replace(codeBlockRegex, "").trim();
+                         return `${c.user}: ${cleanText}`; 
+                     }).join(' | ');
+                     interactions += ` (Comments: ${commentsText})`;
+                 }
+                 
+                 // 使用带有强制标签的 authorLabel
+                 momentsContext += `Post #${i+1} by ${authorLabel}: "${content}"${interactions}\n`;
+            });
             }
 
 // 4. 如果有动态，就拼接到系统提示词的末尾
@@ -24634,6 +24654,7 @@ function renderDisplay() {
     })();
     
     // --- END: PAGER MANAGER ---
+    
 
     // --- START: LIFESTYLE MANAGER (Data Source Moved Here) ---
     
