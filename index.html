@@ -13852,24 +13852,39 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     const stickerName = stickerMatch[1];
                     const sticker = stickers.find(s => s.name === stickerName);
                     if (sticker) {
-                        // 如果是表情包，就直接把它渲染成一个图片，然后结束这个 case 的所有逻辑
                         div.dataset.isSticker = "true";
                         const img = document.createElement('img');
                         img.alt = stickerName;
                         setImageSrc(img, sticker.url);
                         div.appendChild(img);
-                        // 关键：在这里 return，不再执行下面的任何文本处理逻辑
                         mainContentWrapper.appendChild(div);
                         mainContentAndNameWrapper.appendChild(mainContentWrapper);
                         contentRow.appendChild(mainContentAndNameWrapper);
                         wrapper.appendChild(contentRow);
                         messagesContainer.appendChild(wrapper);
-                        return; // 提前结束 addMessageToDOM 函数
+                        return; 
                     }
                 }
                 // 【【【【【【 表情包处理逻辑到这里结束 】】】】】】
                 
-                // 新增：定义一个辅助函数，用于应用正则并返回安全的HTML
+                // --- 新增辅助函数：只替换 [emoji:xx] 标签，不转义HTML ---
+                // 专门用于处理那些已经是 HTML 代码的片段
+                const replaceMediaTagsInHtml = (htmlContent) => {
+                    return htmlContent.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                        type = type.toLowerCase();
+                        const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
+                        if (item) {
+                            if (type === 'emoji') {
+                                return `<img src="${item.url}" alt="${escapeHtml(name)}" class="inline-emoji">`;
+                            } else {
+                                return `<img src="${item.url}" alt="${escapeHtml(name)}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+                            }
+                        }
+                        return match;
+                    });
+                };
+
+                // 定义 applyRegexAndRender (保持原有的安全转义逻辑)
                 const applyRegexAndRender = (rawText) => {
                         const chatId = conversationManager.getCurrentChatId();
                         if (!chatId) return escapeHtml(rawText).replace(/\n/g, '<br>');
@@ -13899,63 +13914,52 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         }
                         
                         if (hasBeenReplaced) {
-                            return processedText;
+                            // 如果触发了正则（如弹幕），生成的 HTML 可能包含 [emoji:xx]，需要替换
+                            return replaceMediaTagsInHtml(processedText);
                         } else {
+                            // 普通文本处理：占位 -> 转义 -> 还原图片 -> Markdown -> 换行
                             let tempPlaceholders = {};
                             let tempCounter = 0;
                             
-                            // 【核心升级】同时替换 Emoji 和 Sticker
-                            // 1. 定义一个通用的替换函数
-                            const replaceTags = (text) => {
-                                return text.replace(/\[(emoji|sticker):([^\]]+)\]/g, (match, type, name) => {
-                                    const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
-                                    if (item) {
-                                        const placeholder = `__ITEM_PLACEHOLDER_${tempCounter}__`;
-                                        // 根据类型决定样式
-                                        const styleClass = type === 'emoji' ? 'class="inline-emoji"' : 'style="max-width: 60px; max-height: 60px; vertical-align: middle;"';
-                                        tempPlaceholders[placeholder] = `<img src="${item.url}" alt="${escapeHtml(item.name)}" ${styleClass}>`;
-                                        tempCounter++;
-                                        return placeholder;
+                            const textWithPlaceholders = rawText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                                type = type.toLowerCase();
+                                const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
+                                if (item) {
+                                    const key = `__MEDIA_${tempCounter++}__`;
+                                    let imgTag = '';
+                                    if (type === 'emoji') {
+                                        imgTag = `<img src="${item.url}" alt="${escapeHtml(name)}" class="inline-emoji">`;
+                                    } else {
+                                        imgTag = `<img src="${item.url}" alt="${escapeHtml(name)}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
                                     }
-                                    return match;
-                                });
-                            };
-
-                            // 2. 执行替换
-                            let textWithPlaceholders = replaceTags(rawText);
+                                    tempPlaceholders[key] = imgTag;
+                                    return key;
+                                }
+                                return match;
+                            });
 
                             let safeText = escapeHtml(textWithPlaceholders);
 
                             let textWithImages = safeText;
-                            for (const placeholder in tempPlaceholders) {
-                                textWithImages = textWithImages.replace(placeholder, tempPlaceholders[placeholder]);
+                            for (const [key, val] of Object.entries(tempPlaceholders)) {
+                                textWithImages = textWithImages.replace(key, val);
                             }
                             
                             let formattedText = simpleMarkdownToHtml(textWithImages);
                             let finalHtml = formattedText.replace(/\n/g, '<br>');
 
-                            // --- 核心修复：如果内容包含Emoji，就用一个div包裹起来 ---
                             if (Object.keys(tempPlaceholders).length > 0) {
                                 finalHtml = `<div>${finalHtml}</div>`;
                             }
-                            // --- 修复结束 ---
 
                             return finalHtml;
                         }
                     };
 
-                // 【核心修复步骤 1】: 在处理之前，先暴力清洗掉可能残留的 <block> 标签
-                // 这样即使你手动输入了 <block type="html"> 而没有闭合，或者正则解析失败，
-                // 这里也会把它删得干干净净，不会显示在气泡里。
                 let cleanText = msg.text.replace(/<block[^>]*>/g, '').replace(/<\/block>/g, '');
                 const trimmedText = cleanText.trim();
-
-                // 【核心修复步骤 2】: 逻辑重构
-                // 以前是只要以 <snippet> 开头就认为是纯HTML，导致后面的弹幕被忽略。
-                // 现在改为：只要包含了 <snippet>，就无条件走分割逻辑。
                 
                 if (trimmedText.includes('<snippet>')) {
-                    // === 混合内容处理逻辑 (HTML + 弹幕/文本) ===
                     const parts = trimmedText.split(/<snippet>([\s\S]*?)<\/snippet>/);
                     let finalHtml = '';
                     
@@ -13964,16 +13968,13 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         if (!part) continue;
 
                         if (i % 2 === 0) {
-                            // 偶数部分是文本（包括弹幕指令），必须经过正则渲染！
-                            // 这里的 part 就是 "[DANMAKU_PLAYER]..."
-                            // 经过 applyRegexAndRender 后，它就会变成漂亮的弹幕HTML
                             const safeHtmlText = applyRegexAndRender(part.trim());
                             if (safeHtmlText) {
                                 finalHtml += `<div style="white-space: pre-wrap; word-wrap: break-word;">${safeHtmlText}</div>`;
                             }
                         } else {
-                            // 奇数部分是 <snippet> 里的内容，直接显示
-                            finalHtml += part;
+                            // 奇数部分是 <snippet> 里的 HTML，【核心修复】也要检查里面的 emoji
+                            finalHtml += replaceMediaTagsInHtml(part);
                         }
                     }
                     
@@ -13991,11 +13992,10 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     }
 
                 } else if (trimmedText.startsWith('<div')) {
-                    // Case 2: 纯 HTML 块 (兼容旧数据，不含 snippet 标签的情况)
-                    div.innerHTML = cleanText;
+                    // Case 2: 纯 HTML 块，【核心修复】增加 emoji 替换
+                    div.innerHTML = replaceMediaTagsInHtml(cleanText);
                 
                 } else if (msg.replyTo) {
-                    // Case 3: 回复消息
                     const originalMsg = chatState.messages.find(m => m.id === msg.replyTo);
                     let previewHTML = '';
                     if (originalMsg) {
@@ -14012,8 +14012,6 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     }
                     div.innerHTML = `${previewHTML}<div>${applyRegexAndRender(cleanText)}</div>`;
                 } else {
-                    // Case 4: 纯文本/弹幕 (经过清洗后的)
-                    // 核心修改：集成 @ 提及渲染
                     let processedHtml = applyRegexAndRender(cleanText);
                     processedHtml = processedHtml.replace(/@(\S+)(?![^<]*>|[^<>]*<\/)/g, (match, name) => {
                         return `<span class="mention">@${escapeHtml(name)}</span>`;
@@ -16629,8 +16627,12 @@ async function showBranchHistoryModal(chatId) {
                 ).reverse(); // 最新在通过
 
                 if (matches.length === 0) {
-                    searchResults.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">无搜索结果</div>';
-                } else {
+    searchResults.innerHTML = `
+        <div class="search-empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span>没有找到相关记录</span>
+        </div>`;
+} else {
                     searchResults.innerHTML = matches.map(m => {
                         const dateStr = new Date(m.timestamp).toLocaleString();
                         const senderName = m.sender || (m.side === 'sent' ? '我' : chatState.chatName);
@@ -16641,13 +16643,13 @@ async function showBranchHistoryModal(chatId) {
                         );
                         
                         return `
-                        <div class="search-result-item" data-msg-id="${m.id}">
-                            <div class="result-top">
-                                <span>${senderName}</span>
-                                <span>${dateStr}</span>
-                            </div>
-                            <div class="result-content">${highlightedText}</div>
-                        </div>`;
+<div class="search-result-item" data-msg-id="${m.id}">
+    <div class="result-top">
+        <span class="result-sender">${senderName}</span>
+        <span class="result-time">${dateStr}</span>
+    </div>
+    <div class="result-content">${highlightedText}</div>
+</div>`;
                     }).join('');
                 }
             });
