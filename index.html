@@ -4554,6 +4554,246 @@ input:checked + .slider:before {
     margin-bottom: 5px; /* 对齐微调 */
     color: #ccc;
 }
+/* --- START: 九宫格朋友圈样式 --- */
+
+/* 发布页面的九宫格上传区 */
+.publish-grid-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.publish-grid-item {
+    position: relative;
+    width: 100%;
+    padding-top: 100%; /* 1:1 正方形 */
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #f0f0f0;
+    background-size: cover;
+    background-position: center;
+}
+
+.publish-grid-item .delete-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 20px;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 18px;
+    font-size: 14px;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.publish-add-btn {
+    position: relative;
+    width: 100%;
+    padding-top: 100%;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.publish-add-btn::after {
+    content: '+';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 40px;
+    color: #ccc;
+}
+
+/* 朋友圈信息流中的九宫格显示 */
+.moments-photo-grid {
+    display: grid;
+    gap: 4px;
+    margin-top: 12px;
+    width: 100%;
+    max-width: 300px; /* 限制最大宽度，模拟手机效果 */
+}
+
+/* 1张图：默认样式 */
+.moments-photo-grid[data-count="1"] {
+    display: block; /* 单图不走 Grid */
+}
+.moments-photo-grid[data-count="1"] img {
+    max-width: 200px;
+    max-height: 250px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+/* 2张、4张图：2列布局 */
+.moments-photo-grid[data-count="2"],
+.moments-photo-grid[data-count="4"] {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* 3, 5-9张图：3列布局 */
+.moments-photo-grid[data-count="3"],
+.moments-photo-grid[data-count="5"],
+.moments-photo-grid[data-count="6"],
+.moments-photo-grid[data-count="7"],
+.moments-photo-grid[data-count="8"],
+.moments-photo-grid[data-count="9"] {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.moments-photo-item {
+    position: relative;
+    width: 100%;
+    padding-top: 100%; /* 强制正方形 */
+    background-color: #f0f0f0;
+}
+
+.moments-photo-item img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+/* --- END: 九宫格朋友圈样式 --- */
+/* --- 图片全屏查看器样式 --- */
+.image-viewer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    z-index: 10000; /* 保证最顶层 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s;
+    touch-action: none; /* 防止穿透滚动 */
+}
+
+.image-viewer-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.image-viewer-overlay img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transform: scale(1);
+    transition: transform 0.2s;
+}
+/* --- 聊天记录搜索样式 (美化版) --- */
+#search-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: #f7f7f7; /* iOS 浅灰背景 */
+    z-index: 2000; display: flex; flex-direction: column;
+    transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1); /* 更丝滑的动画 */
+}
+#search-overlay.visible { transform: translateX(0); }
+
+.search-header {
+    padding: 10px 16px; padding-top: 50px; /* 避开刘海 */
+    background: #fff;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    display: flex; gap: 12px; align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+/* 搜索框容器：模仿 iOS 原生样式 */
+.search-input-wrapper {
+    flex: 1; position: relative;
+    background: #f2f2f2;
+    border-radius: 10px;
+    display: flex; align-items: center;
+    padding: 0 10px;
+    height: 36px;
+}
+.search-input-wrapper svg {
+    width: 16px; height: 16px; stroke: #999; margin-right: 6px; flex-shrink: 0;
+}
+
+#chat-search-input {
+    flex: 1; border: none; background: transparent;
+    font-size: 15px; outline: none; color: #333;
+    padding: 0; height: 100%; width: 100%;
+}
+#chat-search-input::placeholder { color: #999; }
+
+.search-cancel-btn {
+    color: #576b95; font-size: 16px; font-weight: 500;
+    cursor: pointer; padding: 5px 0;
+}
+.search-cancel-btn:active { opacity: 0.7; }
+
+.search-results-container {
+    flex: 1; overflow-y: auto; padding: 0;
+    background: #f7f7f7;
+}
+
+/* 结果项样式优化 */
+.search-result-item {
+    padding: 12px 16px; 
+    background: #fff; 
+    border-bottom: 1px solid rgba(0,0,0,0.03);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.search-result-item:active { background: #f2f2f2; }
+
+.result-top {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 6px; 
+}
+.result-sender {
+    font-size: 13px; font-weight: 600; color: #333;
+}
+.result-time {
+    font-size: 11px; color: #b2b2b2;
+}
+
+.result-content {
+    font-size: 15px; color: #666; line-height: 1.4;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 匹配文字高亮：清新的绿色 */
+.result-match {
+    color: #28a745; 
+    font-weight: 600;
+    background: rgba(40, 167, 69, 0.1); /* 淡淡的绿色背景 */
+    padding: 0 2px; border-radius: 2px;
+}
+
+/* 空状态 */
+.search-empty-state {
+    text-align: center; margin-top: 60px; color: #b2b2b2; font-size: 14px;
+}
+.search-empty-state svg {
+    width: 48px; height: 48px; stroke: #e0e0e0; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;
+}
+
+/* 跳转高亮动画 */
+@keyframes flash-highlight {
+    0% { background-color: rgba(40, 167, 69, 0.3); }
+    100% { background-color: transparent; }
+}
+.message-wrapper.highlight-anim {
+    animation: flash-highlight 1.5s ease-out;
+}
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -4671,11 +4911,13 @@ input:checked + .slider:before {
                                             
                                             <div id="publish-input-container">
                                                 <div class="publish-input-area active" data-publish-type="photo">
-                                                    <div class="publish-image-preview-container">
-                                                        <img id="publish-image-preview" class="publish-image-preview" style="display: none;">
-                                                    </div>
-                                                    <button id="upload-image-btn" class="btn-primary btn-secondary" style="width: 100px; padding: 8px;">上传图片</button>
-                                                </div>
+    <div id="publish-grid-view" class="publish-grid-container">
+        <!-- JS 会动态在这里插入图片 -->
+        <div id="publish-add-image-btn" class="publish-add-btn"></div>
+    </div>
+    <!-- 注意：这里 ID 变了，而且加了 multiple -->
+    <input type="file" id="moments-image-upload-input-multi" class="visually-hidden" accept="image/*" multiple>
+</div>
 
                                                 <div class="publish-input-area" data-publish-type="text-on-image">
                                                     <textarea placeholder="输入图文卡片的描述文字..."></textarea>
@@ -4875,12 +5117,36 @@ input:checked + .slider:before {
     <!-- 核心修改：添加 multiple 属性 -->
     <input type="file" id="image-upload-input" class="visually-hidden" accept="image/*" multiple>
     <div class="chat-app-container">
+    <!-- 搜索覆盖层 (美化版) -->
+                    <div id="search-overlay">
+                        <div class="search-header">
+                            <div class="search-input-wrapper">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                                <input type="text" id="chat-search-input" placeholder="搜索">
+                            </div>
+                            <span class="search-cancel-btn" id="close-search-btn">取消</span>
+                        </div>
+                        <div id="search-results" class="search-results-container">
+                            <!-- 结果列表 -->
+                        </div>
+                    </div>
                         <div id="dynamic-decoration-btn" class="dynamic-decoration"></div>
                         <div id="chat-view">
                             <div class="chat-header">
                                 <button id="back-button" class="back-btn" data-target="chat"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
                                 <span id="chat-contact-name"></span>
-                                <div id="header-more-btn">...</div>
+                                <div style="display:flex; gap:15px; align-items:center; justify-self: end;">
+                                    <div id="header-search-btn" style="cursor: pointer; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+</div>
+                                    <div id="header-more-btn">...</div>
+                                </div>
                             </div>
                             <div class="chat-content">
                                 <div class="messages" id="messages-container"></div>
@@ -16327,6 +16593,104 @@ async function showBranchHistoryModal(chatId) {
                 await customAlert('删除失败：找不到该分支。');
             }
         }
+        // --- 聊天搜索功能 ---
+        const searchOverlay = document.getElementById('search-overlay');
+        const searchInput = document.getElementById('chat-search-input');
+        const searchResults = document.getElementById('search-results');
+        const searchBtn = document.getElementById('header-search-btn');
+        const closeSearchBtn = document.getElementById('close-search-btn');
+
+        if (searchBtn) {
+            searchBtn.addEventListener('click', () => {
+                searchOverlay.classList.add('visible');
+                searchInput.value = '';
+                searchResults.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">输入关键词搜索</div>';
+                searchInput.focus();
+            });
+        }
+
+        if (closeSearchBtn) {
+            closeSearchBtn.addEventListener('click', () => {
+                searchOverlay.classList.remove('visible');
+            });
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const keyword = e.target.value.trim();
+                if (!keyword) {
+                    searchResults.innerHTML = '';
+                    return;
+                }
+
+                // 从 fullMessageHistory (完整历史) 中搜索
+                const matches = fullMessageHistory.filter(m => 
+                    m.type === 'text' && m.text && m.text.includes(keyword)
+                ).reverse(); // 最新在通过
+
+                if (matches.length === 0) {
+                    searchResults.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">无搜索结果</div>';
+                } else {
+                    searchResults.innerHTML = matches.map(m => {
+                        const dateStr = new Date(m.timestamp).toLocaleString();
+                        const senderName = m.sender || (m.side === 'sent' ? '我' : chatState.chatName);
+                        // 高亮关键词
+                        const highlightedText = escapeHtml(m.text).replace(
+                            new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), 
+                            '<span class="result-match">$&</span>'
+                        );
+                        
+                        return `
+                        <div class="search-result-item" data-msg-id="${m.id}">
+                            <div class="result-top">
+                                <span>${senderName}</span>
+                                <span>${dateStr}</span>
+                            </div>
+                            <div class="result-content">${highlightedText}</div>
+                        </div>`;
+                    }).join('');
+                }
+            });
+        }
+
+        if (searchResults) {
+            searchResults.addEventListener('click', (e) => {
+                const item = e.target.closest('.search-result-item');
+                if (!item) return;
+                
+                const msgId = item.dataset.msgId;
+                jumpToMessage(msgId);
+                searchOverlay.classList.remove('visible');
+            });
+        }
+
+        // 核心跳转函数：不卡顿的秘密
+        function jumpToMessage(msgId) {
+            const index = fullMessageHistory.findIndex(m => m.id === msgId);
+            if (index === -1) return;
+
+            // 1. 计算窗口：只取目标消息的前20条和后20条
+            const startIndex = Math.max(0, index - 20);
+            const endIndex = Math.min(fullMessageHistory.length, index + 20);
+            
+            // 2. 重置当前显示的视图数据
+            chatState.messages = fullMessageHistory.slice(startIndex, endIndex);
+            
+            // 3. 重新渲染界面 (只渲染这40条，绝对不卡)
+            reRenderMessages();
+            
+            // 4. 滚动到目标并高亮
+            // 稍微延迟一点点，等待渲染完成
+            setTimeout(() => {
+                const targetEl = document.querySelector(`.message-wrapper[data-message-id="${msgId}"]`);
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'auto', block: 'center' });
+                    targetEl.classList.add('highlight-anim');
+                    // 动画结束后移除类
+                    setTimeout(() => targetEl.classList.remove('highlight-anim'), 2000);
+                }
+            }, 50);
+        }
         return { 
             open, 
             getCurrentChatId, 
@@ -16746,7 +17110,7 @@ const momentsManager = (function() {
         let activePostForComment = null;
         let replyToUser = null;
         let currentPrivacy = { type: 'public', list: [], days: null };
-        let currentImageBlobKey = null;
+        let currentImageBlobKeys = []; // 改成数组
 
         const feedContainer = appRoot.querySelector('#feed-container');
         const momentsTitle = appRoot.querySelector('#moments-title');
@@ -16793,6 +17157,36 @@ const momentsManager = (function() {
         }
 
         // --- ↓↓↓ 全新的红点检查函数 从这里开始 ↓↓↓ ---
+        // 渲染上传时的九宫格预览
+        function renderUploadGrid() {
+            const container = appRoot.querySelector('#publish-grid-view');
+            const addBtn = appRoot.querySelector('#publish-add-image-btn');
+            
+            // 清理旧的预览图 (保留加号按钮)
+            const existingItems = container.querySelectorAll('.publish-grid-item');
+            existingItems.forEach(el => el.remove());
+
+            currentImageBlobKeys.forEach((key, index) => {
+                const item = document.createElement('div');
+                item.className = 'publish-grid-item';
+                setImageSrc(item, key); // 利用全局 setImageSrc
+
+                const delBtn = document.createElement('div');
+                delBtn.className = 'delete-btn';
+                delBtn.textContent = '×';
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    currentImageBlobKeys.splice(index, 1); // 删除对应图片
+                    renderUploadGrid();
+                    updatePublishButtonState();
+                };
+                item.appendChild(delBtn);
+                container.insertBefore(item, addBtn);
+            });
+
+            // 9张封顶，隐藏加号
+            addBtn.style.display = currentImageBlobKeys.length >= 9 ? 'none' : 'flex';
+        }
         function checkMomentsUpdates() {
             const momentsTab = document.getElementById('tab-content-moments');
             if (!momentsTab || momentsTab.classList.contains('active')) {
@@ -17118,11 +17512,40 @@ const momentsManager = (function() {
 
                     
                     case 'photo':
-                        if (post.image) {
+                        // 1. 新逻辑：优先检查多图数组
+                        if (post.images && post.images.length > 0) {
+                            const count = post.images.length;
+                            const gridDiv = document.createElement('div');
+                            gridDiv.className = 'moments-photo-grid';
+                            gridDiv.dataset.count = count; // 让CSS知道有几张图
+
+                            post.images.forEach(imgKey => {
+                                if (count === 1) {
+                                    // 单图模式
+                                    const img = document.createElement('img');
+                                    setImageSrc(img, imgKey);
+                                    gridDiv.appendChild(img);
+                                } else {
+                                    // 多图模式 (需要包裹div来实现正方形裁切)
+                                    const itemDiv = document.createElement('div');
+                                    itemDiv.className = 'moments-photo-item';
+                                    const img = document.createElement('img');
+                                    setImageSrc(img, imgKey);
+                                    itemDiv.appendChild(img);
+                                    gridDiv.appendChild(itemDiv);
+                                }
+                            });
+                            postBody.appendChild(gridDiv);
+                        } 
+                        // 2. 旧逻辑兼容：如果没有数组，但有单图字符串 (老数据)
+                        else if (post.image) {
+                            const gridDiv = document.createElement('div');
+                            gridDiv.className = 'moments-photo-grid';
+                            gridDiv.dataset.count = "1"; // 强制设为1张图的样式
                             const img = document.createElement('img');
-                            img.className = 'post-image';
                             setImageSrc(img, post.image);
-                            postBody.appendChild(img);
+                            gridDiv.appendChild(img);
+                            postBody.appendChild(gridDiv);
                         }
                         break;
                     case 'photo-description':
@@ -17454,7 +17877,7 @@ const momentsManager = (function() {
 
             switch (selectedType) {
                 case 'photo':
-                    hasContent = hasContent || !!currentImageBlobKey;
+                    hasContent = hasContent || currentImageBlobKeys.length > 0; // 检查数组长度
                     break;
                 case 'text-on-image':
                 case 'video':
@@ -17467,35 +17890,48 @@ const momentsManager = (function() {
             confirmPublishBtn.disabled = !hasContent;
         }
 
-        uploadImageBtn.addEventListener('click', () => imageUploadInput.click());
-        
-        imageUploadInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const key = `moments-image-${Date.now()}`;
-            try {
-                await imageStore.setItem(key, file);
-                currentImageBlobKey = `indexeddb:${key}`;
-                setImageSrc(imagePreview, currentImageBlobKey);
-                imagePreview.style.display = 'block';
+// 新的多图上传监听
+        const addImgBtn = appRoot.querySelector('#publish-add-image-btn');
+        const multiInput = appRoot.querySelector('#moments-image-upload-input-multi');
+
+        if (addImgBtn && multiInput) {
+            addImgBtn.addEventListener('click', () => multiInput.click());
+
+            multiInput.addEventListener('change', async (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
+
+                const remainingSlots = 9 - currentImageBlobKeys.length;
+                const filesToProcess = files.slice(0, remainingSlots);
+
+                if (files.length > remainingSlots) {
+                    alert(`最多只能再上传 ${remainingSlots} 张图片。`);
+                }
+
+                for (const file of filesToProcess) {
+                    const key = `moments-image-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+                    try {
+                        await imageStore.setItem(key, file);
+                        currentImageBlobKeys.push(`indexeddb:${key}`);
+                    } catch (error) {
+                        console.error("Failed to save image:", error);
+                    }
+                }
+                renderUploadGrid();
                 updatePublishButtonState();
-            } catch (error) { 
-                console.error("Failed to store moments image:", error); 
-                alert("图片上传失败！"); 
-            } finally {
-                // **关键修正：无论成功或失败，都清空 input 的值**
-                e.target.value = '';
-            }
-        });
+                multiInput.value = '';
+            });
+        }
         
         publishBtn.addEventListener('click', () => {
             publishPage.classList.add('visible');
             mainTextInput.value = '';
             
             publishInputContainer.querySelectorAll('textarea, input[type="text"]').forEach(input => input.value = '');
-            imagePreview.style.display = 'none';
-            imagePreview.src = '';
-            currentImageBlobKey = null;
+            
+            // 新重置逻辑
+            currentImageBlobKeys = []; 
+            renderUploadGrid();
             
             document.getElementById('type-photo').checked = true;
             publishInputContainer.querySelectorAll('.publish-input-area').forEach(area => {
@@ -17525,14 +17961,11 @@ const momentsManager = (function() {
 
             let finalType = selectedTypeOption;
             
-            // **核心修正：判断真正的帖子类型**
-            if (selectedTypeOption === 'photo' && !currentImageBlobKey && mainTextValue) {
-                // 如果用户选择了“图片”类型，但没上传图片，只写了文字，那这就是一个“纯文本”帖子
+            // 如果有文字没图片，自动转为纯文本帖
+            if (selectedTypeOption === 'photo' && currentImageBlobKeys.length === 0 && mainTextValue) {
                 finalType = 'text';
-            } else if (selectedTypeOption === 'photo' && !currentImageBlobKey && !mainTextValue) {
-                // 如果什么都没填，不允许发布
-                confirmPublishBtn.disabled = true;
-                return;
+            } else if (selectedTypeOption === 'photo' && currentImageBlobKeys.length === 0 && !mainTextValue) {
+                return; 
             }
 
             const newPost = {
@@ -17542,18 +17975,18 @@ const momentsManager = (function() {
                 reactions: { '点赞': [] },
                 comments: [],
                 privacy: { ...currentPrivacy },
-                type: finalType, // 使用我们最终判断的正确类型
+                type: finalType,
                 text: mainTextValue,
-                image: null,
+                // 【关键】保存图片数组
+                images: [...currentImageBlobKeys], 
+                // 兼容旧数据的兜底（取第一张）
+                image: currentImageBlobKeys.length > 0 ? currentImageBlobKeys[0] : null,
                 content: '',
                 signer: '',
                 date: ''
             };
 
-            switch (finalType) { // 根据最终类型来处理
-                case 'photo':
-                    newPost.image = currentImageBlobKey;
-                    break;
+            switch (finalType) {
                 case 'text-on-image':
                     newPost.content = publishInputContainer.querySelector('[data-publish-type="text-on-image"] textarea').value.trim();
                     break;
@@ -17566,7 +17999,6 @@ const momentsManager = (function() {
                     newPost.signer = statementArea.querySelector('input:nth-of-type(1)').value.trim();
                     newPost.date = statementArea.querySelector('input:nth-of-type(2)').value.trim();
                     break;
-                // 'text' 类型不需要额外处理
             }
             
             feedData.unshift(newPost);
@@ -17574,6 +18006,7 @@ const momentsManager = (function() {
             cancelPublishBtn.click(); 
             renderFeed(); 
             showNotification('发布了一条新朋友圈');
+            checkMomentsUpdates();
         });
 
         privacyBtn.addEventListener('click', () => {
@@ -17779,7 +18212,28 @@ sendCommentBtn.addEventListener('click', () => {
 
             }, stepDurationMs);
         }
-        
+        // 显示全屏大图
+        function showImageViewer(src) {
+            let overlay = document.getElementById('moments-image-viewer');
+            
+            // 如果 DOM 里没有，就现造一个
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'moments-image-viewer';
+                overlay.className = 'image-viewer-overlay';
+                overlay.innerHTML = '<img src="" />';
+                document.body.appendChild(overlay);
+                
+                // 点击关闭
+                overlay.addEventListener('click', () => {
+                    overlay.classList.remove('visible');
+                });
+            }
+            
+            const img = overlay.querySelector('img');
+            img.src = src;
+            overlay.classList.add('visible');
+        }
         function saveFeed() { 
             saveToLocalStorage('moments_feed_data', feedData); 
         }
@@ -17809,6 +18263,7 @@ sendCommentBtn.addEventListener('click', () => {
             }
             
             showNotification(`“${senderName}”发布了一条新朋友圈`);
+            
             checkMomentsUpdates(); // <--- 新增这一行
         }
 
@@ -17951,7 +18406,29 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
                 } 
                 // 普通帖子的处理逻辑
                 else {
-                    if (post.image) {
+                    // 1. 优先处理多图 (九宫格)
+                    if (post.images && post.images.length > 0) {
+                        const count = post.images.length;
+                        if (post.imageDescription) {
+                            // 如果有描述（暂时只支持整体描述），直接用
+                            imageInfo = `[This post contains ${count} images. Description: ${post.imageDescription}]`;
+                        } else {
+                            // 如果没描述，告诉AI这是多图，并把所有图加入待发送列表
+                            imageInfo = `[This post contains ${count} images. Image contents are provided below. IMPORTANT: You MUST generate a <moment_img_desc> tag to describe the scene shown in these images.]`;
+                            
+                            // 遍历所有图片，加入 payload
+                            post.images.forEach(imgKey => {
+                                if (imgKey.startsWith('indexeddb:')) {
+                                    imagePayloads.push({
+                                        _isPendingImage: true,
+                                        key: imgKey
+                                    });
+                                }
+                            });
+                        }
+                    }
+                    // 2. 兼容旧的单图逻辑
+                    else if (post.image) {
                         if (post.imageDescription) {
                             imageInfo = `[Image Description: ${post.imageDescription}]`;
                         } else {
@@ -18159,7 +18636,22 @@ if (momentsCommentStickerBtn) {
     });
 }
 // 【【【 新代码块到此结束 】】】
-
+// --- 绑定朋友圈图片点击放大事件 ---
+            // 使用事件委托，监听整个 feed 容器
+            feedContainer.addEventListener('click', (e) => {
+                // 检查点击的是不是图片
+                // 并且排除掉头像 (post-avatar) 和表情包 (inline-emoji)
+                if (e.target.tagName === 'IMG' && 
+                    !e.target.classList.contains('post-avatar') && 
+                    !e.target.classList.contains('inline-emoji')) {
+                    
+                    e.stopPropagation(); // 防止触发其他点击事件
+                    const src = e.target.src;
+                    if (src) {
+                        showImageViewer(src);
+                    }
+                }
+            });
 checkMomentsUpdates(); // <--- 新增这一行
         }
         
