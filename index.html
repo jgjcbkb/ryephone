@@ -23766,7 +23766,7 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
         const danmakuContainer = page.querySelector('#danmaku-container-vc');
         const selfAvatarEl = page.querySelector('#self-view-avatar-vc');
         const callerNameEl = page.querySelector('#caller-name-vc');
-        const endCallBtn = page.querySelector('#end-call-container-vc');
+        const endCallBtn = page.querySelector('#end-call-btn-vc'); // <--- 改成具体的按钮ID
         const replyModal = page.querySelector('#video-call-reply-modal');
         const historyModal = page.querySelector('#video-call-history-modal');
 
@@ -23908,7 +23908,7 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const profile = apiProfiles[parseInt(profileIndexStr)];
                 if (!profile) throw new Error("API profile not found.");
 
-                // --- 1. 构建一个包含所有所需信息的完整 System Prompt ---
+                // --- 1. 构建 Prompt ---
                 let fullSystemPrompt = "You MUST respond in Simplified Chinese (简体中文).\n\n";
                 fullSystemPrompt += `[SCENE: VIDEO CALL - DIRECTOR'S NOTES]\nYou are in a live video call. Your world is limited to what you can SEE and HEAR. Your response must be engaging and in-character. To hang up, you MUST end your response with the command \`[hang_up_call]\`.\n`;
 
@@ -23928,19 +23928,10 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
 
                 const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${chatId}`, []);
                 worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
-                    // --- 【核心新增】: 在这里检查世界书名称 ---
-                    // 如果世界书的名称包含特殊标记 (VC-IGNORE)，则跳过该条目
-                    if (entry.name.includes('(VC-IGNORE)')) {
-                        console.log(`[Video Call] Ignoring Worldbook entry: "${entry.name}"`);
-                        return; // 跳过本次循环，不将此世界书内容添加到Prompt中
-                    }
-                    // --- 新增逻辑结束 ---
-
-                    // 只有不包含标记的世界书才会走到这里
+                    if (entry.name.includes('(VC-IGNORE)')) return;
                     fullSystemPrompt += `\n[Background Information: ${entry.name}]\n${entry.content}\n`;
                 });
 
-                // <<< 核心修改：读取并注入完整的NPC人设，而不仅仅是名字 >>>
                 const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${chatId}`, []);
                 if (associatedNpcNames.length > 0) {
                     fullSystemPrompt += '\n[Associated NPCs]\n';
@@ -23952,33 +23943,24 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 }
                 
                 if (chat.type === '群聊') {
-                    // --- 1. 获取正式成员 ---
                     const formalMembers = loadFromLocalStorage(`chat_members_${chatId}`, []);
-                    // --- 2. 获取群聊主角 ---
                     const groupPersonasData = chatInfo.groupPersonas || [];
                     const protagonistNames = groupPersonasData.map(p => p.name);
-                    // --- 3. 合并并去重，得到完整的演员名单 ---
                     const allPotentialAiEntities = [...new Set([...formalMembers, ...protagonistNames])];
                     const allAiActors = allPotentialAiEntities.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
                     
                     let groupPersonasPrompt = `\n[YOUR ROLES: GROUP CHAT]\nThis is a group video call. You are playing ALL of the following AI characters. Your response MUST be a single paragraph describing everyone's actions and words from a narrator's perspective.\n`;
                     
-                    // --- 新增代码块：无条件加载群聊主角和群演人设 ---
                     const ensemblePersona = chatInfo.ensemblePersona || 'No general ensemble persona has been defined.';
                     groupPersonasPrompt += `\n[Ensemble & Supporting Cast Persona]\n${ensemblePersona}\n`;
-                    // --- 新增结束 ---
 
                     allAiActors.forEach(actorName => {
                         let persona = '';
                         const isNpc = npcList.includes(actorName);
-
-                        // --- 修改：优先从群聊主角人设中查找 ---
                         const protagonistPersona = groupPersonasData.find(p => p.name === actorName);
                         if (protagonistPersona) {
                             persona = protagonistPersona.description || '(No persona defined)';
-                        }
-                        // --- 修改结束 ---
-                        else if (isNpc) { persona = (npcSettings.personas && npcSettings.personas[actorName]) || '(No persona defined)'; } 
+                        } else if (isNpc) { persona = (npcSettings.personas && npcSettings.personas[actorName]) || '(No persona defined)'; } 
                         else { const memberChat = chatList.find(c => c.name === actorName && c.type === '私聊'); if (memberChat) { const info = loadFromLocalStorage(`chat_info_${memberChat.id}`, {}); persona = info.aiPersona || '(No persona defined)'; } }
                         groupPersonasPrompt += `- **${actorName}**: ${persona}\n`;
                     });
@@ -23988,11 +23970,9 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                     fullSystemPrompt += `\n[YOUR ROLE: PRIVATE CALL]\nYOUR PERSONA IS: "${chatInfo.aiPersona || 'A helpful assistant.'}"\nYour response MUST come from this persona.`;
                 }
 
-                // --- 5. 构建API请求 ---
                 const systemMessage = { role: "system", content: fullSystemPrompt };
                 const finalMessages = [systemMessage];
 
-                // 注入聊天记录 (包括主聊天记录和当前通话记录)
                 const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
                 const recentChatHistory = memoryLength > 0 ? loadFromLocalStorage(`conversation_${chatId}`, []).slice(-memoryLength) : loadFromLocalStorage(`conversation_${chatId}`, []);
                 const apiPayloadHistory = await conversationManager.prepareApiPayload(recentChatHistory);
@@ -24003,10 +23983,39 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                     finalMessages.push({ role, content: msg.text });
                 });
 
-                const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
+                // --- 2. API 请求逻辑 (Gemini/OpenAI 兼容修正) ---
+                let chatUrl, requestBody, requestHeaders;
+
+                if (profile.url.includes('googleapis.com')) {
+                    chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:generateContent?key=${profile.key}`;
+                    requestHeaders = { 'Content-Type': 'application/json' };
+                    
+                    const systemInstruction = finalMessages.find(m => m.role === 'system');
+                    const contents = finalMessages
+                        .filter(m => m.role !== 'system')
+                        .map(msg => ({
+                            role: msg.role === 'assistant' ? 'model' : 'user',
+                            parts: [{ text: msg.content }]
+                        }));
+                        
+                    requestBody = { contents };
+                    if (systemInstruction) {
+                        requestBody.system_instruction = { parts: [{ text: systemInstruction.content }] };
+                    }
+                    if (profile.temperature !== undefined) {
+                        requestBody.generationConfig = { temperature: profile.temperature };
+                    }
+                } else {
+                    chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
+                    requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
+                    // 【注意】这里必须用 finalMessages
+                    requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
+                }
+
+                const response = await fetch(chatUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) }) 
+                    headers: requestHeaders,
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!response.ok) {
@@ -24015,7 +24024,12 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 }
                 
                 const data = await response.json();
-                const aiResponse = data.choices[0]?.message?.content;
+                let aiResponse;
+                if (profile.url.includes('googleapis.com')) {
+                    aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                } else {
+                    aiResponse = data.choices?.[0]?.message?.content;
+                }
 
                 if (aiResponse && aiResponse.includes('[hang_up_call]')) {
                     const lastWords = aiResponse.replace('[hang_up_call]', '').trim();
@@ -24052,14 +24066,12 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
         }
         // --- START: 新增的、专门用于重新生成的函数 ---
         async function regenerateLastAiDialogue() {
-            // 找到用户最后一次发言
             const lastUserMessageIndex = callState.conversation.map(m => m.sender === '{{user}}').lastIndexOf(true);
             if (lastUserMessageIndex === -1) {
                 await conversationManager.customAlert('需要您先发言才能重新生成。');
                 return;
             }
 
-            // 删除用户发言之后的所有AI旧回复
             callState.conversation.splice(lastUserMessageIndex + 1);
 
             const typingIndicator = page.querySelector('.typing-indicator-vc');
@@ -24070,7 +24082,6 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const chatId = callState.chatId;
                 const chat = chatList.find(c => c.id === chatId);
                 if (!chat) throw new Error("Chat not found for video call.");
-                // (后续的API请求逻辑和 addUserReply 基本一致，但去掉了挂断指令的处理)
                 
                 const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
                 const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
@@ -24081,7 +24092,6 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 let directorNotes = `[ABSOLUTE LAW: LANGUAGE REQUIREMENT]\nYou MUST respond in **Simplified Chinese (简体中文)**.\n\n[SCENE: VIDEO CALL - DIRECTOR'S NOTES]\nYou are in a live video call. Your response should be an alternative to your previous one, based on the user's last message.`;
                 
                 if (chat.type === '群聊') {
-                    // (此处省略了完整的群聊人设构建，因为您代码里已经有了，保持那部分不变即可)
                     const groupMembers = loadFromLocalStorage(`chat_members_${chatId}`, []);
                     const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
                     const allAiActors = groupMembers.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
@@ -24099,30 +24109,62 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                     directorNotes += `\n\n[YOUR ROLE: PRIVATE CALL]\nYOUR PERSONA IS: "${chatInfo.aiPersona || 'A helpful assistant.'}"`;
                 }
                 
-                
                 const sceneInstruction = { role: "system", content: directorNotes };
                 const finalMessages = [sceneInstruction];
 
-                callState.conversation.forEach(msg => { // 使用完整的当前对话历史
+                callState.conversation.forEach(msg => { 
                     finalMessages.push({
                         role: msg.sender === '{{user}}' ? 'user' : 'assistant',
                         content: msg.text
                     });
                 });
 
-                const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
+                // --- API 请求逻辑 (Gemini/OpenAI 兼容修正) ---
+                let chatUrl, requestBody, requestHeaders;
+
+                if (profile.url.includes('googleapis.com')) {
+                    chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:generateContent?key=${profile.key}`;
+                    requestHeaders = { 'Content-Type': 'application/json' };
+                    
+                    const systemInstruction = finalMessages.find(m => m.role === 'system');
+                    const contents = finalMessages
+                        .filter(m => m.role !== 'system')
+                        .map(msg => ({
+                            role: msg.role === 'assistant' ? 'model' : 'user',
+                            parts: [{ text: msg.content }]
+                        }));
+                        
+                    requestBody = { contents };
+                    if (systemInstruction) {
+                        requestBody.system_instruction = { parts: [{ text: systemInstruction.content }] };
+                    }
+                    if (profile.temperature !== undefined) {
+                        requestBody.generationConfig = { temperature: profile.temperature };
+                    }
+                } else {
+                    chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
+                    requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
+                    // 【注意】这里必须用 finalMessages
+                    requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
+                }
+
+                const response = await fetch(chatUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) }) 
+                    headers: requestHeaders,
+                    body: JSON.stringify(requestBody)
                 });
 
                 if (!response.ok) throw new Error('API request failed');
                 
                 const data = await response.json();
-                let aiResponse = data.choices[0]?.message?.content;
+                let aiResponse;
+                if (profile.url.includes('googleapis.com')) {
+                    aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                } else {
+                    aiResponse = data.choices?.[0]?.message?.content;
+                }
                 
-                // 【【【核心区别】】】在这里，我们只获取文本，绝不检查 [hang_up_call] 指令
-                aiResponse = aiResponse.replace('[hang_up_call]', '').trim();
+                aiResponse = aiResponse ? aiResponse.replace('[hang_up_call]', '').trim() : '';
 
                 if (aiResponse) {
                     addAiDialogue(aiResponse);
@@ -24479,10 +24521,18 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             endCallBtn.addEventListener('click', endCall);
             dialogueOverlay.addEventListener('click', () => replyModal.classList.add('visible'));
             
-            prevBtn.addEventListener('click', e => { e.stopPropagation(); if (callState.currentDialogueIndex > 0) { callState.currentDialogueIndex--; updateDialogueDisplay(); }});
+            prevBtn.addEventListener('click', e => { 
+                // 统一逻辑：只要不是用户发的，都算作AI台词（包括旁白）
+                const dialogues = callState.conversation.filter(m => m.sender !== '{{user}}');
+                if (callState.currentDialogueIndex > 0) { 
+                    callState.currentDialogueIndex--; 
+                    updateDialogueDisplay(); 
+                }
+            });
+
             nextBtn.addEventListener('click', e => { 
-                e.stopPropagation(); 
-                const dialogues = callState.conversation.filter(m => m.sender !== '{{user}}' && !m.text.startsWith('（'));
+                // 统一逻辑：与上方保持完全一致，确保索引长度对齐
+                const dialogues = callState.conversation.filter(m => m.sender !== '{{user}}');
                 if (callState.currentDialogueIndex < dialogues.length - 1) { 
                     callState.currentDialogueIndex++; 
                     updateDialogueDisplay(); 
@@ -24491,7 +24541,6 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
 
             replyModal.querySelector('.cancel').addEventListener('click', () => replyModal.classList.remove('visible'));
             
-            // --- 核心修正：用ID来绝对精确地绑定“发送”按钮的点击事件 ---
             document.getElementById('video-call-send-btn').addEventListener('click', () => {
                 const input = replyModal.querySelector('#video-call-reply-input');
                 if (input.value.trim()) {
@@ -24517,14 +24566,12 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
 
             const changeBgBtn = document.getElementById('change-vc-bg-btn');
             if(changeBgBtn) changeBgBtn.addEventListener('click', handleChangeBackground);
-            // --- START: 新增视频通话重新生成逻辑 (简化版 V2) ---
+            
             const vcRegenerateBtn = page.querySelector('#vc-regenerate-btn');
-
             vcRegenerateBtn.addEventListener('click', async (e) => {
-                e.stopPropagation(); // 防止触发打开回复框的事件
-                await regenerateLastAiDialogue(); // 直接调用重新生成函数
+                e.stopPropagation(); 
+                await regenerateLastAiDialogue(); 
             });
-            // --- END: 新增逻辑 ---
         }
 
         return { init, startCall, showHistoryModal };
