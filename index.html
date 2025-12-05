@@ -12909,13 +12909,35 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         const amount = parseFloat((Math.random() * 200 + 1).toFixed(2));
                         messageData.packetData = { id: `rp-${Date.now()}`, createdAt: Date.now(), amount, portions: 1, remainingAmount: amount, remainingPortions: 1, portionsData: [amount], claimedBy: [], senderName: sender, status: 'active' };
                     } else if (cmd.command === 'transfer') {
-                        messageData.text = parseFloat(cmd.value).toFixed(2);
-                        messageData.transferStatus = 'pending';
-                        messageData.sender = sender;
-                    } else if (cmd.command === 'gift') {
-                        messageData.giftStatus = 'active';
-                        messageData.sender = sender;
+                    let amountValue;
+                    let recipientValue = null;
+
+                    // 优先尝试解析为JSON对象
+                    try {
+                        const transferData = JSON.parse(cmd.value);
+                        // 确保解析出来的是一个包含 amount 属性的对象
+                        if (typeof transferData === 'object' && transferData !== null && 'amount' in transferData) {
+                            amountValue = transferData.amount;
+                            recipientValue = transferData.recipient || null;
+                        } else {
+                            // 虽然是合法的JSON（比如纯数字），但不是我们期望的格式，按原始值处理
+                            amountValue = cmd.value;
+                        }
+                    } catch (e) {
+                        // 如果JSON解析失败，说明它就是个纯数字字符串
+                        amountValue = cmd.value;
                     }
+
+                    // 统一处理金额，并添加到 messageData
+                    messageData.text = parseFloat(amountValue).toFixed(2);
+                    messageData.transferStatus = 'pending';
+                    messageData.sender = sender;
+                    
+                    // 如果成功提取到接收人，也添加到 messageData
+                    if (recipientValue) {
+                        messageData.recipient = recipientValue;
+                    }
+                }
                     await addMessage(messageData, targetChatId);
                     messageSent = true;
                     regularText = '';
