@@ -5510,6 +5510,13 @@ input:checked + .slider:before {
         <label for="dynamics-global-interval" style="font-size: 14px; color: #555;">全局检测间隔(秒):</label>
         <input type="number" id="dynamics-global-interval" min="5" value="15" style="width: 60px; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
     </div>
+    
+    <!-- 从这里开始是新增的代码块 -->
+    <div style="display: flex; align-items: center; gap: 8px; margin-left: 15px;">
+        <label for="dynamics-global-rate-limit" style="font-size: 14px; color: #555;">速率限制(次/分):</label>
+        <input type="number" id="dynamics-global-rate-limit" min="1" value="2" style="width: 60px; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
+    </div>
+    <!-- 新增代码块到此结束 -->
 
     <button id="bulk-set-dynamics-btn" class="btn-primary btn-secondary" style="padding: 4px 8px; font-size: 13px; margin-left: auto;">批量设置</button>
 </div>
@@ -6200,6 +6207,7 @@ input:checked + .slider:before {
     let chatList = [], worldBookEntries = [], apiProfiles = [], activeProfileIndex = null, myAvatar = null, customBubbles = [], stickers = [], appearanceSettings = {};
     let userPersonas = []; // 新增：用户人设
     let npcList = [], npcSettings = {}; 
+    let proactiveApiCallTimestamps = []; // <--- 在这里添加这一行代码
     const avatarColors = ['#2d6a4f', '#40916c', '#52b788', '#74c69d', '#95d5b2', '#b7e4c7', '#d8f3e5', '#1b4332'];
     const pages = document.querySelectorAll('.page');
     
@@ -6345,6 +6353,34 @@ input:checked + .slider:before {
         }
 
     async function triggerProactiveAI(chatId, senderName, actionType) {
+        // =================================================================
+      // =================================================================
+        // START: Proactive Action Rate Limiter (Configurable)
+        // =================================================================
+        const now = Date.now();
+        const ONE_MINUTE = 60 * 1000;
+        
+        // 从 localStorage 动态加载速率限制设置，如果找不到则默认为 2
+        const dynamicsSettings = loadFromLocalStorage('app-dynamics-settings', { rateLimit: 2 });
+        const RATE_LIMIT = (dynamicsSettings.rateLimit && dynamicsSettings.rateLimit >= 1) ? dynamicsSettings.rateLimit : 2;
+
+        // 1. 移除所有超过一分钟的旧时间戳 (这就是“滑动窗口”)
+        proactiveApiCallTimestamps = proactiveApiCallTimestamps.filter(timestamp => now - timestamp < ONE_MINUTE);
+
+        // 2. 检查当前窗口内的调用次数是否已达到上限
+        if (proactiveApiCallTimestamps.length >= RATE_LIMIT) {
+            // 如果达到上限，打印一条日志并立即中止函数，阻止本次API调用
+            console.log(`%c[Rate Limiter]`, 'color: orange; font-weight: bold;', `Proactive API call for "${senderName}" (${actionType}) blocked. Limit of ${RATE_LIMIT} per minute reached.`);
+            return; 
+        }
+
+        // 3. 如果未达到上限，就记录本次调用的时间戳，然后继续执行函数
+        proactiveApiCallTimestamps.push(now);
+        console.log(`%c[Rate Limiter]`, 'color: #27ae60; font-weight: bold;', `Proactive API call for "${senderName}" (${actionType}) allowed. Count in last minute: ${proactiveApiCallTimestamps.length}`);
+        // =================================================================
+        // END: Proactive Action Rate Limiter
+        // =================================================================
+
         console.log(`%c[ULTIMATE DIAGNOSIS]`, 'color: red; font-weight: bold; font-size: 14px;', `
 --------------------------------------------------
   Function triggerProactiveAI CALLED
@@ -6559,7 +6595,8 @@ input:checked + .slider:before {
                 }
             }
         } else if (isNpc) {
-            const rawPersonaText = (npcSettings.personas && npcSettings.personas[senderName]) || 'A mysterious NPC.';
+            const personaData = (npcSettings.personas && npcSettings.personas[senderName]) || {};
+            const rawPersonaText = personaData.description || 'A mysterious NPC.'; // <-- 核心修复在这里
             finalCharPersonaText = rawPersonaText.replace(/{{char}}/g, charNameForPrompt).replace(/{{user}}/g, userNameForPrompt);
         } else {
             const rawPersonaText = contextChatInfo.aiPersona || 'A thoughtful character.';
@@ -12909,35 +12946,13 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         const amount = parseFloat((Math.random() * 200 + 1).toFixed(2));
                         messageData.packetData = { id: `rp-${Date.now()}`, createdAt: Date.now(), amount, portions: 1, remainingAmount: amount, remainingPortions: 1, portionsData: [amount], claimedBy: [], senderName: sender, status: 'active' };
                     } else if (cmd.command === 'transfer') {
-                    let amountValue;
-                    let recipientValue = null;
-
-                    // 优先尝试解析为JSON对象
-                    try {
-                        const transferData = JSON.parse(cmd.value);
-                        // 确保解析出来的是一个包含 amount 属性的对象
-                        if (typeof transferData === 'object' && transferData !== null && 'amount' in transferData) {
-                            amountValue = transferData.amount;
-                            recipientValue = transferData.recipient || null;
-                        } else {
-                            // 虽然是合法的JSON（比如纯数字），但不是我们期望的格式，按原始值处理
-                            amountValue = cmd.value;
-                        }
-                    } catch (e) {
-                        // 如果JSON解析失败，说明它就是个纯数字字符串
-                        amountValue = cmd.value;
+                        messageData.text = parseFloat(cmd.value).toFixed(2);
+                        messageData.transferStatus = 'pending';
+                        messageData.sender = sender;
+                    } else if (cmd.command === 'gift') {
+                        messageData.giftStatus = 'active';
+                        messageData.sender = sender;
                     }
-
-                    // 统一处理金额，并添加到 messageData
-                    messageData.text = parseFloat(amountValue).toFixed(2);
-                    messageData.transferStatus = 'pending';
-                    messageData.sender = sender;
-                    
-                    // 如果成功提取到接收人，也添加到 messageData
-                    if (recipientValue) {
-                        messageData.recipient = recipientValue;
-                    }
-                }
                     await addMessage(messageData, targetChatId);
                     messageSent = true;
                     regularText = '';
@@ -19387,9 +19402,10 @@ checkMomentsUpdates(); // <--- 新增这一行
         let settings = {};
         let universalTimer = null;
         const defaults = {
-            globalInterval: 15,
-            perCharacter: {}
-        };
+    globalInterval: 15,
+    rateLimit: 2, // <--- 新增这一行
+    perCharacter: {}
+};
 
         function loadSettings() {
             const loaded = loadFromLocalStorage('app-dynamics-settings', {});
@@ -19399,8 +19415,9 @@ checkMomentsUpdates(); // <--- 新增这一行
         function saveSettings() { saveToLocalStorage('app-dynamics-settings', settings); }
 
         function renderPage() {
-        loadSettings();
-        document.getElementById('dynamics-global-interval').value = settings.globalInterval || 15;
+    loadSettings();
+    document.getElementById('dynamics-global-interval').value = settings.globalInterval || 15;
+    document.getElementById('dynamics-global-rate-limit').value = settings.rateLimit || 2; // <--- 新增这一行
         
         const listContainer = document.getElementById('dynamics-char-list');
         listContainer.innerHTML = '';
@@ -19962,6 +19979,21 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                         alert('间隔时间不能少于5秒。');
                     }
                 });
+
+                // --- 从这里开始是新增的代码块 ---
+                document.getElementById('dynamics-global-rate-limit').addEventListener('change', (e) => {
+                    const newLimit = parseInt(e.target.value, 10);
+                    if (newLimit && newLimit >= 1) {
+                        settings.rateLimit = newLimit; // 保存新设置
+                        saveSettings();
+                        alert(`主动行为速率限制已更新为每分钟 ${newLimit} 次。`);
+                    } else {
+                        e.target.value = settings.rateLimit || 2; // 如果输入无效，恢复原值
+                        alert('速率限制不能少于1次/分钟。');
+                    }
+                });
+                // --- 新增代码块到此结束 ---
+
                 isListenerAttached = true;
             }
             
@@ -20601,25 +20633,46 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         // !!!!!!!!!! 粘贴的第一个新函数到这里结束 !!!!!!!!!!
 
         async function tick() {
-            console.log(`NPC Dynamics Tick running...`); // 把日志改得更清晰，以后好区分
+            console.log(`NPC Dynamics Tick running...`); 
             const characters = npcList.filter(name => npcSettings.activeStates && npcSettings.activeStates[name]);
             const now = Date.now();
             let settingsChanged = false;
 
             for (const charName of characters) {
-                // 核心修正：使用 npcSettings.dynamics 而不是 settings.perCharacter
                 const charDynamics = npcSettings.dynamics && npcSettings.dynamics[charName];
                 if (!charDynamics) continue;
 
-                // 检查朋友圈互动逻辑
-                const config = charDynamics; // 直接使用这个配置
+                const config = charDynamics;
                  if (!config.lastTick || (now - config.lastTick >= config.interval * 60 * 1000)) {
                     if (Math.random() * 100 < config.probability) {
+                        
+                        // =================================================================
+                        // START: Proactive Action Rate Limiter (for NPCs)
+                        // =================================================================
+                        const ONE_MINUTE = 60 * 1000;
+                        const dynamicsSettings = loadFromLocalStorage('app-dynamics-settings', { rateLimit: 2 });
+                        const RATE_LIMIT = (dynamicsSettings.rateLimit && dynamicsSettings.rateLimit >= 1) ? dynamicsSettings.rateLimit : 2;
+
+                        proactiveApiCallTimestamps = proactiveApiCallTimestamps.filter(timestamp => now - timestamp < ONE_MINUTE);
+
+                        if (proactiveApiCallTimestamps.length >= RATE_LIMIT) {
+                            console.log(`%c[Rate Limiter]`, 'color: orange; font-weight: bold;', `NPC action for "${charName}" blocked. Limit of ${RATE_LIMIT} per minute reached.`);
+                            // 即使被阻止，也更新时间戳，防止在下一轮tick中立即重试
+                            config.lastTick = now;
+                            settingsChanged = true;
+                            continue; // 跳过这个NPC，检查下一个
+                        }
+                        
+                        // 如果未达到上限，记录本次调用
+                        proactiveApiCallTimestamps.push(now);
+                        // =================================================================
+                        // END: Proactive Action Rate Limiter
+                        // =================================================================
+
                         const action = Math.random() < 0.8 ? 'browse_moments' : 'post_moment';
                         console.log(`NPC Dynamics: Triggering moment action (${action}) for ${charName}`);
                         await triggerProactiveAI(null, charName, action);
                         
-                        // 只有成功触发后才更新时间和保存
                         config.lastTick = now;
                         settingsChanged = true;
                     }
@@ -20627,7 +20680,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             }
 
             if (settingsChanged) {
-                saveNpcData(); // 核心修正：调用正确的保存函数
+                saveNpcData();
             }
         }
         
