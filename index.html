@@ -7414,8 +7414,27 @@ ${processedChatHistory}
             const emojiNames = stickers.filter(s => s.type === 'emoji').map(s => `"${s.name}"`).join(', ');
             // --- 修复结束 ---
 
+            // =================================================================
+            // START: 注入时间上下文 (朋友圈动态)
+            // =================================================================
+            // 核心修复：即使没有聊天ID，我们也要尝试加载时间设置。
+            // 如果 contextChatId 存在，就用它的时间设置；如果不存在，就用全局真实时间。
+            if (contextChatId) {
+                timeManager.updateSettingsForChat(contextChatId);
+            } else {
+                // 如果没有上下文聊天，则重置为真实时间模式
+                timeManager.updateSettingsForChat(null); 
+            }
+            const timeContext = timeManager.getAITimeContext();
+            // =================================================================
+            // END: 注入时间上下文
+            // =================================================================
+
             const instruction = `
 ${baseSystemPrompt}
+${timeContext}
+
+
 
 # [ULTIMATE IDENTITY LOCK-IN - UNBREAKABLE RULE]
 **FOR THIS SPECIFIC ACTION, YOUR IDENTITY IS LOCKED. YOU ARE, AND ONLY ARE, "${senderName}".**
@@ -7640,11 +7659,26 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
             // --- 核心修复：注入基础系统提示 ---
             const baseSystemPrompt = profile.prompt || '';
 
+            // =================================================================
+            // START: 注入时间上下文 (发朋友圈)
+            // =================================================================
+            if (contextChatId) {
+                timeManager.updateSettingsForChat(contextChatId);
+            } else {
+                timeManager.updateSettingsForChat(null);
+            }
+            const timeContext = timeManager.getAITimeContext();
+            // =================================================================
+            // END: 注入时间上下文
+            // =================================================================
+
             // --- 核心修正：注入身份锁定指令 ---
             const identityLockInPrompt = `
 ${baseSystemPrompt}
+${timeContext}
 
 # [ULTIMATE IDENTITY LOCK-IN - UNBREAKABLE RULE]
+
 **FOR THIS SPECIFIC ACTION, YOUR IDENTITY IS LOCKED. YOU ARE, AND ONLY ARE, "${senderName}".**
 - **Your Persona:** ${personaText}
 - **Your Task:** You are about to post on Moments. The content of your post MUST originate from your locked identity as "${senderName}".
@@ -11851,7 +11885,33 @@ Okay, that's all the context and rules. Now, generate your full response.
                 throw new Error(`API Error ${response.status}: ${response.statusText}\nResponse: ${errorBody}`);
             }
     
-            const data = await response.json();
+            // --- START: 流式响应安全处理模块 (SSE Fix) ---
+            const rawText = await response.text();
+            let data;
+            
+            try {
+                // 优先尝试直接解析，兼容非流式API
+                data = JSON.parse(rawText);
+            } catch (e) {
+                // 如果直接解析失败，说明可能是流式数据
+                console.log("[SSE Fix] Direct JSON parse failed, attempting SSE format cleanup.");
+                const lines = rawText.trim().split('\n');
+                const lastLine = lines.find(line => line.startsWith('data: {'));
+
+                if (lastLine) {
+                    const jsonString = lastLine.substring('data: '.length);
+                    try {
+                        data = JSON.parse(jsonString);
+                    } catch (finalError) {
+                        // 如果清理后还是失败，就抛出详细错误
+                        throw new Error(`Failed to parse SSE data. Raw line: ${lastLine}\nOriginal Error: ${finalError.message}`);
+                    }
+                } else {
+                    // 如果连 data: { 开头的行都找不到，说明格式完全错误
+                    throw new Error(`Invalid response format. Not JSON and not recognized SSE. Raw response: ${rawText}`);
+                }
+            }
+            // --- END: 流式响应安全处理模块 (SSE Fix) ---
 
             // 兼容 Gemini 和 OpenAI 的不同返回格式
             let aiResponse;
