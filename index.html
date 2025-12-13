@@ -14962,18 +14962,31 @@ const recallMessage = async (messageId) => {
     
     saveConversation();
 };
+// ...
 const showContextMenu = (event, messageId) => {
-            hideContextMenu(); const message = chatState.messages.find(m => m.id === messageId); if (!message) return;
-            let menuItems = [];
-            if (message.side === 'sent') { 
-                menuItems = [ { label: '引用', action: 'quote' }, { label: '撤回', action: 'recall' }, { label: '编辑', action: 'edit' }, { label: '从此处重新生成', action: 'regenerate_from' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
-              } else { 
-                // 在这里新增 '代我回复' 选项
-                menuItems = [ { label: '引用', action: 'quote' }, { label: '代我回复', action: 'reply_for_me' }, { label: '编辑', action: 'edit' }, { label: '从此处重新生成', action: 'regenerate_from' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
-                if (contactInfo.isGroup) { menuItems.unshift({ label: '@ Ta', action: 'at' }); } 
-            }
+    hideContextMenu(); const message = chatState.messages.find(m => m.id === messageId); if (!message) return;
+    let menuItems = [];
+    if (message.side === 'sent') { 
+        menuItems = [ { label: '引用', action: 'quote' }, { label: '撤回', action: 'recall' }, { label: '编辑', action: 'edit' }, { label: '从此处重新生成', action: 'regenerate_from' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
+    } else { 
+        menuItems = [ { label: '引用', action: 'quote' }, { label: '代我回复', action: 'reply_for_me' }, { label: '编辑', action: 'edit' }, { label: '从此处重新生成', action: 'regenerate_from' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
+        if (contactInfo.isGroup) { menuItems.unshift({ label: '@ Ta', action: 'at' }); } 
+    }
 
-            messageContextMenu.innerHTML = ''; menuItems.forEach(item => { const div = document.createElement('div'); div.className = 'context-menu-item'; div.textContent = item.label; div.dataset.action = item.action; messageContextMenu.appendChild(div); });
+    // --- 核心新增：检查收藏状态并动态添加菜单项 ---
+    const chatId = conversationManager.getCurrentChatId();
+    const favoritesKey = `chat_favorites_${chatId}`;
+    const favorites = loadFromLocalStorage(favoritesKey, []);
+    const isFavorited = favorites.some(fav => fav.id === messageId);
+
+    if (isFavorited) {
+        menuItems.unshift({ label: '取消收藏', action: 'unfavorite' });
+    } else {
+        menuItems.unshift({ label: '收藏', action: 'favorite' });
+    }
+    // --- 新增结束 ---
+
+    messageContextMenu.innerHTML = ''; menuItems.forEach(item => { const div = document.createElement('div'); div.className = 'context-menu-item'; div.textContent = item.label; div.dataset.action = item.action; messageContextMenu.appendChild(div); });
 
     messageContextMenu.style.left = `${event.clientX}px`; messageContextMenu.style.top = `${event.clientY}px`; messageContextMenu.classList.remove('hidden');
     const rect = messageContextMenu.getBoundingClientRect(); const screenRect = appRoot.getBoundingClientRect();
@@ -14982,17 +14995,25 @@ const showContextMenu = (event, messageId) => {
     const menuClickHandler = async (e) => {
         const action = e.target.dataset.action; hideContextMenu(); const msgToActOn = chatState.messages.find(m => m.id === messageId); if (!msgToActOn) return;
         switch(action) {
+            // --- 核心新增：处理收藏/取消收藏动作 ---
+            case 'favorite':
+                await favoriteMessage(messageId);
+                break;
+            case 'unfavorite':
+                await unfavoriteMessage(messageId);
+                break;
+            // --- 新增结束 ---
             case 'quote': startReply(messageId); break;
-            case 'reply_for_me': // 新增的 case
+            case 'reply_for_me':
                 handleReplyForMe(messageId);
                 break;
             case 'recall': recallMessage(messageId); break;
             case 'regenerate_from':
                 regenerateFromMessage(messageId);
                 break;
-
-        case 'edit':
-            switch (msgToActOn.type) {
+            case 'edit':
+                // ... (此处的 case 'edit' 内部逻辑保持不变)
+                switch (msgToActOn.type) {
                 case 'text':
                 case 'voice':
                 case 'photo-description':
@@ -15053,28 +15074,28 @@ const showContextMenu = (event, messageId) => {
                     break;
             }
             break;
-// ===== 到这里结束复制 =====
             case 'multi-select': enterMultiSelectMode(messageId); break;
-            // ===== 从这里开始复制 =====
-                    case 'delete':
-                        if (await customConfirm('确定要删除这条消息吗？')) {
-                            // --- 核心修复：同时从两个数组中删除 ---
-                            chatState.messages = chatState.messages.filter(m => m.id !== messageId);
-                            fullMessageHistory = fullMessageHistory.filter(m => m.id !== messageId);
-                            // --- 修复结束 ---
-                            reRenderMessages();
-                            saveConversation();
-                        }
-                        break;
-// ===== 到这里结束复制 =====
-             case 'insert':
-                    await showInsertMessageModal(messageId);
-                    break;
-                case 'at': if (msgToActOn.sender) { footerMessageInput.value += `@${msgToActOn.sender} `; footerMessageInput.focus(); } break;
-            }
-        };
+            case 'delete':
+                if (await customConfirm('确定要删除这条消息吗？')) {
+                    // --- 核心修复：同时从两个数组中删除 ---
+                    chatState.messages = chatState.messages.filter(m => m.id !== messageId);
+                    fullMessageHistory = fullMessageHistory.filter(m => m.id !== messageId);
+                    // --- 修复结束 ---
+                    reRenderMessages();
+                    saveConversation();
+                }
+                break;
+            case 'insert':
+                await showInsertMessageModal(messageId);
+                break;
+            case 'at': if (msgToActOn.sender) { footerMessageInput.value += `@${msgToActOn.sender} `; footerMessageInput.focus(); } break;
+        }
+    };
     messageContextMenu.addEventListener('click', menuClickHandler, { once: true });
 };
+// ...
+
+    
 // ===== 从这里开始，完整复制下面所有的代码 =====
 
     async function showInsertMessageModal(targetMessageId) {
@@ -16128,11 +16149,13 @@ dynamicDecorationBtn.addEventListener('click', triggerAIContinuation);
 headerMoreBtn.addEventListener('click', async () => { 
     const menuButtons = [ 
         { text: '聊天信息', value: 'chat_info', class: 'primary' },
+        { text: '查看收藏', value: 'view_favorites', class: 'primary' }, // <<< --- 核心新增
         { text: '统计字数', value: 'char_count', class: 'primary' },
         { text: '更换聊天背景', value: 'change_bg', class: 'primary' }, 
         { text: '更换气泡样式', value: 'change_bubble', class: 'primary' }, 
         { text: '字体', value: 'font_color', class: 'primary' } 
     ]; 
+// ...
     
     if (!contactInfo.isGroup) { 
         const autoReplyStatus = autoReplySettings.enabled ? ' (已启用)' : ''; 
@@ -16197,6 +16220,11 @@ headerMoreBtn.addEventListener('click', async () => {
         case 'auto_reply':
             await showAutoReplyModal();
             break;
+        // <<< --- 核心新增 ---
+        case 'view_favorites':
+            showFavoritesModal(conversationManager.getCurrentChatId());
+            break;
+        // --- 新增结束 ---
     }
 });
 
@@ -16465,7 +16493,17 @@ messagesContainer.addEventListener('click', async (e) => {
     }, stepDuration); } 
     function pause(isFinished = false) { anim.isPlaying = false; clearInterval(anim.interval); if(playButtonOverlay) playButtonOverlay.classList.remove('hidden'); if (isFinished) { setTimeout(() => { videoElement.classList.remove('playing'); anim.wordIndex = 0; if(textContainer) textContainer.innerHTML = ''; if(progressBarFill) progressBarFill.style.width = '0%'; if(movingDecoration) movingDecoration.style.left = '0'; }, 1500); } } if (anim.isPlaying) pause(); else play(); return; } 
 });
-messagesContainer.addEventListener('dblclick', (e) => { if (isMultiSelectMode) return; const wrapper = e.target.closest('.message-wrapper'); if (!wrapper) return; const messageId = wrapper.dataset.messageId; const message = chatState.messages.find(m => m.id === messageId); if (!message || message.side === 'system' || message.type === 'red_packet') return; e.preventDefault(); showContextMenu(e, messageId); });
+messagesContainer.addEventListener('dblclick', (e) => { 
+    if (isMultiSelectMode) return; 
+    const wrapper = e.target.closest('.message-wrapper'); 
+    if (!wrapper) return; 
+    const messageId = wrapper.dataset.messageId; 
+    const message = chatState.messages.find(m => m.id === messageId); 
+    if (!message || message.side === 'system' || message.type === 'red_packet') return; 
+    e.preventDefault(); 
+    showContextMenu(e, messageId); 
+});
+// ...
 multiSelectCancelBtn.addEventListener('click', exitMultiSelectMode);
 // ===== 从这里开始复制 =====
     multiSelectDeleteBtn.addEventListener('click', async () => { 
@@ -16874,6 +16912,129 @@ async function showBranchHistoryModal(chatId) {
                 }
             }, 50);
         }
+        // =========================================================================
+// ================= START: FAVORITES MANAGEMENT (NEW) =====================
+// =========================================================================
+
+        async function showFavoritesModal(chatId) {
+            const favoritesKey = `chat_favorites_${chatId}`;
+            let favorites = loadFromLocalStorage(favoritesKey, []);
+
+            if (favorites.length === 0) {
+                await conversationManager.customAlert('还没有任何收藏。');
+                return;
+            }
+
+            // 用于生成预览文本的辅助函数 (这是修改后的版本)
+            const createPreview = (msg) => {
+                if (msg.type !== 'text') {
+                    const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'transfer': '[转账]', 'red_packet': '[红包]', 'video': '[视频]', 'location': '[位置]', 'gift': '[礼物]', 'pay_for_me': '[代付]'};
+                    return typeMap[msg.type] || '[消息]';
+                }
+                
+                let content = msg.text || '';
+                
+                // 如果内容是复杂的HTML卡片，则显示一个占位符，而不是混乱的源码
+                if (content.trim().startsWith('<div') || content.trim().startsWith('<snippet>')) {
+                    return '[卡片/格式化消息]';
+                }
+                
+                // 对于普通文本，进行转义并替换换行符，完整显示
+                return escapeHtml(content).replace(/\n/g, '<br>');
+            };
+            
+            const favoritesHtml = `
+                <div id="favorites-list-container" style="max-height: 60vh; overflow-y: auto; text-align: left;">
+                    ${favorites.map(msg => `
+                        <div class="favorite-item" style="padding: 12px; border-bottom: 1px solid #eee;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                                <strong style="color: #333;">${escapeHtml(msg.sender || (msg.side === 'sent' ? '我' : chatState.chatName))}</strong>
+                                <span style="font-size: 11px; color: #999;">${new Date(msg.timestamp).toLocaleString()}</span>
+                            </div>
+                            <p style="margin: 0 0 10px 0; color: #555; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;">${createPreview(msg)}</p>
+                            <div style="text-align: right;">
+                                <button class="modal-button secondary" data-action="jump" data-msg-id="${msg.id}" style="padding: 4px 10px; font-size: 12px;">跳转</button>
+                                <button class="modal-button danger" data-action="delete" data-msg-id="${msg.id}" style="padding: 4px 10px; font-size: 12px; margin-left: 8px;">移除</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>`;
+
+            await conversationManager.showCustomModal({
+                title: '收藏夹',
+                html: favoritesHtml,
+                showCloseButton: true,
+                buttons: [{ text: '关闭', value: 'close', class: 'secondary' }],
+                onRender: (modalDOM, closeModal) => {
+                    const listContainer = modalDOM.querySelector('#favorites-list-container');
+                    listContainer.addEventListener('click', async (e) => {
+                        const button = e.target.closest('button[data-action]');
+                        if (!button) return;
+
+                        const action = button.dataset.action;
+                        const msgId = button.dataset.msgId;
+
+                        if (action === 'jump') {
+                            closeModal(); // 先关闭收藏夹
+                            jumpToMessage(msgId); // 调用已有的搜索跳转函数
+                        } else if (action === 'delete') {
+                            const confirmed = await conversationManager.customConfirm('确定要移除这条收藏吗？');
+                            if (confirmed) {
+                                // 从数据中移除
+                                favorites = favorites.filter(fav => fav.id !== msgId);
+                                saveToLocalStorage(favoritesKey, favorites);
+                                
+                                // 从视图中移除
+                                const itemToRemove = button.closest('.favorite-item');
+                                itemToRemove.style.transition = 'opacity 0.3s, transform 0.3s';
+                                itemToRemove.style.opacity = '0';
+                                itemToRemove.style.transform = 'translateX(-20px)';
+                                setTimeout(() => {
+                                    itemToRemove.remove();
+                                    if (listContainer.children.length === 0) {
+                                        listContainer.innerHTML = '<p style="text-align: center; color: #888; padding: 20px;">收藏夹已清空</p>';
+                                    }
+                                }, 300);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+// =========================================================================
+// =================== END: FAVORITES MANAGEMENT (NEW) =====================
+// =========================================================================
+
+        async function favoriteMessage(messageId) {
+            const message = chatState.messages.find(m => m.id === messageId);
+            if (!message) return;
+
+            const chatId = conversationManager.getCurrentChatId();
+            const favoritesKey = `chat_favorites_${chatId}`;
+            let favorites = loadFromLocalStorage(favoritesKey, []);
+            
+            if (!favorites.some(fav => fav.id === message.id)) {
+                favorites.unshift(message);
+                saveToLocalStorage(favoritesKey, favorites);
+                await conversationManager.customAlert('消息已收藏！');
+            }
+        }
+
+        async function unfavoriteMessage(messageId) {
+            const chatId = conversationManager.getCurrentChatId();
+            const favoritesKey = `chat_favorites_${chatId}`;
+            let favorites = loadFromLocalStorage(favoritesKey, []);
+            
+            const initialLength = favorites.length;
+            favorites = favorites.filter(fav => fav.id !== messageId);
+
+            if (favorites.length < initialLength) {
+                saveToLocalStorage(favoritesKey, favorites);
+                await conversationManager.customAlert('已取消收藏。');
+            }
+        }
+
+// ... (conversationManager 内部的其他函数)
         return { 
             open, 
             getCurrentChatId, 
