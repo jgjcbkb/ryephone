@@ -5600,30 +5600,47 @@ input:checked + .slider:before {
                             <p class="form-hint" style="padding: 0 15px 15px;">为指定功能设置图标。留空以使用默认图标。</p>
                         </div>
                         
-                        <div class="form-section">
+                          <div class="form-section">
                             <h3>全局背景</h3>
                             <div class="form-group">
                                 <label for="global-chat-bg-url">全局聊天背景链接</label>
-                                <input type="text" id="global-chat-bg-url" placeholder="输入图片URL">
+                                <!-- 【核心修改】使用flex布局包裹输入框和按钮 -->
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="text" id="global-chat-bg-url" placeholder="输入图片URL" style="flex-grow: 1;">
+                                    <button id="global-chat-bg-upload-btn" class="btn-primary btn-secondary" style="flex-shrink: 0;">本地</button>
+                                </div>
                                 <p class="form-hint">为所有聊天窗口设置一个统一的默认背景。</p>
                             </div>
                             <div class="form-group">
                                 <label for="home-bg-url">主页背景链接</label>
-                                <input type="text" id="home-bg-url" placeholder="输入图片URL">
+                                <!-- 【核心修改】使用flex布局包裹输入框和按钮 -->
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="text" id="home-bg-url" placeholder="输入图片URL" style="flex-grow: 1;">
+                                    <button id="home-bg-upload-btn" class="btn-primary btn-secondary" style="flex-shrink: 0;">本地</button>
+                                </div>
                                 <p class="form-hint">为App主页设置背景图。</p>
                             </div>
                         </div>
-                         <div class="form-section">
+<!-- ... -->
+                         <!-- ... in page-appearance ... -->
+                        <div class="form-section">
                             <h3>全局美化</h3>
                             <div class="form-group">
                                 <label for="global-css-select">选择样式片段</label>
+                                <!-- 第一个div，只包含下拉列表 -->
                                 <div class="css-snippet-controls">
                                     <select id="global-css-select" class="modal-select"></select>
+                                </div>
+                                <!-- 第二个div，包含所有操作按钮 -->
+                                <div class="css-snippet-controls" style="margin-top: 10px; justify-content: space-around;">
                                     <button id="global-css-save-btn" class="btn-primary btn-secondary" title="将下方代码保存为新片段">保存</button>
                                     <button id="global-css-manage-btn" class="btn-primary btn-secondary" title="管理已保存的片段">管理</button>
+                                    <button id="global-css-export-btn" class="btn-primary btn-secondary" title="将所有片段导出为.txt文件">导出</button>
+                                    <button id="global-css-import-btn" class="btn-primary btn-secondary" title="从.txt文件导入片段">导入</button>
                                 </div>
                             </div>
                             <div class="form-group">
+<!-- ... -->
                                 <label for="global-custom-css-editor">CSS 代码编辑器</label>
                                 <textarea id="global-custom-css-editor" placeholder="在此处编辑或输入新的CSS代码..."></textarea>
                                 <p class="form-hint">从上方选择一个片段以编辑，或直接输入新代码后点击“保存”。</p>
@@ -6117,6 +6134,8 @@ input:checked + .slider:before {
             </div>
         </div>
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
 
 <script>
 (function() {
@@ -20384,69 +20403,86 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             saveToLocalStorage('app-appearance-settings', appearanceSettings);
         }
         
-        function applySettings() {
-    // --- 从这里开始插入新代码 ---
-    // 应用框架显示/隐藏状态
-    document.body.classList.toggle('frame-hidden', appearanceSettings.isFrameHidden);
-    // --- 新代码到此结束 ---
+        // ===== 请用下面这个完整的新版本替换上面的旧版本 =====
+        async function applySettings() {
+            // --- 框架显示/隐藏状态 ---
+            document.body.classList.toggle('frame-hidden', appearanceSettings.isFrameHidden);
 
-    const screenElement = document.querySelector('.screen');
-    const fontSize = appearanceSettings.globalFontSize;
-// ...函数剩余部分
-    if (fontSize && !isNaN(fontSize)) {
-        screenElement.style.fontSize = `${fontSize}px`;
-    } else {
-        screenElement.style.fontSize = '';
-    }
-    
-    const fontStyleTag = document.getElementById('global-font-style');
-    const activeFont = savedFonts.find(f => f.name === activeFontName);
-    if (activeFont && activeFont.url) {
-        const fontName = `GlobalCustomFont_${activeFont.name.replace(/\s/g, '_')}`;
-        fontStyleTag.innerHTML = `@font-face { font-family: '${fontName}'; src: url('${activeFont.url}'); } body, .screen, input, textarea, button, select { font-family: '${fontName}', -apple-system, sans-serif !important; }`;
-    } else {
-        fontStyleTag.innerHTML = '';
-    }
+            // --- 全局字体大小 ---
+            const screenElement = document.querySelector('.screen');
+            const fontSize = appearanceSettings.globalFontSize;
+            if (fontSize && !isNaN(fontSize)) {
+                screenElement.style.fontSize = `${fontSize}px`;
+            } else {
+                screenElement.style.fontSize = '';
+            }
+            
+            // --- 全局字体 ---
+            const fontStyleTag = document.getElementById('global-font-style');
+            const activeFont = savedFonts.find(f => f.name === activeFontName);
+            if (activeFont && activeFont.url) {
+                const fontName = `GlobalCustomFont_${activeFont.name.replace(/\s/g, '_')}`;
+                // 【核心修复】对于可能是Base64的本地字体，直接使用其值
+                fontStyleTag.innerHTML = `@font-face { font-family: '${fontName}'; src: url('${activeFont.url}'); } body, .screen, input, textarea, button, select { font-family: '${fontName}', -apple-system, sans-serif !important; }`;
+            } else {
+                fontStyleTag.innerHTML = '';
+            }
 
-    let cssToApply = appearanceSettings.currentCustomCss || ''; 
-    if (!cssToApply && appearanceSettings.activeCssSnippetName) { 
-        const activeSnippet = appearanceSettings.customCssSnippets.find(s => s.name === appearanceSettings.activeCssSnippetName);
-        cssToApply = activeSnippet ? activeSnippet.css : '';
-    }
-    document.getElementById('global-custom-styles-container').innerHTML = cssToApply;
+            // --- 自定义CSS ---
+            let cssToApply = appearanceSettings.currentCustomCss || ''; 
+            if (!cssToApply && appearanceSettings.activeCssSnippetName) { 
+                const activeSnippet = appearanceSettings.customCssSnippets.find(s => s.name === appearanceSettings.activeCssSnippetName);
+                cssToApply = activeSnippet ? activeSnippet.css : '';
+            }
+            document.getElementById('global-custom-styles-container').innerHTML = cssToApply;
 
-    // 【【【这就是我们修改的核心区域，现在是最终的、最安全的形式】】】
-    document.querySelectorAll('#page-home .home-icon-btn').forEach(btn => {
-    const page = btn.dataset.page;
-    const iconBg = btn.querySelector('.icon-bg');
-    const url = appearanceSettings.iconUrls[page];
-    
-    // 【【【核心、唯一的逻辑：只有当localStorage里明确存了URL时，才去动它！】】】
-    if (url && url.trim() !== '') {
-        iconBg.style.backgroundImage = `url('${url}')`;
-        iconBg.classList.add('custom-icon');
-    } 
-    // 【【【没有 else！如果localStorage里是空的，JS就什么也不做，HTML里写的是什么就是什么！】】】
-});
+            // --- 主页图标 (现在也使用 setImageSrc) ---
+            document.querySelectorAll('#page-home .home-icon-btn').forEach(async (btn) => {
+                const page = btn.dataset.page;
+                const iconBg = btn.querySelector('.icon-bg');
+                const url = appearanceSettings.iconUrls[page];
+                
+                if (url && url.trim() !== '') {
+                    await setImageSrc(iconBg, url); // 【核心修复】使用 setImageSrc
+                    iconBg.classList.add('custom-icon');
+                }
+            });
+            
+            // --- 全局聊天背景 (最关键的修复) ---
+            const globalChatBgUrl = appearanceSettings.globalChatBgUrl;
+            if (globalChatBgUrl) {
+                if (globalChatBgUrl.startsWith('indexeddb:')) {
+                    try {
+                        const key = globalChatBgUrl.substring(10);
+                        const blob = await imageStore.getItem(key);
+                        if (blob) {
+                            const objectURL = URL.createObjectURL(blob);
+                            document.documentElement.style.setProperty('--global-chat-background', `url('${objectURL}')`);
+                        }
+                    } catch (e) {
+                        console.error("Failed to load global chat background from DB:", e);
+                        document.documentElement.style.removeProperty('--global-chat-background');
+                    }
+                } else {
+                    document.documentElement.style.setProperty('--global-chat-background', `url('${globalChatBgUrl}')`);
+                }
+            } else {
+                document.documentElement.style.removeProperty('--global-chat-background');
+            }
 
-    
-    const globalChatBgUrl = appearanceSettings.globalChatBgUrl;
-    if (globalChatBgUrl) {
-        document.documentElement.style.setProperty('--global-chat-background', `url('${globalChatBgUrl}')`);
-    } else {
-        document.documentElement.style.removeProperty('--global-chat-background');
-    }
-
-    const homeBgUrl = appearanceSettings.homeBgUrl;
-    const homePage = document.getElementById('page-home');
-    if (homeBgUrl) {
-        homePage.style.backgroundImage = `url('${homeBgUrl}')`;
-        homePage.style.backgroundSize = 'cover';
-        homePage.style.backgroundPosition = 'center';
-    } else {
-        homePage.style.backgroundImage = '';
-    }
-}
+            // --- 主页背景 (最关键的修复) ---
+            const homeBgUrl = appearanceSettings.homeBgUrl;
+            const homePage = document.getElementById('page-home');
+            
+            // 【核心修复】直接调用我们万能的 setImageSrc 函数，它懂得如何处理 indexeddb 地址
+            await setImageSrc(homePage, homeBgUrl);
+            
+            if (homeBgUrl) {
+                homePage.style.backgroundSize = 'cover';
+                homePage.style.backgroundPosition = 'center';
+            }
+        }
+// ===== 新版本的 applySettings 函数到这里结束 =====
 
         function renderPage() {
             loadSettings();
@@ -20514,7 +20550,14 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 const currentUrl = appearanceSettings.iconUrls[page] || '';
                 const formGroup = document.createElement('div');
                 formGroup.className = 'form-group';
-                formGroup.innerHTML = `<label for="icon-url-${page}">${name} 图标链接</label><input type="text" id="icon-url-${page}" data-page="${page}" value="${currentUrl}" placeholder="输入图片URL">`;
+                // 【核心修改】在innerHTML中加入按钮和flex布局
+                formGroup.innerHTML = `
+                    <label for="icon-url-${page}">${name} 图标链接</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="icon-url-${page}" data-page="${page}" value="${currentUrl}" placeholder="输入图片URL" style="flex-grow: 1;">
+                        <button class="local-icon-upload-btn btn-primary btn-secondary" data-page="${page}" style="flex-shrink: 0;">本地</button>
+                    </div>
+                `;
                 container.appendChild(formGroup);
             });
         }
@@ -20523,8 +20566,11 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             let listHtml = appearanceSettings.customCssSnippets.length > 0
                 ? appearanceSettings.customCssSnippets.map((snippet, index) => `
                     <li class="snippet-management-item">
-                        <span class="name">${snippet.name}</span>
-                        <button class="delete-btn" data-index="${index}">删除</button>
+                        <span class="name">${escapeHtml(snippet.name)}</span>
+                        <div>
+                            <button class="btn-primary btn-secondary" data-action="edit" data-index="${index}" style="padding: 4px 8px; font-size: 12px;">编辑名称</button>
+                            <button class="delete-btn" data-action="delete" data-index="${index}" style="margin-left: 5px;">删除</button>
+                        </div>
                     </li>`).join('')
                 : '<p style="padding: 20px; text-align: center; color: #888;">没有已保存的片段</p>';
 
@@ -20533,14 +20579,18 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 html: `<ul class="snippet-management-list">${listHtml}</ul>`,
                 showCloseButton: true,
                 buttons: [{ text: '完成', value: 'close', class: 'secondary' }],
-                onRender: (modalDOM) => {
-                    modalDOM.querySelector('.snippet-management-list').addEventListener('click', (e) => {
-                        if (e.target.classList.contains('delete-btn')) {
-                            e.stopPropagation();
-                            const index = parseInt(e.target.dataset.index, 10);
-                            const snippet = appearanceSettings.customCssSnippets[index];
-                            
-                            if (confirm(`确定要删除片段 "${snippet.name}" 吗？`)) {
+                onRender: (modalDOM, closeModal) => {
+                    modalDOM.querySelector('.snippet-management-list').addEventListener('click', async (e) => {
+                        const button = e.target.closest('button[data-action]');
+                        if (!button) return;
+
+                        e.stopPropagation();
+                        const action = button.dataset.action;
+                        const index = parseInt(button.dataset.index, 10);
+                        const snippet = appearanceSettings.customCssSnippets[index];
+
+                        if (action === 'delete') {
+                            if (await conversationManager.customConfirm(`确定要删除片段 "${snippet.name}" 吗？`)) {
                                 if (appearanceSettings.activeCssSnippetName === snippet.name) {
                                     appearanceSettings.activeCssSnippetName = '';
                                 }
@@ -20549,17 +20599,47 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                                 applySettings();
                                 renderPage();
 
-                                const listItem = e.target.closest('.snippet-management-item');
+                                const listItem = button.closest('.snippet-management-item');
                                 listItem.remove();
                                 if (modalDOM.querySelectorAll('.snippet-management-item').length === 0) {
                                     modalDOM.querySelector('.snippet-management-list').innerHTML = '<p style="padding: 20px; text-align: center; color: #888;">没有已保存的片段</p>';
                                 }
+                            }
+                        } else if (action === 'edit') {
+                            const newName = await conversationManager.showContentInputModal({
+                                title: '重命名样式片段',
+                                placeholder: '输入新的名称',
+                                value: snippet.name
+                            });
+
+                            if (newName && newName.trim()) {
+                                const trimmedName = newName.trim();
+                                if (appearanceSettings.customCssSnippets.some((s, i) => s.name === trimmedName && i !== index)) {
+                                    await conversationManager.customAlert('错误：该名称已存在！');
+                                    return;
+                                }
+
+                                const oldName = snippet.name;
+                                snippet.name = trimmedName;
+
+                                if (appearanceSettings.activeCssSnippetName === oldName) {
+                                    appearanceSettings.activeCssSnippetName = trimmedName;
+                                }
+
+                                saveSettings();
+                                applySettings();
+                                renderPage();
+                                
+                                // 关闭并重新打开弹窗以刷新列表
+                                closeModal();
+                                setTimeout(() => showCssManagerModal(), 100);
                             }
                         }
                     });
                 }
             });
         }
+// ===== 新版本的 showCssManagerModal 函数到这里结束 =====
         
         async function showAddFontModal() {
             const fontName = await conversationManager.showContentInputModal({ title: '添加新字体', placeholder: '为字体命名 (例如: 可爱圆体)' });
@@ -20585,8 +20665,11 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             let listHtml = savedFonts.length > 0
                 ? savedFonts.map((font, index) => `
                     <li class="snippet-management-item">
-                        <span class="name">${font.name}</span>
-                        <button class="delete-btn" data-index="${index}">删除</button>
+                        <span class="name">${escapeHtml(font.name)}</span>
+                        <div>
+                            <button class="btn-primary btn-secondary" data-action="edit" data-index="${index}" style="padding: 4px 8px; font-size: 12px;">编辑名称</button>
+                            <button class="delete-btn" data-action="delete" data-index="${index}" style="margin-left: 5px;">删除</button>
+                        </div>
                     </li>`).join('')
                 : '<p style="padding: 20px; text-align: center; color: #888;">没有已保存的字体</p>';
             
@@ -20595,33 +20678,67 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 html: `<ul class="snippet-management-list">${listHtml}</ul>`,
                 showCloseButton: true,
                 buttons: [{ text: '完成', value: 'close', class: 'secondary' }],
-                onRender: (modalDOM) => {
-                    modalDOM.querySelector('.snippet-management-list').addEventListener('click', (e) => {
-                         if (e.target.classList.contains('delete-btn')) {
-                            e.stopPropagation();
-                            const index = parseInt(e.target.dataset.index, 10);
-                            const font = savedFonts[index];
+                onRender: (modalDOM, closeModal) => {
+                    modalDOM.querySelector('.snippet-management-list').addEventListener('click', async (e) => {
+                        const button = e.target.closest('button[data-action]');
+                        if (!button) return;
 
-                            if (confirm(`确定要删除字体 "${font.name}" 吗？`)) {
+                        e.stopPropagation();
+                        const action = button.dataset.action;
+                        const index = parseInt(button.dataset.index, 10);
+                        const font = savedFonts[index];
+
+                        if (action === 'delete') {
+                            if (await conversationManager.customConfirm(`确定要删除字体 "${font.name}" 吗？`)) {
                                 if (activeFontName === font.name) {
                                     activeFontName = '默认';
                                 }
                                 savedFonts.splice(index, 1);
                                 saveSettings();
                                 applySettings();
-                                renderPage(); 
+                                renderPage();
                                 
-                                const listItem = e.target.closest('.snippet-management-item');
+                                const listItem = button.closest('.snippet-management-item');
                                 listItem.remove();
-                                if(modalDOM.querySelectorAll('.snippet-management-item').length === 0) {
+                                if (modalDOM.querySelectorAll('.snippet-management-item').length === 0) {
                                     modalDOM.querySelector('.snippet-management-list').innerHTML = '<p style="padding: 20px; text-align: center; color: #888;">没有已保存的字体</p>';
                                 }
+                            }
+                        } else if (action === 'edit') {
+                            const newName = await conversationManager.showContentInputModal({
+                                title: '重命名字体',
+                                placeholder: '输入新的名称',
+                                value: font.name
+                            });
+
+                            if (newName && newName.trim()) {
+                                const trimmedName = newName.trim();
+                                if (savedFonts.some((f, i) => f.name === trimmedName && i !== index)) {
+                                    await conversationManager.customAlert('错误：该名称已存在！');
+                                    return;
+                                }
+                                
+                                const oldName = font.name;
+                                font.name = trimmedName;
+
+                                if (activeFontName === oldName) {
+                                    activeFontName = trimmedName;
+                                }
+
+                                saveSettings();
+                                applySettings();
+                                renderPage();
+                                
+                                // 关闭并重新打开弹窗以刷新列表
+                                closeModal();
+                                setTimeout(() => showFontManagerModal(), 100);
                             }
                         }
                     });
                 }
             });
         }
+// ===== 新版本的 showFontManagerModal 函数到这里结束 =====
         function renderRegexList() {
             const listEl = document.getElementById('regex-list');
             listEl.innerHTML = '';
@@ -20677,7 +20794,33 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             }
         };
 
+        // ... in appearanceManager ...
         function init() {
+            // 【全新的辅助函数】
+            const handleBackgroundUpload = async (storageKey, inputElement) => {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'image/*';
+                fileInput.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    const dbKey = `bg-image-${storageKey}-${Date.now()}`;
+                    const indexedDbRef = `indexeddb:${dbKey}`;
+                    try {
+                        await imageStore.setItem(dbKey, file);
+                        inputElement.value = indexedDbRef; // 更新输入框的值
+                        
+                        // 触发保存逻辑
+                        document.getElementById('appearance-save-btn').click();
+                        alert('图片已上传并自动保存！');
+                    } catch (error) {
+                        alert("图片上传失败！");
+                    }
+                };
+                fileInput.click();
+            };
+
             loadSettings();
             applySettings();
 
@@ -20704,6 +20847,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 });
             }
             // ******** 全新代码到此结束 ********
+            
             // --- 新增：时间戳开关与位置选择监听 ---
             const timestampToggle = document.getElementById('toggle-msg-timestamps');
             const posSelect = document.getElementById('timestamp-pos-select');
@@ -20741,48 +20885,6 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             }
             // --- 结束 ---
 
-             // START: 新增正则替换的事件监听
-// ...
-            document.getElementById('regex-add-btn').addEventListener('click', () => {
-                const name = document.getElementById('regex-name').value.trim();
-                const pattern = document.getElementById('regex-pattern').value.trim();
-                const editIndex = document.getElementById('regex-edit-index').value;
-
-                if (!name || !pattern) {
-                    alert('规则名称和正则表达式不能为空！');
-                    return;
-                }
-
-                if (appearanceSettings.regexReplacements.some((r, i) => r.name === name && String(i) !== editIndex)) {
-                    alert('该规则名称已存在！');
-                    return;
-                }
-
-                const newRule = {
-                    name: name,
-                    pattern: pattern,
-                    flags: document.getElementById('regex-flags').value.trim(),
-                    template: document.getElementById('regex-template').value,
-                    enabled: document.getElementById('regex-enabled').checked
-                };
-
-                if (editIndex !== '') {
-                    appearanceSettings.regexReplacements[editIndex] = newRule;
-                } else {
-                    appearanceSettings.regexReplacements.push(newRule);
-                }
-                
-                saveSettings();
-                renderRegexList();
-                resetRegexForm();
-            });
-
-            document.getElementById('regex-cancel-btn').addEventListener('click', resetRegexForm);
-            
-            document.querySelector('.home-icon-btn[data-page="appearance"]').addEventListener('click', renderRegexList);
-            // END: 新增正则替换的事件监听
-
-
             document.getElementById('appearance-save-btn').addEventListener('click', () => {
                 appearanceSettings.globalFontSize = document.getElementById('global-font-size').value.trim();
                 document.querySelectorAll('#home-icon-settings-container input').forEach(input => {
@@ -20798,6 +20900,26 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 applySettings();
                 alert('外观设置已保存！');
             });
+
+            // 【【【核心修改：为所有新按钮绑定事件】】】
+            document.getElementById('global-chat-bg-upload-btn').addEventListener('click', () => {
+                const inputEl = document.getElementById('global-chat-bg-url');
+                handleBackgroundUpload('globalChatBgUrl', inputEl);
+            });
+
+            document.getElementById('home-bg-upload-btn').addEventListener('click', () => {
+                const inputEl = document.getElementById('home-bg-url');
+                handleBackgroundUpload('homeBgUrl', inputEl);
+            });
+
+            document.getElementById('page-appearance').addEventListener('click', (e) => {
+                if (e.target.classList.contains('local-icon-upload-btn')) {
+                    const page = e.target.dataset.page;
+                    const inputEl = document.getElementById(`icon-url-${page}`);
+                    handleBackgroundUpload(`iconUrls.${page}`, inputEl);
+                }
+            });
+            // 【【【修改结束】】】
 
             document.getElementById('global-css-select').addEventListener('change', (e) => {
                 const newName = e.target.value;
@@ -20916,6 +21038,110 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 });
             });
             // END: 新增正则规则的导出/导入事件监听
+            // ========================================================================
+            // ================= 【【【 全新的CSS片段导入导出逻辑 】】】 ================
+            // ========================================================================
+
+            document.getElementById('global-css-export-btn').addEventListener('click', async () => {
+                const snippets = appearanceSettings.customCssSnippets || [];
+                if (snippets.length === 0) {
+                    await conversationManager.customAlert('没有可导出的样式片段。');
+                    return;
+                }
+
+                if (typeof JSZip === 'undefined') {
+                    await conversationManager.customAlert('错误：ZIP库未加载，无法导出。');
+                    return;
+                }
+
+                try {
+                    const zip = new JSZip();
+                    snippets.forEach(snippet => {
+                        // 使用 sanitizeFilename 函数确保文件名合法
+                        const filename = `${sanitizeFilename(snippet.name)}.txt`;
+                        zip.file(filename, snippet.css);
+                    });
+
+                    const content = await zip.generateAsync({ type: "blob" });
+                    const timestamp = new Date().toISOString().slice(0, 19).replace(/[-T:]/g, "");
+                    const zipFilename = `css_snippets_backup_${timestamp}.zip`;
+                    
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(content);
+                    a.download = zipFilename;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(a.href);
+                    }, 100);
+
+                } catch (error) {
+                    console.error("导出CSS片段时出错:", error);
+                    await conversationManager.customAlert('导出失败: ' + error.message);
+                }
+            });
+
+            document.getElementById('global-css-import-btn').addEventListener('click', () => {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = '.txt'; // 只接受 .txt 文件
+                fileInput.multiple = true; // 允许选择多个文件
+fileInput.style.display = 'none';
+
+                fileInput.onchange = async (e) => {
+                    const files = e.target.files;
+                    if (!files || files.length === 0) return;
+
+                    let newCount = 0;
+                    let updatedCount = 0;
+
+                    for (const file of files) {
+                        const reader = new FileReader();
+                        // 使用 Promise 来处理异步读取
+                        const content = await new Promise((resolve, reject) => {
+                            reader.onload = (event) => resolve(event.target.result);
+                            reader.onerror = (error) => reject(error);
+                            reader.readAsText(file);
+                        });
+
+                        // 从文件名中提取片段名称
+                        const name = file.name.replace(/\.txt$/, '').trim();
+                        const css = content;
+
+                        if (name && css) {
+                            const existingIndex = appearanceSettings.customCssSnippets.findIndex(s => s.name === name);
+                            if (existingIndex > -1) {
+                                // 覆盖同名片段
+                                appearanceSettings.customCssSnippets[existingIndex].css = css;
+                                updatedCount++;
+                            } else {
+                                // 添加新片段
+                                appearanceSettings.customCssSnippets.push({ name, css });
+                                newCount++;
+                            }
+                        }
+                    }
+
+                    if (newCount > 0 || updatedCount > 0) {
+                        saveSettings();
+                        applySettings(); // 重新应用设置以防万一
+                        renderPage();  // 刷新下拉列表
+                        await conversationManager.customAlert(`导入完成！\n新增 ${newCount} 个片段。\n更新 ${updatedCount} 个片段。`);
+                    } else {
+                        await conversationManager.customAlert('没有导入任何有效的文件。');
+                    }
+
+                    document.body.removeChild(fileInput);
+                };
+
+                document.body.appendChild(fileInput);
+                fileInput.click();
+            });
+
+            // ========================================================================
+            // ================= 【【【 新增逻辑结束 】】】 ==========================
+            // ========================================================================
         }
 
         return { init, applySettings };
