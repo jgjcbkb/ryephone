@@ -5099,10 +5099,22 @@ input:checked + .slider:before {
                             <p class="form-hint">值越高，回复越随机；值越低，回复越稳定。推荐 0.7 ~ 1.2。</p>
                         </div>
 
+                        <!-- 【【【 全新的、完整的流式开关代码块从这里开始 】】】 -->
+                        <div class="form-group-toggle">
+                            <label for="api-stream-toggle" class="toggle-label">启用流式回复</label>
+                            <label class="switch">
+                                <input type="checkbox" id="api-stream-toggle">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <p class="form-hint" style="padding: 0 15px 15px;">开启后，AI的回复将逐字显示，增强实时感。关闭则等待完整回复后显示。</p>
+                        <!-- 【【【 新增代码块到此结束 】】】 -->
+
                         <div class="form-buttons-spaced">
                             <button id="save-api-profile-btn" class="btn-primary">保存</button>
                             <button id="cancel-api-form-btn" class="btn-primary btn-secondary">取消</button>
                         </div>
+<!-- ... -->
                         <input type="hidden" id="api-edit-index"></div>
                     <div class="form-section danger-zone" style="margin-top: 20px;">
                         <h3>数据管理</h3>
@@ -8665,14 +8677,14 @@ You MUST use the custom \`<dm>\` tag format.
         const tempSlider = document.getElementById('api-temperature-slider');
         const tempInput = document.getElementById('api-temperature');
         const providerSelect = document.getElementById('api-provider');
+        const streamToggle = document.getElementById('api-stream-toggle'); // 【核心新增】
         
         tempSlider.oninput = () => tempInput.value = tempSlider.value;
         tempInput.oninput = () => tempSlider.value = tempInput.value;
 
-        // ******** 核心修改区域 #2 开始 ********
         providerSelect.onchange = () => {
             switch(providerSelect.value) {
-                case 'gemini': // 新增：处理 Gemini 选项
+                case 'gemini':
                     apiUrlInput.value = 'https://generativelanguage.googleapis.com/v1beta/';
                     break;
                 case 'deepseek':
@@ -8682,7 +8694,6 @@ You MUST use the custom \`<dm>\` tag format.
                     break;
             }
         };
-        // ******** 核心修改区域 #2 结束 ********
 
         modelSelectGroup.style.display = 'none'; 
         apiFetchStatus.textContent = ''; 
@@ -8696,19 +8707,18 @@ You MUST use the custom \`<dm>\` tag format.
             apiUrlInput.value = profile.url; 
             systemPromptInput.value = profile.prompt; 
             
-            // ******** 核心修改区域 #3 开始 ********
-            if (profile.url.includes('googleapis.com')) { // 新增：识别 Gemini URL
+            if (profile.url.includes('googleapis.com')) {
                 providerSelect.value = 'gemini';
             } else if (profile.url.includes('api.deepseek.com')) {
                 providerSelect.value = 'deepseek';
             } else {
                 providerSelect.value = 'custom';
             }
-            // ******** 核心修改区域 #3 结束 ********
 
             const temperature = (profile.temperature !== undefined && profile.temperature !== null) ? profile.temperature : 0.7;
             tempSlider.value = temperature;
             tempInput.value = temperature;
+            streamToggle.checked = profile.enableStream || false; // 【核心新增】
             apiEditIndexInput.value = index; 
             if (profile.url && profile.key) fetchModels(profile.model); 
         } else { 
@@ -8722,9 +8732,11 @@ You MUST use the custom \`<dm>\` tag format.
             
             tempSlider.value = 0.7;
             tempInput.value = 0.7;
+            streamToggle.checked = false; // 【核心新增】
             apiEditIndexInput.value = ''; 
         } 
     }
+// ===== 新版本的 showApiForm 函数到此结束 =====
     function hideApiForm() { apiFormContainer.style.display = 'none'; }
     async function fetchModels(profileToSelectModel = null) { 
         const apiKey = apiKeyInput.value.trim(); 
@@ -8796,7 +8808,32 @@ You MUST use the custom \`<dm>\` tag format.
     addNewProfileBtn.addEventListener('click', () => showApiForm());
     cancelApiFormBtn.addEventListener('click', hideApiForm);
     fetchModelsBtn.addEventListener('click', () => fetchModels());
-    saveApiProfileBtn.addEventListener('click', () => { const name = apiNameInput.value.trim(); if (!name) return; const profileData = { name: name, key: apiKeyInput.value.trim(), url: apiUrlInput.value.trim(), prompt: systemPromptInput.value.trim(), model: modelSelectGroup.style.display === 'block' ? apiModelSelect.value : null, temperature: parseFloat(document.getElementById('api-temperature').value) }; const editIndex = apiEditIndexInput.value; if (editIndex !== '') apiProfiles[editIndex] = profileData; else apiProfiles.push(profileData); saveApiSettings(); renderApiProfiles(); hideApiForm(); });
+    saveApiProfileBtn.addEventListener('click', () => { 
+        const name = apiNameInput.value.trim(); 
+        if (!name) return; 
+        
+        const profileData = { 
+            name: name, 
+            key: apiKeyInput.value.trim(), 
+            url: apiUrlInput.value.trim(), 
+            prompt: systemPromptInput.value.trim(), 
+            model: modelSelectGroup.style.display === 'block' ? apiModelSelect.value : null, 
+            temperature: parseFloat(document.getElementById('api-temperature').value),
+            enableStream: document.getElementById('api-stream-toggle').checked // 【核心新增】
+        }; 
+        
+        const editIndex = apiEditIndexInput.value; 
+        if (editIndex !== '') {
+            apiProfiles[editIndex] = profileData; 
+        } else {
+            apiProfiles.push(profileData); 
+        }
+        
+        saveApiSettings(); 
+        renderApiProfiles(); 
+        hideApiForm(); 
+    });
+// ===== 新版本的事件监听器到此结束 =====
     window.app.selectProfile = (index) => { activeProfileIndex = index; saveApiSettings(); renderApiProfiles(); };
     window.app.editProfile = (index) => showApiForm(true, index);
     window.app.deleteProfile = (index) => { if (confirm('确认删除?')) { apiProfiles.splice(index, 1); if (activeProfileIndex === index) activeProfileIndex = null; saveApiSettings(); renderApiProfiles(); } };
@@ -11920,116 +11957,239 @@ Okay, that's all the context and rules. Now, generate your full response.
             finalMessages.push(finalFormattingInstruction);
             // 【【【【【【 注入结束 】】】】】】
 
-            // =================================================================
-            // ================= START: GEMINI COMPATIBILITY BLOCK ================
-            // =================================================================
-            let chatUrl, requestBody, requestHeaders;
+            // ... (构建完 finalMessages 之后) ...
+                // =================================================================
+                // ================= START: STREAMING VS NON-STREAMING LOGIC ========
+                // =================================================================
 
-            if (profile.url.includes('googleapis.com')) {
-                // --- Gemini API Logic ---
-                chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:generateContent?key=${profile.key}`;
-                requestHeaders = { 'Content-Type': 'application/json' };
-                
-                // Gemini 的 "system" prompt 需要单独处理
-                const systemInstruction = finalMessages.find(m => m.role === 'system');
-                
-                // 将 OpenAI 格式转换为 Gemini 格式
-                const contents = finalMessages
-                    .filter(m => m.role !== 'system') // 过滤掉 system 角色的消息
-                    .map(msg => {
-                        // Gemini 的 role 只能是 'user' 或 'model'
-                        const role = msg.role === 'assistant' ? 'model' : 'user';
-                        
-                        // Gemini 的 content 是一个包含 parts 数组的对象
-                        let parts;
-                        if (Array.isArray(msg.content)) {
-                            parts = msg.content.map(part => {
-                                if (part.type === 'text') {
-                                    return { text: part.text };
-                                }
-                                if (part.type === 'image_url') {
-                                    const base64Data = part.image_url.url.split(',')[1];
-                                    const mimeType = part.image_url.url.match(/data:(.*?);/)[1];
-                                    return { inline_data: { mime_type: mimeType, data: base64Data } };
-                                }
-                                return null;
-                            }).filter(Boolean);
-                        } else {
-                            parts = [{ text: msg.content }];
-                        }
-                        return { role, parts };
-                    });
-                    
-                requestBody = { contents };
-                if (systemInstruction) {
-                    requestBody.system_instruction = { parts: [{ text: systemInstruction.content }] };
-                }
-                if (profile.temperature !== undefined) {
-                    requestBody.generationConfig = { temperature: profile.temperature };
-                }
+                // 【【【 修复结束 】】】
 
-            } else {
-                // --- OpenAI Compatible API Logic ---
-                chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
-                requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
-                requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
-            }
+                let aiResponse = ""; // 【核心修复1】在此处提前声明变量，确保它全局存在
+                if (profile.enableStream) {
+                    // --- 模式A: 流式回复 ---
+                    let chatUrl, requestBody, requestHeaders;
+                    const decoder = new TextDecoder();
+                    let streamingMessageId = null;
+                    let fullResponseText = "";
+                    let buffer = "";
 
-            const response = await fetch(chatUrl, {
-                method: 'POST',
-                headers: requestHeaders,
-                body: JSON.stringify(requestBody)
-            });
-    
-            if (!response.ok) {
-                const errorBody = await response.text();
-                throw new Error(`API Error ${response.status}: ${response.statusText}\nResponse: ${errorBody}`);
-            }
-    
-            // --- START: 流式响应安全处理模块 (SSE Fix) ---
-            const rawText = await response.text();
-            let data;
-            
-            try {
-                // 优先尝试直接解析，兼容非流式API
-                data = JSON.parse(rawText);
-            } catch (e) {
-                // 如果直接解析失败，说明可能是流式数据
-                console.log("[SSE Fix] Direct JSON parse failed, attempting SSE format cleanup.");
-                const lines = rawText.trim().split('\n');
-                const lastLine = lines.find(line => line.startsWith('data: {'));
-
-                if (lastLine) {
-                    const jsonString = lastLine.substring('data: '.length);
-                    try {
-                        data = JSON.parse(jsonString);
-                    } catch (finalError) {
-                        // 如果清理后还是失败，就抛出详细错误
-                        throw new Error(`Failed to parse SSE data. Raw line: ${lastLine}\nOriginal Error: ${finalError.message}`);
+                    // 1. 准备流式请求
+                    if (profile.url.includes('googleapis.com')) {
+                        // Gemini 流式请求
+                        chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:streamGenerateContent?key=${profile.key}`;
+                        requestHeaders = { 'Content-Type': 'application/json' };
+                        const systemInstruction = finalMessages.find(m => m.role === 'system');
+                        const contents = finalMessages.filter(m => m.role !== 'system').map(msg => ({ role: msg.role === 'assistant' ? 'model' : 'user', parts: [{ text: msg.content }] }));
+                        requestBody = { contents };
+                        if (systemInstruction) requestBody.system_instruction = { parts: [{ text: systemInstruction.content }] };
+                        if (profile.temperature !== undefined) requestBody.generationConfig = { temperature: profile.temperature };
+                    } else {
+                        // OpenAI 兼容流式请求
+                        chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
+                        requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
+                        requestBody = { model: profile.model, messages: finalMessages, stream: true, temperature: (profile.temperature ?? 0.7) };
                     }
+
+                    const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody) });
+                    if (!response.ok) {
+                        const errorBody = await response.text();
+                        throw new Error(`API Error ${response.status}: ${response.statusText}\nResponse: ${errorBody}`);
+                    }
+
+                    const reader = response.body.getReader();
+                    
+                    // 2. 循环读取数据流
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        
+                        // OpenAI SSE 格式处理
+                        if (!profile.url.includes('googleapis.com')) {
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop(); // 保留不完整的一行
+
+                            for (const line of lines) {
+                                if (line.startsWith('data: ')) {
+                                    const jsonStr = line.substring(6);
+                                    if (jsonStr === '[DONE]') continue;
+                                    try {
+                                        const chunk = JSON.parse(jsonStr);
+                                        const delta = chunk.choices[0]?.delta?.content || '';
+                                        if (delta) {
+                                            fullResponseText += delta;
+                                            await updateStreamingMessage(delta);
+                                        }
+                                    } catch (e) { /* ignore parse errors on partial lines */ }
+                                }
+                            }
+                        } else {
+                            // Gemini 响应格式处理 (它不是标准的SSE)
+                            try {
+                                const potentialJson = JSON.parse(buffer);
+                                const delta = potentialJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                                if (delta) {
+                                    fullResponseText += delta;
+                                    await updateStreamingMessage(delta);
+                                }
+                                buffer = ""; // 成功解析后清空缓冲区
+                            } catch(e) { /* JSON不完整，等待下一个chunk */ }
+                        }
+                    }
+
+                    async function updateStreamingMessage(delta) {
+                        if (!streamingMessageId) {
+                            // 创建第一个占位消息
+                            const placeholderMsg = {
+                                id: `streaming-${Date.now()}`,
+                                type: 'text',
+                                text: '',
+                                side: 'received',
+                                // 在群聊中，我们暂时不知道谁在说话，所以sender留空
+                                sender: contactInfo.isGroup ? null : chatState.chatName,
+                            };
+                            await addMessage(placeholderMsg, originatingChatId);
+                            streamingMessageId = placeholderMsg.id;
+                        }
+
+                        // 更新DOM
+                        const streamingWrapper = messagesContainer.querySelector(`[data-message-id="${streamingMessageId}"]`);
+                        if (streamingWrapper) {
+                            const messageDiv = streamingWrapper.querySelector('.message.text');
+                            if (messageDiv) {
+                                // 简单地追加文本，不处理Markdown，最后统一处理
+                                messageDiv.textContent += delta;
+                                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                            }
+                        }
+                    }
+
+                    // 3. 流结束后，用完整内容覆盖并正确解析
+                    if (streamingMessageId) {
+                        // A. 从数据中删除
+                        const streamingMsgIndex = chatState.messages.findIndex(m => m.id === streamingMessageId);
+                        if (streamingMsgIndex > -1) {
+                            chatState.messages.splice(streamingMsgIndex, 1);
+                            const fullHistoryStreamingMsgIndex = fullMessageHistory.findIndex(m => m.id === streamingMessageId);
+                            if(fullHistoryStreamingMsgIndex > -1) {
+                                fullMessageHistory.splice(fullHistoryStreamingMsgIndex, 1);
+                            }
+                        }
+
+                        // 【核心修复】B. 立即从屏幕上彻底移除这个临时的流式气泡
+                        const streamingElement = document.querySelector(`[data-message-id="${streamingMessageId}"]`);
+                        if (streamingElement) {
+                            streamingElement.remove();
+                        }
+                    }
+                    
+                    // 【核心修复2】将流式结果赋值给全局变量，交由函数底部的公共逻辑统一处理
+                    aiResponse = fullResponseText; 
+
+                    // 【已删除重复的处理逻辑，防止出现双重回复】
+
                 } else {
-                    // 如果连 data: { 开头的行都找不到，说明格式完全错误
-                    throw new Error(`Invalid response format. Not JSON and not recognized SSE. Raw response: ${rawText}`);
+                    // --- 模式B: 非流式回复 (保持原有逻辑不变) ---
+                    let chatUrl, requestBody, requestHeaders;
+
+                    if (profile.url.includes('googleapis.com')) {
+                        chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:generateContent?key=${profile.key}`;
+                        requestHeaders = { 'Content-Type': 'application/json' };
+                        const systemInstruction = finalMessages.find(m => m.role === 'system');
+                        const contents = finalMessages.filter(m => m.role !== 'system').map(msg => ({ role: msg.role === 'assistant' ? 'model' : 'user', parts: [{ text: msg.content }] }));
+                        requestBody = { contents };
+                        if (systemInstruction) requestBody.system_instruction = { parts: [{ text: systemInstruction.content }] };
+                        if (profile.temperature !== undefined) requestBody.generationConfig = { temperature: profile.temperature };
+                    } else {
+                        chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
+                        requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
+                        requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
+                    }
+
+                    const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody) });
+                    if (!response.ok) {
+                        const errorBody = await response.text();
+                        throw new Error(`API Error ${response.status}: ${response.statusText}\nResponse: ${errorBody}`);
+                    }
+                    const data = await response.json();
+                    
+                    // let aiResponse; // 【核心修复3】删掉前面的 let，直接使用我们在第一步声明的变量
+                    if (profile.url.includes('googleapis.com')) {
+                        aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    } else {
+                        aiResponse = data.choices?.[0]?.message?.content;
+                    }
+
+                    if (aiResponse) {
+                        aiResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    }
+                    
+                    // 原有的 aiResponse 后续处理逻辑（弹窗、解析等）从这里开始
+                    if (aiResponse && aiResponse.includes('<div') && appearanceSettings.showRawOutput) {
+                        // ... (此处的弹窗逻辑保持不变)
+                        const result = await conversationManager.showCustomModal({
+                            title: '修改 AI 原始输出',
+                            html: `<textarea id="raw-output-editor-continuation" style="width: 100%; height: 250px; white-space: pre; word-wrap: normal; overflow-x: scroll; font-family: monospace; border: 1px solid #ccc; border-radius: 5px; padding: 10px;">${escapeHtml(aiResponse)}</textarea>`,
+                            buttons: [{ text: '直接处理 (不改)', value: 'skip', class: 'secondary' },{ text: '确认修改', value: 'confirm', class: 'primary' }]
+                        });
+                        if (result && result.value === 'confirm') {
+                            const editor = result.target.closest('.modal-box').querySelector('#raw-output-editor-continuation');
+                            if (editor) aiResponse = editor.value;
+                        }
+                    }
+            
+                    if (aiResponse && aiResponse.trim()) {
+                        // ... (此处的 processAIResponseLine 调用逻辑保持不变)
+                        let responseToProcess = aiResponse.trim();
+                        const descriptionRegex = /<private_note type="image_description">([\s\S]*?)<\/private_note>/;
+                        const descriptionMatch = responseToProcess.match(descriptionRegex);
+                        if (descriptionMatch) {
+                            const imageDescription = descriptionMatch[1].trim();
+                            const lastImageMessage = [...chatState.messages].reverse().find(m => m.type === 'photo' && m.side === 'sent');
+                            if (lastImageMessage && imageDescription) {
+                                lastImageMessage.imageDescription = imageDescription;
+                                saveConversation();
+                            }
+                            responseToProcess = responseToProcess.replace(descriptionRegex, '').trim();
+                        }
+                        const cleanedText = await executeBackgroundUpdatesAndCleanText(responseToProcess, originatingChatId, chatState.chatName);
+                        if (!cleanedText) {
+                            loadingStates[originatingChatId] = false;
+                            if (chatState.chatId === originatingChatId) {
+                                dynamicDecorationBtn.classList.remove('loading');
+                            }
+                            return;
+                        }
+
+                        const blockRegex = /<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>/g;
+                        let match;
+                        while ((match = blockRegex.exec(cleanedText)) !== null) {
+                            const type = match[1];
+                            const sender = match[2];
+                            const content = match[3].trim();
+                            if (!content) continue;
+                            switch (type) {
+                                case 'text':
+                                case 'html':
+                                    if (content.trim().startsWith('[reply_to:')) {
+                                        const commandWithSender = sender ? `${sender}: ${content}` : content;
+                                        await processAIResponseLine(commandWithSender, originatingChatId, sender);
+                                    } else {
+                                        await addMessage({ type: 'text', text: content, side: 'received', sender: sender || null, }, originatingChatId);
+                                    }
+                                    break;
+                                case 'command':
+                                    await processAIResponseLine(content, originatingChatId, sender);
+                                    break;
+                            }
+                        }
+                    }
                 }
-            }
-            // --- END: 流式响应安全处理模块 (SSE Fix) ---
-
-            // 兼容 Gemini 和 OpenAI 的不同返回格式
-            let aiResponse;
-            if (profile.url.includes('googleapis.com')) {
-                aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            } else {
-                aiResponse = data.choices?.[0]?.message?.content;
-            }
-
-            // 【核心修复】：在进入任何处理逻辑之前，彻底切除思维链
-            if (aiResponse) {
-                aiResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-            }
-
-            // =================================================================
-            // =================== END: GEMINI COMPATIBILITY BLOCK =================
-            // =================================================================
+                
+                // =================================================================
+                // =================== END: STREAMING VS NON-STREAMING LOGIC =========
+                // =================================================================
 
                 // --- 【【【请在这里插入新的诊断代码】】】 ---
                 if (aiResponse && aiResponse.includes('<div') && appearanceSettings.showRawOutput) {
