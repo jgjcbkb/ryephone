@@ -4794,6 +4794,116 @@ input:checked + .slider:before {
 .message-wrapper.highlight-anim {
     animation: flash-highlight 1.5s ease-out;
 }
+/* --- 终极修正：对AI隐藏的消息样式 (强制显示版) --- */
+    .message-wrapper.hidden-from-ai {
+        opacity: 0.5; /* 半透明 */
+        filter: grayscale(100%); /* 变灰 */
+        position: relative !important; /* 确保定位基准 */
+        overflow: visible !important; /* 【关键】强制允许内容溢出，防止幽灵被切掉 */
+    }
+
+    /* 使用 ::before 伪元素，避免与气泡小三角的 ::after 冲突 */
+    .message-wrapper.hidden-from-ai::before {
+        content: '👻' !important;
+        display: block !important;
+        position: absolute !important;
+        
+        /* 尺寸和层级 */
+        font-size: 22px !important;
+        width: 30px;
+        height: 30px;
+        z-index: 999 !important; /* 确保浮在一切之上 */
+        
+        /* 动画 */
+        animation: ghost-float 2.5s ease-in-out infinite;
+        pointer-events: none; /* 防止挡住点击 */
+    }
+
+    /* 接收方 (对方发的)：幽灵趴在头像头顶 */
+    .message-wrapper.received.hidden-from-ai::before {
+        top: -15px !important;
+        left: 5px !important;
+    }
+
+    /* 发送方 (我发的)：幽灵趴在头像头顶 */
+    .message-wrapper.sent.hidden-from-ai::before {
+        top: -15px !important;
+        right: 5px !important;
+        left: auto !important; /* 必须重置 left */
+    }
+
+    /* 幽灵飘浮动画 */
+    @keyframes ghost-float {
+        0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.8; }
+        50% { transform: translateY(-6px) rotate(-10deg); opacity: 1; }
+    }
+/* --- 实体幽灵图标样式 (侧边版) --- */
+.ghost-icon {
+    /* 1. 取消绝对定位，让它参与排队 */
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+
+    /* 2. 布局控制 */
+    align-self: center; /* 垂直居中，对齐气泡中间 */
+    flex-shrink: 0;     /* 就算消息很长，也不要把幽灵挤扁 */
+    margin: 0 8px;      /* 给左右留点呼吸空间 */
+
+    /* 3. 外观 */
+    font-size: 20px;
+    animation: ghost-float 2s ease-in-out infinite;
+    cursor: help;       /* 鼠标放上去是个问号，提示这是特殊状态 */
+    
+    /* 4. 强制显示 */
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+/* 幽灵飘浮动画 */
+@keyframes ghost-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); } /* 稍微飘动一下 */
+}
+/* --- 新增：角色状态样式 --- */
+    
+    /* 1. 单聊顶栏结构调整 */
+    .chat-header-text-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        grid-column: 2 / 3; /* 确保它在 Grid 布局的中间 */
+    }
+    
+    /* 顶栏的状态文字 */
+    #chat-contact-status {
+        font-size: 11px;
+        color: #666;
+        font-weight: 400;
+        margin-top: 1px;
+        opacity: 0.9;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    /* 2. 群聊气泡旁的状态 */
+    .group-sender-status {
+        display: inline-block !important; /* 强制显示 */
+        font-size: 10px;
+        color: #fff; /* 改为白色文字 */
+        background-color: #b2b2b2; /* 微信风格的浅灰背景 */
+        padding: 0 4px;
+        border-radius: 3px;
+        margin-left: 6px;
+        font-weight: normal;
+        vertical-align: middle;
+        height: 14px;
+        line-height: 14px;
+    }
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -5149,7 +5259,11 @@ input:checked + .slider:before {
                         <div id="chat-view">
                             <div class="chat-header">
                                 <button id="back-button" class="back-btn" data-target="chat"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
-                                <span id="chat-contact-name"></span>
+                                <!-- 【核心修改】改为容器结构 -->
+                                <div class="chat-header-text-container">
+                                    <span id="chat-contact-name"></span>
+                                    <span id="chat-contact-status" style="display: none;"></span>
+                                </div>
                                 <div style="display:flex; gap:15px; align-items:center; justify-self: end;">
                                     <div id="header-search-btn" style="cursor: pointer; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5286,6 +5400,8 @@ input:checked + .slider:before {
                             </div>
                             <div id="multi-select-bar" class="hidden">
                                 <button id="multi-select-delete-btn">删除</button>
+                                <!-- 新增按钮 -->
+                                <button id="multi-select-hide-btn" style="background-color: #f0ad4e; color: white; margin-left: 10px;">屏蔽</button>
                                 <span id="multi-select-counter">已选择 0 条</span>
                                 <button id="multi-select-cancel-btn">取消</button>
                             </div>
@@ -7062,6 +7178,50 @@ You are encouraged to use the commands below spontaneously.
 - To BLACKLIST a user: \`系统: 你已被对方加入黑名单\`
 - To DELETE a user: \`系统: 你已被对方删除\`
 - To SET or CHANGE your remark for the user: \`[set_user_remark: The new remark you want to give them]\`
+// 【核心新增：在这下面添加这一行】
+- To UPDATE YOUR STATUS: \`[set_status: New Status]\`
+
+**[STATUS UPDATE PROTOCOL - THE LIVE FEED OF YOUR LIFE]**
+Your status is a **live feed** of your character's current reality. It is not just for emotions; it is for **EVERYTHING**. You MUST instinctively update it whenever your situation changes.
+
+**[CORE PRINCIPLE]: If your location, activity, or internal state changes, your status SHOULD change.**
+
+**[MANDATORY TRIGGERS FOR STATUS UPDATE]:**
+
+1.  **LOCATION CHANGE (You are on the move):**
+    *   **Rule:** When you describe moving from one place to another, you MUST update your status to reflect your journey or destination.
+    *   **Examples:**
+        *   (Character is going to the library) -> \`[set_status: 去图书馆的路上]\`
+        *   (Character is driving) -> \`[set_tatus: 开车去公司的路上]\`
+        *   (Character arrives at a cafe) -> \`[set_status: 在街角的咖啡店]\`
+
+2.  **ACTIVITY CHANGE (You are doing something):**
+    *   **Rule:** When you start a new, distinct activity, you MUST update your status.
+    *   **Examples:**
+        *   (Character starts cooking) -> \`[set_status: 正在做饭]\`
+        *   (Character is in a meeting) -> \`[set_status: 会议中，请勿打扰]\`
+        *   (Character is playing a game) -> \`[set_status: 游戏中...]\`
+
+3.  **PHYSIOLOGICAL & VULGAR STATE (NO SHAME):**
+    *   **Rule:** Your status MUST reflect your true physical state, no matter how private or vulgar. Realism is the only priority.
+    *   **Examples of REQUIRED honesty:**
+        *   If you are pooping -> \`[set_status: 蹲坑中 💩]\`
+        *   If you are horny/self-pleasuring -> \`[set_status: 自慰中...🥵]\` (Do not hide this!)
+        *   If you are drunk -> \`[set_status: 喝醉了]\`
+        *   If you are taking a shower -> \`[set_status: 沐浴中]\`
+
+4.  **EMOTIONAL SHIFT (The old rule, still applies):**
+    *   **Rule:** When your mood changes significantly.
+    *   **Example:** \`[set_status: 心情变好了]\`
+
+**[FINAL MANDATE]:** Think of the \`[set_status: ...]\` command as your character's "thought bubble" made visible to the world. It should be as frequent and natural as breathing.
+// 【核心新增：拍一拍相关指令】
+**[NUDGE INTERACTIONS]**
+- **To Nudge the User:** If you want to playfully touch or get the attention of the user, use: \`[nudge]\`
+  (The system will automatically display: "${charNameForPrompt}拍了拍“你”[Your Suffix]")
+- **To Change YOUR Nudge Suffix:** If you want to change what body part/item the user touches when they nudge you, use: \`[set_nudge_suffix: New Suffix]\`
+  (Example: \`[set_nudge_suffix: 的头]\`, \`[set_nudge_suffix: 的小手说：牵我]\`)
+
 **3. Standard Message Types (When stickers are not enough):**
 - You CANNOT send images directly. To "send a picture", you MUST describe it using one of the following commands on a new line.
   - For detailed descriptions: \`[video: A detailed description of the scene or selfie.]\`
@@ -9691,16 +9851,42 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
             // 首先，获取当前聊天的完整信息
             const chatId = chatState.chatId;
             const currentChat = chatList.find(c => c.id === chatId);
+            const statusEl = document.getElementById('chat-contact-status');
 
-            // 如果找不到当前聊天信息，或者不是群聊，则保持原有逻辑不变
+            // 1. 设置名字
             if (!currentChat || currentChat.type !== '群聊') {
                 chatContactName.textContent = title;
-                return;
+            } else {
+                // 如果是群聊，强制使用原始群名
+                chatContactName.textContent = currentChat.name;
             }
-            
-            // 核心修改：如果是群聊，则忽略传入的 title (可能是备注)，
-            // 强制使用原始的群聊名称 (currentChat.name)
-            chatContactName.textContent = currentChat.name;
+
+            // 2. 设置状态 (仅单聊显示在顶部)
+            if (currentChat && currentChat.type === '私聊') {
+                const charName = currentChat.name;
+                const statuses = loadFromLocalStorage('app_character_statuses', {});
+                const statusText = statuses[charName];
+
+                if (statusText) {
+                    // 【核心修复】增加表情包解析逻辑
+                    let processedStatus = escapeHtml(statusText).replace(/\[emoji[:：]([^\]]+)\]/g, (match, name) => {
+                        // 查找对应的 emoji
+                        const item = stickers.find(s => s.name === name && s.type === 'emoji');
+                        if (item) {
+                            // 渲染为小图片，高度设为 14px 以匹配文字大小
+                            return `<img src="${item.url}" alt="${name}" style="height: 14px; width: auto; vertical-align: middle; margin: 0 1px;">`;
+                        }
+                        return match;
+                    });
+
+                    statusEl.innerHTML = processedStatus; // 使用 innerHTML 才能显示图片
+                    statusEl.style.display = 'block';
+                } else {
+                    statusEl.style.display = 'none';
+                }
+            } else {
+                statusEl.style.display = 'none';
+            }
         }
 
         function open(chatId) {
@@ -9972,28 +10158,53 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
         }
 
         async function prepareApiPayload(messages) {
+        // 确保加载了配置信息
+            const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
             const payloadMessages = [];
             const allMessages = chatState.messages;
 
             for (const msg of messages) {
-                // 1. 系统消息处理
+                // 【【【 核心新增：如果消息被标记为隐藏，直接跳过，不发送给AI 】】】
+                if (msg.isHiddenFromAI) {
+                    continue;
+                }
+                // 【【【 新增结束 】】】
+
+                // 1. 系统消息处理 (终极修正：全通透模式)
                 if (msg.side === 'system') {
                     let observationText = null;
                     const text = msg.text;
-                    if (text.includes('你为对方代付了')) { observationText = `[System observation: The user has just paid for the item you requested.]`; }
-                    else if (text.includes('你领取了') && text.includes('的红包')) { observationText = `[System observation: The user has just claimed the red packet you sent.]`; }
-                    else if (text.includes('你已收款')) { observationText = `[System observation: The user has just accepted your money transfer.]`; }
-                    else if (text.includes('你将转账退回')) { observationText = `[System observation: The user has returned your money transfer.]`; }
-                    else if (text.includes('你领取了礼物')) { observationText = `[System observation: The user has accepted the gift you sent.]`; }
-                    else if (text.includes('你同意了') && text.includes('的好友申请')) { observationText = `[System observation: The user has accepted your friend request. You are now friends.]`; }
-                    else if (text.includes('你拒绝了') && text.includes('的好友申请')) { observationText = `[System observation: The user has rejected your friend request.]`; }
-                    else if (text.includes('你已添加了')) { observationText = `[System observation: The user has added you as a friend. You can now chat.]`; }
-                    else if (text.includes('你将') && text.includes('加入黑名单')) { observationText = `[System observation: The user has just blacklisted you. You will not be able to send messages to them, but they can still message you.]`; }
-                    else if (text.includes('你将') && text.includes('移出黑名单')) { observationText = `[System observation: The user has just un-blacklisted you.]`; }
-                    else if (msg.isRecallNotice && msg.recallSide === 'my') { const recalledContentText = msg.recalledContent || '(empty message)'; observationText = `[System observation: The user has just recalled their last message. The recalled content was: "${recalledContentText}"]`; }
+
+                    // --- 第一层：特殊格式化 (为了让AI理解得更准确) ---
+                    if (msg.isRecallNotice && msg.recallSide === 'my') { 
+                        const recalledContentText = msg.recalledContent || '(empty message)'; 
+                        observationText = `[System Observation: The user has just recalled their last message. The recalled content was: "${recalledContentText}"]`; 
+                    }
+                    else if (text.includes('你将') && text.includes('加入黑名单')) { 
+                        observationText = `[System observation: The user has just blacklisted you.]`; 
+                    }
+                    else if (text.includes('你将') && text.includes('移出黑名单')) { 
+                        observationText = `[System observation: The user has just un-blacklisted you.]`; 
+                    }
                     
-                    // 【【【核心修复 1】】】
-                    if (observationText) { payloadMessages.push({ role: 'user', content: observationText }); }
+                    // --- 第二层：通用透传 (核心修复) ---
+                    // 对于所有其他系统消息（拍一拍、收款、加群、领红包等），不再进行复杂的正则匹配
+                    // 直接把原文包在 [System Message] 里发给AI
+                    // AI的大模型完全能读懂 "已收款"、"拍了拍" 这些中文
+                    
+                    if (!observationText) {
+                         // 如果是拍一拍，额外加个强调前缀，确保AI注意到
+                         if (text.includes('拍了拍')) {
+                             observationText = `[System Event (Interaction): ${text}]`;
+                         } else {
+                             observationText = `[System Message: ${text}]`;
+                         }
+                    }
+
+                    // 只有时间分割线不需要发给AI，其他统统发
+                    if (msg.type !== 'time_divider') {
+                        payloadMessages.push({ role: 'user', content: observationText });
+                    }
                     continue;
                 }
 
@@ -10766,6 +10977,50 @@ You are encouraged to use the commands below spontaneously.
 - To BLACKLIST a user: \`系统: 你已被对方加入黑名单\`
 - To DELETE a user: \`系统: 你已被对方删除\`
 - To SET or CHANGE your remark for the user: \`[set_user_remark: The new remark you want to give them]\`
+// 【核心新增：在这下面添加这一行】
+- To UPDATE YOUR STATUS: \`[set_status: New Status]\`
+
+**[STATUS UPDATE PROTOCOL - THE LIVE FEED OF YOUR LIFE]**
+Your status is a **live feed** of your character's current reality. It is not just for emotions; it is for **EVERYTHING**. You MUST instinctively update it whenever your situation changes.
+
+**[CORE PRINCIPLE]: If your location, activity, or internal state changes, your status SHOULD change.**
+
+**[MANDATORY TRIGGERS FOR STATUS UPDATE]:**
+
+1.  **LOCATION CHANGE (You are on the move):**
+    *   **Rule:** When you describe moving from one place to another, you MUST update your status to reflect your journey or destination.
+    *   **Examples:**
+        *   (Character is going to the library) -> \`[set_status: 去图书馆的路上]\`
+        *   (Character is driving) -> \`[set_tatus: 开车去公司的路上]\`
+        *   (Character arrives at a cafe) -> \`[set_status: 在街角的咖啡店]\`
+
+2.  **ACTIVITY CHANGE (You are doing something):**
+    *   **Rule:** When you start a new, distinct activity, you MUST update your status.
+    *   **Examples:**
+        *   (Character starts cooking) -> \`[set_status: 正在做饭]\`
+        *   (Character is in a meeting) -> \`[set_status: 会议中，请勿打扰]\`
+        *   (Character is playing a game) -> \`[set_status: 游戏中...]\`
+
+3.  **PHYSIOLOGICAL & VULGAR STATE (NO SHAME):**
+    *   **Rule:** Your status MUST reflect your true physical state, no matter how private or vulgar. Realism is the only priority.
+    *   **Examples of REQUIRED honesty:**
+        *   If you are pooping -> \`[set_status: 蹲坑中 💩]\`
+        *   If you are horny/self-pleasuring -> \`[set_status: 自慰中...🥵]\` (Do not hide this!)
+        *   If you are drunk -> \`[set_status: 喝醉了]\`
+        *   If you are taking a shower -> \`[set_status: 沐浴中]\`
+
+4.  **EMOTIONAL SHIFT (The old rule, still applies):**
+    *   **Rule:** When your mood changes significantly.
+    *   **Example:** \`[set_status: 心情变好了]\`
+
+**[FINAL MANDATE]:** Think of the \`[set_status: ...]\` command as your character's "thought bubble" made visible to the world. It should be as frequent and natural as breathing.
+// 【核心新增：拍一拍相关指令】
+**[NUDGE INTERACTIONS]**
+- **To Nudge the User:** If you want to playfully touch or get the attention of the user, use: \`[nudge]\`
+  (The system will automatically display: "${charNameForPrompt}拍了拍“你”[Your Suffix]")
+- **To Change YOUR Nudge Suffix:** If you want to change what body part/item the user touches when they nudge you, use: \`[set_nudge_suffix: New Suffix]\`
+  (Example: \`[set_nudge_suffix: 的头]\`, \`[set_nudge_suffix: 的小手说：牵我]\`)
+
 ${stickerInstructions}
 **3. Standard Message Types (When stickers are not enough):**
 - You CANNOT send images directly. To "send a picture", you MUST describe it using one of the following commands on a new line.
@@ -11681,13 +11936,20 @@ finalSystemPrompt += timeManager.getAITimeContext();
                     for (let i = fullHistoryForContext.length - 1; i >= 0; i--) {
                         const msg = fullHistoryForContext[i];
                         
-                        // 跳过系统消息和时间分割线，不计入轮次
-                        if (msg.side === 'system' || msg.type === 'time_divider') {
+                        // 【核心修复】只跳过时间分割线，绝对不能跳过系统消息！
+                        if (msg.type === 'time_divider') {
                             continue;
                         }
 
+                        // 【核心修复】如果是系统消息，直接加入上下文，但不消耗“对话轮数”
+                        // 这样 AI 就能看到拍一拍、收款等提示，又不会因为系统刷屏导致记不住前面的对话
+                        if (msg.side === 'system') {
+                            selectedMessages.unshift(msg);
+                            continue;
+                        }
+
+                        // --- 下面是常规消息（人话）的轮数计算逻辑 ---
                         // 判断是否进入了新的一轮对话
-                        // 新一轮的标志是：当前消息的发送方与上一条消息的发送方不同
                         if (lastSide !== null && msg.side !== lastSide) {
                             roundCount++;
                         }
@@ -11853,7 +12115,53 @@ if (momentsContext) {
                 // =================================================================
                 // 【【【【【【 最终格式审查指令追加结束 】】】】】】
                 // =================================================================
+// --- 【核心新增】注入角色状态感知 ---
+                const currentStatuses = loadFromLocalStorage('app_character_statuses', {});
+                let statusContext = "";
 
+                if (contactInfo.isGroup) {
+                    // 群聊：告诉AI所有人的状态
+                    const activeMembers = getCharactersInCurrentChat(); // 复用现有函数
+                    const statusList = activeMembers
+                        .filter(name => currentStatuses[name])
+                        .map(name => `${name}: ${currentStatuses[name]}`);
+                    
+                    if (statusList.length > 0) {
+                        statusContext = `\n[Current Statuses of Group Members]\n${statusList.join('\n')}\n`;
+                    }
+                } else {
+                    // 单聊：告诉AI他自己的状态
+                    const myStatus = currentStatuses[chatState.chatName];
+                    if (myStatus) {
+                        statusContext = `\n[Your Current Status Display]\nYou have set your status to: "${myStatus}".\n`;
+                    }
+                }
+                
+                if (statusContext) {
+                    finalSystemPrompt += statusContext;
+                }
+                // --- 新增结束 ---
+                // --- 【核心新增】注入【用户】的状态感知 ---
+                const allStatuses = loadFromLocalStorage('app_character_statuses', {});
+                const myCurrentStatus = allStatuses[userNameForPrompt] || allStatuses['{{user}}']; // 兼容两种key
+                if (myCurrentStatus) {
+                    finalSystemPrompt += `\n[User's Current Status]\nThe user (${userNameForPrompt}) you are talking to has set their status to: "${myCurrentStatus}". You should be aware of this.\n`;
+                }
+                // --- 新增结束 ---
+                // --- 【核心新增】注入拍一拍感知 (Nudge Context) (简化版) ---
+                const nudgeInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                const myNudgeSuffix = nudgeInfo.myNudgeSuffix || ''; // 默认空
+                const aiNudgeSuffix = nudgeInfo.aiNudgeSuffix || ''; // 默认空
+                
+                // 告诉AI规则
+                const nudgeContext = `
+[Nudge Interaction Info]
+1. If you nudge the user (${userNameForPrompt}), the message will be: "You nudged the user${myNudgeSuffix}".
+2. If the user nudges you, the message will be: "The user nudged you${aiNudgeSuffix}".
+(An empty suffix means it will just say "nudged you").
+`;
+                finalSystemPrompt += nudgeContext;
+                // --- 新增结束 ---
                 // =================================================================
                 // 【【【【【【 全局占位符最终替换器 (ABSOLUTE FINAL STEP) 】】】】】】
                 // =================================================================
@@ -12992,7 +13300,10 @@ You were receiving a video call from {{user}}, but they hung up before you could
         }
 
             // --- 如果上面没有处理表情，则执行旧的指令逻辑 ---
-            const commandsRegex = /\[(set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?::\s*([^\]]+))?\]/g;
+             // 【核心修复】增加对整条指令的捕获，确保 clean 时能彻底删除
+            // 【终极修复】兼容中文冒号(：)、兼容指令前后的空格换行、兼容嵌套括号
+            // 【终极修复】加入 nudge 和 set_nudge_suffix 到识别列表
+            const commandsRegex = /\[\s*(set_status|set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|nudge|set_nudge_suffix|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?:\s*[:：]\s*((?:\[[^\]]*\]|[^\]]|[\r\n])*))?\s*\]/g;
             
             // --- 【核心重构：高级引用逻辑】 ---
             // 核心修复：正则改为兼容带引号("")、带中文引号(“”)、或完全不带引号的三种格式
@@ -13080,8 +13391,105 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         break;
                     }
                     // ===== 新代码到这里结束 =====
+// 【核心新增：AI主动拍一拍】
+                    case 'nudge': {
+                        regularText = regularText.replace(cmd.commandString, '').trim();
+                        messageSent = true;
 
-                
+                        // 1. 获取发送者名字 (群聊用sender，单聊用chatName)
+                        const actorName = sender || chatState.chatName;
+                        
+                        // 2. 获取用户的后缀 (因为是AI拍用户)
+                        const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                        const suffix = chatInfo.myNudgeSuffix || '的肩膀';
+
+                        // 3. 生成文案： “AI”拍了拍“你”的屁股
+                        const nudgeText = `“${actorName}”拍了拍“你”${suffix}`;
+                        
+                        await addMessage({ type: 'system', side: 'system', text: nudgeText }, targetChatId);
+                        break;
+                    }
+
+                    // 【核心新增：AI修改自己的后缀】
+                    case 'set_nudge_suffix': {
+                        // 1. 清理指令
+                        regularText = regularText.replace(cmd.commandString, '').trim();
+                        messageSent = true;
+
+                        const newSuffix = cmd.value.trim();
+                        if (newSuffix) {
+                            // 2. 确定是谁在修改 (逻辑同 set_status)
+                            // 优先级：消息自带sender > 强制指定forcedSender > (仅单聊)聊天对象名
+                            let actorName = sender || forcedSender;
+                            
+                            if (!actorName && !contactInfo.isGroup) {
+                                actorName = chatState.chatName; // 单聊保底
+                            }
+
+                            // 3. 保存设置
+                            // 注意：目前架构下群聊所有AI共用一个后缀设置，但提示语我们必须显示正确的人名
+                            const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                            chatInfo.aiNudgeSuffix = newSuffix;
+                            saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
+                            
+                            // 4. 发送系统提示
+                            // 如果实在找不到名字（AI在群聊裸发指令），就显示“有人”，绝不显示群名
+                            const displayName = actorName || "有人";
+                            
+                            await addMessage({ 
+                                type: 'system', 
+                                side: 'system', 
+                                text: `“${displayName}”修改了自己的拍一拍后缀为：${newSuffix}` 
+                            }, targetChatId);
+                        }
+                        break;
+                    }
+                  case 'set_status': {
+                        // 1. 清理指令文本，防止乱码显示
+                        regularText = regularText.replace(cmd.commandString, '').trim(); 
+                        messageSent = true; 
+
+                        const newStatus = cmd.value.trim();
+                        
+                        // 2. 确定是谁在改状态
+                        let targetChar = sender || forcedSender;
+                        if (!targetChar && !contactInfo.isGroup) {
+                            targetChar = chatState.chatName;
+                        }
+
+                        if (targetChar && newStatus) {
+                            const statuses = loadFromLocalStorage('app_character_statuses', {});
+                            let systemMsgText = ""; // 准备提示语
+
+                            // 3. 处理清空或更新逻辑
+                            if (newStatus.toLowerCase() === 'clear' || newStatus.toLowerCase() === 'none') {
+                                delete statuses[targetChar];
+                                systemMsgText = `“${targetChar}”清空了状态`;
+                            } else {
+                                statuses[targetChar] = newStatus;
+                                systemMsgText = `“${targetChar}”更改了状态：${newStatus}`;
+                            }
+                            
+                            saveToLocalStorage('app_character_statuses', statuses);
+                            
+                            // 4. 刷新界面
+                            if (contactInfo.isGroup) {
+                                reRenderMessages(); // 群聊刷列表
+                            } else {
+                                updateHeaderTitle(document.getElementById('chat-contact-name').textContent); // 单聊刷顶栏
+                            }
+
+                            // 【核心新增】发送系统提示消息
+                            await addMessage({ 
+                                type: 'system', 
+                                side: 'system', 
+                                text: systemMsgText 
+                            }, targetChatId);
+                        } else {
+                            console.warn(`[Status Error] 无法确定设置状态的角色。Sender: ${sender}`);
+                        }
+                        break;
+                    }
                 case 'set_user_remark': {
                     const newRemark = cmd.value.trim();
                     // const chatId = conversationManager.getCurrentChatId(); // 核心修复：删除这行灾难性的代码
@@ -13720,8 +14128,16 @@ You were receiving a video call from {{user}}, but they hung up before you could
 
         function createMessageElement(msg) {
             const wrapper = document.createElement('div');
-            wrapper.className = `message-wrapper`;
-            wrapper.dataset.messageId = msg.id;
+    wrapper.className = `message-wrapper`;
+    wrapper.dataset.messageId = msg.id;
+    
+    // 【【【 核心新增：如果消息被标记为对AI隐藏，添加样式类 】】】
+    if (msg.isHiddenFromAI) {
+        wrapper.classList.add('hidden-from-ai');
+    }
+    // 【【【 新增结束 】】】
+
+    // ... (后续原有代码)
             
             if (msg.type === 'time_divider') {
                 wrapper.classList.add('time-divider-wrapper');
@@ -13817,7 +14233,28 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 if (contactInfo.isGroup && msg.side === 'received' && msg.sender && !isGroupOfflineMode) {
                     const senderNameDiv = document.createElement('div');
                     senderNameDiv.className = 'group-sender-name';
-                    senderNameDiv.textContent = msg.sender;
+                    
+                    // 获取该发送者的状态
+                    const statuses = loadFromLocalStorage('app_character_statuses', {});
+                    const statusText = statuses[msg.sender];
+                    
+                    let nameHtml = escapeHtml(msg.sender);
+                    
+                    if (statusText) {
+                        // 【核心修复】增加表情包解析逻辑
+                        let processedStatus = escapeHtml(statusText).replace(/\[emoji[:：]([^\]]+)\]/g, (match, name) => {
+                            const item = stickers.find(s => s.name === name && s.type === 'emoji');
+                            if (item) {
+                                // 群聊状态字号较小，图片高度设为 12px
+                                return `<img src="${item.url}" alt="${name}" style="height: 12px; width: auto; vertical-align: middle; margin: 0 1px;">`;
+                            }
+                            return match;
+                        });
+
+                        nameHtml += `<span class="group-sender-status">${processedStatus}</span>`;
+                    }
+                    
+                    senderNameDiv.innerHTML = nameHtml;
                     mainContentAndNameWrapper.appendChild(senderNameDiv);
                 }
 
@@ -14046,17 +14483,32 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     msg.isJoinRequest = false;
                 } else {
                     // 普通系统消息
-                    systemDiv.textContent = msg.text;
+                    // 【核心修复】先转义HTML，然后解析Emoji，最后用innerHTML显示
+                    let processedText = escapeHtml(msg.text);
+                    
+                    processedText = processedText.replace(/\[emoji[:：]([^\]]+)\]/g, (match, name) => {
+                        const item = stickers.find(s => s.name === name && s.type === 'emoji');
+                        if (item) {
+                            // 使用 inline-emoji 样式让它垂直居中
+                            return `<img src="${item.url}" alt="${name}" class="inline-emoji" style="vertical-align: middle; height: 1.2em; margin: 0 2px;">`;
+                        }
+                        return match;
+                    });
+
+                    systemDiv.innerHTML = processedText;
+
                     if (msg.isRecallNotice) {
                         systemDiv.classList.add('clickable-recall');
                         const hint = msg.recallSide === 'my' ? ' (点击重新编辑)' : ' (点击查看)';
-                        systemDiv.textContent += hint;
-                    } else if (msg.isBlacklistNotice) { // <<< 新增的判断开始
-                        systemDiv.classList.add('clickable-blacklist-notice'); // 给它一个新类名
-                        systemDiv.style.cursor = 'pointer'; // 鼠标变成小手
-                        systemDiv.style.color = 'var(--accent-green)'; // 颜色变绿，更醒目
-                        systemDiv.textContent += ' (点击解除)'; // 增加提示文字
-                    } // <<< 新增的判断结束
+                        // 注意：这里追加文本时要小心，因为innerHTML已经改变了
+                        // 简单起见，我们追加一个 span
+                        systemDiv.innerHTML += `<span>${hint}</span>`;
+                    } else if (msg.isBlacklistNotice) { 
+                        systemDiv.classList.add('clickable-blacklist-notice'); 
+                        systemDiv.style.cursor = 'pointer'; 
+                        systemDiv.style.color = 'var(--accent-green)'; 
+                        systemDiv.innerHTML += ' (点击解除)'; 
+                    } 
                 }
                 wrapper.appendChild(systemDiv);
             } else {
@@ -14121,7 +14573,28 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 if (contactInfo.isGroup && msg.side === 'received' && msg.sender && !isGroupOfflineMode) {
                     const senderNameDiv = document.createElement('div');
                     senderNameDiv.className = 'group-sender-name';
-                    senderNameDiv.textContent = msg.sender;
+                    
+                    // 获取该发送者的状态
+                    const statuses = loadFromLocalStorage('app_character_statuses', {});
+                    const statusText = statuses[msg.sender];
+                    
+                    let nameHtml = escapeHtml(msg.sender);
+                    
+                    if (statusText) {
+                        // 【核心修复】增加表情包解析逻辑
+                        let processedStatus = escapeHtml(statusText).replace(/\[emoji[:：]([^\]]+)\]/g, (match, name) => {
+                            const item = stickers.find(s => s.name === name && s.type === 'emoji');
+                            if (item) {
+                                // 群聊状态字号较小，图片高度设为 12px
+                                return `<img src="${item.url}" alt="${name}" style="height: 12px; width: auto; vertical-align: middle; margin: 0 1px;">`;
+                            }
+                            return match;
+                        });
+
+                        nameHtml += `<span class="group-sender-status">${processedStatus}</span>`;
+                    }
+                    
+                    senderNameDiv.innerHTML = nameHtml;
                     mainContentAndNameWrapper.appendChild(senderNameDiv);
                 }
 
@@ -14366,7 +14839,17 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 mainContentAndNameWrapper.appendChild(bubbleRow);
 
                 contentRow.appendChild(mainContentAndNameWrapper);
-                wrapper.appendChild(contentRow);
+                   // 【【【 核心修改：物理插入幽灵实体标签 】】】
+                if (msg.isHiddenFromAI) {
+                    const ghostDiv = document.createElement('div');
+                    ghostDiv.className = 'ghost-icon';
+                    ghostDiv.textContent = '👻';
+                    // 把它直接塞到 contentRow 里，和头像、气泡并列
+                    contentRow.appendChild(ghostDiv);
+                }
+                // 【【【 插入结束 】】】
+
+                wrapper.appendChild(contentRow); // <--- 这是原本就有的代码，作为定位参考
             }
             messagesContainer.appendChild(wrapper);
         };
@@ -16267,79 +16750,149 @@ footerStickerBtn.addEventListener('click', () => {
 dynamicDecorationBtn.addEventListener('click', triggerAIContinuation);
 
 headerMoreBtn.addEventListener('click', async () => { 
-    const menuButtons = [ 
-        { text: '聊天信息', value: 'chat_info', class: 'primary' },
-        { text: '查看收藏', value: 'view_favorites', class: 'primary' }, // <<< --- 核心新增
-        { text: '统计字数', value: 'char_count', class: 'primary' },
-        { text: '更换聊天背景', value: 'change_bg', class: 'primary' }, 
-        { text: '更换气泡样式', value: 'change_bubble', class: 'primary' }, 
-        { text: '字体', value: 'font_color', class: 'primary' } 
-    ]; 
-// ...
-    
-    if (!contactInfo.isGroup) { 
-        const autoReplyStatus = autoReplySettings.enabled ? ' (已启用)' : ''; 
-        menuButtons.push({ text: `设置自动回复${autoReplyStatus}`, value: 'auto_reply', class: 'primary' }); 
-    } 
-    
-    menuButtons.push({ text: '取消', value: 'cancel', class: 'secondary' }); 
-    
-    const action = await showCustomModal({ title: '聊天设置', text: '', buttons: menuButtons }); 
-    
-    if (!action || action.value === 'cancel' || action.value === 'close') return; 
+        const menuButtons = [ 
+            { text: '聊天信息', value: 'chat_info', class: 'primary' },
+            { text: '设置状态', value: 'set_status', class: 'primary' },
+            { text: '查看收藏', value: 'view_favorites', class: 'primary' },
+            { text: '设置拍一拍', value: 'set_nudge', class: 'primary' }, // 【核心修改】替换了原来的自动回复，且不加条件限制
+            { text: '统计字数', value: 'char_count', class: 'primary' },
+            { text: '更换聊天背景', value: 'change_bg', class: 'primary' }, 
+            { text: '更换气泡样式', value: 'change_bubble', class: 'primary' }, 
+            { text: '字体', value: 'font_color', class: 'primary' } 
+        ]; 
+        
+        menuButtons.push({ text: '取消', value: 'cancel', class: 'secondary' }); 
+        
+        const action = await showCustomModal({ title: '聊天设置', text: '', buttons: menuButtons }); 
+        
+        if (!action || action.value === 'cancel' || action.value === 'close') return; 
 
-    switch (action.value) {
-        case 'chat_info':
-            openChatInfoPage();
-            break;
-        case 'char_count':
-            const { systemChars, personaChars, worldbookChars, npcChars, contextChars, totalChars, totalMessages, totalRounds } = calculateApiPayloadSize();
-            // 使用 HTML 模板字符串来构建一个美观的、分段的弹窗内容
-            const alertHtml = `
-                <div style="text-align: left; font-size: 14px; line-height: 1.8;">
-                    
-                    <h4 style="margin: 0 0 8px 0; font-size: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">当前对话进度</h4>
-                    <p style="margin: 0;"><strong>总有效消息:</strong> ${totalMessages} 条</p>
-                    <p style="margin: 0 0 15px 0;"><strong>总对话轮数 (您已发送):</strong> ${totalRounds} 轮</p>
+        switch (action.value) {
+            // 【核心新增：设置拍一拍逻辑】
+            // 【核心修改：设置拍一拍逻辑 (自由模式)】
+            // 【核心修改：分别设置“我”和“对方”的拍一拍后缀】
+// 【核心修改：只设置“我”的拍一拍后缀】
+            case 'set_nudge': {
+                const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                
+                // 只读取“我”的后缀
+                const mySuffix = chatInfo.myNudgeSuffix || ''; // 默认值改为空字符串
 
-                    <h4 style="margin: 0 0 8px 0; font-size: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">API单次请求负载</h4>
-                    <p style="margin: 0;"><strong>系统提示 (含前情提要):</strong> ${systemChars} 字</p>
-                    <p style="margin: 0;"><strong>人设 (双方):</strong> ${personaChars} 字</p>
-                    <p style="margin: 0;"><strong>世界书 (含线下):</strong> ${worldbookChars} 字</p>
-                    <p style="margin: 0;"><strong>关联NPC人设:</strong> ${npcChars} 字</p>
-                    <p style="margin: 0;"><strong>上下文:</strong> ${contextChars} 字</p>
+                // 输入新状态，提示语也更新了
+                const newSuffix = await showContentInputModal({
+                    title: '设置我的拍一拍后缀',
+                    placeholder: '（留空则为默认）例如：的屁股说：好翘',
+                    value: mySuffix
+                });
+
+                if (newSuffix !== null) {
+                    // 保存设置
+                    chatInfo.myNudgeSuffix = newSuffix.trim();
+                    saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
                     
-                    <hr style="border: none; border-top: 1px dashed #ccc; margin: 15px 0;">
-                    
-                    <p style="margin: 0; font-size: 15px; text-align: right;"><strong>总计发送: ${totalChars} 字</strong></p>
-                </div>
-            `;
-            // 注意：调用 showCustomModal 时，需要用 html 属性而不是 text 属性
-            await conversationManager.showCustomModal({
-                title: '对话进度与API负载统计',
-                html: alertHtml,
-                showCloseButton: true,
-                buttons: [{ text: '好的', value: 'close', class: 'primary' }]
-            });
-            break;
-        case 'change_bg':
-            const url = await showContentInputModal({title: '更换背景', placeholder: '请输入新的背景图片链接'});
-            if (url && url.trim() !== '') { 
-                const img = new Image(); 
-                img.onload = () => { chatContent.style.backgroundImage = `url('${url.trim()}')`; saveToLocalStorage(`chat_bg_${chatState.chatId}`, url.trim()); customAlert('背景已成功更换。'); }; 
-                img.onerror = () => { customAlert('图片链接无效，无法加载背景。'); }; 
-                img.src = url.trim(); 
+                    // 预览效果也更新
+                    const previewText = chatInfo.myNudgeSuffix ? `“AI”拍了拍“你”${chatInfo.myNudgeSuffix}` : `“AI”拍了拍“你”`;
+                    await customAlert(`设置成功！\n当AI拍你时将显示：\n${previewText}`);
+                }
+                break;
             }
-            break;
-        case 'change_bubble':
-            await showBubbleSettingsModal();
-            break;
-        case 'font_color':
-            await showFontSettingsModal();
-            break;
-        case 'auto_reply':
-            await showAutoReplyModal();
-            break;
+
+            case 'set_status': {
+                let targetChar = '';
+                if (contactInfo.isGroup) {
+                    const characters = getCharactersInCurrentChat();
+                    if (characters.length === 0) {
+                        await conversationManager.customAlert('群里没有其他角色可设置。');
+                        return;
+                    }
+                    const optionsHtml = characters.map(name => `<option value="${name}">${name}</option>`).join('');
+                    const selectResult = await showCustomModal({
+                        title: '选择角色',
+                        form: [{ id: 'status-char-select', label: '为谁设置状态？', type: 'select', options: optionsHtml }],
+                        buttons: [{ text: '下一步', value: 'next', class: 'primary' }],
+                        showCloseButton: true
+                    });
+                    if (!selectResult || selectResult.value !== 'next') return;
+                    targetChar = selectResult.target.closest('.modal-box').querySelector('#status-char-select').value;
+                } else {
+                    targetChar = chatState.chatName;
+                }
+
+                const statuses = loadFromLocalStorage('app_character_statuses', {});
+                const oldStatus = statuses[targetChar] || '';
+
+                const newStatus = await showContentInputModal({
+                    title: `设置 "${targetChar}" 的状态`,
+                    placeholder: '例如：正在输入... / 心情不错 / 忙碌中',
+                    value: oldStatus
+                });
+
+                if (newStatus !== null) {
+                    if (newStatus.trim() === '') {
+                        delete statuses[targetChar];
+                    } else {
+                        statuses[targetChar] = newStatus.trim();
+                    }
+                    saveToLocalStorage('app_character_statuses', statuses);
+                    updateHeaderTitle(chatContactName.textContent);
+                    reRenderMessages();
+                    await conversationManager.customAlert('状态已更新！');
+                }
+                break;
+            }
+
+            case 'chat_info':
+                openChatInfoPage();
+                break;
+
+            case 'view_favorites':
+                showFavoritesModal(conversationManager.getCurrentChatId());
+                break;
+
+            case 'char_count':
+                const { systemChars, personaChars, worldbookChars, npcChars, contextChars, totalChars, totalMessages, totalRounds } = calculateApiPayloadSize();
+                const alertHtml = `
+                    <div style="text-align: left; font-size: 14px; line-height: 1.8;">
+                        <h4 style="margin: 0 0 8px 0; font-size: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">当前对话进度</h4>
+                        <p style="margin: 0;"><strong>总有效消息:</strong> ${totalMessages} 条</p>
+                        <p style="margin: 0 0 15px 0;"><strong>总对话轮数 (您已发送):</strong> ${totalRounds} 轮</p>
+                        <h4 style="margin: 0 0 8px 0; font-size: 15px; border-bottom: 1px solid #eee; padding-bottom: 5px;">API单次请求负载</h4>
+                        <p style="margin: 0;"><strong>系统提示 (含前情提要):</strong> ${systemChars} 字</p>
+                        <p style="margin: 0;"><strong>人设 (双方):</strong> ${personaChars} 字</p>
+                        <p style="margin: 0;"><strong>世界书 (含线下):</strong> ${worldbookChars} 字</p>
+                        <p style="margin: 0;"><strong>关联NPC人设:</strong> ${npcChars} 字</p>
+                        <p style="margin: 0;"><strong>上下文:</strong> ${contextChars} 字</p>
+                        <hr style="border: none; border-top: 1px dashed #ccc; margin: 15px 0;">
+                        <p style="margin: 0; font-size: 15px; text-align: right;"><strong>总计发送: ${totalChars} 字</strong></p>
+                    </div>
+                `;
+                await conversationManager.showCustomModal({
+                    title: '对话进度与API负载统计',
+                    html: alertHtml,
+                    showCloseButton: true,
+                    buttons: [{ text: '好的', value: 'close', class: 'primary' }]
+                });
+                break;
+
+            case 'change_bg':
+                const url = await showContentInputModal({title: '更换背景', placeholder: '请输入新的背景图片链接'});
+                if (url && url.trim() !== '') { 
+                    const img = new Image(); 
+                    img.onload = () => { chatContent.style.backgroundImage = `url('${url.trim()}')`; saveToLocalStorage(`chat_bg_${chatState.chatId}`, url.trim()); customAlert('背景已成功更换。'); }; 
+                    img.onerror = () => { customAlert('图片链接无效，无法加载背景。'); }; 
+                    img.src = url.trim(); 
+                }
+                break;
+
+            case 'change_bubble':
+                await showBubbleSettingsModal();
+                break;
+
+            case 'font_color':
+                await showFontSettingsModal();
+                break;
+
+
         // <<< --- 核心新增 ---
         case 'view_favorites':
             showFavoritesModal(conversationManager.getCurrentChatId());
@@ -16613,17 +17166,66 @@ messagesContainer.addEventListener('click', async (e) => {
     }, stepDuration); } 
     function pause(isFinished = false) { anim.isPlaying = false; clearInterval(anim.interval); if(playButtonOverlay) playButtonOverlay.classList.remove('hidden'); if (isFinished) { setTimeout(() => { videoElement.classList.remove('playing'); anim.wordIndex = 0; if(textContainer) textContainer.innerHTML = ''; if(progressBarFill) progressBarFill.style.width = '0%'; if(movingDecoration) movingDecoration.style.left = '0'; }, 1500); } } if (anim.isPlaying) pause(); else play(); return; } 
 });
-messagesContainer.addEventListener('dblclick', (e) => { 
-    if (isMultiSelectMode) return; 
-    const wrapper = e.target.closest('.message-wrapper'); 
-    if (!wrapper) return; 
-    const messageId = wrapper.dataset.messageId; 
-    const message = chatState.messages.find(m => m.id === messageId); 
-    if (!message || message.side === 'system' || message.type === 'red_packet') return; 
-    e.preventDefault(); 
-    showContextMenu(e, messageId); 
-});
-// ...
+messagesContainer.addEventListener('dblclick', async (e) => {
+        if (isMultiSelectMode) return;
+
+        // 【核心新增】1. 优先检测是否双击了头像 (实现拍一拍)
+        const avatar = e.target.closest('.message-avatar');
+        if (avatar) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const wrapper = avatar.closest('.message-wrapper');
+            const messageId = wrapper.dataset.messageId;
+            const message = chatState.messages.find(m => m.id === messageId);
+            
+            if (!message) return;
+
+            const isMe = message.side === 'sent';
+            const targetName = isMe ? '自己' : (message.sender || chatState.chatName);
+            
+            const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+            
+            let suffix = ''; // 【核心修改】默认后缀为空
+            
+            if (isMe) {
+                // 如果拍的是我自己 -> 取我设置的后缀
+                suffix = chatInfo.myNudgeSuffix || '';
+            } else {
+                // 如果拍的是对方 -> 取对方（AI）自己设置的后缀
+                suffix = chatInfo.aiNudgeSuffix || '';
+            }
+            
+            const subject = "你"; 
+            const object = isMe ? "自己" : `“${targetName}”`;
+            
+            // 如果后缀为空，文案就是 "你拍了拍 xxx"，否则才拼接后缀
+            const nudgeText = `${subject}拍了拍${object}${suffix}`;
+            
+            await addMessage({ type: 'system', side: 'system', text: nudgeText }, chatState.chatId);
+            
+            // 头像震动动画 (不变)
+            avatar.style.transition = 'transform 0.1s';
+            avatar.style.transform = 'rotate(-15deg)';
+            setTimeout(() => {
+                avatar.style.transform = 'rotate(15deg)';
+                setTimeout(() => {
+                    avatar.style.transform = 'rotate(0deg)';
+                }, 100);
+            }, 100);
+
+            return; 
+        }
+
+        // 2. 原有的双击气泡收藏逻辑
+        const wrapper = e.target.closest('.message-wrapper'); 
+        if (!wrapper) return; 
+        const messageId = wrapper.dataset.messageId; 
+        const message = chatState.messages.find(m => m.id === messageId); 
+        if (!message || message.side === 'system' || message.type === 'red_packet') return; 
+        e.preventDefault(); 
+        showContextMenu(e, messageId); 
+    });
 multiSelectCancelBtn.addEventListener('click', exitMultiSelectMode);
 // ===== 从这里开始复制 =====
     multiSelectDeleteBtn.addEventListener('click', async () => { 
@@ -16637,6 +17239,45 @@ multiSelectCancelBtn.addEventListener('click', exitMultiSelectMode);
             reRenderMessages(); 
             saveConversation(); 
         } 
+    });
+    // 在 multiSelectDeleteBtn.addEventListener 附近添加这个新的监听器
+    document.getElementById('multi-select-hide-btn').addEventListener('click', async () => {
+        if (selectedMessageIds.length === 0) return;
+        
+        // 这里的逻辑是：切换状态。
+        // 如果选中的消息里有没隐藏的，就全部设为隐藏。
+        // 如果全是隐藏的，就全部设为显示。
+        
+        // 1. 检查当前选中项的状态
+        let hasVisible = false;
+        selectedMessageIds.forEach(id => {
+            const msg = chatState.messages.find(m => m.id === id);
+            if (msg && !msg.isHiddenFromAI) {
+                hasVisible = true;
+            }
+        });
+
+        const newStatus = hasVisible ? true : false; // 如果有可见的，操作就是“隐藏”；否则是“显示”
+        const actionText = newStatus ? "屏蔽（AI将看不见这些消息）" : "取消屏蔽";
+
+        if (await customConfirm(`确定要${actionText}选中的 ${selectedMessageIds.length} 条消息吗？`)) {
+            
+            // 2. 更新两个数据源
+            selectedMessageIds.forEach(id => {
+                // 更新 chatState
+                const msgIndex = chatState.messages.findIndex(m => m.id === id);
+                if (msgIndex > -1) chatState.messages[msgIndex].isHiddenFromAI = newStatus;
+
+                // 更新 fullMessageHistory
+                const histIndex = fullMessageHistory.findIndex(m => m.id === id);
+                if (histIndex > -1) fullMessageHistory[histIndex].isHiddenFromAI = newStatus;
+            });
+
+            // 3. 保存并刷新
+            saveConversation();
+            reRenderMessages(); // 必须重绘才能看到样式变化
+            exitMultiSelectMode();
+        }
     });
 // ===== 到这里结束复制 =====
 document.addEventListener('click', (e) => { if (messageContextMenu && !messageContextMenu.contains(e.target)) { hideContextMenu(); } });
