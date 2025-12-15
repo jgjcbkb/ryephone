@@ -12125,66 +12125,7 @@ Okay, that's all the context and rules. Now, generate your full response.
                         aiResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     }
                     
-                    // 原有的 aiResponse 后续处理逻辑（弹窗、解析等）从这里开始
-                    if (aiResponse && aiResponse.includes('<div') && appearanceSettings.showRawOutput) {
-                        // ... (此处的弹窗逻辑保持不变)
-                        const result = await conversationManager.showCustomModal({
-                            title: '修改 AI 原始输出',
-                            html: `<textarea id="raw-output-editor-continuation" style="width: 100%; height: 250px; white-space: pre; word-wrap: normal; overflow-x: scroll; font-family: monospace; border: 1px solid #ccc; border-radius: 5px; padding: 10px;">${escapeHtml(aiResponse)}</textarea>`,
-                            buttons: [{ text: '直接处理 (不改)', value: 'skip', class: 'secondary' },{ text: '确认修改', value: 'confirm', class: 'primary' }]
-                        });
-                        if (result && result.value === 'confirm') {
-                            const editor = result.target.closest('.modal-box').querySelector('#raw-output-editor-continuation');
-                            if (editor) aiResponse = editor.value;
-                        }
-                    }
-            
-                    if (aiResponse && aiResponse.trim()) {
-                        // ... (此处的 processAIResponseLine 调用逻辑保持不变)
-                        let responseToProcess = aiResponse.trim();
-                        const descriptionRegex = /<private_note type="image_description">([\s\S]*?)<\/private_note>/;
-                        const descriptionMatch = responseToProcess.match(descriptionRegex);
-                        if (descriptionMatch) {
-                            const imageDescription = descriptionMatch[1].trim();
-                            const lastImageMessage = [...chatState.messages].reverse().find(m => m.type === 'photo' && m.side === 'sent');
-                            if (lastImageMessage && imageDescription) {
-                                lastImageMessage.imageDescription = imageDescription;
-                                saveConversation();
-                            }
-                            responseToProcess = responseToProcess.replace(descriptionRegex, '').trim();
-                        }
-                        const cleanedText = await executeBackgroundUpdatesAndCleanText(responseToProcess, originatingChatId, chatState.chatName);
-                        if (!cleanedText) {
-                            loadingStates[originatingChatId] = false;
-                            if (chatState.chatId === originatingChatId) {
-                                dynamicDecorationBtn.classList.remove('loading');
-                            }
-                            return;
-                        }
 
-                        const blockRegex = /<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>/g;
-                        let match;
-                        while ((match = blockRegex.exec(cleanedText)) !== null) {
-                            const type = match[1];
-                            const sender = match[2];
-                            const content = match[3].trim();
-                            if (!content) continue;
-                            switch (type) {
-                                case 'text':
-                                case 'html':
-                                    if (content.trim().startsWith('[reply_to:')) {
-                                        const commandWithSender = sender ? `${sender}: ${content}` : content;
-                                        await processAIResponseLine(commandWithSender, originatingChatId, sender);
-                                    } else {
-                                        await addMessage({ type: 'text', text: content, side: 'received', sender: sender || null, }, originatingChatId);
-                                    }
-                                    break;
-                                case 'command':
-                                    await processAIResponseLine(content, originatingChatId, sender);
-                                    break;
-                            }
-                        }
-                    }
                 }
                 
                 // =================================================================
