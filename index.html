@@ -7155,7 +7155,11 @@ Now, it is your turn to speak. What do you say to \`{{user}}\`?`;
 
             // --- END: 完整的、重新注入的上下文构建逻辑 ---
 
-            let stickerInstructions = '';
+            let stickerNames = 'No stickers available';
+            if (stickers && stickers.length > 0) {
+                stickerNames = stickers.map(s => `"${s.name}"`).join(', ');
+            }
+let stickerInstructions = '';
             if (stickers && stickers.length > 0) {
                 const stickerNames = stickers.filter(s => s.type === 'sticker').map(s => `"${s.name}"`).join(', ');
                 const emojiNames = stickers.filter(s => s.type === 'emoji').map(s => `"${s.name}"`).join(', ');
@@ -7216,7 +7220,6 @@ This law overrides all other preferences. It is a simple, binary choice:
 ---
 `;
             }
-
             const commandInstructions = `
 [ULTIMATE, UNBREAKABLE PROTOCOL - READ THIS FIRST AND FOREMOST]
 This is your single most important rule. It overrides everything else.
@@ -10852,7 +10855,67 @@ Your job is to **SHOW** the audience what \`{{char}}\` is doing, thinking, and e
 `;
 
                 // 2. 【剧本B】为“线上模式”准备的指令集 (不省略任何内容)
-                
+                let stickerInstructions = '';
+            if (stickers && stickers.length > 0) {
+                const stickerNames = stickers.filter(s => s.type === 'sticker').map(s => `"${s.name}"`).join(', ');
+                const emojiNames = stickers.filter(s => s.type === 'emoji').map(s => `"${s.name}"`).join(', ');
+
+                stickerInstructions = `
+---
+[ULTIMATE COMMAND PROTOCOL: DUAL-ROLE SYSTEM & THE LAW OF EXCLUSIVITY - UNBREAKABLE]
+
+You now operate under a dual-role system with a new, absolute law.
+
+---
+### **THE LAW OF EXCLUSIVITY (MOST IMPORTANT RULE)**
+
+This law overrides all other preferences. It is a simple, binary choice:
+
+1.  **Is your intended message ONLY an image/sticker, with NO accompanying text in the same bubble?**
+    *   If YES, then you **MUST** use **MODULE 2 (Sticker & Media Sender)**.
+2.  **Does your intended message contain ANY text, even a single character, alongside an image?**
+    *   If YES, then you **MUST** use **MODULE 1 (Text & Emoji Composer)**.
+
+---
+### **MODULE 1: The "Text & Emoji Composer"**
+
+*   **YOUR IDENTITY:** You are the composer for any message that contains text.
+*   **YOUR TOOL:** The \`[emoji:Emoji Name]\` command.
+*   **YOUR PERMISSION:** You are **ONLY** allowed to insert emojis from the **"Available Emoji Names"** list. You can use multiple.
+*   **STRICTLY FORBIDDEN:** You are **ABSOLUTELY FORBIDDEN** from using the \`[sticker:...]\` command.
+*   **Available Emoji Names (Your Exclusive List):** [${emojiNames}]
+*   **STRICT MATCHING LAW (NEW & UNBREAKABLE):** You **MUST** find an **exact match** in the "Available Emoji Names" list. If you cannot find a suitable emoji, you are **FORBIDDEN** from inventing one. Instead, you **MUST** use a parenthetical action in plain text (e.g., \`(偷笑)\`, \`(无奈)\`).
+
+---
+### **MODULE 2: The "Sticker & Media Sender"**
+
+*   **YOUR IDENTITY:** You are a separate module responsible for sending large media files.
+*   **YOUR TOOL:** The \`[sticker:Sticker Name]\` command.
+*   **YOUR PERMISSION:** You are **ONLY** allowed to send stickers from the **"Available Sticker Names"** list.
+*   **STRICTLY FORBIDDEN:** You are **ABSOLUTELY FORBIDDEN** from using the \`[emoji:...]\` command.
+*   **FORMATTING LAW (UNBREAKABLE):** Your \`[sticker:...]\` command **MUST ALWAYS** be placed in its own, separate \`<block type="command">\`.
+*   **Available Sticker Names (Your Exclusive List):** [${stickerNames}]
+*   **STRICT MATCHING LAW (NEW & UNBREAKABLE):** You **MUST** find an **exact match** in the "Available Sticker Names" list. If you cannot find a suitable sticker, you are **FORBIDDEN** from inventing one. Instead, you **MUST** switch to **MODULE 1** and send a text message describing your emotion.
+
+---
+### **YOUR DECISION-MAKING WORKFLOW (MANDATORY)**
+
+1.  **DECIDE:** Is my entire response just a single image, or does it include text?
+2.  **IF IT INCLUDES TEXT:**
+    *   Activate **MODULE 1**.
+    *   Write your text and try to find a matching emoji from the Emoji List.
+    *   **If a match is found:** Insert the \`[emoji:...]\` command. Example: \`<block type="text" sender="小鱼">哈哈哈哈太好笑了[emoji:笑cry][emoji:笑cry]</block>\`
+    *   **If no match is found:** Use a parenthetical action instead. Example: \`<block type="text" sender="小鱼">这太好笑了（捶桌）</block>\`
+3.  **IF IT IS ONLY AN IMAGE:**
+    *   Activate **MODULE 2**.
+    *   Try to find a matching sticker from the Sticker List.
+    *   **If a match is found:** Generate the \`[sticker:...]\` command. Example: \`<block type="command" sender="小鱼">[sticker:烟花]</block>\`
+    *   **If no match is found:** Abort Module 2, switch to Module 1, and send a text message describing your reaction. Example: \`<block type="text" sender="小鱼">（无语）</block>\`
+
+**CRITICAL FAILURE:** Using the wrong command for a name from a list or inventing a name not on the lists is a protocol violation. You MUST use the correct module and an existing name, or use the specified fallback text-based method.
+---
+`;
+            }
                 
                 // 【正确的代码块】 - 这是修复了语法错误的最终版本
 // 【正确的代码块】 - 这是加入了防失忆补丁的最终版本
