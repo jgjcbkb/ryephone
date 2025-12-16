@@ -5398,12 +5398,13 @@ input:checked + .slider:before {
     </div>
 </div>
                             </div>
-                            <div id="multi-select-bar" class="hidden">
-                                <button id="multi-select-delete-btn">删除</button>
+                            <div id="multi-select-bar" class="hidden" style="padding: 10px 5px;">
+                                <button id="multi-select-all-btn" style="background-color: #fff; border: 1px solid #ccc; color: #333; padding: 6px 10px; margin-right: 5px;">全选</button>
+                                <button id="multi-select-delete-btn" style="padding: 8px 12px;">删除</button>
                                 <!-- 新增按钮 -->
-                                <button id="multi-select-hide-btn" style="background-color: #f0ad4e; color: white; margin-left: 10px;">屏蔽</button>
-                                <span id="multi-select-counter">已选择 0 条</span>
-                                <button id="multi-select-cancel-btn">取消</button>
+                                <button id="multi-select-hide-btn" style="background-color: #f0ad4e; color: white; margin-left: 5px; padding: 8px 12px;">屏蔽</button>
+                                <span id="multi-select-counter" style="font-size: 12px; margin: 0 5px; white-space: nowrap;">已选 0</span>
+                                <button id="multi-select-cancel-btn" style="padding: 8px 12px;">取消</button>
                             </div>
                         </div>
                         <div id="message-context-menu" class="hidden"></div>
@@ -5631,22 +5632,25 @@ input:checked + .slider:before {
 
                         
                         <div class="form-section">
-                             <div class="list-header" style="padding: 15px; display:flex; align-items:center; flex-wrap: wrap; gap: 10px;">
-    <h2 style="margin:0; flex-basis: 100%;">角色设置</h2>
+                             <div class="list-header" style="padding: 15px; display: flex; flex-direction: column; align-items: flex-start; gap: 15px;">
+    <h2 style="margin:0;">角色设置</h2>
     
-    <div style="display: flex; align-items: center; gap: 8px;">
-        <label for="dynamics-global-interval" style="font-size: 14px; color: #555;">全局检测间隔(秒):</label>
-        <input type="number" id="dynamics-global-interval" min="5" value="15" style="width: 60px; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
-    </div>
-    
-    <!-- 从这里开始是新增的代码块 -->
-    <div style="display: flex; align-items: center; gap: 8px; margin-left: 15px;">
-        <label for="dynamics-global-rate-limit" style="font-size: 14px; color: #555;">速率限制(次/分):</label>
-        <input type="number" id="dynamics-global-rate-limit" min="1" value="2" style="width: 60px; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
-    </div>
-    <!-- 新增代码块到此结束 -->
+    <!-- 核心修改：用一个新的 div 把所有控制项包起来，让它们成为一个整体进行换行 -->
+    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <label for="dynamics-global-interval" style="font-size: 14px; color: #555; white-space: nowrap;">全局检测间隔(秒):</label>
+            <input type="number" id="dynamics-global-interval" min="5" value="15" style="width: 60px; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
+        </div>
+        
+        <!-- 核心修改：移除了不美观的 margin-left -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <label for="dynamics-global-rate-limit" style="font-size: 14px; color: #555; white-space: nowrap;">速率限制(次/分):</label>
+            <input type="number" id="dynamics-global-rate-limit" min="1" value="2" style="width: 60px; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
+        </div>
 
-    <button id="bulk-set-dynamics-btn" class="btn-primary btn-secondary" style="padding: 4px 8px; font-size: 13px; margin-left: auto;">批量设置</button>
+        <!-- 核心修改：移除了 margin-left: auto，让它自然排列 -->
+        <button id="bulk-set-dynamics-btn" class="btn-primary btn-secondary" style="padding: 6px 12px; font-size: 13px; margin-left: 10px;">批量设置</button>
+    </div>
 </div>
                              <div id="dynamics-char-list" class="list-container"></div>
                         </div>
@@ -9690,7 +9694,7 @@ const conversationManager = (function() {
         const imageUploadInput = appRoot.querySelector('#image-upload-input');
         const messagesContainer = appRoot.querySelector('#messages-container'), chatContent = appRoot.querySelector('.chat-content'), chatContactName = appRoot.querySelector('#chat-contact-name'), backButton = appRoot.querySelector('#back-button'), headerMoreBtn = appRoot.querySelector('#header-more-btn'), actionMenu = appRoot.querySelector('#action-menu'), dynamicDecorationBtn = appRoot.querySelector('#dynamic-decoration-btn'), messageContextMenu = appRoot.querySelector('#message-context-menu'), replyPreviewBar = appRoot.querySelector('#reply-preview-bar'), replyPreviewContent = replyPreviewBar.querySelector('.reply-preview-content'), cancelReplyBtn = appRoot.querySelector('#cancel-reply-btn');
         const footerMessageInput = appRoot.querySelector('#footer-message-input'), footerVoiceBtn = appRoot.querySelector('#footer-voice-btn'), footerStickerBtn = appRoot.querySelector('#footer-sticker-btn'), footerPlusBtn = appRoot.querySelector('#footer-plus-btn'), footerSendBtn = appRoot.querySelector('#footer-send-btn');
-        const multiSelectBar = appRoot.querySelector('#multi-select-bar'), multiSelectDeleteBtn = appRoot.querySelector('#multi-select-delete-btn'), multiSelectCancelBtn = appRoot.querySelector('#multi-select-cancel-btn'), multiSelectCounter = appRoot.querySelector('#multi-select-counter');
+        const multiSelectBar = appRoot.querySelector('#multi-select-bar'), multiSelectDeleteBtn = appRoot.querySelector('#multi-select-delete-btn'), multiSelectCancelBtn = appRoot.querySelector('#multi-select-cancel-btn'), multiSelectCounter = appRoot.querySelector('#multi-select-counter'), multiSelectAllBtn = appRoot.querySelector('#multi-select-all-btn');
         
         const BUBBLE_NAMES = ["默认"];
         let bubbleSettings = {}, fontSettings = {}, activeDisplayedStyles = {};
@@ -12937,7 +12941,19 @@ Okay, that's all the context and rules. Now, generate your full response.
                     return;
                 }
 
-                const summarySystemPrompt = 'You are a helpful assistant tasked with summarization.';
+                // 【核心修复：读取API配置的系统提示词和时间上下文】
+                const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
+                let baseSystemPrompt = '';
+                if (profileIndexStr !== null && apiProfiles[parseInt(profileIndexStr)]) {
+                    baseSystemPrompt = apiProfiles[parseInt(profileIndexStr)].prompt || '';
+                }
+                
+                // 获取时间上下文
+                timeManager.updateSettingsForChat(chatId);
+                const timeContext = timeManager.getAITimeContext();
+
+                // 组合成最终的系统提示：API设定 + 时间 + 总结模式声明
+                const summarySystemPrompt = baseSystemPrompt + timeContext + '\n\n[SYSTEM STATUS: EXECUTE SUMMARIZATION PROTOCOL]';
                 
                 // 【核心设计修正 2】: 只把【新】的消息发给API
                 const apiPayloadMessages = await prepareApiPayload(newMessagesToSummarize);
@@ -16650,6 +16666,10 @@ function enterMultiSelectMode(initialMessageId) {
     selectedMessageIds = [initialMessageId]; 
     appRoot.querySelector('.input-container-wrapper').classList.add('hidden'); 
     multiSelectBar.classList.remove('hidden'); 
+    
+    // 【核心新增】重置全选按钮文字
+    if (multiSelectAllBtn) multiSelectAllBtn.textContent = "全选";
+
     updateMultiSelectCounter(); 
     document.querySelectorAll('.message-wrapper').forEach(el => { 
         if(el.dataset.messageId === initialMessageId) { 
@@ -17521,6 +17541,34 @@ messagesContainer.addEventListener('dblclick', async (e) => {
         showContextMenu(e, messageId); 
     });
 multiSelectCancelBtn.addEventListener('click', exitMultiSelectMode);
+// --- 全选/全不选逻辑 ---
+    if (multiSelectAllBtn) {
+        multiSelectAllBtn.addEventListener('click', () => {
+            // 获取当前视图中所有消息的ID (chatState.messages 包含当前加载的所有消息数据)
+            const allIds = chatState.messages.map(m => m.id);
+            
+            // 检查是否已经全选 (所有消息ID都在已选列表中)
+            const isAllSelected = allIds.length > 0 && allIds.every(id => selectedMessageIds.includes(id));
+
+            if (isAllSelected) {
+                // 如果已全选，则执行“全不选”
+                selectedMessageIds = [];
+                document.querySelectorAll('.message-wrapper.selected').forEach(el => el.classList.remove('selected'));
+                multiSelectAllBtn.textContent = "全选";
+            } else {
+                // 否则执行“全选”
+                selectedMessageIds = [...allIds];
+                document.querySelectorAll('.message-wrapper').forEach(el => {
+                    // 确保只选中消息，不选中时间分割线
+                    if (el.dataset.messageId && !el.classList.contains('time-divider-wrapper')) {
+                        el.classList.add('selected');
+                    }
+                });
+                multiSelectAllBtn.textContent = "全不选";
+            }
+            updateMultiSelectCounter();
+        });
+    }
 // ===== 从这里开始复制 =====
     multiSelectDeleteBtn.addEventListener('click', async () => { 
         if(selectedMessageIds.length === 0) return; 
