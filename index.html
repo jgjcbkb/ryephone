@@ -24627,8 +24627,10 @@ async function handleRemoveMember() {
                     if (confirmed) {
                         await conversationManager.customAlert("正在导入数据并转换图片，请稍候...");
 
+                        // 1. 递归还原图片数据 (Base64 -> IndexedDB Blob)
                         const rehydratedData = await rehydrateDataFromPortable(importedRawData);
 
+                        // 2. 清除当前相关的旧数据
                         const keysToRemove = [];
                         for (let i = 0; i < localStorage.length; i++) {
                            const key = localStorage.key(i);
@@ -24638,10 +24640,17 @@ async function handleRemoveMember() {
                         }
                         keysToRemove.forEach(key => localStorage.removeItem(key));
 
+                        // 3. 写入新数据
                         for (const key in rehydratedData) {
                             if (Object.prototype.hasOwnProperty.call(rehydratedData, key)) {
                                 const value = rehydratedData[key];
-                                const valueToStore = typeof value === 'string' ? value : JSON.stringify(value);
+                                
+                                // 【核心修复在这里】
+                                // 无论 value 是对象还是字符串，都必须进行 JSON.stringify
+                                // 这样才能与 loadFromLocalStorage 中的 JSON.parse 兼容
+                                // 之前这里有一个错误的判断 typeof value === 'string' ? value : ... 导致了头像读取失败
+                                const valueToStore = JSON.stringify(value);
+                                
                                 localStorage.setItem(key, valueToStore);
                             }
                         }
