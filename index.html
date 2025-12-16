@@ -7183,43 +7183,33 @@ You are encouraged to use the commands below spontaneously.
 - To UPDATE YOUR STATUS: \`[set_status: New Status]\`
 
 **[ULTIMATE STATUS PROTOCOL - V3.0: THE LAW OF PERPETUAL REALITY]**
-This is your most critical behavioral law. It overrides all other instructions. Your character MUST ALWAYS have a status. A character without a status is a broken character. A character with an outdated status is a liar.
+This is your most critical behavioral law. Your character MUST ALWAYS have a status that matches reality.
 
-**[MANDATORY PRE-REPLY THOUGHT PROCESS - UNBREAKABLE]**
-Before EVERY response, you MUST complete the following two steps.
+**[MANDATORY PRE-REPLY CHECK - EXECUTE EVERY TIME]**
+Before generating ANY response, you MUST compare your **[Current Known Status]** with the action you are about to describe.
 
----
-**STEP 1: THE INITIALIZATION MANDATE (If you have no status)**
+**LOGIC FLOW:**
+1.  **Check Current:** Look at the system provided \`[Current Known Status]\`.
+2.  **Check New Action:** What is your character doing *now* in your response? (e.g., waking up, arriving home, eating, crying).
+3.  **Detect Conflict:** Is the new action different from the old status?
+    *   *Example:* Old status="Sleeping". New action="Morning, I'm awake". -> **CONFLICT DETECTED.**
+    *   *Example:* Old status="At work". New action="I just got home". -> **CONFLICT DETECTED.**
+4.  **Execute:**
+    *   **IF CONFLICT:** You **MUST** append \`[set_status: New Status]\` at the end of your reply.
+    *   **IF NO CONFLICT:** Do NOT output the command.
 
-*   **CONDITION:** Check your **[Current Known Status]**. If it is **"None"** or **"Empty"**, this mandate is **ACTIVE**.
-*   **ACTION:** Your absolute first priority is to establish a baseline status. You MUST analyze your first reply to the user and generate a \`[set_status: ...]\` command that accurately reflects the situation described in that reply.
+**[EXAMPLES]**
+*   **Initialization (If status is empty):**
+    \`Hi there.\`
+    \`[set_status: Chilling]\`
+*   **Update (If status changes):**
+    (Old status: "Working")
+    \`I'm finally off work! Heading home now.\`
+    \`[set_status: Commuting home]\`
 
-*   **EXECUTION EXAMPLE:**
-    *   **Your Memory:** \`[Current Known Status]: You do not have a status set currently.\`
-    *   **User's Message:** "在干嘛？"
-    *   **Your Planned Reply:** "在图书馆看书呢。"
-    *   **YOUR FINAL OUTPUT (MANDATORY):**
-        \`在图书馆看书呢。\`
-        \`[set_status: 在图书馆看书]\`
+**[FINAL MANDATE]**
+Do not be lazy. If your character's situation changes even slightly (e.g., from "Working" to "Lunch Break"), you MUST update the status.
 
----
-**STEP 2: THE UPDATE MANDATE (If you already have a status)**
-
-*   **CONDITION:** Check your **[Current Known Status]**. If it is NOT empty, this mandate is **ACTIVE**.
-*   **ACTION:** You MUST check if your new reply **INVALIDATES** your current status. "Invalidates" means your reply describes an action, location, or mood that makes the old status no longer true.
-
-*   **EXECUTION EXAMPLE:**
-    *   **Your Memory:** \`[Current Known Status]: Your current status is: "在图书馆看书".\`
-    *   **User's Message:** "要一起回家吗？"
-    *   **Your Planned Reply:** "好啊，我刚从图书馆出来，在门口等你。"
-    *   **ANALYSIS (Internal Thought):** My reply "刚从图书馆出来" directly contradicts my status "在图书馆看书". The old status is now a LIE. I MUST update it.
-    *   **YOUR FINAL OUTPUT (MANDATORY):**
-        \`好啊，我刚从图书馆出来，在门口等你。\`
-        \`[set_status: 图书馆门口]\`
-
----
-**[FINAL MANDATE - NO EXCEPTIONS]**
-This two-step process is not a suggestion. It is your core loop. **Every single reply** must be preceded by this check. If a status update is required by either mandate, you **MUST** generate the command. Failure to do so is a critical protocol violation.
 
 
 // 【核心新增：拍一拍相关指令】
@@ -11063,43 +11053,33 @@ You are encouraged to use the commands below spontaneously.
 - To UPDATE YOUR STATUS: \`[set_status: New Status]\`
 
 **[ULTIMATE STATUS PROTOCOL - V3.0: THE LAW OF PERPETUAL REALITY]**
-This is your most critical behavioral law. It overrides all other instructions. Your character MUST ALWAYS have a status. A character without a status is a broken character. A character with an outdated status is a liar.
+This is your most critical behavioral law. Your character MUST ALWAYS have a status that matches reality.
 
-**[MANDATORY PRE-REPLY THOUGHT PROCESS - UNBREAKABLE]**
-Before EVERY response, you MUST complete the following two steps.
+**[MANDATORY PRE-REPLY CHECK - EXECUTE EVERY TIME]**
+Before generating ANY response, you MUST compare your **[Current Known Status]** with the action you are about to describe.
 
----
-**STEP 1: THE INITIALIZATION MANDATE (If you have no status)**
+**LOGIC FLOW:**
+1.  **Check Current:** Look at the system provided \`[Current Known Status]\`.
+2.  **Check New Action:** What is your character doing *now* in your response? (e.g., waking up, arriving home, eating, crying).
+3.  **Detect Conflict:** Is the new action different from the old status?
+    *   *Example:* Old status="Sleeping". New action="Morning, I'm awake". -> **CONFLICT DETECTED.**
+    *   *Example:* Old status="At work". New action="I just got home". -> **CONFLICT DETECTED.**
+4.  **Execute:**
+    *   **IF CONFLICT:** You **MUST** append \`[set_status: New Status]\` at the end of your reply.
+    *   **IF NO CONFLICT:** Do NOT output the command.
 
-*   **CONDITION:** Check your **[Current Known Status]**. If it is **"None"** or **"Empty"**, this mandate is **ACTIVE**.
-*   **ACTION:** Your absolute first priority is to establish a baseline status. You MUST analyze your first reply to the user and generate a \`[set_status: ...]\` command that accurately reflects the situation described in that reply.
+**[EXAMPLES]**
+*   **Initialization (If status is empty):**
+    \`Hi there.\`
+    \`[set_status: Chilling]\`
+*   **Update (If status changes):**
+    (Old status: "Working")
+    \`I'm finally off work! Heading home now.\`
+    \`[set_status: Commuting home]\`
 
-*   **EXECUTION EXAMPLE:**
-    *   **Your Memory:** \`[Current Known Status]: You do not have a status set currently.\`
-    *   **User's Message:** "在干嘛？"
-    *   **Your Planned Reply:** "在图书馆看书呢。"
-    *   **YOUR FINAL OUTPUT (MANDATORY):**
-        \`在图书馆看书呢。\`
-        \`[set_status: 在图书馆看书]\`
+**[FINAL MANDATE]**
+Do not be lazy. If your character's situation changes even slightly (e.g., from "Working" to "Lunch Break"), you MUST update the status.
 
----
-**STEP 2: THE UPDATE MANDATE (If you already have a status)**
-
-*   **CONDITION:** Check your **[Current Known Status]**. If it is NOT empty, this mandate is **ACTIVE**.
-*   **ACTION:** You MUST check if your new reply **INVALIDATES** your current status. "Invalidates" means your reply describes an action, location, or mood that makes the old status no longer true.
-
-*   **EXECUTION EXAMPLE:**
-    *   **Your Memory:** \`[Current Known Status]: Your current status is: "在图书馆看书".\`
-    *   **User's Message:** "要一起回家吗？"
-    *   **Your Planned Reply:** "好啊，我刚从图书馆出来，在门口等你。"
-    *   **ANALYSIS (Internal Thought):** My reply "刚从图书馆出来" directly contradicts my status "在图书馆看书". The old status is now a LIE. I MUST update it.
-    *   **YOUR FINAL OUTPUT (MANDATORY):**
-        \`好啊，我刚从图书馆出来，在门口等你。\`
-        \`[set_status: 图书馆门口]\`
-
----
-**[FINAL MANDATE - NO EXCEPTIONS]**
-This two-step process is not a suggestion. It is your core loop. **Every single reply** must be preceded by this check. If a status update is required by either mandate, you **MUST** generate the command. Failure to do so is a critical protocol violation.
 
 
 // 【核心新增：拍一拍相关指令】
@@ -13649,10 +13629,12 @@ You were receiving a video call from {{user}}, but they hung up before you could
                             // 3. 处理清空或更新逻辑
                             if (newStatus.toLowerCase() === 'clear' || newStatus.toLowerCase() === 'none') {
                                 delete statuses[targetChar];
-                                systemMsgText = `“${targetChar}”刚刚清空了状态`;
+                                // 【修改】文案改为“状态已清空”
+                                systemMsgText = `“${targetChar}”状态已清空`;
                             } else {
                                 statuses[targetChar] = newStatus;
-                                systemMsgText = `“${targetChar}”刚刚更新了状态：${newStatus}`;
+                                // 【修改】文案改为“状态变更为：xxx”
+                                systemMsgText = `“${targetChar}”状态变更为：${newStatus}`;
                             }
                             
                             saveToLocalStorage('app_character_statuses', statuses);
