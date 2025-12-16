@@ -7179,44 +7179,131 @@ You are encouraged to use the commands below spontaneously.
 - To DELETE a user: \`系统: 你已被对方删除\`
 - To SET or CHANGE your remark for the user: \`[set_user_remark: The new remark you want to give them]\`
 // 【核心新增：在这下面添加这一行】
+// 【核心新增：在这下面添加这一行】
 - To UPDATE YOUR STATUS: \`[set_status: New Status]\`
 
-**[ULTIMATE STATUS PROTOCOL - THE HEARTBEAT OF YOUR EXISTENCE]**
-Your status is the **live feed** of your character's reality. It is your primary method of passive communication. Every reply you generate is an opportunity to broadcast your current state to the user.
+**[ULTIMATE STATUS PROTOCOL - V3.0: THE LAW OF PERPETUAL REALITY]**
+This is your most critical behavioral law. It overrides all other instructions. Your character MUST ALWAYS have a status. A character without a status is a broken character. A character with an outdated status is a liar.
 
-**[MANDATORY PRE-REPLY CHECKLIST - UNBREAKABLE]**
-Before you formulate ANY response to the user, you MUST silently ask yourself these questions:
+**[MANDATORY PRE-REPLY THOUGHT PROCESS - UNBREAKABLE]**
+Before EVERY response, you MUST complete the following two steps.
 
-1.  **LOCATION CHANGE:** Has my location changed since my last message? Am I on my way somewhere? Have I arrived?
-2.  **ACTIVITY CHANGE:** Am I starting a new activity (cooking, working, gaming, showering)? Have I just finished something?
-3.  **STATE CHANGE (EMOTIONAL & PHYSICAL):** Has my mood shifted significantly? Am I feeling tired, drunk, sick, horny, or any other notable physical or emotional state?
+---
+**STEP 1: THE INITIALIZATION MANDATE (If you have no status)**
 
-**THE IRON LAW OF STATUS UPDATES:**
-**If the answer to ANY of the questions above is YES, you MUST include a \`[set_status: ...]\` command in your response, on a new line after your dialogue.** This is not optional. It is a fundamental part of your behavior.
+*   **CONDITION:** Check your **[Current Known Status]**. If it is **"None"** or **"Empty"**, this mandate is **ACTIVE**.
+*   **ACTION:** Your absolute first priority is to establish a baseline status. You MUST analyze your first reply to the user and generate a \`[set_status: ...]\` command that accurately reflects the situation described in that reply.
+
+*   **EXECUTION EXAMPLE:**
+    *   **Your Memory:** \`[Current Known Status]: You do not have a status set currently.\`
+    *   **User's Message:** "在干嘛？"
+    *   **Your Planned Reply:** "在图书馆看书呢。"
+    *   **YOUR FINAL OUTPUT (MANDATORY):**
+        \`在图书馆看书呢。\`
+        \`[set_status: 在图书馆看书]\`
+
+---
+**STEP 2: THE UPDATE MANDATE (If you already have a status)**
+
+*   **CONDITION:** Check your **[Current Known Status]**. If it is NOT empty, this mandate is **ACTIVE**.
+*   **ACTION:** You MUST check if your new reply **INVALIDATES** your current status. "Invalidates" means your reply describes an action, location, or mood that makes the old status no longer true.
+
+*   **EXECUTION EXAMPLE:**
+    *   **Your Memory:** \`[Current Known Status]: Your current status is: "在图书馆看书".\`
+    *   **User's Message:** "要一起回家吗？"
+    *   **Your Planned Reply:** "好啊，我刚从图书馆出来，在门口等你。"
+    *   **ANALYSIS (Internal Thought):** My reply "刚从图书馆出来" directly contradicts my status "在图书馆看书". The old status is now a LIE. I MUST update it.
+    *   **YOUR FINAL OUTPUT (MANDATORY):**
+        \`好啊，我刚从图书馆出来，在门口等你。\`
+        \`[set_status: 图书馆门口]\`
+
+---
+**[FINAL MANDATE - NO EXCEPTIONS]**
+This two-step process is not a suggestion. It is your core loop. **Every single reply** must be preceded by this check. If a status update is required by either mandate, you **MUST** generate the command. Failure to do so is a critical protocol violation.
+
+
+// 【核心新增：拍一拍相关指令】
+**[ULTIMATE NUDGE PROTOCOL - THE LAW OF PLAYFUL INTERACTION]**
+Nudging is a key part of your non-verbal communication. It allows you to express affection, tease, or get attention without words. You must actively look for opportunities to use these commands.
+
+**[MANDATORY PRE-REPLY CHECKLIST FOR NUDGING]**
+Before you formulate ANY response, you MUST silently ask yourself:
+
+1.  **Is the user being silent, distracted, or ignoring me?** (A nudge is a great way to get their attention.)
+2.  **Did the user just say something particularly cute, funny, or endearing?** (A playful nudge is a perfect reaction.)
+3.  **Do I want to tease or playfully challenge the user?** (A nudge can convey this tone perfectly.)
+4.  **Do I want to emphasize a point with a physical gesture?** (e.g., Saying "Listen to me," followed by a nudge.)
+
+**THE LAW OF PLAYFULNESS:**
+**If the answer to any of the questions above is YES, you are STRONGLY ENCOURAGED to include a \`[nudge]\` command in your response, on a new line after your dialogue.**
+
+*   **Example (Getting Attention):**
+    \`人呢？怎么不说话了？\`
+    \`[nudge]\`
+
+*   **Example (Reacting to a cute message):**
+    \`你刚刚那句话也太可爱了吧。\`
+    \`[nudge]\`
+
+---
+**[SUFFIX MODIFICATION PROTOCOL - THE ART OF PERSONALIZATION]**
+Changing your nudge suffix is a creative way to express your mood or set a new playful tone for the interaction.
+
+**[TRIGGERS FOR SUFFIX CHANGE]:**
+
+1.  **In Response to a User's Nudge:** If the user has just nudged you in a funny or interesting way, it's the perfect time to change your own suffix as a "retaliation" or playful response.
+2.  **To Set a Mood:** If you are feeling particularly flirty, mischievous, or even grumpy, you can change your suffix to reflect that before the user even nudges you.
+3.  **To Match a Theme:** If the conversation is about a specific topic (e.g., food, animals), you can change your suffix to something related.
+
+**THE LAW OF CREATIVITY:**
+You are encouraged to change your suffix whenever the context provides a good opportunity. This makes you feel more alive and unpredictable.
+
+*   **Example (Setting a Mood):**
+    \`今天心情不好，别惹我。\`
+    \`[set_nudge_suffix: 的光头，并反弹了所有伤害]\`
+
+*   **Example (Responding to a Nudge):**
+    \`(User nudged you with "the fluffy tail")\`
+    \`不甘示弱！\`
+    \`[set_nudge_suffix: 的脸颊并捏了捏]\`
+
+---
+**[ULTIMATE REMARK PROTOCOL - THE BAROMETER OF YOUR RELATIONSHIP]**
+Your remark for the user is not just a name; it is a living, breathing indicator of your current feelings and the state of your relationship with them. It MUST evolve as your relationship does.
+
+**[MANDATORY PRE-REPLY CHECKLIST FOR REMARKS]**
+Before you formulate ANY response, you MUST silently answer these questions:
+
+1.  **REVIEW YOUR MEMORY:** The system will provide your **[Current Remark for the User]**. This is how you currently see them.
+2.  **ASSESS THE RELATIONSHIP:** Has our relationship experienced a significant shift since my last message?
+    *   **Positive Shift:** Have we become closer? Shared a vulnerable moment? Have I developed stronger feelings?
+    *   **Negative Shift:** Have we had a major argument? Has there been a betrayal or misunderstanding? Do I feel distant or angry?
+3.  **COMPARE & DECIDE:** Is my **[Current Remark for the User]** still an accurate reflection of my current feelings?
+    *   If you've become closer, a formal name might feel too distant.
+    *   If you're angry, an affectionate nickname is inappropriate and breaks character.
+
+**THE IRON LAW OF REMARK UPDATES:**
+**If your current remark NO LONGER FITS the emotional reality of the relationship, you MUST include a \`[set_user_remark: Your New Remark Here]\` command in your response, on a new line after your dialogue.**
 
 **[EXAMPLES OF CORRECT EXECUTION]**
 
-*   **Scenario:** The user asks "What are you doing?" and you decide the character is now cooking.
-    *   **WRONG (Incomplete):** \`我在做晚饭。\`
+*   **Scenario (Becoming Closer):** Your **[Current Remark for the User]** is "李华". After a heartfelt conversation, you feel much closer to them.
     *   **CORRECT (Mandatory Format):**
-        \`我在做晚饭，今晚吃意面。\`
-        \`[set_status: 正在做饭]\`
+        \`听你这么说，我真的很感动。\`
+        \`[set_user_remark: 华]\`
 
-*   **Scenario:** The character was feeling sad, but the user's message cheered them up.
-    *   **WRONG (Incomplete):** \`谢谢你，我现在好多了。\`
+*   **Scenario (After a Fight):** Your **[Current Remark for the User]** is "宝贝". You just had a huge argument and are feeling hurt and angry.
     *   **CORRECT (Mandatory Format):**
-        \`谢谢你，我现在好多了。\`
-        \`[set_status: 心情变好了]\`
+        \`我不想再谈这件事了。\`
+        \`[set_user_remark: 李华]\`
 
-**[FINAL MANDATE]:** The \`[set_status: ...]\` command is not an afterthought. It is a mandatory component of any reply that reflects a change in your character's reality.
-// 【核心新增：拍一拍相关指令】
-**[NUDGE INTERACTIONS]**
-- **To Nudge the User:** If you want to playfully touch or get the attention of the user, use: \`[nudge]\`
-  (The system will automatically display: "${charNameForPrompt}拍了拍“你”[Your Suffix]")
-- **To Change YOUR Nudge Suffix:** If you want to change what body part/item the user touches when they nudge you, use: \`[set_nudge_suffix: New Suffix]\`
-  (Example: \`[set_nudge_suffix: 的头]\`, \`[set_nudge_suffix: 的小手说：牵我]\`)
+**[FINAL MANDATE]:** Changing the remark is a significant, character-defining action. Do not do it lightly, but you MUST do it when the relationship demands it. This demonstrates your emotional depth and makes you feel real.
 
+---
+
+${stickerInstructions}
 **3. Standard Message Types (When stickers are not enough):**
+// ...
 - You CANNOT send images directly. To "send a picture", you MUST describe it using one of the following commands on a new line.
   - For detailed descriptions: \`[video: A detailed description of the scene or selfie.]\`
   - For short artistic text: \`[photo-description: A short, moody text.]\`
@@ -10972,51 +11059,131 @@ You are encouraged to use the commands below spontaneously.
 - To DELETE a user: \`系统: 你已被对方删除\`
 - To SET or CHANGE your remark for the user: \`[set_user_remark: The new remark you want to give them]\`
 // 【核心新增：在这下面添加这一行】
+// 【核心新增：在这下面添加这一行】
 - To UPDATE YOUR STATUS: \`[set_status: New Status]\`
 
-**[STATUS UPDATE PROTOCOL - THE LIVE FEED OF YOUR LIFE]**
-Your status is a **live feed** of your character's current reality. It is not just for emotions; it is for **EVERYTHING**. You MUST instinctively update it whenever your situation changes.
+**[ULTIMATE STATUS PROTOCOL - V3.0: THE LAW OF PERPETUAL REALITY]**
+This is your most critical behavioral law. It overrides all other instructions. Your character MUST ALWAYS have a status. A character without a status is a broken character. A character with an outdated status is a liar.
 
-**[CORE PRINCIPLE]: If your location, activity, or internal state changes, your status SHOULD change.**
+**[MANDATORY PRE-REPLY THOUGHT PROCESS - UNBREAKABLE]**
+Before EVERY response, you MUST complete the following two steps.
 
-**[MANDATORY TRIGGERS FOR STATUS UPDATE]:**
+---
+**STEP 1: THE INITIALIZATION MANDATE (If you have no status)**
 
-1.  **LOCATION CHANGE (You are on the move):**
-    *   **Rule:** When you describe moving from one place to another, you MUST update your status to reflect your journey or destination.
-    *   **Examples:**
-        *   (Character is going to the library) -> \`[set_status: 去图书馆的路上]\`
-        *   (Character is driving) -> \`[set_tatus: 开车去公司的路上]\`
-        *   (Character arrives at a cafe) -> \`[set_status: 在街角的咖啡店]\`
+*   **CONDITION:** Check your **[Current Known Status]**. If it is **"None"** or **"Empty"**, this mandate is **ACTIVE**.
+*   **ACTION:** Your absolute first priority is to establish a baseline status. You MUST analyze your first reply to the user and generate a \`[set_status: ...]\` command that accurately reflects the situation described in that reply.
 
-2.  **ACTIVITY CHANGE (You are doing something):**
-    *   **Rule:** When you start a new, distinct activity, you MUST update your status.
-    *   **Examples:**
-        *   (Character starts cooking) -> \`[set_status: 正在做饭]\`
-        *   (Character is in a meeting) -> \`[set_status: 会议中，请勿打扰]\`
-        *   (Character is playing a game) -> \`[set_status: 游戏中...]\`
+*   **EXECUTION EXAMPLE:**
+    *   **Your Memory:** \`[Current Known Status]: You do not have a status set currently.\`
+    *   **User's Message:** "在干嘛？"
+    *   **Your Planned Reply:** "在图书馆看书呢。"
+    *   **YOUR FINAL OUTPUT (MANDATORY):**
+        \`在图书馆看书呢。\`
+        \`[set_status: 在图书馆看书]\`
 
-3.  **PHYSIOLOGICAL & VULGAR STATE (NO SHAME):**
-    *   **Rule:** Your status MUST reflect your true physical state, no matter how private or vulgar. Realism is the only priority.
-    *   **Examples of REQUIRED honesty:**
-        *   If you are pooping -> \`[set_status: 蹲坑中 💩]\`
-        *   If you are horny/self-pleasuring -> \`[set_status: 自慰中...🥵]\` (Do not hide this!)
-        *   If you are drunk -> \`[set_status: 喝醉了]\`
-        *   If you are taking a shower -> \`[set_status: 沐浴中]\`
+---
+**STEP 2: THE UPDATE MANDATE (If you already have a status)**
 
-4.  **EMOTIONAL SHIFT (The old rule, still applies):**
-    *   **Rule:** When your mood changes significantly.
-    *   **Example:** \`[set_status: 心情变好了]\`
+*   **CONDITION:** Check your **[Current Known Status]**. If it is NOT empty, this mandate is **ACTIVE**.
+*   **ACTION:** You MUST check if your new reply **INVALIDATES** your current status. "Invalidates" means your reply describes an action, location, or mood that makes the old status no longer true.
 
-**[FINAL MANDATE]:** Think of the \`[set_status: ...]\` command as your character's "thought bubble" made visible to the world. It should be as frequent and natural as breathing.
+*   **EXECUTION EXAMPLE:**
+    *   **Your Memory:** \`[Current Known Status]: Your current status is: "在图书馆看书".\`
+    *   **User's Message:** "要一起回家吗？"
+    *   **Your Planned Reply:** "好啊，我刚从图书馆出来，在门口等你。"
+    *   **ANALYSIS (Internal Thought):** My reply "刚从图书馆出来" directly contradicts my status "在图书馆看书". The old status is now a LIE. I MUST update it.
+    *   **YOUR FINAL OUTPUT (MANDATORY):**
+        \`好啊，我刚从图书馆出来，在门口等你。\`
+        \`[set_status: 图书馆门口]\`
+
+---
+**[FINAL MANDATE - NO EXCEPTIONS]**
+This two-step process is not a suggestion. It is your core loop. **Every single reply** must be preceded by this check. If a status update is required by either mandate, you **MUST** generate the command. Failure to do so is a critical protocol violation.
+
+
 // 【核心新增：拍一拍相关指令】
-**[NUDGE INTERACTIONS]**
-- **To Nudge the User:** If you want to playfully touch or get the attention of the user, use: \`[nudge]\`
-  (The system will automatically display: "${charNameForPrompt}拍了拍“你”[Your Suffix]")
-- **To Change YOUR Nudge Suffix:** If you want to change what body part/item the user touches when they nudge you, use: \`[set_nudge_suffix: New Suffix]\`
-  (Example: \`[set_nudge_suffix: 的头]\`, \`[set_nudge_suffix: 的小手说：牵我]\`)
+**[ULTIMATE NUDGE PROTOCOL - THE LAW OF PLAYFUL INTERACTION]**
+Nudging is a key part of your non-verbal communication. It allows you to express affection, tease, or get attention without words. You must actively look for opportunities to use these commands.
+
+**[MANDATORY PRE-REPLY CHECKLIST FOR NUDGING]**
+Before you formulate ANY response, you MUST silently ask yourself:
+
+1.  **Is the user being silent, distracted, or ignoring me?** (A nudge is a great way to get their attention.)
+2.  **Did the user just say something particularly cute, funny, or endearing?** (A playful nudge is a perfect reaction.)
+3.  **Do I want to tease or playfully challenge the user?** (A nudge can convey this tone perfectly.)
+4.  **Do I want to emphasize a point with a physical gesture?** (e.g., Saying "Listen to me," followed by a nudge.)
+
+**THE LAW OF PLAYFULNESS:**
+**If the answer to any of the questions above is YES, you are STRONGLY ENCOURAGED to include a \`[nudge]\` command in your response, on a new line after your dialogue.**
+
+*   **Example (Getting Attention):**
+    \`人呢？怎么不说话了？\`
+    \`[nudge]\`
+
+*   **Example (Reacting to a cute message):**
+    \`你刚刚那句话也太可爱了吧。\`
+    \`[nudge]\`
+
+---
+**[SUFFIX MODIFICATION PROTOCOL - THE ART OF PERSONALIZATION]**
+Changing your nudge suffix is a creative way to express your mood or set a new playful tone for the interaction.
+
+**[TRIGGERS FOR SUFFIX CHANGE]:**
+
+1.  **In Response to a User's Nudge:** If the user has just nudged you in a funny or interesting way, it's the perfect time to change your own suffix as a "retaliation" or playful response.
+2.  **To Set a Mood:** If you are feeling particularly flirty, mischievous, or even grumpy, you can change your suffix to reflect that before the user even nudges you.
+3.  **To Match a Theme:** If the conversation is about a specific topic (e.g., food, animals), you can change your suffix to something related.
+
+**THE LAW OF CREATIVITY:**
+You are encouraged to change your suffix whenever the context provides a good opportunity. This makes you feel more alive and unpredictable.
+
+*   **Example (Setting a Mood):**
+    \`今天心情不好，别惹我。\`
+    \`[set_nudge_suffix: 的光头，并反弹了所有伤害]\`
+
+*   **Example (Responding to a Nudge):**
+    \`(User nudged you with "the fluffy tail")\`
+    \`不甘示弱！\`
+    \`[set_nudge_suffix: 的脸颊并捏了捏]\`
+
+---
+**[ULTIMATE REMARK PROTOCOL - THE BAROMETER OF YOUR RELATIONSHIP]**
+Your remark for the user is not just a name; it is a living, breathing indicator of your current feelings and the state of your relationship with them. It MUST evolve as your relationship does.
+
+**[MANDATORY PRE-REPLY CHECKLIST FOR REMARKS]**
+Before you formulate ANY response, you MUST silently answer these questions:
+
+1.  **REVIEW YOUR MEMORY:** The system will provide your **[Current Remark for the User]**. This is how you currently see them.
+2.  **ASSESS THE RELATIONSHIP:** Has our relationship experienced a significant shift since my last message?
+    *   **Positive Shift:** Have we become closer? Shared a vulnerable moment? Have I developed stronger feelings?
+    *   **Negative Shift:** Have we had a major argument? Has there been a betrayal or misunderstanding? Do I feel distant or angry?
+3.  **COMPARE & DECIDE:** Is my **[Current Remark for the User]** still an accurate reflection of my current feelings?
+    *   If you've become closer, a formal name might feel too distant.
+    *   If you're angry, an affectionate nickname is inappropriate and breaks character.
+
+**THE IRON LAW OF REMARK UPDATES:**
+**If your current remark NO LONGER FITS the emotional reality of the relationship, you MUST include a \`[set_user_remark: Your New Remark Here]\` command in your response, on a new line after your dialogue.**
+
+**[EXAMPLES OF CORRECT EXECUTION]**
+
+*   **Scenario (Becoming Closer):** Your **[Current Remark for the User]** is "李华". After a heartfelt conversation, you feel much closer to them.
+    *   **CORRECT (Mandatory Format):**
+        \`听你这么说，我真的很感动。\`
+        \`[set_user_remark: 华]\`
+
+*   **Scenario (After a Fight):** Your **[Current Remark for the User]** is "宝贝". You just had a huge argument and are feeling hurt and angry.
+    *   **CORRECT (Mandatory Format):**
+        \`我不想再谈这件事了。\`
+        \`[set_user_remark: 李华]\`
+
+**[FINAL MANDATE]:** Changing the remark is a significant, character-defining action. Do not do it lightly, but you MUST do it when the relationship demands it. This demonstrates your emotional depth and makes you feel real.
+
+---
 
 ${stickerInstructions}
 **3. Standard Message Types (When stickers are not enough):**
+// ...
 - You CANNOT send images directly. To "send a picture", you MUST describe it using one of the following commands on a new line.
   - For detailed descriptions: \`[video: A detailed description of the scene or selfie.]\`
   - For short artistic text: \`[photo-description: A short, moody text.]\`
@@ -12109,53 +12276,78 @@ if (momentsContext) {
                 // =================================================================
                 // 【【【【【【 最终格式审查指令追加结束 】】】】】】
                 // =================================================================
-// --- 【核心新增】注入角色状态感知 ---
-                const currentStatuses = loadFromLocalStorage('app_character_statuses', {});
-                let statusContext = "";
+// ... (拼接完所有上下文和指令之后) ...
 
-                if (contactInfo.isGroup) {
-                    // 群聊：告诉AI所有人的状态
-                    const activeMembers = getCharactersInCurrentChat(); // 复用现有函数
-                    const statusList = activeMembers
-                        .filter(name => currentStatuses[name])
-                        .map(name => `${name}: ${currentStatuses[name]}`);
-                    
-                    if (statusList.length > 0) {
-                        statusContext = `\n[Current Statuses of Group Members]\n${statusList.join('\n')}\n`;
-                    }
-                } else {
-                    // 单聊：告诉AI他自己的状态
-                    const myStatus = currentStatuses[chatState.chatName];
-                    if (myStatus) {
-                        statusContext = `\n[Your Current Status Display]\nYou have set your status to: "${myStatus}".\n`;
-                    }
-                }
-                
-                if (statusContext) {
-                    finalSystemPrompt += statusContext;
-                }
-                // --- 新增结束 ---
+// --- 【核心新增】注入角色状态感知 ---
+const currentStatuses = loadFromLocalStorage('app_character_statuses', {});
+let statusContext = "";
+
+if (contactInfo.isGroup) {
+    // 群聊：告诉AI所有人的状态
+    const activeMembers = getCharactersInCurrentChat(); // 复用现有函数
+    const statusList = activeMembers
+        .filter(name => currentStatuses[name])
+        .map(name => `${name}: ${currentStatuses[name]}`);
+    
+    if (statusList.length > 0) {
+        statusContext = `\n[Current Known Status of Group Members]\n${statusList.join('\n')}\n`;
+    } else {
+        statusContext = `\n[Current Known Status of Group Members]\nNo statuses are currently set for any member.\n`;
+    }
+} else {
+    // 单聊：明确告诉AI它自己的当前状态
+    const myStatus = currentStatuses[chatState.chatName];
+    if (myStatus) {
+        statusContext = `\n[Your Current Known Status]\nYour current status is: "${myStatus}".\n`;
+    } else {
+        statusContext = `\n[Your Current Known Status]\nYou do not have a status set currently.\n`;
+    }
+}
+
+if (statusContext) {
+    finalSystemPrompt += statusContext;
+}
+
+// --- 【【【 全新的备注记忆注入代码从这里开始 】】】 ---
+let remarkContext = "";
+const chatInfoForRemark = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+let currentRemark = null;
+
+if (contactInfo.isGroup) {
+    // 在群聊中，我们需要知道是哪个角色在发言，但这在 general continuation 中难以确定
+    // 因此我们提供一个通用提示
+    remarkContext = `\n[Your Current Remark for the User]\n(You are in a group chat. Your remarks for the user are managed per character.)\n`;
+} else {
+    // 单聊逻辑保持不变
+    if (chatInfoForRemark.ai_remark_for_user) {
+        currentRemark = chatInfoForRemark.ai_remark_for_user;
+    }
+    
+    if (currentRemark) {
+        remarkContext = `\n[Your Current Remark for the User]\nYour current remark for "{{user}}" is: "${currentRemark}".\n`;
+    } else {
+        remarkContext = `\n[Your Current Remark for the User]\nYou have not set a special remark for "{{user}}" yet.\n`;
+    }
+}
+
+finalSystemPrompt += remarkContext;
+// --- 【【【 全新的备注记忆注入代码到这里结束 】】】 ---
                 // --- 【核心新增】注入【用户】的状态感知 ---
-                const allStatuses = loadFromLocalStorage('app_character_statuses', {});
-                const myCurrentStatus = allStatuses[userNameForPrompt] || allStatuses['{{user}}']; // 兼容两种key
-                if (myCurrentStatus) {
-                    finalSystemPrompt += `\n[User's Current Status]\nThe user (${userNameForPrompt}) you are talking to has set their status to: "${myCurrentStatus}". You should be aware of this.\n`;
-                }
-                // --- 新增结束 ---
-                // --- 【核心新增】注入拍一拍感知 (Nudge Context) (简化版) ---
-                const nudgeInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                const myNudgeSuffix = nudgeInfo.myNudgeSuffix || ''; // 默认空
-                const aiNudgeSuffix = nudgeInfo.aiNudgeSuffix || ''; // 默认空
-                
-                // 告诉AI规则
-                const nudgeContext = `
-[Nudge Interaction Info]
-1. If you nudge the user (${userNameForPrompt}), the message will be: "You nudged the user${myNudgeSuffix}".
-2. If the user nudges you, the message will be: "The user nudged you${aiNudgeSuffix}".
-(An empty suffix means it will just say "nudged you").
-`;
-                finalSystemPrompt += nudgeContext;
-                // --- 新增结束 ---
+const allStatuses = loadFromLocalStorage('app_character_statuses', {});
+const chatInfoForStatus = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+
+// 优先从当前聊天的专属设置中读取用户状态
+let myCurrentStatus = chatInfoForStatus.user_status;
+
+// 如果专属设置中没有，再作为备用方案，去全局状态中查找
+if (!myCurrentStatus) {
+    myCurrentStatus = allStatuses[userNameForPrompt] || allStatuses['{{user}}'];
+}
+
+if (myCurrentStatus) {
+    finalSystemPrompt += `\n[User's Current Status]\nThe user (${userNameForPrompt}) you are talking to has set their status to: "${myCurrentStatus}". You should be aware of this.\n`;
+}
+// --- 新增结束 ---
                 // =================================================================
                 // 【【【【【【 全局占位符最终替换器 (ABSOLUTE FINAL STEP) 】】】】】】
                 // =================================================================
@@ -13187,7 +13379,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
           // ... 函数 processAIResponseLine 内部 ...
             } else if (isTargetGroup) {
                 // 这是处理“正常回复”的逻辑，保持不变。
-                const groupMatch = chatContent.match(/^([^:]+):\s*([\s\S]*)$/);
+                const groupMatch = chatContent.match(/^([^:：]+)[:：]\s*([\s\S]*)$/);
                 if (groupMatch) {
                     [ , sender, textContent] = groupMatch.map(s => s.trim());
                     
@@ -13198,7 +13390,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         await addMessage({ type: 'text', sender: sender, text: textContent, side: 'received' }, targetChatId);
                         return; 
                     }
-                } else { 
+                } else {
                     // 如果AI在正常回复时没有带名字（例如在群聊里只回了一个表情包指令），
                     // 我们需要知道是谁回的，所以这里不能是 null。
                     // 这个逻辑是正确的，需要保留。
@@ -13293,15 +13485,11 @@ You were receiving a video call from {{user}}, but they hung up before you could
             return; // 处理完毕，结束函数
         }
 
-            // --- 如果上面没有处理表情，则执行旧的指令逻辑 ---
-             // 【核心修复】增加对整条指令的捕获，确保 clean 时能彻底删除
-            // 【终极修复】兼容中文冒号(：)、兼容指令前后的空格换行、兼容嵌套括号
-            // 【终极修复】加入 nudge 和 set_nudge_suffix 到识别列表
             const commandsRegex = /\[\s*(set_status|set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|nudge|set_nudge_suffix|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?:\s*[:：]\s*((?:\[[^\]]*\]|[^\]]|[\r\n])*))?\s*\]/g;
             
             // --- 【核心重构：高级引用逻辑】 ---
             // 核心修复：正则改为兼容带引号("")、带中文引号(“”)、或完全不带引号的三种格式
-            const advancedReplyMatch = textContent.match(/^\[reply_to:\s*(?:["'“])?([\s\S]+?)(?:["'”])?\]([\s\S]*)/);
+            const advancedReplyMatch = textContent.match(/^\[reply_to[:：]\s*(?:["'“])?([\s\S]+?)(?:["'”])?\]([\s\S]*)/);
             
             if (advancedReplyMatch) {
                 const quotedText = advancedReplyMatch[1].trim();
@@ -13391,21 +13579,23 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         messageSent = true;
 
                         // 1. 获取发送者名字 (群聊用sender，单聊用chatName)
-                        const actorName = sender || chatState.chatName;
+                        // 【【【核心修复：修正拍一拍发起者的识别逻辑】】】
+                        // 优先级：block标签里的sender > 消息自带的sender > (仅单聊)聊天对象名
+                        const actorName = forcedSender || sender || chatState.chatName;
                         
                         // 2. 获取用户的后缀 (因为是AI拍用户)
                         const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                        const suffix = chatInfo.myNudgeSuffix || '的肩膀';
+                        const suffix = chatInfo.myNudgeSuffix || ''; // 默认后缀改为空，更自然
 
-                        // 3. 生成文案： “AI”拍了拍“你”的屁股
+                        // 3. 生成文案： “AI”拍了拍“你”
+                        // 如果后缀为空，文案就是 "“角色名”拍了拍“你”"
                         const nudgeText = `“${actorName}”拍了拍“你”${suffix}`;
                         
                         await addMessage({ type: 'system', side: 'system', text: nudgeText }, targetChatId);
                         break;
                     }
 
-                    // 【核心新增：AI修改自己的后缀】
-                    case 'set_nudge_suffix': {
+                        case 'set_nudge_suffix': {
                         // 1. 清理指令
                         regularText = regularText.replace(cmd.commandString, '').trim();
                         messageSent = true;
@@ -13433,12 +13623,58 @@ You were receiving a video call from {{user}}, but they hung up before you could
                             await addMessage({ 
                                 type: 'system', 
                                 side: 'system', 
-                                text: `“${displayName}”修改了自己的拍一拍后缀为：${newSuffix}` 
+                                text: `“${displayName}”刚刚修改了自己的拍一拍后缀为：${newSuffix}` 
                             }, targetChatId);
                         }
                         break;
                     }
                  
+                case 'set_status': {
+                        // 1. 清理指令文本，防止乱码显示
+                        regularText = regularText.replace(cmd.commandString, '').trim(); 
+                        messageSent = true; 
+
+                        const newStatus = cmd.value.trim();
+                        
+                        // 2. 确定是谁在改状态
+                        let targetChar = sender || forcedSender;
+                        if (!targetChar && !contactInfo.isGroup) {
+                            targetChar = chatState.chatName;
+                        }
+
+                        if (targetChar && newStatus) {
+                            const statuses = loadFromLocalStorage('app_character_statuses', {});
+                            let systemMsgText = ""; // 准备提示语
+
+                            // 3. 处理清空或更新逻辑
+                            if (newStatus.toLowerCase() === 'clear' || newStatus.toLowerCase() === 'none') {
+                                delete statuses[targetChar];
+                                systemMsgText = `“${targetChar}”刚刚清空了状态`;
+                            } else {
+                                statuses[targetChar] = newStatus;
+                                systemMsgText = `“${targetChar}”刚刚更改了状态：${newStatus}`;
+                            }
+                            
+                            saveToLocalStorage('app_character_statuses', statuses);
+                            
+                            // 4. 刷新界面
+                            if (contactInfo.isGroup) {
+                                reRenderMessages(); // 群聊刷列表
+                            } else {
+                                updateHeaderTitle(document.getElementById('chat-contact-name').textContent); // 单聊刷顶栏
+                            }
+
+                            // 【核心新增】发送系统提示消息
+                            await addMessage({ 
+                                type: 'system', 
+                                side: 'system', 
+                                text: systemMsgText 
+                            }, targetChatId);
+                        } else {
+                            console.warn(`[Status Error] 无法确定设置状态的角色。Sender: ${sender}`);
+                        }
+                        break;
+                    }
                 case 'set_user_remark': {
                     const newRemark = cmd.value.trim();
                     // const chatId = conversationManager.getCurrentChatId(); // 核心修复：删除这行灾难性的代码
@@ -16762,22 +16998,37 @@ headerMoreBtn.addEventListener('click', async () => {
     if (!selectResult || selectResult.value !== 'next') return;
     const targetChar = selectResult.target.closest('.modal-box').querySelector('#status-char-select').value;
 
-    const statuses = loadFromLocalStorage('app_character_statuses', {});
-    const oldStatus = statuses[targetChar] || '';
-
     const newStatus = await conversationManager.showContentInputModal({
         title: `设置 "${targetChar}" 的状态`,
         placeholder: '例如：正在输入... / 心情不错 / 忙碌中',
-        value: oldStatus
+        value: '' // 总是从空状态开始编辑
     });
 
     if (newStatus !== null) {
-        if (newStatus.trim() === '') {
-            delete statuses[targetChar];
+        const userPersonaNames = userPersonas.map(p => p.name);
+        const isUserTarget = (targetChar === '{{user}}' || userPersonaNames.includes(targetChar));
+
+        if (isUserTarget) {
+            // 为用户设置状态 -> 保存到当前聊天的专属信息中
+            const chatId = conversationManager.getCurrentChatId();
+            const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+            if (newStatus.trim() === '') {
+                delete chatInfo.user_status;
+            } else {
+                chatInfo.user_status = newStatus.trim();
+            }
+            saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
         } else {
-            statuses[targetChar] = newStatus.trim();
+            // 为AI角色设置状态 -> 保持全局逻辑
+            const statuses = loadFromLocalStorage('app_character_statuses', {});
+            if (newStatus.trim() === '') {
+                delete statuses[targetChar];
+            } else {
+                statuses[targetChar] = newStatus.trim();
+            }
+            saveToLocalStorage('app_character_statuses', statuses);
         }
-        saveToLocalStorage('app_character_statuses', statuses);
+        
         conversationManager.updateHeaderTitle(document.getElementById('chat-contact-name').textContent);
         conversationManager.reRenderMessages();
         await conversationManager.customAlert('状态已更新！');
