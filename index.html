@@ -24527,7 +24527,7 @@ async function handleRemoveMember() {
         
         navigateTo('home');
     }
-    const APP_DATA_PREFIXES = [ 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_' ];
+    const APP_DATA_PREFIXES = [ 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' ];
 
     function base64ToBlob(base64, contentType = '', sliceSize = 512) {
         const byteCharacters = atob(base64.split(',')[1]);
