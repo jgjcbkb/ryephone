@@ -6640,24 +6640,32 @@ input:checked + .slider:before {
         } 
         else if (isNpc) {
             // 规则2: 如果是NPC，上下文【优先】来自与关联角色的共同群聊
-            const associatedChar = npcSettings.associations[senderName];
-            if (associatedChar) {
+            // 【核心修复：兼容多关联角色数组，只要有一个关联角色同在群里，就视为有效上下文】
+            let associations = npcSettings.associations[senderName];
+            // 归一化为数组
+            if (associations && !Array.isArray(associations)) {
+                associations = [associations];
+            }
+
+            if (associations && associations.length > 0) {
                 const commonGroup = chatList.find(chat => {
                     if (chat.type !== '群聊') return false;
                     const members = loadFromLocalStorage(`chat_members_${chat.id}`, []);
-                    return members.includes(senderName) && members.includes(associatedChar);
+                    // 逻辑：NPC本人必须在群里 AND (关联角色列表中至少有一个人也在群里)
+                    return members.includes(senderName) && associations.some(assocName => members.includes(assocName));
                 });
+
                 if (commonGroup) {
                     contextChatId = commonGroup.id;
                     contextChatInfo = loadFromLocalStorage(`chat_info_${commonGroup.id}`, {});
-                    console.log(`[诊断日志] NPC "${senderName}" 已从其与关联角色 "${associatedChar}" 的共同群聊 "${commonGroup.name}" 加载上下文。`);
+                    console.log(`[诊断日志] NPC "${senderName}" 已从共同群聊 "${commonGroup.name}" 加载上下文 (前情提要+历史)。`);
                 } else {
-                     console.log(`[诊断日志] NPC "${senderName}" 未找到共同群聊，将不加载任何聊天上下文。`);
+                     console.log(`[诊断日志] NPC "${senderName}" 未找到与关联角色的共同群聊，将不加载任何聊天上下文。`);
                 }
             } else {
                 console.log(`[诊断日志] NPC "${senderName}" 未关联任何角色，将不加载任何聊天上下文。`);
             }
-        } 
+        }
         else if (isPrivateCharacter) {
             // 规则3: 如果是普通单聊角色，上下文【永远】来自他们的私聊窗口
             const privateChat = chatList.find(c => c.type === '私聊' && c.name === senderName);
@@ -6974,7 +6982,15 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                 finalSystemPrompt += '\n\n[Associated NPCs for this Context]\n';
                 if (npcSettings.personas) {
                     associatedNpcNames.forEach(name => {
-                        const persona = npcSettings.personas[name] || 'No specific persona defined.';
+                        // 【核心修复：兼容NPC新旧数据格式】
+                        const rawData = npcSettings.personas[name];
+                        let persona = 'No specific persona defined.';
+                        if (typeof rawData === 'object' && rawData !== null) {
+                            persona = rawData.description || '';
+                        } else if (typeof rawData === 'string') {
+                            persona = rawData;
+                        }
+                        
                         finalSystemPrompt += `- **${name}**: ${persona}\n`;
                     });
                 }
@@ -7660,8 +7676,12 @@ if (isGroupPersona) {
                 // 如果是NPC，从NPC设置里读
                 let associations = (npcSettings.associations && npcSettings.associations[senderName]) || [];
                 associatedCharNames = Array.isArray(associations) ? associations : [associations];
+            } else if (contextChatId) {
+                // 【核心修复】如果是群聊主角/群演（contextChatId 存在），或者是单聊角色，都从其上下文ID读取
+                // 因为在函数开头我们已经智能确定了 contextChatId (无论是群ID还是私聊ID)
+                associatedCharNames = loadFromLocalStorage(`chat_associated_npcs_${contextChatId}`, []);
             } else {
-                // 如果是单聊角色，从聊天设置里读
+                // 保底逻辑：如果上述都没命中，尝试找私聊窗口
                 const privateChat = chatList.find(c => c.type === '私聊' && c.name === senderName);
                 if (privateChat) {
                     associatedCharNames = loadFromLocalStorage(`chat_associated_npcs_${privateChat.id}`, []);
@@ -7688,7 +7708,13 @@ if (isGroupPersona) {
                     }
                     if (!personaText) {
                         if (npcSettings.personas && npcSettings.personas[charName]) {
-                            personaText = npcSettings.personas[charName];
+                            // 【核心修复：兼容新旧数据格式】
+                            const rawData = npcSettings.personas[charName];
+                            if (typeof rawData === 'object' && rawData !== null) {
+                                personaText = rawData.description || '';
+                            } else {
+                                personaText = rawData;
+                            }
                         }
                     }
 
@@ -12117,7 +12143,18 @@ finalSystemPrompt += timeManager.getAITimeContext();
                         
                         const npcSettings = loadFromLocalStorage('app-npc-settings', {});
                         associatedNpcNames.forEach(name => {
-                            const persona = (npcSettings.personas && npcSettings.personas[name]) || 'No specific persona defined.';
+                            // 【核心修复：兼容新旧数据格式】
+                            const rawData = (npcSettings.personas && npcSettings.personas[name]);
+                            let persona = 'No specific persona defined.';
+                            
+                            if (typeof rawData === 'object' && rawData !== null) {
+                                // 新格式：对象
+                                persona = rawData.description || '';
+                            } else if (typeof rawData === 'string') {
+                                // 旧格式：字符串
+                                persona = rawData;
+                            }
+                            
                             npcInfoPrompt += `- **${name}**: ${persona}\n`;
                         });
                         finalSystemPrompt += npcInfoPrompt;
@@ -22668,8 +22705,15 @@ async function handleBatchDelete() {
                 return;
             }
 
+            // 【核心修改：在HTML中添加“启用动态”的开关】
             const modalHtml = `<div style="text-align: left; display: flex; flex-direction: column; gap: 15px;">
     <p>为选中的 ${selectedNpcs.length} 个NPC设置动态：</p>
+    
+    <label class="inline-label" style="justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+        <span style="font-weight: 500;">启用动态 (Active)</span>
+        <input type="checkbox" id="bulk-npc-active" checked style="width: 20px; height: 20px;">
+    </label>
+
     <div class="form-group" style="margin:0;">
         <label for="bulk-npc-dynamics-probability">概率 (%)</label>
         <input type="number" id="bulk-npc-dynamics-probability" class="modal-input" min="0" max="100" value="40">
@@ -22701,19 +22745,29 @@ async function handleBatchDelete() {
                         if (npcSettings.dynamics) {
                             delete npcSettings.dynamics[npcName];
                         }
+                        // 同时关闭激活状态
+                        if (npcSettings.activeStates) {
+                            delete npcSettings.activeStates[npcName];
+                        }
                     });
                 } else if (result.value === 'apply') {
-                    // 确保 dynamics 对象存在
-                    if (!npcSettings.dynamics) {
-                        npcSettings.dynamics = {};
-                    }
+                    // 确保对象存在
+                    if (!npcSettings.dynamics) npcSettings.dynamics = {};
+                    if (!npcSettings.activeStates) npcSettings.activeStates = {};
+
+                    // 【核心修改：获取启用状态】
+                    const isActive = modalBox.querySelector('#bulk-npc-active').checked;
 
                     const newSettings = {
                         probability: parseInt(modalBox.querySelector('#bulk-npc-dynamics-probability').value, 10),
                         interval: parseInt(modalBox.querySelector('#bulk-npc-dynamics-interval').value, 10)
                     };
+
                     selectedNpcs.forEach(npcName => {
+                        // 1. 设置具体参数
                         npcSettings.dynamics[npcName] = { ...newSettings };
+                        // 2. 设置激活状态 (对应列表上的开关)
+                        npcSettings.activeStates[npcName] = isActive;
                     });
                 }
                 saveNpcData();
