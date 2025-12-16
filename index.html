@@ -11908,41 +11908,54 @@ finalSystemPrompt += timeManager.getAITimeContext();
                     // 【【【【【【【【【【 终极修复：彻底重构群聊人设部分的逻辑 】】】】】】】】】】
 
                     const remarkNames = (chatInfo.remark || '').split(/[,，\s]+/).filter(Boolean);
+                    
+                    // 1. 【核心逻辑前置】先获取成员列表，判断用户是否在群里
+                    const formalMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
+                    const isUserInGroup = formalMembers.includes('{{user}}');
+
                     let groupPersonasPrompt = `\n\n[Group Chat Context & Your Roles]\n`;
-                    groupPersonasPrompt += `This is a group chat named "${chatState.chatName}". The user you are interacting with is named "${userNameForPrompt}".\n`;
+                    groupPersonasPrompt += `This is a group chat named "${chatState.chatName}".\n`;
 
-                    // 1. 【最终修复 第1步】获取所有潜在的AI实体
-                const formalMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
-                const groupPersonas = chatInfo.groupPersonas || [];
-                const protagonistNames = groupPersonas.map(p => p.name);
-                const allAiEntitiesInChat = [...new Set([...formalMembers, ...protagonistNames])];
+                    // 2. 【核心分支】根据用户是否在群，注入完全不同的世界观指令
+                    if (isUserInGroup) {
+                        // --- 场景 A: 用户在群里 (正常互动) ---
+                        groupPersonasPrompt += `The user you are interacting with is named "${userNameForPrompt}". You treat them as a present, equal member of the group.\n`;
+                    } else {
+                        // --- 场景 B: 用户不在群里 (旁观模式/私密群聊) ---
+                        groupPersonasPrompt += `
+*** [CRITICAL SCENARIO: PRIVATE GROUP - USER ABSENT] ***
+The user ("${userNameForPrompt}") is **NOT** a member of this group.
+This is a **PRIVATE** conversation strictly between the AI characters.
 
-                // 【最终修复 第2步】加载“软移出”名单
-                const softRemovedMembers = chatInfo.softRemovedMembers || [];
+**[ABSOLUTE PROHIBITION - THE FOURTH WALL]**
+1.  **INVISIBLE AUDIENCE:** The user is merely an invisible camera/ghost observing this chat.
+2.  **NO INTERACTION:** You are **STRICTLY FORBIDDEN** from addressing, mentioning, greeting, or reacting to the user.
+3.  **IGNORE INPUT:** Even if the user sends a message (as a director's cue), your characters must NOT acknowledge hearing it. They simply act out the scene requested.
+4.  **INTERNAL FOCUS:** Your characters must only talk to each other.
+`;
+                    }
 
-                // 【最终修复 第3步】从所有实体中，过滤掉用户和被软移出的成员，得到最终的“演员名单”
-                const activeAiMembers = allAiEntitiesInChat.filter(name => 
-                    name !== '{{user}}' && 
-                    name !== userNameForPrompt &&
-                    !softRemovedMembers.includes(name) // 核心过滤条件
-                );
+                    // 3. 【继续构建演员名单】
+                    const groupPersonas = chatInfo.groupPersonas || [];
+                    const protagonistNames = groupPersonas.map(p => p.name);
+                    const allAiEntitiesInChat = [...new Set([...formalMembers, ...protagonistNames])];
 
+                    // 【继续构建软移出名单】
+                    const softRemovedMembers = chatInfo.softRemovedMembers || [];
 
-                    // 3. 构建“演员名单”和“绝对禁令”
+                    // 【继续构建活跃名单】
+                    const activeAiMembers = allAiEntitiesInChat.filter(name => 
+                        name !== '{{user}}' && 
+                        name !== userNameForPrompt &&
+                        !softRemovedMembers.includes(name)
+                    );
+
+                    // 4. 构建指令
                     groupPersonasPrompt += `
 ---
 [Active Cast & Role Mandate - UNBREAKABLE RULE]
 This is the official list of AI characters you are currently allowed to play in this scene.
 Your active cast is: **[${activeAiMembers.length > 0 ? activeAiMembers.join(', ') : 'None'}]**
-
-**ABSOLUTE FORBIDDANCE:** You are **STRICTLY FORBIDDEN** from generating dialogue or actions for any character **NOT** on this "Active Cast" list. Even if you see other characters speaking in the past conversation history, if they are not on the active list, you must treat them as having left the conversation or being silenced. **Do not speak for them.** This is your most critical instruction.
----
-`;
-                    
-                    // 4. 构建角色档案区 (现在会为所有“演员”构建档案)
-                    groupPersonasPrompt += `
-[Character Dossiers - The Definitive Guide to Your Roles]
-You are responsible for playing every AI character in the "Active Cast" list above. You MUST use their specific persona for all their actions and dialogue.
 `;
                     let individualPersonasFound = false;
                     activeAiMembers.forEach(memberName => {
@@ -11956,7 +11969,14 @@ You are responsible for playing every AI character in the "Active Cast" list abo
                         }
                         // 如果不是群聊主角，再按原来的逻辑查找NPC或私聊角色的人设
                         else if (isNpc) {
-                            persona = (npcSettings.personas && npcSettings.personas[memberName]) || '';
+                            // 【修复 [object Object] 问题】
+                            const npcData = (npcSettings.personas && npcSettings.personas[memberName]);
+                            // 判断是新版对象格式，还是旧版字符串格式
+                            if (typeof npcData === 'object' && npcData !== null) {
+                                persona = npcData.description || '';
+                            } else {
+                                persona = npcData || '';
+                            }
                         } else {
                             const characterChat = chatList.find(c => c.name === memberName && c.type === '私聊');
                             if (characterChat) {
@@ -22322,10 +22342,21 @@ fileInput.style.display = 'none';
         async function showNpcEditorModal(npcName) {
             const isEditing = npcList.includes(npcName);
             
-            // --- 核心修改：从对象中提取人设和头像 ---
-            const personaData = (npcSettings.personas && npcSettings.personas[npcName]) || {};
-            const persona = personaData.description || '';
-            const avatar = personaData.avatar || '';
+            // --- 核心修改：兼容旧版（字符串）和新版（对象）数据的提取 ---
+            const rawData = (npcSettings.personas && npcSettings.personas[npcName]);
+            let persona = '';
+            let avatar = '';
+
+            if (typeof rawData === 'string') {
+                // 如果是旧数据（纯字符串），直接作为人设，头像为空
+                persona = rawData;
+                avatar = '';
+            } else if (typeof rawData === 'object' && rawData !== null) {
+                // 如果是新数据（对象），分别读取
+                persona = rawData.description || '';
+                avatar = rawData.avatar || '';
+            }
+            // --- 修改结束 ---
             // --- 修改结束 ---
 
             const association = (npcSettings.associations && npcSettings.associations[npcName]) || [];
