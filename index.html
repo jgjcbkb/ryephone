@@ -13444,52 +13444,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         }
                         break;
                     }
-                  case 'set_status': {
-                        // 1. 清理指令文本，防止乱码显示
-                        regularText = regularText.replace(cmd.commandString, '').trim(); 
-                        messageSent = true; 
-
-                        const newStatus = cmd.value.trim();
-                        
-                        // 2. 确定是谁在改状态
-                        let targetChar = sender || forcedSender;
-                        if (!targetChar && !contactInfo.isGroup) {
-                            targetChar = chatState.chatName;
-                        }
-
-                        if (targetChar && newStatus) {
-                            const statuses = loadFromLocalStorage('app_character_statuses', {});
-                            let systemMsgText = ""; // 准备提示语
-
-                            // 3. 处理清空或更新逻辑
-                            if (newStatus.toLowerCase() === 'clear' || newStatus.toLowerCase() === 'none') {
-                                delete statuses[targetChar];
-                                systemMsgText = `“${targetChar}”清空了状态`;
-                            } else {
-                                statuses[targetChar] = newStatus;
-                                systemMsgText = `“${targetChar}”更改了状态：${newStatus}`;
-                            }
-                            
-                            saveToLocalStorage('app_character_statuses', statuses);
-                            
-                            // 4. 刷新界面
-                            if (contactInfo.isGroup) {
-                                reRenderMessages(); // 群聊刷列表
-                            } else {
-                                updateHeaderTitle(document.getElementById('chat-contact-name').textContent); // 单聊刷顶栏
-                            }
-
-                            // 【核心新增】发送系统提示消息
-                            await addMessage({ 
-                                type: 'system', 
-                                side: 'system', 
-                                text: systemMsgText 
-                            }, targetChatId);
-                        } else {
-                            console.warn(`[Status Error] 无法确定设置状态的角色。Sender: ${sender}`);
-                        }
-                        break;
-                    }
+                 
                 case 'set_user_remark': {
                     const newRemark = cmd.value.trim();
                     // const chatId = conversationManager.getCurrentChatId(); // 核心修复：删除这行灾难性的代码
@@ -16781,7 +16736,7 @@ headerMoreBtn.addEventListener('click', async () => {
                 // 输入新状态，提示语也更新了
                 const newSuffix = await showContentInputModal({
                     title: '设置我的拍一拍后缀',
-                    placeholder: '（留空则为默认）例如：的屁股说：好翘',
+                    placeholder: '例如：的屁股说：好翘',
                     value: mySuffix
                 });
 
@@ -16797,49 +16752,44 @@ headerMoreBtn.addEventListener('click', async () => {
                 break;
             }
 
-            case 'set_status': {
-                let targetChar = '';
-                if (contactInfo.isGroup) {
-                    const characters = getCharactersInCurrentChat();
-                    if (characters.length === 0) {
-                        await conversationManager.customAlert('群里没有其他角色可设置。');
-                        return;
-                    }
-                    const optionsHtml = characters.map(name => `<option value="${name}">${name}</option>`).join('');
-                    const selectResult = await showCustomModal({
-                        title: '选择角色',
-                        form: [{ id: 'status-char-select', label: '为谁设置状态？', type: 'select', options: optionsHtml }],
-                        buttons: [{ text: '下一步', value: 'next', class: 'primary' }],
-                        showCloseButton: true
-                    });
-                    if (!selectResult || selectResult.value !== 'next') return;
-                    targetChar = selectResult.target.closest('.modal-box').querySelector('#status-char-select').value;
-                } else {
-                    targetChar = chatState.chatName;
-                }
+           case 'set_status': {
+    const characters = getCharactersInCurrentChat();
+    if (characters.length === 0) {
+        await conversationManager.customAlert('没有可设置状态的角色。');
+        return;
+    }
+    const optionsHtml = characters.map(name => `<option value="${name}">${name}</option>`).join('');
+    const selectResult = await conversationManager.showCustomModal({
+        title: '选择角色',
+        form: [{ id: 'status-char-select', label: '为谁设置状态？', type: 'select', options: optionsHtml }],
+        buttons: [{ text: '下一步', value: 'next', class: 'primary' }],
+        showCloseButton: true
+    });
+    if (!selectResult || selectResult.value !== 'next') return;
+    const targetChar = selectResult.target.closest('.modal-box').querySelector('#status-char-select').value;
 
-                const statuses = loadFromLocalStorage('app_character_statuses', {});
-                const oldStatus = statuses[targetChar] || '';
+    const statuses = loadFromLocalStorage('app_character_statuses', {});
+    const oldStatus = statuses[targetChar] || '';
 
-                const newStatus = await showContentInputModal({
-                    title: `设置 "${targetChar}" 的状态`,
-                    placeholder: '例如：正在输入... / 心情不错 / 忙碌中',
-                    value: oldStatus
-                });
+    const newStatus = await conversationManager.showContentInputModal({
+        title: `设置 "${targetChar}" 的状态`,
+        placeholder: '例如：正在输入... / 心情不错 / 忙碌中',
+        value: oldStatus
+    });
 
-                if (newStatus !== null) {
-                    if (newStatus.trim() === '') {
-                        delete statuses[targetChar];
-                    } else {
-                        statuses[targetChar] = newStatus.trim();
-                    }
-                    saveToLocalStorage('app_character_statuses', statuses);
-                    updateHeaderTitle(chatContactName.textContent);
-                    reRenderMessages();
-                    await conversationManager.customAlert('状态已更新！');
-                }
-                break;
-            }
+    if (newStatus !== null) {
+        if (newStatus.trim() === '') {
+            delete statuses[targetChar];
+        } else {
+            statuses[targetChar] = newStatus.trim();
+        }
+        saveToLocalStorage('app_character_statuses', statuses);
+        conversationManager.updateHeaderTitle(document.getElementById('chat-contact-name').textContent);
+        conversationManager.reRenderMessages();
+        await conversationManager.customAlert('状态已更新！');
+    }
+    break;
+}
 
             case 'chat_info':
                 openChatInfoPage();
