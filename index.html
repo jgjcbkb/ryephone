@@ -17991,6 +17991,13 @@ async function showBranchHistoryModal(chatId) {
         }
 
 // ... (conversationManager 内部的其他函数)
+function reloadContactInfo() {
+            if (chatState.chatId) {
+                // 重新从本地存储加载头像
+                contactInfo.avatarUrl = loadFromLocalStorage(`chat_avatar_${chatState.chatId}`, null) || generateDefaultAvatar(chatState.chatName);
+            }
+        }
+
         return { 
             open, 
             getCurrentChatId, 
@@ -18011,9 +18018,11 @@ async function showBranchHistoryModal(chatId) {
             processAIResponseLine, 
             executeBackgroundUpdatesAndCleanText, 
             showBubbleSettingsModal,
-            triggerAIContinuation // <--- 就是缺了这个王八蛋
+            triggerAIContinuation, // <--- 注意这里加了逗号
+            reloadContactInfo // <--- 【核心新增】暴露这个函数
         };
 })();
+        
 async function showGroupPersonaEditor(persona = {}, isEditing = false) {
         // --- 1. 新增的头像UI HTML ---
         const avatarHtml = `
@@ -22927,7 +22936,8 @@ async function handleRemoveMember() {
                         // 如果是为当前聊天更新 {{user}} 头像，不需要额外操作，因为预览已经更新
                     } else {
                         // 如果是更新对方头像
-                        contactInfo.avatarUrl = avatarValue;
+                        // 【核心修复】：调用刚才新增的公共方法来刷新内部状态
+                        conversationManager.reloadContactInfo();
                     }
                     // 刷新聊天列表和当前对话，确保所有地方的头像都更新
                     renderChatList();
@@ -22970,7 +22980,7 @@ async function handleRemoveMember() {
     }
     
     // 为聊天信息页面的按钮添加事件
-    document.getElementById('change-my-avatar-link-btn').addEventListener('click', () => { 
+    document.getElementById('change-my-avatar-link-btn').addEventListener('click', () => {
         const chatId = conversationManager.getCurrentChatId();
         if (chatId) {
             // 参数解读: 存储键, 预览元素ID, 是否是为当前聊天设置的user头像, 来源
@@ -22984,27 +22994,18 @@ async function handleRemoveMember() {
         }
     });
 
-    document.getElementById('change-contact-avatar-link-btn').addEventListener('click', () => { 
-        const chatId = conversationManager.getCurrentChatId(); 
-        if (chatId) { 
+    document.getElementById('change-contact-avatar-link-btn').addEventListener('click', () => {
+        const chatId = conversationManager.getCurrentChatId();
+        if (chatId) {
             // 参数解读: 存储键, 预览元素ID, 是否是为当前聊天设置的user头像, 来源
-            handleAvatarChange(`chat_avatar_${chatId}`, 'contact-avatar-preview', false, 'link'); 
-        } 
+            handleAvatarChange(`chat_avatar_${chatId}`, 'contact-avatar-preview', false, 'link');
+        }
     });
-    document.getElementById('change-contact-avatar-gallery-btn').addEventListener('click', () => { 
-        const chatId = conversationManager.getCurrentChatId(); 
-        if (chatId) { 
-            handleAvatarChange(`chat_avatar_${chatId}`, 'contact-avatar-preview', false, 'gallery'); 
-        } 
-    });
-
-    document.getElementById('change-contact-avatar-link-btn').addEventListener('click', () => { 
-        const chatId = conversationManager.getCurrentChatId(); 
-        if (chatId) { handleAvatarChange(`chat_avatar_${chatId}`, 'contact-avatar-preview', true, 'link'); } 
-    });
-    document.getElementById('change-contact-avatar-gallery-btn').addEventListener('click', () => { 
-        const chatId = conversationManager.getCurrentChatId(); 
-        if (chatId) { handleAvatarChange(`chat_avatar_${chatId}`, 'contact-avatar-preview', true, 'gallery'); } 
+    document.getElementById('change-contact-avatar-gallery-btn').addEventListener('click', () => {
+        const chatId = conversationManager.getCurrentChatId();
+        if (chatId) {
+            handleAvatarChange(`chat_avatar_${chatId}`, 'contact-avatar-preview', false, 'gallery');
+        }
     });
     
     function triggerFileInput(onFileSelected) {
