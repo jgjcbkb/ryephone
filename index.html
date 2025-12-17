@@ -4946,6 +4946,12 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     background-image: none !important;
     background-color: #ffffff !important; /* 可选：强制设为白色背景 */
 }
+/* --- 修复顶栏名字顶部被切除的问题 --- */
+#page-conversation #chat-contact-name {
+    line-height: 1.4 !important; /* 核心修复：增加行高，给文字顶部留出空间 */
+    padding-top: 4px !important; /* 核心修复：增加顶部内边距，把文字整体往下压一点 */
+    display: block !important;   /* 确保它作为块元素渲染，撑开高度 */
+}
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -13535,27 +13541,34 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 }
           // ... 函数 processAIResponseLine 内部 ...
             } else if (isTargetGroup) {
-                // 这是处理“正常回复”的逻辑，保持不变。
-                const groupMatch = chatContent.match(/^([^:：]+)[:：]\s*([\s\S]*)$/);
-                if (groupMatch) {
-                    [ , sender, textContent] = groupMatch.map(s => s.trim());
-                    
-                    const isGeneratedHtmlBlock = (textContent.startsWith('<snippet>') && textContent.endsWith('</snippet>')) || 
-                                                 (textContent.startsWith('<div') && textContent.endsWith('</div>'));
-
-                    if (isGeneratedHtmlBlock) {
-                        await addMessage({ type: 'text', sender: sender, text: textContent, side: 'received' }, targetChatId);
-                        return; 
-                    }
+                // 【核心修复】更严格的群聊名字解析逻辑
+                // 1. 如果内容直接以 '[' (指令) 或 '<' (HTML块) 开头，说明这绝对不是 "名字: 内容" 的格式
+                // 直接跳过解析，视为无名消息（让后续的指令解析器去处理）
+                if (chatContent.trim().match(/^[\[<]/)) {
+                    sender = null;
+                    textContent = chatContent.trim();
                 } else {
-                    // 如果AI在正常回复时没有带名字（例如在群聊里只回了一个表情包指令），
-                    // 我们需要知道是谁回的，所以这里不能是 null。
-                    // 这个逻辑是正确的，需要保留。
-                    sender = null; 
-                    textContent = chatContent.trim(); 
+                    // 2. 使用更严格的正则：名字里绝不能包含 [ ] < > 且长度限制在30字以内
+                    // 这样就能防止把很长的弹幕代码误判为名字
+                    const groupMatch = chatContent.match(/^([^:：\[\]<>\n\r]{1,30})[:：]\s*([\s\S]*)$/);
+                    
+                    if (groupMatch) {
+                        [ , sender, textContent] = groupMatch.map(s => s.trim());
+                        
+                        const isGeneratedHtmlBlock = (textContent.startsWith('<snippet>') && textContent.endsWith('</snippet>')) || 
+                                                     (textContent.startsWith('<div') && textContent.endsWith('</div>'));
+    
+                        if (isGeneratedHtmlBlock) {
+                            await addMessage({ type: 'text', sender: sender, text: textContent, side: 'received' }, targetChatId);
+                            return; 
+                        }
+                    } else {
+                        // 如果不符合名字格式，sender 设为 null，作为普通文本或指令处理
+                        sender = null; 
+                        textContent = chatContent.trim(); 
+                    }
                 }
-            } else { 
-// ...
+            } else {
                 // 私聊模式，逻辑不变。
                 sender = targetChat ? targetChat.name : chatState.chatName; 
                 textContent = chatContent.trim(); 
@@ -18092,31 +18105,47 @@ async function showBranchHistoryModal(chatId) {
         }
 
         // 核心跳转函数：不卡顿的秘密
+// 核心跳转函数：数学计算版 (绝不动摇整体布局)
         function jumpToMessage(msgId) {
             const index = fullMessageHistory.findIndex(m => m.id === msgId);
             if (index === -1) return;
 
-            // 1. 计算窗口：只取目标消息的前20条和后20条
+            // 1. 强制失焦，收起键盘
+            const input = document.getElementById('footer-message-input');
+            if (input) input.blur();
+
+            // 2. 准备数据并渲染
             const startIndex = Math.max(0, index - 20);
             const endIndex = Math.min(fullMessageHistory.length, index + 20);
-            
-            // 2. 重置当前显示的视图数据
             chatState.messages = fullMessageHistory.slice(startIndex, endIndex);
-            
-            // 3. 重新渲染界面 (只渲染这40条，绝对不卡)
             reRenderMessages();
             
-            // 4. 滚动到目标并高亮
-            // 稍微延迟一点点，等待渲染完成
+            // 3. 延迟执行，等待DOM渲染完毕
             setTimeout(() => {
                 const targetEl = document.querySelector(`.message-wrapper[data-message-id="${msgId}"]`);
-                if (targetEl) {
-                    targetEl.scrollIntoView({ behavior: 'auto', block: 'center' });
+                const container = document.getElementById('messages-container');
+
+                if (targetEl && container) {
+                    // 【核心逻辑：手动计算滚动位置】
+                    // 目标元素距离容器顶部的距离
+                    const elementTop = targetEl.offsetTop;
+                    // 容器可视高度的一半
+                    const halfContainerHeight = container.clientHeight / 2;
+                    // 目标元素高度的一半
+                    const halfElementHeight = targetEl.clientHeight / 2;
+
+                    // 计算出让元素居中所需的滚动高度
+                    // 公式：元素位置 - 容器半高 + 元素半高 = 居中位置
+                    const targetScrollTop = elementTop - halfContainerHeight + halfElementHeight;
+
+                    // 直接赋值给容器，绝不波及 body 或 screen
+                    container.scrollTop = targetScrollTop;
+
+                    // 高亮动画
                     targetEl.classList.add('highlight-anim');
-                    // 动画结束后移除类
                     setTimeout(() => targetEl.classList.remove('highlight-anim'), 2000);
                 }
-            }, 50);
+            }, 100);
         }
         // =========================================================================
 // ================= START: FAVORITES MANAGEMENT (NEW) =====================
