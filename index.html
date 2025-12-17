@@ -11393,8 +11393,24 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
 `;
                     }
                     
-                    // 将基础提示、剧本和角色定义拼接起来
-                    finalSystemPrompt = basePrompt + '\n\n' + directorHandbook + characterDefinition;
+                    
+// 【核心新增：线下模式专用状态更新指令】
+                    // 告诉AI，即使在写小说，也要记得用 <block type="command"> 来同步系统状态
+                    const offlineStatusPrompt = `
+---
+[SYSTEM SYNCHRONIZATION: STATUS & NUDGE]
+Even in narrative mode, you must verify if the character's state has changed.
+
+1.  **Status Update:** If the character's activity changes (e.g., from "Working" to "Sleeping"), you MUST output a command block to update the system status:
+    \`<block type="command" sender="{{char}}">[set_status: New Status]</block>\`
+
+2.  **Nudge Suffix:** If the character's mood changes, update their nudge suffix:
+    \`<block type="command" sender="{{char}}">[set_nudge_suffix: 后缀内容]</block>\`
+---
+`;
+
+                    // 将基础提示、剧本、角色定义以及【新的状态指令】拼接起来
+                    finalSystemPrompt = basePrompt + '\n\n' + directorHandbook + characterDefinition + offlineStatusPrompt;
                 } else if (contactInfo.isGroup) {
     // 【第二优先级判断】：如果不是线下模式，再判断是不是群聊
     const GROUP_CHAT_DIRECTOR_PROMPT = `
