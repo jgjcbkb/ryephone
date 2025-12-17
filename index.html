@@ -45,7 +45,8 @@
     html, body { 
         margin: 0; padding: 0; background-color: #f0f2f5; 
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-        display: flex; align-items: center; justify-content: center; min-height: 100vh;
+        /* display: flex; align-items: center; justify-content: center; min-height: 100vh; */ /* 注释掉这整行 */
+        padding: 20px 0; /* 新增：给上下一点边距，让手机不会贴边 */
         /* 【核心修复1】：强制开启全局点击手型，激活 iOS PWA 的点击穿透逻辑 */
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
@@ -64,8 +65,8 @@
         border: 10px solid var(--phone-outer-border); box-sizing: border-box; 
         box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         /* 【核心修复】：强制开启 iOS 硬件加速，修复圆角内的点击失效问题 */
-        transform: translate3d(0, 0, 0);
-        -webkit-transform: translate3d(0, 0, 0);
+        /* transform: translate3d(0, 0, 0); */
+        /* -webkit-transform: translate3d(0, 0, 0); */
         -webkit-mask-image: -webkit-radial-gradient(white, black); /* 修复圆角溢出遮罩 */
     }
     .screen::before {
@@ -73,8 +74,8 @@
         border: 3px solid var(--phone-inner-border); border-radius: 35px;
         pointer-events: none; z-index: 100;
         /* 【核心修复2】：给遮挡层开启硬件加速，确保 pointer-events: none 生效 */
-        transform: translate3d(0, 0, 0);
-        -webkit-transform: translate3d(0, 0, 0);
+        /* transform: translate3d(0, 0, 0); */
+        /* -webkit-transform: translate3d(0, 0, 0); */
     }
     .status-bar { 
         position: absolute; top: 8px; left: 0; width: 100%; height: 28px;
@@ -99,8 +100,8 @@
         border-radius: 35px;
         overflow: hidden;
         /* 【核心修复】：同上，确保内部应用容器也能正确接收点击 */
-        transform: translate3d(0, 0, 0);
-        -webkit-transform: translate3d(0, 0, 0);
+        /* transform: translate3d(0, 0, 0); */
+        /* -webkit-transform: translate3d(0, 0, 0); */
         z-index: 1; /* 确保内容层级明确 */
     }
     .page { 
