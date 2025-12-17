@@ -4908,8 +4908,8 @@ input:checked + .slider:before {
 #page-conversation #chat-view.preview-active .message-wrapper:not(.selected) {
     display: none !important;
 }
-/* --- 预览模式核心样式 (V2) --- */
-#page-conversation #chat-view.preview-active .message-wrapper:not(.selected) {
+/* --- 预览模式核心样式 (V3 - 显示时间) --- */
+#page-conversation #chat-view.preview-active .message-wrapper:not(.selected):not(.time-divider-wrapper) {
     display: none !important;
 }
 /* 新增：在预览模式下，强制隐藏选中消息的绿色覆盖层 */
@@ -17714,15 +17714,17 @@ multiSelectCancelBtn.addEventListener('click', exitMultiSelectMode);
         document.body.classList.remove('preview-fullscreen-active');
     }
 
-    // 为消息容器添加双击事件监听器，用于退出预览
-    messagesContainer.addEventListener('dblclick', (e) => {
-        // 只有在预览模式下，双击才有效
-        if (isPreviewMode) {
-            e.preventDefault();
-            e.stopPropagation();
-            exitPreviewMode();
-        }
-    });
+     const chatHeaderForDblClick = appRoot.querySelector('.chat-header');
+    if (chatHeaderForDblClick) {
+        chatHeaderForDblClick.addEventListener('dblclick', (e) => {
+            // 只有在预览模式下，双击才有效
+            if (isPreviewMode) {
+                e.preventDefault();
+                e.stopPropagation();
+                exitPreviewMode();
+            }
+        });
+    }
 document.addEventListener('click', (e) => { if (messageContextMenu && !messageContextMenu.contains(e.target)) { hideContextMenu(); } });
 
 document.getElementById('delete-contact-btn').addEventListener('click', async () => {
