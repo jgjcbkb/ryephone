@@ -45,8 +45,7 @@
     html, body { 
         margin: 0; padding: 0; background-color: #f0f2f5; 
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-        /* display: flex; align-items: center; justify-content: center; min-height: 100vh; */ /* 注释掉这整行 */
-        padding: 20px 0; /* 新增：给上下一点边距，让手机不会贴边 */
+        display: flex; align-items: center; justify-content: center; min-height: 100vh;
         /* 【核心修复1】：强制开启全局点击手型，激活 iOS PWA 的点击穿透逻辑 */
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
@@ -65,8 +64,8 @@
         border: 10px solid var(--phone-outer-border); box-sizing: border-box; 
         box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         /* 【核心修复】：强制开启 iOS 硬件加速，修复圆角内的点击失效问题 */
-        /* transform: translate3d(0, 0, 0); */
-        /* -webkit-transform: translate3d(0, 0, 0); */
+        transform: translate3d(0, 0, 0);
+        -webkit-transform: translate3d(0, 0, 0);
         -webkit-mask-image: -webkit-radial-gradient(white, black); /* 修复圆角溢出遮罩 */
     }
     .screen::before {
@@ -74,8 +73,8 @@
         border: 3px solid var(--phone-inner-border); border-radius: 35px;
         pointer-events: none; z-index: 100;
         /* 【核心修复2】：给遮挡层开启硬件加速，确保 pointer-events: none 生效 */
-        /* transform: translate3d(0, 0, 0); */
-        /* -webkit-transform: translate3d(0, 0, 0); */
+        transform: translate3d(0, 0, 0);
+        -webkit-transform: translate3d(0, 0, 0);
     }
     .status-bar { 
         position: absolute; top: 8px; left: 0; width: 100%; height: 28px;
@@ -100,8 +99,8 @@
         border-radius: 35px;
         overflow: hidden;
         /* 【核心修复】：同上，确保内部应用容器也能正确接收点击 */
-        /* transform: translate3d(0, 0, 0); */
-        /* -webkit-transform: translate3d(0, 0, 0); */
+        transform: translate3d(0, 0, 0);
+        -webkit-transform: translate3d(0, 0, 0);
         z-index: 1; /* 确保内容层级明确 */
     }
     .page { 
@@ -4905,6 +4904,48 @@ input:checked + .slider:before {
         height: 14px;
         line-height: 14px;
     }
+    /* --- 预览模式核心样式 --- */
+#page-conversation #chat-view.preview-active .message-wrapper:not(.selected) {
+    display: none !important;
+}
+/* --- 预览模式核心样式 (V2) --- */
+#page-conversation #chat-view.preview-active .message-wrapper:not(.selected) {
+    display: none !important;
+}
+/* 新增：在预览模式下，强制隐藏选中消息的绿色覆盖层 */
+#page-conversation #chat-view.preview-active .message-wrapper.selected::after {
+    content: none !important;
+}
+/* --- 新增：预览模式全屏自适应高度样式 (V2 - 保留边框版) --- */
+body.preview-fullscreen-active .phone {
+    height: auto; /* 核心：高度由内容决定，可以无限拉长 */
+    min-height: 100vh; /* 保证内容少时，手机框架也能撑满屏幕底部 */
+    max-height: none; /* 移除 90vh 的高度限制 */
+    margin-top: 0; /* 移除顶部外边距，让手机从屏幕顶端开始 */
+    margin-bottom: 0; /* 移除底部外边距 */
+}
+
+body.preview-fullscreen-active .screen {
+    /* screen 也需要自适应高度 */
+    height: auto;
+    min-height: 100vh;
+    max-height: none;
+}
+
+/* 在预览模式下，状态栏和刘海没有意义，需要隐藏 */
+body.preview-fullscreen-active .status-bar {
+    display: none;
+}
+
+/* 隐藏状态栏后，需要调整聊天头部的内边距，防止内容顶上去 */
+body.preview-fullscreen-active #page-conversation .chat-header {
+    padding-top: 10px;
+}
+/* --- 新增：预览模式下隐藏聊天背景 --- */
+body.preview-fullscreen-active #page-conversation .chat-content {
+    background-image: none !important;
+    background-color: #ffffff !important; /* 可选：强制设为白色背景 */
+}
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -5399,12 +5440,13 @@ input:checked + .slider:before {
     </div>
 </div>
                             </div>
-                            <div id="multi-select-bar" class="hidden" style="padding: 10px 5px;">
-                                <button id="multi-select-all-btn" style="background-color: #fff; border: 1px solid #ccc; color: #333; padding: 6px 10px; margin-right: 5px;">全选</button>
+                            <div id="multi-select-bar" class="hidden" style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0 5px; gap: 5px;">
+                                <!-- 所有按钮现在都在一个容器里 -->
+                                <button id="multi-select-all-btn" style="background-color: #fff; border: 1px solid #ccc; color: #333; padding: 6px 10px;">全选</button>
                                 <button id="multi-select-delete-btn" style="padding: 8px 12px;">删除</button>
-                                <!-- 新增按钮 -->
-                                <button id="multi-select-hide-btn" style="background-color: #f0ad4e; color: white; margin-left: 5px; padding: 8px 12px;">屏蔽</button>
-                                <span id="multi-select-counter" style="font-size: 12px; margin: 0 5px; white-space: nowrap;">已选 0</span>
+                                <button id="multi-select-hide-btn" style="background-color: #f0ad4e; color: white; padding: 8px 12px;">屏蔽</button>
+                                <button id="multi-select-preview-btn" style="background-color: #3498db; color: white; padding: 8px 12px;">预览</button>
+                                <span id="multi-select-counter" style="font-size: 12px; white-space: nowrap; margin: 0 auto;">已选 0</span>
                                 <button id="multi-select-cancel-btn" style="padding: 8px 12px;">取消</button>
                             </div>
                         </div>
@@ -5633,25 +5675,22 @@ input:checked + .slider:before {
 
                         
                         <div class="form-section">
-                             <div class="list-header" style="padding: 15px; display: flex; flex-direction: column; align-items: flex-start; gap: 15px;">
-    <h2 style="margin:0;">角色设置</h2>
+                             <div class="list-header" style="padding: 15px; display:flex; align-items:center; flex-wrap: wrap; gap: 10px;">
+    <h2 style="margin:0; flex-basis: 100%;">角色设置</h2>
     
-    <!-- 核心修改：用一个新的 div 把所有控制项包起来，让它们成为一个整体进行换行 -->
-    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 15px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <label for="dynamics-global-interval" style="font-size: 14px; color: #555; white-space: nowrap;">全局检测间隔(秒):</label>
-            <input type="number" id="dynamics-global-interval" min="5" value="15" style="width: 60px; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
-        </div>
-        
-        <!-- 核心修改：移除了不美观的 margin-left -->
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <label for="dynamics-global-rate-limit" style="font-size: 14px; color: #555; white-space: nowrap;">速率限制(次/分):</label>
-            <input type="number" id="dynamics-global-rate-limit" min="1" value="2" style="width: 60px; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
-        </div>
-
-        <!-- 核心修改：移除了 margin-left: auto，让它自然排列 -->
-        <button id="bulk-set-dynamics-btn" class="btn-primary btn-secondary" style="padding: 6px 12px; font-size: 13px; margin-left: 10px;">批量设置</button>
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <label for="dynamics-global-interval" style="font-size: 14px; color: #555;">全局检测间隔(秒):</label>
+        <input type="number" id="dynamics-global-interval" min="5" value="15" style="width: 60px; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
     </div>
+    
+    <!-- 从这里开始是新增的代码块 -->
+    <div style="display: flex; align-items: center; gap: 8px; margin-left: 15px;">
+        <label for="dynamics-global-rate-limit" style="font-size: 14px; color: #555;">速率限制(次/分):</label>
+        <input type="number" id="dynamics-global-rate-limit" min="1" value="2" style="width: 60px; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
+    </div>
+    <!-- 新增代码块到此结束 -->
+
+    <button id="bulk-set-dynamics-btn" class="btn-primary btn-secondary" style="padding: 4px 8px; font-size: 13px; margin-left: auto;">批量设置</button>
 </div>
                              <div id="dynamics-char-list" class="list-container"></div>
                         </div>
@@ -9696,7 +9735,10 @@ const conversationManager = (function() {
         const messagesContainer = appRoot.querySelector('#messages-container'), chatContent = appRoot.querySelector('.chat-content'), chatContactName = appRoot.querySelector('#chat-contact-name'), backButton = appRoot.querySelector('#back-button'), headerMoreBtn = appRoot.querySelector('#header-more-btn'), actionMenu = appRoot.querySelector('#action-menu'), dynamicDecorationBtn = appRoot.querySelector('#dynamic-decoration-btn'), messageContextMenu = appRoot.querySelector('#message-context-menu'), replyPreviewBar = appRoot.querySelector('#reply-preview-bar'), replyPreviewContent = replyPreviewBar.querySelector('.reply-preview-content'), cancelReplyBtn = appRoot.querySelector('#cancel-reply-btn');
         const footerMessageInput = appRoot.querySelector('#footer-message-input'), footerVoiceBtn = appRoot.querySelector('#footer-voice-btn'), footerStickerBtn = appRoot.querySelector('#footer-sticker-btn'), footerPlusBtn = appRoot.querySelector('#footer-plus-btn'), footerSendBtn = appRoot.querySelector('#footer-send-btn');
         const multiSelectBar = appRoot.querySelector('#multi-select-bar'), multiSelectDeleteBtn = appRoot.querySelector('#multi-select-delete-btn'), multiSelectCancelBtn = appRoot.querySelector('#multi-select-cancel-btn'), multiSelectCounter = appRoot.querySelector('#multi-select-counter'), multiSelectAllBtn = appRoot.querySelector('#multi-select-all-btn');
-        
+        // --- 核心新增 ---
+        const multiSelectPreviewBtn = appRoot.querySelector('#multi-select-preview-btn');
+        // --- 新增结束 ---
+
         const BUBBLE_NAMES = ["默认"];
         let bubbleSettings = {}, fontSettings = {}, activeDisplayedStyles = {};
         
@@ -9711,6 +9753,7 @@ const conversationManager = (function() {
 let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
 // 【【【新增代码到这里结束】】】        
         let isMultiSelectMode = false, selectedMessageIds = [];
+        let isPreviewMode = false; // --- 核心新增 ---
         let callAttemptState = { callId: null, closeUI: null }; // <--- 新增这一行
         async function executeBackgroundUpdatesAndCleanText(aiResponseText, targetChatId, senderName) {
             // 匹配所有后台更新标签，现在能捕获 sender 属性
@@ -16664,9 +16707,14 @@ elements.userPersonaSelect.innerHTML = '<option value="无">无</option>';
         }
 function enterMultiSelectMode(initialMessageId) { 
     isMultiSelectMode = true; 
+    isPreviewMode = false; // 确保初始不是预览模式
     selectedMessageIds = [initialMessageId]; 
     appRoot.querySelector('.input-container-wrapper').classList.add('hidden'); 
     multiSelectBar.classList.remove('hidden'); 
+
+    // 显示常规操作栏，隐藏预览操作栏
+    multiSelectActionsDiv.classList.remove('hidden');
+    previewActionsDiv.classList.add('hidden');
     
     // 【核心新增】重置全选按钮文字
     if (multiSelectAllBtn) multiSelectAllBtn.textContent = "全选";
@@ -16682,12 +16730,17 @@ function enterMultiSelectMode(initialMessageId) {
 }
 function exitMultiSelectMode() { 
     isMultiSelectMode = false; 
+    isPreviewMode = false; // 退出时重置预览状态
     selectedMessageIds = []; 
     appRoot.querySelector('.input-container-wrapper').classList.remove('hidden'); 
     multiSelectBar.classList.add('hidden'); 
     document.querySelectorAll('.message-wrapper.selected').forEach(el => el.classList.remove('selected')); 
     // 【【【【【【 新增的唯一一行代码 】】】】】】
     document.getElementById('chat-view').classList.remove('multi-select-active');
+    document.getElementById('chat-view').classList.remove('preview-active'); // 退出时移除预览模式的class
+
+    // 【核心新增】确保在取消时也移除全屏类
+    document.body.classList.remove('preview-fullscreen-active');
 }
 
 function toggleMessageSelection(messageId) { 
@@ -16704,7 +16757,13 @@ function toggleMessageSelection(messageId) {
     updateMultiSelectCounter(); 
 }
 
-function updateMultiSelectCounter() { const count = selectedMessageIds.length; multiSelectCounter.textContent = `已选择 ${count} 条`; multiSelectDeleteBtn.disabled = count === 0; }
+function updateMultiSelectCounter() { 
+    const count = selectedMessageIds.length; 
+    multiSelectCounter.textContent = `已选 ${count}`; 
+    multiSelectDeleteBtn.disabled = count === 0; 
+    // 预览按钮也需要有消息才能点
+    if (multiSelectPreviewBtn) multiSelectPreviewBtn.disabled = count === 0;
+}
 
 imageUploadInput.addEventListener('change', async (e) => {
     // 检查是否有文件被选中 (支持多选)
@@ -17623,6 +17682,47 @@ multiSelectCancelBtn.addEventListener('click', exitMultiSelectMode);
         }
     });
 // ===== 到这里结束复制 =====
+// 在 multiSelectDeleteBtn.addEventListener 的后面添加
+
+    if (multiSelectPreviewBtn) {
+        multiSelectPreviewBtn.addEventListener('click', () => {
+            if (selectedMessageIds.length === 0) return;
+            
+            isPreviewMode = true;
+            document.getElementById('chat-view').classList.add('preview-active');
+
+            // 切换操作栏：直接隐藏整个多选栏
+            multiSelectBar.classList.add('hidden');
+            appRoot.querySelector('.input-container-wrapper').classList.remove('hidden');
+
+            // 【核心新增】为 body 添加全屏类
+            document.body.classList.add('preview-fullscreen-active');
+        });
+    }
+
+    // 用于退出预览的独立函数
+    function exitPreviewMode() {
+        if (!isPreviewMode) return;
+        isPreviewMode = false;
+        document.getElementById('chat-view').classList.remove('preview-active');
+        
+        // 切换回常规多选栏：隐藏输入框，并重新显示多选操作栏
+        appRoot.querySelector('.input-container-wrapper').classList.add('hidden');
+        multiSelectBar.classList.remove('hidden');
+
+        // 【核心新增】从 body 移除全屏类
+        document.body.classList.remove('preview-fullscreen-active');
+    }
+
+    // 为消息容器添加双击事件监听器，用于退出预览
+    messagesContainer.addEventListener('dblclick', (e) => {
+        // 只有在预览模式下，双击才有效
+        if (isPreviewMode) {
+            e.preventDefault();
+            e.stopPropagation();
+            exitPreviewMode();
+        }
+    });
 document.addEventListener('click', (e) => { if (messageContextMenu && !messageContextMenu.contains(e.target)) { hideContextMenu(); } });
 
 document.getElementById('delete-contact-btn').addEventListener('click', async () => {
