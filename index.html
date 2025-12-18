@@ -66,7 +66,7 @@
         /* 【核心修复】：强制开启 iOS 硬件加速，修复圆角内的点击失效问题 */
         transform: translate3d(0, 0, 0);
         -webkit-transform: translate3d(0, 0, 0);
-        -webkit-mask-image: -webkit-radial-gradient(white, black); /* 修复圆角溢出遮罩 */
+        
     }
     .screen::before {
         content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -16738,10 +16738,6 @@ function enterMultiSelectMode(initialMessageId) {
     appRoot.querySelector('.input-container-wrapper').classList.add('hidden'); 
     multiSelectBar.classList.remove('hidden'); 
 
-    // 显示常规操作栏，隐藏预览操作栏
-    multiSelectActionsDiv.classList.remove('hidden');
-    previewActionsDiv.classList.add('hidden');
-    
     // 【核心新增】重置全选按钮文字
     if (multiSelectAllBtn) multiSelectAllBtn.textContent = "全选";
 
