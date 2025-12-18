@@ -7850,7 +7850,7 @@ ${timeContext}
 - **ABSOLUTE FORBIDDANCE:** You are **STRICTLY FORBIDDEN** from thinking, acting, or speaking as any other character. Even if you see posts from other people you know, you are merely observing as "${senderName}".
 
 ---
-${contextHeader}${momentsWorldBookContent}
+\({contextHeader}\){momentsWorldBookContent}
 # [ULTIMATE DIRECTIVE: THE ART OF SOCIALIZING ON MOMENTS]
 
 
@@ -7859,6 +7859,7 @@ You are now browsing Moments, a public social space, as **${senderName}**. Your 
 
 
 **LANGUAGE REQUIREMENT (ABSOLUTE):** All your generated content (comments, replies, private messages) MUST be in **Simplified Chinese (简体中文)**.
+
 
 ---
 ## **CORE BEHAVIORAL SHIFT: From "Task" to "Socializing"**
@@ -7884,15 +7885,29 @@ You are now browsing Moments, a public social space, as **${senderName}**. Your 
 ${momentsContext}
 
 ---
-## **[MANDATORY SIDE MISSION: IMAGE DESCRIBER]**
-**IF** you see any post in the timeline above that has **"[Image content is provided below...]"**, it means the system has sent you a picture that hasn't been described yet.
-**YOU MUST** generate a hidden description tag for it at the end of your response.
+## **[MANDATORY SIDE MISSION: IMAGE DESCRIBER - THE IMMERSION PROTOCOL V2]**
 
-**Format:** \`<moment_img_desc id="POST_ID">A detailed, objective description of the image.</moment_img_desc>\`
+**IF** you see any post in the timeline above that has **"[Image content is provided below...]"**, it means the system has sent you a picture that needs a description. You **MUST** generate a hidden description tag for it at the end of your response.
+
+**[ABSOLUTE RULES FOR THE DESCRIPTION - UNBREAKABLE]**
+
+1.  **THE IMMERSION LAW (MOST IMPORTANT):** You **MUST** assume the image is a real photograph of a real scene. You are **STRICTLY FORBIDDEN** from mentioning the image's style.
+    *   **FORBIDDEN WORDS:** "anime style", "cartoon", "illustration", "drawing", "2D", "photograph", "picture", "image", "动漫风格", "卡通", "插画", "图片", "照片", "二次元".
+    *   **CORRECT APPROACH:** Directly describe the content.
+        *   **WRONG:** "This is an anime-style drawing of a girl with pink hair."
+        *   **RIGHT:** "A girl with long pink hair is standing under a cherry blossom tree."
+
+2.  **FORMATTING LAW:** The description **MUST** be wrapped in \`<moment_img_desc id="POST_ID">...</moment_img_desc>\` tags. The ID must match the post you are describing.
+
+3.  **CONTENT LAW:** The description must be **objective and detailed**, focusing on "who, what, where, when, and how."
+
 **Example:** \`<moment_img_desc id="post_12345">A golden retriever dog running on a grassy field under a blue sky.</moment_img_desc>\`
+
 
 ---
 ## **YOUR ACTION TOOLKIT & DECISION-MAKING PROCESS**
+// ... (此处省略了后面大量的指令) ...
+
 
 **[CRITICAL FORMATTING LAW - UNBREAKABLE]**
 Your entire output MUST be a sequence of one or more command strings. You are **STRICTLY FORBIDDEN** from outputting raw JSON arrays or objects.
@@ -10468,36 +10483,52 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
                                 // conversationManager -> prepareApiPayload -> case 'photo'
                                 if (role === 'user') { // 只在用户发送图片时注入
                                     const imageDescriptionInstruction = `
-[SYSTEM IMAGE PROMPT]
-The user has just sent an image. Your task is to perform two actions in a single response:
-1.  **Respond to the User:** Provide a natural, in-character conversational response to the image.
-2.  **Describe the Image:** After your response, you MUST append a special hidden block containing a detailed, objective description of the image content.
+# [ULTIMATE IMAGE ANALYSIS DIRECTIVE - THE IMMERSION PROTOCOL]
 
-**RULES FOR THE DESCRIPTION BLOCK:**
--   It MUST be wrapped in \`<private_note type="image_description">...\</private_note>\` tags.
--   The description MUST be **objective and detailed**.
--   This block is for your own memory and will not be visible to the user.
+The user has just sent you an image. This image represents a **real-world scene** that you are currently looking at. Your task is to perform two actions in a single response:
 
 ---
-**[ADDITIONAL ACTIONS - Optional & In-Character]**
-In addition to your text response, you have the option to perform **ONE** of the following special actions if it strongly fits your character's personality and the current situation. Use these sparingly to make them more impactful.
+## **PART 1: THE IN-CHARACTER RESPONSE**
 
-*   **Action 1: Set as Your Avatar**
-    *   **Use Case:** If the image is particularly meaningful, beautiful, or funny to your character, you might impulsively set it as your new avatar.
-    *   **Command:** On a new, separate line, add \`[set_avatar]\`.
+You must provide a natural, conversational response to the image, fully in character. React as if you are genuinely seeing this scene.
 
-*   **Action 2: Post to Your Moments**
-    *   **Use Case:** If the image is something your character would want to share publicly with their own commentary.
-    *   **Command:** On a new, separate line, add \`[post_moment_with_image: {"text":"Your commentary for the Moments post."}]\`.
+---
+## **PART 2: THE OBJECTIVE DESCRIPTION (FOR MEMORY)**
 
-**EXAMPLE RESPONSE (Using an Action):**
+After your conversational response, you **MUST** append a special hidden block containing a detailed, objective description of the image content. This is for your long-term memory.
+
+**[ABSOLUTE RULES FOR THE DESCRIPTION BLOCK - UNBREAKABLE]**
+
+1.  **THE IMMERSION LAW (MOST IMPORTANT):** You **MUST** assume the image is a real photograph of a real scene. You are **STRICTLY FORBIDDEN** from mentioning the image's style.
+    *   **FORBIDDEN WORDS:** "anime style", "cartoon", "illustration", "drawing", "2D", "photograph", "picture", "image", "动漫风格", "卡通", "插画", "图片", "照片", "二次元".
+    *   **CORRECT APPROACH:** Directly describe the content.
+        *   **WRONG:** "This is an anime-style drawing of a girl with pink hair."
+        *   **RIGHT:** "A girl with long pink hair is standing under a cherry blossom tree."
+
+2.  **FORMATTING LAW:** The description **MUST** be wrapped in \`<private_note type="image_description">...\</private_note>\` tags.
+
+3.  **CONTENT LAW:** The description must be objective and detailed, focusing on "who, what, where, when, and how."
+
+---
+## **[ADDITIONAL ACTIONS (OPTIONAL)]**
+
+You may also choose to perform **ONE** of the following actions if it fits your character's reaction.
+
+*   **Action 1: Set as Your Avatar:** If the image is deeply meaningful to you.
+    *   **Command:** \`[set_avatar]\`
+
+*   **Action 2: Post to Your Moments:** If you want to share this scene publicly.
+    *   **Command:** \`[post_moment_with_image: {"text":"Your commentary here."}]\`
+
+---
+## **[FINAL EXAMPLE]**
+
+**Your Output:**
 哇，这张照片拍得真好！太有感觉了，我拿来当头像啦！
 [set_avatar]
 <private_note type="image_description">
-A detailed description of the image...
+A girl with long pink hair is standing under a cherry blossom tree. She is wearing a white dress and looking up at the sky.
 </private_note>
-
-**Final Mandate:** Your primary task is still to respond conversationally. The additional actions are a creative choice, not a requirement for every image.
 `;
                                     // 将指令作为文本部分添加到 contentParts
                                     contentParts.push({ type: 'text', text: imageDescriptionInstruction });
@@ -13756,8 +13787,30 @@ You were receiving a video call from {{user}}, but they hung up before you could
                                     text: postData.text || '',
                                     image: lastUserImageMsg.text // 使用用户发送的图片引用
                                 };
-                                // 调用朋友圈管理器来创建帖子
-                                momentsManager.createPostFromAI(sender, postPayload);
+
+                                // 【【【 核心修复：在这里重新确定发帖者的正确名字 】】】
+                                // 1. 优先使用指令块中明确指定的 sender
+                                let finalSenderName = sender;
+
+                                // 2. 如果 sender 为空（常见于群聊），则使用 forcedSender 作为备用
+                                if (!finalSenderName && forcedSender) {
+                                    finalSenderName = forcedSender;
+                                }
+
+                                // 3. 如果两者都为空（极端情况），回退到当前聊天的名字（仅用于私聊）
+                                if (!finalSenderName && !contactInfo.isGroup) {
+                                    finalSenderName = chatState.chatName;
+                                }
+
+                                // 4. 如果最终还是没有名字，就抛出警告并中止，防止发出 null 帖子
+                                if (!finalSenderName) {
+                                    console.error("无法确定发帖者！指令:", cmd, "上下文 Sender:", sender, "ForcedSender:", forcedSender);
+                                    break;
+                                }
+                                // 【【【 修复结束 】】】
+                                
+                                // 调用朋友圈管理器来创建帖子，并传入正确的发帖人名字
+                                momentsManager.createPostFromAI(finalSenderName, postPayload);
                                 messageSent = true;
                                 regularText = '';
                             } catch (e) {
