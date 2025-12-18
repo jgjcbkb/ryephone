@@ -6792,8 +6792,16 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                 }
             }
         } else if (isNpc) {
-            const personaData = (npcSettings.personas && npcSettings.personas[senderName]) || {};
-            const rawPersonaText = personaData.description || 'A mysterious NPC.'; // <-- 核心修复在这里
+            // 【核心修复：兼容NPC旧版人设数据】
+            const rawData = (npcSettings.personas && npcSettings.personas[senderName]);
+            let rawPersonaText = 'A mysterious NPC.';
+            
+            if (typeof rawData === 'string') {
+                rawPersonaText = rawData; // 旧版：直接是字符串
+            } else if (typeof rawData === 'object' && rawData !== null) {
+                rawPersonaText = rawData.description || 'A mysterious NPC.'; // 新版：对象
+            }
+            
             finalCharPersonaText = rawPersonaText.replace(/{{char}}/g, charNameForPrompt).replace(/{{user}}/g, userNameForPrompt);
         } else {
             const rawPersonaText = contextChatInfo.aiPersona || 'A thoughtful character.';
@@ -6967,9 +6975,17 @@ You are responsible for playing every AI character in the "Active Cast" list abo
 
                     if (groupProtagonistPersona) {
                         persona = groupProtagonistPersona.description || '';
-                    } else if (isNpc) {
-                        persona = (npcSettings.personas && npcSettings.personas[memberName]) || '';
+                      } else if (isNpc) {
+                        // 【修复 [object Object] 问题】
+                        const npcData = (npcSettings.personas && npcSettings.personas[memberName]);
+                        // 判断是新版对象格式，还是旧版字符串格式
+                        if (typeof npcData === 'object' && npcData !== null) {
+                            persona = npcData.description || '';
+                        } else {
+                            persona = npcData || '';
+                        }
                     } else {
+// ...
                         const characterChat = chatList.find(c => c.name === memberName && c.type === '私聊');
                         if (characterChat) {
                             const characterInfo = loadFromLocalStorage(`chat_info_${characterChat.id}`, {});
@@ -13350,7 +13366,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 const response = await fetch(chatUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
+                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) })
                 });
 
                 if (!response.ok) return;
@@ -17578,9 +17594,25 @@ messagesContainer.addEventListener('dblclick', async (e) => {
             if (!message) return;
 
             const isMe = message.side === 'sent';
-            const targetName = isMe ? '自己' : (message.sender || chatState.chatName);
-            
-            const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                
+                // 【【【 核心修复：在这里区分群聊和私聊，正确获取被拍对象的名字 】】】
+                let targetName;
+                if (isMe) {
+                    targetName = '自己';
+                } else {
+                    // 如果是群聊
+                    if (contactInfo.isGroup) {
+                        // 目标必须是这条消息的发送者 (msg.sender)。
+                        // 如果因为某些原因找不到，就用一个通用的“对方”作为备用，但绝不能用群名。
+                        targetName = message.sender || '对方';
+                    } else {
+                        // 如果是私聊，目标就是这个聊天的名称。
+                        targetName = chatState.chatName;
+                    }
+                }
+                // 【【【 修复结束 】】】
+
+                const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
             
             let suffix = ''; // 【核心修改】默认后缀为空
             
@@ -21260,7 +21292,12 @@ You are responsible for playing every AI character in the "Active Cast" list.`;
                                         if (groupProtagonistPersona) {
                                             persona = groupProtagonistPersona.description || '';
                                         } else if (isNpc) {
-                                            persona = (npcSettings.personas && npcSettings.personas[memberName]) || '';
+                                            const npcData = (npcSettings.personas && npcSettings.personas[memberName]);
+                                            if (npcData && typeof npcData === 'object') {
+                                                persona = npcData.description || '';
+                                            } else {
+                                                persona = npcData || '';
+                                            }
                                         } else {
                                             const characterChat = chatList.find(c => c.name === memberName && c.type === '私聊');
                                             if (characterChat) {
@@ -21293,18 +21330,19 @@ You are responsible for playing every AI character in the "Active Cast" list.`;
                                     timeManager.updateSettingsForChat(group.id);
                                     fullContextPrompt += timeManager.getAITimeContext();
                                     
-                                    // 7. 注入主聊天记录上下文
-                                    const memoryLength = parseInt(info.memoryLength || 20, 10);
-                                    const sourceMessages = loadFromLocalStorage(`conversation_${group.id}`, []);
-                                    const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
-                                    const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages);
-                                    const chatHistoryForPrompt = apiPayloadMessages.map(msg => {
-        const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || senderName);
-        const content = Array.isArray(msg.content) ? msg.content.find(p => p.type === 'text')?.text || '[Media]' : msg.content;
+                                                        // 7. 注入主聊天记录上下文
+                    const memoryLength = parseInt(info.memoryLength || 20, 10);
+                    const sourceMessages = loadFromLocalStorage(`conversation_${group.id}`, []);
+                    const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
+                    const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages);
+                    const chatHistoryForPrompt = apiPayloadMessages.map(msg => {
+        const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || '角色');
+        const content = Array.isArray(msg.content) ? msg.content.find(p => p.type === 'text')?.text || '[多媒体]' : msg.content;
         return `${role}: ${content}`;
     }).join('\n');
 
-                                    if (chatHistoryForPrompt) {
+                    if (chatHistoryForPrompt) {
+
                                         fullContextPrompt += `\n\n[RECENT CHAT HISTORY]\n${chatHistoryForPrompt}`;
                                     }
                                     
