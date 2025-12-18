@@ -9836,7 +9836,7 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                                 finalContent = `[${senderFromBlock}]\n${memoContent}`;
                             }
 
-                            pagerManager.addNoteFromAI(finalContent);
+                            pagerManager.addNoteFromAI(finalContent, targetChatId);
                             console.log(`[Background Update] Pager updated: A new memo was added by "${finalSenderName}".`);
                         }
                         break;
@@ -27191,17 +27191,30 @@ function renderDisplay() {
         }
 
         // 新增：供外部调用的函数，用于自动添加新备忘
-        function addNoteFromAI(aiReplyText) {
-            loadNotes(); // 确保数据最新
+        function addNoteFromAI(aiReplyText, chatId) {
+            if (!chatId) return;
+            const storageKey = `app-pager-notes_${chatId}`;
+            let notes = loadFromLocalStorage(storageKey, []);
+            
             const now = new Date();
             const dateStr = now.toLocaleDateString('zh-CN');
             const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
             const newNote = {
                 content: `${dateStr} ${timeStr}\n${aiReplyText}`
             };
+            
             // 将新备忘添加到数组的最前面
-            currentNotes.unshift(newNote);
-            saveNotes();
+            notes.unshift(newNote);
+            
+            // 过滤掉空内容或初始提示语，确保数据纯净
+            const finalNotes = notes.filter(note => note.content && note.content.trim() && !note.content.startsWith(">> ("));
+            
+            saveToLocalStorage(storageKey, finalNotes);
+
+            // 如果用户当前正好在这个聊天界面，同步更新内存，保证UI能即时看到变化
+            if (chatId === conversationManager.getCurrentChatId()) {
+                currentNotes = finalNotes.length > 0 ? finalNotes : [{ content: ">> (没有备忘录) <<" }];
+            }
         }
 
         async function startEdit() {
