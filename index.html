@@ -18317,7 +18317,93 @@ function reloadContactInfo() {
                 contactInfo.avatarUrl = loadFromLocalStorage(`chat_avatar_${chatState.chatId}`, null) || generateDefaultAvatar(chatState.chatName);
             }
         }
+async function triggerBackgroundDataUpdate(context, senderName, chatId) {
+            // 【【【 核心修复：在这里读取特定聊天的设置 】】】
+            const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+            // 如果该聊天的这个设置为 false，则停止。如果未设置(undefined)，则默认为开启。
+            if (chatInfo.enableBackgroundTasks === false) {
+                console.log(`[Background Update] Skipped for chat ${chatId} because tasks are disabled for this chat.`);
+                return "";
+            }
 
+            if (!senderName || senderName === '{{user}}') {
+                return ""; // 如果不满足条件，返回空字符串
+            }
+            
+        const rand = Math.random() * 100;
+        let choice = -1;
+        let prompt = "";
+
+        if (rand < 95) {
+            choice = 0; // 心事
+        } else {
+            choice = 1; // 备忘录
+        }
+
+        
+        console.log(`[Background Update] Random value: ${rand.toFixed(2)}. Preparing background task #${choice} for ${senderName}.`);
+
+        switch (choice) {
+            case 0: // 更新心事
+                prompt = `
+---
+[BACKGROUND TASK: UPDATE MOOD JOURNAL]
+After your chat response, you MUST generate a private mood journal entry.
+
+**[ULTIMATE, UNBREAKABLE FORMATTING LAW]**
+
+1.  **Persona Lock-in:** The journal entry MUST be from the perspective of your character, "${senderName}", reflecting their inner thoughts and feelings based on the recent conversation.
+2.  **Content Mandate:** The text inside the \`<background_update>\` block MUST be the final, in-character journal entry **ONLY**.
+3.  **STRICTLY FORBIDDEN CONTENT:** You are **ABSOLUTELY FORBIDDEN** from including any of the following inside the block:
+    *   Your reasoning, analysis, or thought process.
+    *   Meta-commentary about your instructions (e.g., "Proactive Behavior Mandate", "Active Cast").
+    *   Any debugging tags like \`[苦]\`.
+    *   Any English words or technical terms unless they are part of the character's natural speech.
+
+**[CRITICAL EXAMPLES - YOU MUST UNDERSTAND THIS]**
+
+*   **CORRECT EXAMPLE (What you SHOULD do):**
+    \`<background_update type="mood_card" sender="祁司礼">
+    今天图图似乎有些不开心，我该怎么哄她呢？也许明天带她去海边散散心会好一些。
+    </background_update>\`
+
+*   **WRONG, CATASTROPHIC FAILURE EXAMPLE (What you MUST NOT do):**
+    \`<background_update type="mood_card" sender="祁司礼">
+    [苦] 用户图图表示无聊。虽然核心Active Cast列表为空，但我启用了群备注中的角色祁司礼进行回应...
+    </background_update>\`
+
+**Final Instruction:** Generate the correctly formatted \`<background_update>\` block at the VERY END of your entire output.`;
+                break;
+            case 1: // 更新备忘录
+                prompt = `
+---
+[BACKGROUND TASK: CREATE A SINGLE, MULTI-LINE MEMO]
+After you formulate your chat response, you MUST ALSO generate a new memo for your pager based on the current context.
+
+**CRITICAL RULES:**
+1.  **SINGLE MEMO:** You MUST generate ONLY ONE complete memo.
+2.  **MULTI-LINE NOTES:** This single memo can, and should, contain multiple lines (notes) if needed. Use the newline character (\\n) to separate each note.
+3.  **SENDER ATTRIBUTE (MANDATORY):** The opening \`<background_update>\` tag **MUST** include the \`sender\` attribute, set to your current character name.
+4.  **NO SEPARATORS:** You MUST NOT use "---" or any other separator. Your entire output for this task is just one block of text.
+5.  **Language:** Simplified Chinese.
+
+Format your response STRICTLY as follows, at the VERY END of your entire output:
+<background_update type="pager" sender="${senderName}">
+First line (note 1) of your memo.
+Second line (note 2) of your memo.
+Third line (note 3), and so on...
+</background_update>
+
+**EXAMPLE:**
+<background_update type="pager" sender="张三">
+- 下午三点去银行取钱
+- 买菜：牛奶、鸡蛋、面包
+- 晚上记得打电话给妈妈
+</background_update>`;
+                break;
+        }
+        return prompt; // 返回生成的指令文本
+    }
         return { 
             open, 
             getCurrentChatId, 
@@ -21620,7 +21706,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 isFrameHidden: false,
                 showRawOutput: false,
                 showMessageTimestamps: false,
-                timestampPosition: 'below' // 新增这一行
+                timestampPosition: 'below', // 新增这一行
+                enableBackgroundTasks: true // 【【【核心新增：后台任务开关，默认开启】】】
             };
             
             // 从 localStorage 加载数据，如果不存在或为空，则 loaded 为 {}
@@ -22416,7 +22503,7 @@ fileInput.style.display = 'none';
             // ========================================================================
         }
 
-        return { init, applySettings };
+        return { init, applySettings, saveSettings };
     })();
     
     const npcManager = (function() {
@@ -26821,6 +26908,15 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             }
         }
         
+        function updateToggleButtonText() {
+            const chatId = conversationManager.getCurrentChatId();
+            if (!chatId) return; // 安全检查，如果没打开任何聊天，直接返回
+            const info = loadFromLocalStorage(`chat_info_${chatId}`, {});
+            // 如果设置未定义(undefined)，则默认为 true (开启)
+            const isEnabled = info.enableBackgroundTasks !== false; 
+            addNewMoodBtn.textContent = isEnabled ? '关闭自动生成' : '开启自动生成';
+        }
+
         let isInitialized = false; // 新增标志
 
         function initializeMoodManager() {
@@ -26842,9 +26938,30 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             cancelDeleteBtn.addEventListener('click', hideDeleteModal);
             deleteModal.addEventListener('click', (event) => { if (event.target === deleteModal) { hideDeleteModal(); } });
             
-            addNewMoodBtn.addEventListener('click', handleAddNewMood);
+            // 【【【 核心修复：将开关绑定到当前聊天 】】】
+            addNewMoodBtn.addEventListener('click', () => {
+                const chatId = conversationManager.getCurrentChatId();
+                if (!chatId) return;
+
+                const info = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                // 获取当前状态（未定义则为true）
+                const isCurrentlyEnabled = info.enableBackgroundTasks !== false;
+                
+                // 切换状态
+                info.enableBackgroundTasks = !isCurrentlyEnabled;
+                
+                // 将设置保存回这个特定聊天的 chat_info 中
+                saveToLocalStorage(`chat_info_${chatId}`, info);
+                
+                // 更新按钮文字以反映新状态
+                updateToggleButtonText();
+                
+                // 提示用户当前聊天的状态已改变
+                conversationManager.customAlert(`当前聊天的后台自动生成功能已${info.enableBackgroundTasks ? '开启' : '关闭'}。`);
+            });
+
             saveBtn.addEventListener('click', handleSaveMood);
-            editCancelBtn.addEventListener('click', () => editModal.classList.remove('visible')); // <<< 修改为 'visible'
+            editCancelBtn.addEventListener('click', () => editModal.classList.remove('visible'));
 
             
             // 监听页面大小变化，重新分页
@@ -26862,6 +26979,7 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             initializeMoodManager();
             loadMoods();
             renderCards();
+            updateToggleButtonText(); // 【【【 核心新增：打开时立即更新按钮状态 】】】
             
             const overlay = document.getElementById('mood-card-modal-overlay');
             if (overlay) {
@@ -29018,85 +29136,7 @@ Format your response STRICTLY as follows, with NO extra text:
     
     }
 
-    async function triggerBackgroundDataUpdate(context, senderName, chatId) {
-            if (!senderName || senderName === '{{user}}') {
-                return ""; // 如果不满足条件，返回空字符串
-            }
-            
-        const rand = Math.random() * 100;
-        let choice = -1;
-        let prompt = "";
-
-        if (rand < 95) {
-            choice = 0; // 心事
-        } else {
-            choice = 1; // 备忘录
-        }
-
-        
-        console.log(`[Background Update] Random value: ${rand.toFixed(2)}. Preparing background task #${choice} for ${senderName}.`);
-
-        switch (choice) {
-            case 0: // 更新心事
-                prompt = `
----
-[BACKGROUND TASK: UPDATE MOOD JOURNAL]
-After your chat response, you MUST generate a private mood journal entry.
-
-**[ULTIMATE, UNBREAKABLE FORMATTING LAW]**
-
-1.  **Persona Lock-in:** The journal entry MUST be from the perspective of your character, "${senderName}", reflecting their inner thoughts and feelings based on the recent conversation.
-2.  **Content Mandate:** The text inside the \`<background_update>\` block MUST be the final, in-character journal entry **ONLY**.
-3.  **STRICTLY FORBIDDEN CONTENT:** You are **ABSOLUTELY FORBIDDEN** from including any of the following inside the block:
-    *   Your reasoning, analysis, or thought process.
-    *   Meta-commentary about your instructions (e.g., "Proactive Behavior Mandate", "Active Cast").
-    *   Any debugging tags like \`[苦]\`.
-    *   Any English words or technical terms unless they are part of the character's natural speech.
-
-**[CRITICAL EXAMPLES - YOU MUST UNDERSTAND THIS]**
-
-*   **CORRECT EXAMPLE (What you SHOULD do):**
-    \`<background_update type="mood_card" sender="祁司礼">
-    今天图图似乎有些不开心，我该怎么哄她呢？也许明天带她去海边散散心会好一些。
-    </background_update>\`
-
-*   **WRONG, CATASTROPHIC FAILURE EXAMPLE (What you MUST NOT do):**
-    \`<background_update type="mood_card" sender="祁司礼">
-    [苦] 用户图图表示无聊。虽然核心Active Cast列表为空，但我启用了群备注中的角色祁司礼进行回应...
-    </background_update>\`
-
-**Final Instruction:** Generate the correctly formatted \`<background_update>\` block at the VERY END of your entire output.`;
-                break;
-            case 1: // 更新备忘录
-                prompt = `
----
-[BACKGROUND TASK: CREATE A SINGLE, MULTI-LINE MEMO]
-After you formulate your chat response, you MUST ALSO generate a new memo for your pager based on the current context.
-
-**CRITICAL RULES:**
-1.  **SINGLE MEMO:** You MUST generate ONLY ONE complete memo.
-2.  **MULTI-LINE NOTES:** This single memo can, and should, contain multiple lines (notes) if needed. Use the newline character (\\n) to separate each note.
-3.  **SENDER ATTRIBUTE (MANDATORY):** The opening \`<background_update>\` tag **MUST** include the \`sender\` attribute, set to your current character name.
-4.  **NO SEPARATORS:** You MUST NOT use "---" or any other separator. Your entire output for this task is just one block of text.
-5.  **Language:** Simplified Chinese.
-
-Format your response STRICTLY as follows, at the VERY END of your entire output:
-<background_update type="pager" sender="${senderName}">
-First line (note 1) of your memo.
-Second line (note 2) of your memo.
-Third line (note 3), and so on...
-</background_update>
-
-**EXAMPLE:**
-<background_update type="pager" sender="张三">
-- 下午三点去银行取钱
-- 买菜：牛奶、鸡蛋、面包
-- 晚上记得打电话给妈妈
-</background_update>`;
-                break;
-        }
-        return prompt; // 返回生成的指令文本
-    }
+    
     // =================================================================================
     // 全局名字暴力替换器 (The Final Solution)
     // =================================================================================
