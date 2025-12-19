@@ -13615,7 +13615,8 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 // 这是为“主动发消息”设计的特殊逻辑，不会影响正常的对话回复。
                 
                 // 1. 先尝试解析AI的回复是否自带了 "名字: 内容" 格式。
-                const groupMatch = chatContent.match(/^([^:]+):\s*([\s\S]*)$/);
+                // 【核心修改】正则增加了 [:：]，同时支持中文和英文冒号
+                const groupMatch = chatContent.match(/^([^:：]+)[:：]\s*([\s\S]*)$/);
                 
                 if (groupMatch && groupMatch[1].trim() === forcedSender) {
                     // 如果AI主动发消息时，自己带上了名字 (例如 "张三: 大家好")
@@ -13624,7 +13625,8 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     textContent = groupMatch[2].trim();
                 } else {
                     // 如果AI主动发消息时，没带名字 (例如 "大家好")
-                    // 我们必须强制指定 sender，否则群聊界面不知道是谁发的，就不会显示名字和头像。
+                    // 【核心修改】强制指定 sender 为当前触发的角色 (forcedSender)
+                    // 这样群聊界面就能正确显示出是谁在说话了
                     sender = forcedSender;
                     textContent = chatContent.trim();
                 }
