@@ -13605,9 +13605,8 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     textContent = groupMatch[2].trim();
                 } else {
                     // 如果AI主动发消息时，没带名字 (例如 "大家好")
-                    // 这正是我们想要的情况！此时我们将 sender 设为 null。
-                    // 这样 addMessageToDOM 就不会再画蛇添足地加上 "张三:" 的标签了。
-                    sender = null;
+                    // 我们必须强制指定 sender，否则群聊界面不知道是谁发的，就不会显示名字和头像。
+                    sender = forcedSender;
                     textContent = chatContent.trim();
                 }
           // ... 函数 processAIResponseLine 内部 ...
