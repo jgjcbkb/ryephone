@@ -11966,11 +11966,13 @@ Your entire focus MUST be on your own actions, thoughts, and interactions with O
 // ... 后续代码 ...
                 // 【【【【【【 修复逻辑到此结束 】】】】】】
                 
-                if (contactInfo.isGroup) {
-                    // --- 【核心重构】在群聊中加载所有AI控制的正式成员的人设 ---
+               if (contactInfo.isGroup) {
+                    // --- 【核心修改 1】: 将成员判断逻辑提上来，放在最前面 ---
+                    const formalMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
+                    const isUserInGroup = formalMembers.includes('{{user}}');
+                    // -------------------------------------------------------
 
-                    // 【新增部分】: 首先加载群聊的通用上下文（前情提要、用户人设、世界书）
-                    // 这部分逻辑与单聊模式完全一致，确保所有成员都能看到场景设定
+                    // ... (下面是原有的代码) ...
 
                     const preamble = chatInfo.preamble || '';
 const preambleEndTime = chatInfo.preambleEndTime;
@@ -11998,21 +12000,39 @@ if (preamble) { // 只有在前情提要存在时才执行判断
 
     // 只有在需要包含时，才将其拼接到系统提示中
     if (includePreamble) {
-        finalSystemPrompt = `[Preamble - Highest Priority Context]\n${preamble}\n\n` + finalSystemPrompt;
+        if (isUserInGroup) {
+            // 用户在群里，正常注入
+            finalSystemPrompt = `[Preamble - Highest Priority Context]\n${preamble}\n\n` + finalSystemPrompt;
+        } else {
+            // 用户不在群里，标记为“背景参考”，并警告不要互动
+            finalSystemPrompt = `[Background Context / Preamble]\n(NOTE: The user is NOT present in this scene. This is for background logic only. DO NOT interact with them.)\n${preamble}\n\n` + finalSystemPrompt;
+        }
     }
 }
                     
                     if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
                         const persona = userPersonas.find(p => p.name === chatInfo.userPersonaName);
                         if (persona && persona.description) {
-                            let processedUserPersona = persona.description.replace(/{{user}}/g, userNameForPrompt); // 替换占位符
-                            finalSystemPrompt += `\n\n[User Persona for "${userNameForPrompt}"]\nThis persona describes the user you are talking to. Their persona is: ${processedUserPersona}`;
+                            let processedUserPersona = persona.description.replace(/{{user}}/g, userNameForPrompt);
+                            
+                            if (isUserInGroup) {
+                                finalSystemPrompt += `\n\n[User Persona for "\({userNameForPrompt}"]\nThis persona describes the user you are talking to. Their persona is: \){processedUserPersona}`;
+                            } else {
+                                // 核心修改：如果不在群，标记为参考资料
+                                finalSystemPrompt += `\n\n[Reference Profile: "\({userNameForPrompt}"]\n(NOTE: This person is NOT in the group chat. This profile is for your knowledge only. Do not address them.)\nProfile: \){processedUserPersona}`;
+                            }
                         }
                     }
 
                     if (chatInfo.myPersona) {
-                        let processedSupplementaryPersona = chatInfo.myPersona.replace(/{{user}}/g, userNameForPrompt); // 替换占位符
-                        finalSystemPrompt += `\n\n[Supplementary User Persona for "${userNameForPrompt}"]\n${processedSupplementaryPersona}`;
+                        let processedSupplementaryPersona = chatInfo.myPersona.replace(/{{user}}/g, userNameForPrompt);
+                        
+                        if (isUserInGroup) {
+                            finalSystemPrompt += `\n\n[Supplementary User Persona for "\({userNameForPrompt}"]\n\){processedSupplementaryPersona}`;
+                        } else {
+                            // 核心修改：如果不在群，标记为参考资料
+                            finalSystemPrompt += `\n\n[Reference Info for "\({userNameForPrompt}"]\n(For background knowledge only):\n\){processedSupplementaryPersona}`;
+                        }
                     }
                     
                     let worldBookContent = '';
@@ -12061,8 +12081,7 @@ finalSystemPrompt += timeManager.getAITimeContext();
                     const remarkNames = (chatInfo.remark || '').split(/[,，\s]+/).filter(Boolean);
                     
                     // 1. 【核心逻辑前置】先获取成员列表，判断用户是否在群里
-                    const formalMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
-                    const isUserInGroup = formalMembers.includes('{{user}}');
+                    
 
                     let groupPersonasPrompt = `\n\n[Group Chat Context & Your Roles]\n`;
                     groupPersonasPrompt += `This is a group chat named "${chatState.chatName}".\n`;
