@@ -5267,50 +5267,43 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 <!-- ... -->
                         <input type="hidden" id="api-edit-index"></div>
 
-<!-- 【新增：云端备份设置模块】 -->
-<div class="form-section" style="margin-top: 20px; border: 2px solid #24292e;">
-    <h3 style="color: #24292e; margin-top: 15px;">
-        <svg viewBox="0 0 24 24" style="width:20px;height:20px;vertical-align:middle;fill:#24292e;"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+<!-- 【GitHub 仓库备份 (仅备份版)】 -->
+<div class="form-section" style="margin-top: 20px; border: 2px solid #d73a49; padding: 20px; border-radius: 12px;">
+    <h3 style="color: #24292e; margin-top: 0; margin-bottom: 15px;">
         GitHub 仓库备份
     </h3>
     
     <div class="form-group">
-        <label>GitHub 用户名 (Owner)</label>
-        <input type="text" id="gh-owner" placeholder="例如: yourname" class="modal-input">
+        <label>仓库链接</label>
+        <input type="text" id="gh-full-url" placeholder="https://github.com/用户名/仓库名" class="modal-input">
     </div>
 
     <div class="form-group">
-        <label>仓库名称 (Repository)</label>
-        <input type="text" id="gh-repo" placeholder="例如: backup-data" class="modal-input">
-        <p class="form-hint">请务必先在 GitHub 网页上创建好这个空仓库！</p>
-    </div>
-
-    <div class="form-group">
-        <label>Token (必须勾选 repo 权限)</label>
-        <input type="password" id="gh-token" placeholder="ghp_..." class="modal-input">
+        <label>Token</label>
+        <input type="text" id="gh-token" placeholder="ghp_..." class="modal-input">
     </div>
 
     <div class="form-group">
         <label>备份文件名</label>
-        <input type="text" id="gh-filename" value="data_backup.json" class="modal-input">
+        <input type="text" id="gh-filename" value="data_backup.zip" class="modal-input">
     </div>
 
     <div class="form-group">
-        <label>自动备份</label>
-        <select id="gh-auto-interval" class="modal-input modal-select">
-            <option value="0">关闭 (仅手动)</option>
-            <option value="30">每 30 分钟</option>
-            <option value="60">每 1 小时</option>
-            <option value="1440">每天</option>
-        </select>
+        <label>自动备份间隔</label>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="number" id="gh-auto-interval" placeholder="0" class="modal-input" style="margin-bottom: 0;">
+            <span style="flex-shrink: 0; font-size: 14px; color: #666;">分钟 (0为关闭)</span>
+        </div>
+        <p class="form-hint" style="margin-top: 5px;">例如输入 30 代表每 30 分钟备份一次。</p>
     </div>
 
-    <div class="form-group" style="display: flex; gap: 10px;">
-        <button id="gh-save-btn" class="btn-primary" style="flex: 1; background-color: #24292e;">保存配置</button>
-        <button id="gh-backup-btn" class="btn-primary" style="flex: 1; background-color: #28a745;">上传备份</button>
-        <button id="gh-restore-btn" class="btn-primary" style="flex: 1; background-color: #0366d6;">下载恢复</button>
+    <!-- 【修改：双按钮布局 (初始化 + 备份)】 -->
+    <div class="form-group" style="display: flex; gap: 10px; margin-top: 20px;">
+        <button id="gh-init-btn" class="btn-primary" style="flex: 1; background-color: #6f42c1;">初始化仓库</button>
+        <button id="gh-backup-btn" class="btn-primary" style="flex: 1; background-color: #28a745;">立即备份</button>
     </div>
-    <p id="gh-status-msg" style="font-size: 12px; color: #666; text-align: center; margin-top: 10px; white-space: pre-wrap;"></p>
+    
+    <p id="gh-status-msg" style="font-size: 12px; color: #666; text-align: center; margin-top: 10px; min-height: 1.5em;"></p>
 </div>
 
 <div class="form-section danger-zone" style="margin-top: 20px;">
@@ -5763,6 +5756,23 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 <p class="form-hint">从下拉菜单中选择一个已保存的字体以应用，或添加新字体。</p>
                             </div>
                         </div>
+
+                        <!-- 【新增：消息提示音设置】 -->
+                        <div class="form-section">
+                            <h3>消息提示音</h3>
+                            <div class="form-group">
+                                <label for="notification-sound-select">选择提示音</label>
+                                <div class="css-snippet-controls">
+                                    <select id="notification-sound-select" class="modal-select"></select>
+                                    <button id="sound-test-btn" class="btn-primary btn-secondary" title="试听当前声音">试听</button>
+                                    <button id="sound-add-btn" class="btn-primary btn-secondary" title="添加新声音">添加</button>
+                                    <button id="sound-manage-btn" class="btn-primary btn-secondary" title="管理声音">管理</button>
+                                </div>
+                                <p class="form-hint">当收到 AI 回复时播放。支持 .mp3, .wav, .ogg。</p>
+                            </div>
+                        </div>
+                        <!-- 【新增结束】 -->
+
                          <!-- ******** 从这里开始插入新代码 ******** -->
                          
                         <div class="form-section">
@@ -14215,6 +14225,17 @@ You were receiving a video call from {{user}}, but they hung up before you could
             if (!msgData.timestamp) msgData.timestamp = timeManager.getCurrentTimestamp();
             simulatedCurrentTime = msgData.timestamp;
 
+            // 【新增：播放提示音 (修复版)】
+            // 条件：收到消息 + 不是系统消息 + 不是时间分割线
+            if (msgData.side === 'received' && msgData.type !== 'time_divider' && msgData.side !== 'system') {
+                setTimeout(() => {
+                    // 核心修复：直接调用 window.app 上的方法，不再依赖 appearanceManager 变量
+                    if (window.app && window.app.playNotificationSound) {
+                        window.app.playNotificationSound();
+                    }
+                }, 100);
+            }
+
             // 更新数据数组
             const existingIndex = chatState.messages.findIndex(m => m.id === msgData.id);
             // **核心修改：同时检查并更新两个数组**
@@ -15444,6 +15465,11 @@ You were receiving a video call from {{user}}, but they hung up before you could
             // 动画显示
             setTimeout(() => banner.classList.add('visible'), 50);
 
+            // 【新增：弹出横幅时播放声音】
+            if (window.app && window.app.playNotificationSound) {
+                window.app.playNotificationSound();
+            }
+
             // 5秒后自动消失
             bannerTimeout = setTimeout(closeBanner, 5000);
         }
@@ -15772,6 +15798,11 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
             console.log('[DEBUG] 6. 最终准备发送的文本:', JSON.stringify(text));
 
             if (!text || (typeof text === 'string' && text.trim() === '')) return;
+
+            // 【核心修复：在用户点击发送的瞬间，预加载并激活音频通道】
+            if (window.app && window.app.preloadNotificationSound) {
+                window.app.preloadNotificationSound();
+            }
 
             // --- 【核心修正】: 在所有检查之前，先加载当前群成员列表 ---
             if (contactInfo.isGroup) {
@@ -21857,7 +21888,13 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 showRawOutput: false,
                 showMessageTimestamps: false,
                 timestampPosition: 'below', // 新增这一行
-                enableBackgroundTasks: true // 【【【核心新增：后台任务开关，默认开启】】】
+                enableBackgroundTasks: true, // 【【【核心新增：后台任务开关，默认开启】】】
+                // 【新增：提示音默认设置】
+                notificationSounds: [
+                    { name: '默认(微信)', url: 'https://files.catbox.moe/x4yz5w.wav' },
+                    { name: '静音', url: '' }
+                ],
+                activeSoundName: '默认(微信)'
             };
             
             // 从 localStorage 加载数据，如果不存在或为空，则 loaded 为 {}
@@ -22030,6 +22067,35 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
 
             document.getElementById('global-chat-bg-url').value = appearanceSettings.globalChatBgUrl || '';
             document.getElementById('home-bg-url').value = appearanceSettings.homeBgUrl || '';
+
+            // --- 【新增：渲染提示音下拉框 (修复版)】 ---
+            const soundSelect = document.getElementById('notification-sound-select');
+            // 1. 清空现有选项
+            soundSelect.innerHTML = '';
+            
+            // 2. 重新生成选项列表
+            (appearanceSettings.notificationSounds || []).forEach(sound => {
+                const option = document.createElement('option');
+                option.value = sound.name;
+                option.textContent = sound.name;
+                soundSelect.appendChild(option);
+            });
+
+            // 3. 【关键修复】显式设置当前选中的值
+            // 如果 activeSoundName 为空或不存在，默认选第一个
+            soundSelect.value = appearanceSettings.activeSoundName || '默认(微信)';
+            
+            // 4. 【关键修复】直接使用 onchange 属性覆盖旧事件，不再使用 cloneNode
+            // 这样既防止了事件重复绑定，又不会导致下拉框状态丢失
+            soundSelect.onchange = (e) => {
+                appearanceSettings.activeSoundName = e.target.value;
+                saveSettings();
+                // 切换时自动试听一下，确认声音是对的
+                if (window.app && window.app.playNotificationSound) {
+                    window.app.playNotificationSound();
+                }
+            };
+            // --- 【新增结束】 ---
             
             const select = document.getElementById('global-css-select');
             const editor = document.getElementById('global-custom-css-editor');
@@ -22170,23 +22236,39 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             await conversationManager.customAlert('字体已添加并应用！');
         }
         
+                // --- 【修复版：字体管理器 (带滚动 + 编辑内容)】 ---
         async function showFontManagerModal() {
+            // 1. 构建列表 HTML (优化布局，显示链接预览，增加编辑按钮)
             let listHtml = savedFonts.length > 0
                 ? savedFonts.map((font, index) => `
-                    <li class="snippet-management-item">
-                        <span class="name">${escapeHtml(font.name)}</span>
-                        <div>
-                            <button class="btn-primary btn-secondary" data-action="edit" data-index="${index}" style="padding: 4px 8px; font-size: 12px;">编辑名称</button>
-                            <button class="delete-btn" data-action="delete" data-index="${index}" style="margin-left: 5px;">删除</button>
+                    <li class="snippet-management-item" style="flex-direction: column; align-items: stretch; gap: 8px; padding: 12px; border-bottom: 1px solid #eee;">
+                        
+                        <!-- 顶部：名称 -->
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="name" style="font-weight: 600; font-size: 15px; color: #333;">${escapeHtml(font.name)}</span>
+                            ${activeFontName === font.name ? '<span style="font-size:12px; color:#28a745; background:#e8f5e9; padding:2px 6px; border-radius:4px;">使用中</span>' : ''}
+                        </div>
+
+                        <!-- 中部：链接预览 (截断显示) -->
+                        <div style="font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f9f9f9; padding: 4px; border-radius: 4px;">
+                            ${escapeHtml(font.url)}
+                        </div>
+
+                        <!-- 底部：操作按钮组 -->
+                        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+                            <button class="modal-button secondary" data-action="edit_name" data-index="${index}" style="padding: 6px 12px; font-size: 13px; width: auto; flex: 0 0 auto;">改名</button>
+                            <button class="modal-button secondary" data-action="edit_url" data-index="${index}" style="padding: 6px 12px; font-size: 13px; width: auto; flex: 0 0 auto;">改链接</button>
+                            <button class="modal-button danger" data-action="delete" data-index="${index}" style="padding: 6px 12px; font-size: 13px; width: auto; flex: 0 0 auto;">删除</button>
                         </div>
                     </li>`).join('')
-                : '<p style="padding: 20px; text-align: center; color: #888;">没有已保存的字体</p>';
+                : '<p style="padding: 40px 20px; text-align: center; color: #888;">没有已保存的字体</p>';
             
             await conversationManager.showCustomModal({
-                title: '管理字体',
-                html: `<ul class="snippet-management-list">${listHtml}</ul>`,
+                title: `管理字体 (${savedFonts.length})`,
+                // 核心修复：给 ul 加上 max-height 和 overflow-y: auto，实现滚动
+                html: `<ul class="snippet-management-list" style="max-height: 55vh; overflow-y: auto; margin: 0 0 20px 0; padding: 0; list-style: none; border: 1px solid #eee; border-radius: 8px;">${listHtml}</ul>`,
                 showCloseButton: true,
-                buttons: [{ text: '完成', value: 'close', class: 'secondary' }],
+                buttons: [{ text: '完成', value: 'close', class: 'primary' }],
                 onRender: (modalDOM, closeModal) => {
                     modalDOM.querySelector('.snippet-management-list').addEventListener('click', async (e) => {
                         const button = e.target.closest('button[data-action]');
@@ -22200,20 +22282,19 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                         if (action === 'delete') {
                             if (await conversationManager.customConfirm(`确定要删除字体 "${font.name}" 吗？`)) {
                                 if (activeFontName === font.name) {
-                                    activeFontName = '默认';
+                                    activeFontName = '默认'; // 如果删除了正在用的，重置为默认
                                 }
                                 savedFonts.splice(index, 1);
                                 saveSettings();
                                 applySettings();
                                 renderPage();
                                 
-                                const listItem = button.closest('.snippet-management-item');
-                                listItem.remove();
-                                if (modalDOM.querySelectorAll('.snippet-management-item').length === 0) {
-                                    modalDOM.querySelector('.snippet-management-list').innerHTML = '<p style="padding: 20px; text-align: center; color: #888;">没有已保存的字体</p>';
-                                }
+                                // 刷新列表
+                                closeModal();
+                                setTimeout(() => showFontManagerModal(), 50);
                             }
-                        } else if (action === 'edit') {
+                        } 
+                        else if (action === 'edit_name') {
                             const newName = await conversationManager.showContentInputModal({
                                 title: '重命名字体',
                                 placeholder: '输入新的名称',
@@ -22235,12 +22316,33 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                                 }
 
                                 saveSettings();
-                                applySettings();
+                                applySettings(); // 重新应用，因为名字变了
                                 renderPage();
                                 
-                                // 关闭并重新打开弹窗以刷新列表
                                 closeModal();
-                                setTimeout(() => showFontManagerModal(), 100);
+                                setTimeout(() => showFontManagerModal(), 50);
+                            }
+                        }
+                        // 【新增】编辑链接/内容的功能
+                        else if (action === 'edit_url') {
+                            const newUrl = await conversationManager.showContentInputModal({
+                                title: '修改字体链接',
+                                placeholder: '输入新的 CSS @font-face 链接或 Base64',
+                                value: font.url,
+                                isTextarea: true // 使用大文本框，方便编辑长链接
+                            });
+
+                            if (newUrl && newUrl.trim()) {
+                                font.url = newUrl.trim();
+
+                                saveSettings();
+                                applySettings(); // 立即应用新字体效果
+                                renderPage();
+
+                                await conversationManager.customAlert('字体内容已更新！');
+                                
+                                closeModal();
+                                setTimeout(() => showFontManagerModal(), 50);
                             }
                         }
                     });
@@ -22475,6 +22577,12 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             document.getElementById('font-add-btn').addEventListener('click', showAddFontModal);
             document.getElementById('font-manage-btn').addEventListener('click', showFontManagerModal);
 
+            // --- 【新增：绑定提示音按钮事件】 ---
+            document.getElementById('sound-test-btn').addEventListener('click', playNotificationSound);
+            document.getElementById('sound-add-btn').addEventListener('click', showAddSoundModal);
+            document.getElementById('sound-manage-btn').addEventListener('click', showSoundManagerModal);
+            // --- 【新增结束】 ---
+
             document.querySelector('.home-icon-btn[data-page="appearance"]').addEventListener('click', renderPage);
 
             // START: 新增正则规则的导出/导入事件监听
@@ -22653,7 +22761,212 @@ fileInput.style.display = 'none';
             // ========================================================================
         }
 
-        return { init, applySettings, saveSettings };
+        // --- 【新增：提示音相关逻辑函数 (终极激活版)】 ---
+        
+        // 1. 创建一个全局复用的 Audio 对象，不再每次创建新的
+        const globalAudioContext = new Audio();
+        
+        // 【核心功能 1】预加载/激活函数 (必须绑定在发送按钮上)
+        function preloadNotificationSound() {
+            const currentSettings = loadFromLocalStorage('app-appearance-settings', {});
+            const activeName = currentSettings.activeSoundName || '默认(微信)';
+            const sounds = currentSettings.notificationSounds || [];
+            const sound = sounds.find(s => s.name === activeName);
+
+            if (sound && sound.url) {
+                const prepareAudio = (src) => {
+                    globalAudioContext.src = src;
+                    globalAudioContext.volume = 0; // 先静音
+                    // 核心：播放一下立即暂停，骗过浏览器的“用户手势”检查
+                    const playPromise = globalAudioContext.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            globalAudioContext.pause();
+                            globalAudioContext.currentTime = 0;
+                            globalAudioContext.volume = 1.0; // 恢复音量，准备真播放
+                            console.log('[Sound] 音频通道已激活');
+                        }).catch(error => {
+                            console.log('[Sound] 预加载被拦截 (正常现象):', error);
+                        });
+                    }
+                };
+
+                if (sound.url.startsWith('indexeddb:')) {
+                    const key = sound.url.substring(10);
+                    imageStore.getItem(key).then(blob => {
+                        if (blob) prepareAudio(URL.createObjectURL(blob));
+                    });
+                } else {
+                    prepareAudio(sound.url);
+                }
+            }
+        }
+
+        // 【核心功能 2】真播放函数 (AI回复时调用)
+        function playNotificationSound() {
+            // 直接播放已经准备好的 globalAudioContext
+            if (globalAudioContext.src) {
+                globalAudioContext.currentTime = 0;
+                globalAudioContext.volume = 1.0;
+                globalAudioContext.play().catch(e => console.error('[Sound] 播放最终失败:', e));
+            } else {
+                // 如果没有预加载过（比如刚打开网页就收到消息），尝试直接播放
+                preloadNotificationSound(); // 尝试临阵磨枪
+            }
+        }
+
+        async function showAddSoundModal() {
+            const name = await conversationManager.showContentInputModal({ title: '添加提示音', placeholder: '给声音起个名字 (如: 叮咚)' });
+            if (!name || !name.trim()) return;
+
+            if (appearanceSettings.notificationSounds.some(s => s.name === name.trim())) {
+                await conversationManager.customAlert('该名称已存在！');
+                return;
+            }
+
+            const result = await conversationManager.showCustomModal({
+                title: '选择声音来源',
+                buttons: [
+                    { text: '本地上传', value: 'upload', class: 'primary' },
+                    { text: '输入链接', value: 'url', class: 'secondary' },
+                    { text: '取消', value: 'cancel', class: 'secondary' }
+                ]
+            });
+
+            if (!result || result.value === 'cancel') return;
+
+            if (result.value === 'url') {
+                const url = await conversationManager.showContentInputModal({ title: '输入音频链接', placeholder: 'https://...' });
+                if (url && url.trim()) {
+                    appearanceSettings.notificationSounds.push({ name: name.trim(), url: url.trim() });
+                    appearanceSettings.activeSoundName = name.trim(); // 自动选中新建的
+                    saveSettings();
+                    renderPage();
+                    await conversationManager.customAlert('提示音已添加！');
+                }
+            } else if (result.value === 'upload') {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'audio/*';
+                fileInput.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    
+                    const dbKey = `sound-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+                    try {
+                        await imageStore.setItem(dbKey, file); 
+                        appearanceSettings.notificationSounds.push({ name: name.trim(), url: `indexeddb:${dbKey}` });
+                        appearanceSettings.activeSoundName = name.trim();
+                        saveSettings();
+                        renderPage();
+                        await conversationManager.customAlert('本地提示音已添加！');
+                    } catch (err) {
+                        alert('保存失败: ' + err.message);
+                    }
+                };
+                fileInput.click();
+            }
+        }
+
+        async function showSoundManagerModal() {
+            const sounds = appearanceSettings.notificationSounds || [];
+            
+            let listHtml = sounds.length > 0
+                ? sounds.map((sound, index) => `
+                    <li class="snippet-management-item" style="flex-direction: column; align-items: stretch; gap: 8px; padding: 12px; border-bottom: 1px solid #eee;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="name" style="font-weight: 600; font-size: 15px; color: #333;">${escapeHtml(sound.name)}</span>
+                            ${appearanceSettings.activeSoundName === sound.name ? '<span style="font-size:12px; color:#28a745; background:#e8f5e9; padding:2px 6px; border-radius:4px;">使用中</span>' : ''}
+                        </div>
+                        <div style="font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f9f9f9; padding: 4px; border-radius: 4px;">
+                            ${escapeHtml(sound.url || '(无链接)')}
+                        </div>
+                        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+                            <button class="modal-button secondary" data-action="play" data-index="${index}" style="padding: 6px 12px; font-size: 13px; width: auto; flex: 0 0 auto;">播放</button>
+                            <button class="modal-button secondary" data-action="edit_name" data-index="${index}" style="padding: 6px 12px; font-size: 13px; width: auto; flex: 0 0 auto;">改名</button>
+                            <button class="modal-button secondary" data-action="edit_url" data-index="${index}" style="padding: 6px 12px; font-size: 13px; width: auto; flex: 0 0 auto;">改链接</button>
+                            <button class="modal-button danger" data-action="delete" data-index="${index}" style="padding: 6px 12px; font-size: 13px; width: auto; flex: 0 0 auto;">删除</button>
+                        </div>
+                    </li>`).join('')
+                : '<p style="padding: 40px 20px; text-align: center; color: #888;">没有已保存的声音</p>';
+
+            await conversationManager.showCustomModal({
+                title: `管理提示音 (${sounds.length})`,
+                html: `<ul class="snippet-management-list" style="max-height: 55vh; overflow-y: auto; margin: 0 0 20px 0; padding: 0; list-style: none; border: 1px solid #eee; border-radius: 8px;">${listHtml}</ul>`,
+                showCloseButton: true,
+                buttons: [{ text: '完成', value: 'close', class: 'primary' }],
+                onRender: (modalDOM, closeModal) => {
+                    modalDOM.querySelector('.snippet-management-list').addEventListener('click', async (e) => {
+                        const button = e.target.closest('button[data-action]');
+                        if (!button) return;
+                        e.stopPropagation();
+                        
+                        const action = button.dataset.action;
+                        const index = parseInt(button.dataset.index, 10);
+                        const sound = sounds[index];
+
+                        if (action === 'play') {
+                            // 临时播放选中的声音
+                            const tempUrl = sound.url;
+                            if (tempUrl.startsWith('indexeddb:')) {
+                                const key = tempUrl.substring(10);
+                                imageStore.getItem(key).then(blob => {
+                                    if (blob) new Audio(URL.createObjectURL(blob)).play();
+                                });
+                            } else {
+                                new Audio(tempUrl).play();
+                            }
+                        } else if (action === 'delete') {
+                            if (sound.name === '默认(微信)' || sound.name === '静音') {
+                                alert("系统预设声音不能删除。");
+                                return;
+                            }
+                            if (await conversationManager.customConfirm(`确定删除 "${sound.name}" 吗？`)) {
+                                if (appearanceSettings.activeSoundName === sound.name) {
+                                    appearanceSettings.activeSoundName = '默认(微信)';
+                                }
+                                appearanceSettings.notificationSounds.splice(index, 1);
+                                saveSettings();
+                                renderPage();
+                                closeModal();
+                                setTimeout(showSoundManagerModal, 50);
+                            }
+                        } else if (action === 'edit_name') {
+                            if (sound.name === '默认(微信)' || sound.name === '静音') { return alert("预设声音不可改名"); }
+                            const newName = await conversationManager.showContentInputModal({ title: '重命名', value: sound.name });
+                            if (newName && newName.trim()) {
+                                if (sounds.some((s, i) => s.name === newName.trim() && i !== index)) return alert("名称已存在");
+                                if (appearanceSettings.activeSoundName === sound.name) appearanceSettings.activeSoundName = newName.trim();
+                                sound.name = newName.trim();
+                                saveSettings();
+                                renderPage();
+                                closeModal();
+                                setTimeout(showSoundManagerModal, 50);
+                            }
+                        } else if (action === 'edit_url') {
+                            if (sound.name === '默认(微信)' || sound.name === '静音') { return alert("预设声音不可修改"); }
+                            const newUrl = await conversationManager.showContentInputModal({ title: '修改链接', value: sound.url, isTextarea: true });
+                            if (newUrl && newUrl.trim()) {
+                                sound.url = newUrl.trim();
+                                saveSettings();
+                                renderPage();
+                                await conversationManager.customAlert("链接已更新");
+                                closeModal();
+                                setTimeout(showSoundManagerModal, 50);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        // 暴露给外部调用
+        window.app = window.app || {};
+        window.app.playNotificationSound = playNotificationSound;
+        // 【核心新增】暴露预加载函数
+        window.app.preloadNotificationSound = preloadNotificationSound;
+
+        return { init, applySettings, saveSettings, playNotificationSound, preloadNotificationSound };
     })();
     
     const npcManager = (function() {
@@ -28081,28 +28394,44 @@ Your optional message to the user about the update.
     // --- END: ACCOUNT MANAGER ---
     
     
-        // --- START: CLOUD BACKUP MANAGER (GITHUB REPO VERSION) ---
+        // --- START: CLOUD BACKUP MANAGER (含初始化功能) ---
 const cloudBackupManager = (function() {
-    let settings = {
-        owner: '',
-        repo: '',
-        token: '',
-        filename: 'data_backup.json',
-        autoInterval: 0,
-        lastBackupTime: 0
-    };
     let autoBackupTimer = null;
+    let lastBackupTime = 0;
+    
+    function getRepoInfo() {
+        var urlInput = document.getElementById('gh-full-url').value.trim();
+        var token = document.getElementById('gh-token').value.trim();
+        var filename = document.getElementById('gh-filename').value.trim() || 'data_backup.zip';
+        var autoInterval = parseInt(document.getElementById('gh-auto-interval').value, 10);
+        if (isNaN(autoInterval) || autoInterval < 0) autoInterval = 0;
 
-    // 解决中文乱码的 Base64 编码函数
-    function utf8_to_b64(str) {
-        return window.btoa(unescape(encodeURIComponent(str)));
-    }
-    function b64_to_utf8(str) {
-        return decodeURIComponent(escape(window.atob(str)));
+        if (!urlInput || !token) return null;
+
+        var clean = urlInput.replace(/\/+$/, '').replace(/\.git$/, '');
+        var parts = clean.split('/');
+        var repo = parts[parts.length - 1];
+        var owner = parts[parts.length - 2];
+        return { owner: owner, repo: repo, token: token, filename: filename, autoInterval: autoInterval };
     }
 
-    // 获取完整数据
-    async function getFullBackupDataString() {
+    async function getFileSha(apiBase, token) {
+        try {
+            const response = await fetch(apiBase, {
+                method: 'GET',
+                headers: { 'Authorization': 'token ' + token }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                return data.sha;
+            }
+        } catch (e) { }
+        return null;
+    }
+
+    async function getCompressedBackupData() {
+        if (typeof JSZip === 'undefined') throw new Error("JSZip 未加载");
+        
         const APP_DATA_PREFIXES = [ 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' ];
         const allData = {};
         for (let i = 0; i < localStorage.length; i++) {
@@ -28114,213 +28443,158 @@ const cloudBackupManager = (function() {
                 allData[key] = await conversationManager.makeDataPortable(valueToProcess);
             }
         }
-        return JSON.stringify(allData);
+        const jsonStr = JSON.stringify(allData);
+
+        var zip = new JSZip();
+        zip.file("backup_content.json", jsonStr);
+        return await zip.generateAsync({ type: "base64", compression: "DEFLATE", compressionOptions: { level: 9 } });
     }
 
-    // 1. 获取文件 SHA (为了覆盖更新)
-    async function getFileSha(url) {
+    // 【新增】初始化仓库逻辑
+    async function performInitialization() {
+        var info = getRepoInfo();
+        if (!info) return alert("请先填写仓库链接和Token！");
+
+        var statusEl = document.getElementById('gh-status-msg');
+        statusEl.textContent = "正在初始化...";
+
         try {
-            const response = await fetch(url, {
-                method: 'GET',
+            // 目标：创建一个 README.md 文件
+            var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/README.md";
+            
+            // 简单的内容 Base64 编码
+            var content = btoa("# Backup Repository\nInitialized by Black Rye Phone.");
+            
+            var bodyData = {
+                message: "Initialize Repo",
+                content: content
+            };
+
+            var response = await fetch(apiUrl, {
+                method: 'PUT',
                 headers: {
-                    'Authorization': `token ${settings.token}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
+                    'Authorization': 'token ' + info.token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bodyData)
             });
-            if (response.ok) {
-                const data = await response.json();
-                return data.sha;
+
+            if (!response.ok) {
+                // 如果返回 422，通常说明文件已存在，这其实算成功
+                if (response.status === 422) {
+                    statusEl.textContent = "✅ 仓库已准备就绪 (文件已存在)";
+                    alert("仓库已经初始化过了，可以直接备份！");
+                    return;
+                }
+                var errText = await response.text();
+                throw new Error(response.status + " " + errText);
             }
+
+            // 保存配置
+            localStorage.setItem('gh_saved_url', document.getElementById('gh-full-url').value);
+            localStorage.setItem('gh_saved_token', info.token);
+
+            statusEl.textContent = "✅ 初始化成功！";
+            alert("初始化成功！现在可以点击“立即备份”了。");
+
         } catch (e) {
-            console.warn("File doesn't exist yet, creating new.");
-        }
-        return null;
-    }
-
-    // 2. 上传到仓库
-    async function uploadToRepo(content) {
-        if (!settings.owner || !settings.repo || !settings.token) throw new Error("请先填写完整的用户名、仓库名和Token");
-
-        const url = `https://api.github.com/repos/\({settings.owner}/\){settings.repo}/contents/${settings.filename}`;
-        
-        // 先尝试获取现有的 SHA，以便覆盖
-        const sha = await getFileSha(url);
-        
-        const bodyData = {
-            message: `Backup from Black Rye Phone: ${new Date().toLocaleString()}`,
-            content: utf8_to_b64(content)
-        };
-        
-        if (sha) {
-            bodyData.sha = sha;
-        }
-
-        const response = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `token ${settings.token}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/vnd.github.v3+json'
-            },
-            body: JSON.stringify(bodyData)
-        });
-
-        if (!response.ok) {
-            const errText = await response.text();
-            let reason = `Status: ${response.status}`;
-            try {
-                const json = JSON.parse(errText);
-                reason = json.message || reason;
-            } catch(e){}
-            throw new Error(`GitHub 上传失败: ${reason}`);
-        }
-    }
-
-    // 3. 从仓库下载
-    async function downloadFromRepo() {
-        if (!settings.owner || !settings.repo || !settings.token) throw new Error("配置不完整");
-
-        const url = `https://api.github.com/repos/\({settings.owner}/\){settings.repo}/contents/${settings.filename}`;
-        
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Authorization': `token ${settings.token}`,
-                'Accept': 'application/vnd.github.v3+json'
-            }
-        });
-
-        if (!response.ok) {
-            if (response.status === 404) throw new Error("仓库中找不到该备份文件，请确认文件名正确。");
-            throw new Error(`下载失败: \({response.status} \){response.statusText}`);
-        }
-
-        const data = await response.json();
-        if (data.content) {
-            // GitHub API 返回的内容可能有换行符，需要去掉
-            const cleanBase64 = data.content.replace(/\n/g, '');
-            return b64_to_utf8(cleanBase64);
-        }
-        throw new Error("文件内容为空");
-    }
-
-    function saveSettings() { saveToLocalStorage('app_gh_backup_settings', settings); }
-    function loadSettings() {
-        const loaded = loadFromLocalStorage('app_gh_backup_settings', {});
-        settings = { ...settings, ...loaded };
-    }
-
-    function updateUI() {
-        const ownerInput = document.getElementById('gh-owner');
-        if(ownerInput) ownerInput.value = settings.owner;
-        
-        const repoInput = document.getElementById('gh-repo');
-        if(repoInput) repoInput.value = settings.repo;
-        
-        const tokenInput = document.getElementById('gh-token');
-        if(tokenInput) tokenInput.value = settings.token;
-        
-        const fileInput = document.getElementById('gh-filename');
-        if(fileInput) fileInput.value = settings.filename;
-        
-        const autoInput = document.getElementById('gh-auto-interval');
-        if(autoInput) autoInput.value = settings.autoInterval;
-    }
-
-    function readSettingsFromUI() {
-        const ownerInput = document.getElementById('gh-owner');
-        if(!ownerInput) return;
-
-        settings.owner = ownerInput.value.trim();
-        settings.repo = document.getElementById('gh-repo').value.trim();
-        settings.token = document.getElementById('gh-token').value.trim();
-        settings.filename = document.getElementById('gh-filename').value.trim();
-        settings.autoInterval = parseInt(document.getElementById('gh-auto-interval').value, 10);
-        saveSettings();
-        
-        if (autoBackupTimer) clearInterval(autoBackupTimer);
-        if (settings.autoInterval > 0) {
-            autoBackupTimer = setInterval(checkAutoBackup, 60000);
+            console.error(e);
+            statusEl.textContent = "❌ " + e.message;
+            alert("初始化失败: " + e.message);
         }
     }
 
     async function performBackup(isAuto = false) {
-        if (!isAuto) readSettingsFromUI();
-        const statusEl = document.getElementById('gh-status-msg');
-        if (!isAuto && statusEl) statusEl.textContent = "正在打包数据...";
+        var info = getRepoInfo();
+        if (!info) {
+            if (!isAuto) alert("请先填写仓库链接和Token！");
+            return;
+        }
 
+        localStorage.setItem('gh_saved_url', document.getElementById('gh-full-url').value);
+        localStorage.setItem('gh_saved_token', info.token);
+        localStorage.setItem('gh_saved_filename', info.filename);
+        localStorage.setItem('gh_saved_interval', info.autoInterval);
+
+        if (!isAuto) setupAutoBackup(info.autoInterval);
+
+        var statusEl = document.getElementById('gh-status-msg');
+        if (statusEl) statusEl.textContent = isAuto ? "正在自动备份..." : "正在处理...";
+        
         try {
-            const dataString = await getFullBackupDataString();
-            if (!isAuto && statusEl) statusEl.textContent = "正在上传到 GitHub...";
+            var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/" + info.filename;
+            var contentBase64 = await getCompressedBackupData();
+            var sha = await getFileSha(apiUrl, info.token);
             
-            await uploadToRepo(dataString);
-            
-            settings.lastBackupTime = Date.now();
-            saveSettings();
-            
-            const timeStr = new Date().toLocaleTimeString();
-            if (statusEl) {
-                statusEl.style.color = "green";
-                statusEl.textContent = `✅ 备份成功 (${timeStr})`;
+            var bodyData = {
+                message: (isAuto ? "Auto " : "Manual ") + "Backup: " + new Date().toLocaleString(),
+                content: contentBase64
+            };
+            if (sha) bodyData.sha = sha;
+
+            var response = await fetch(apiUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'token ' + info.token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bodyData)
+            });
+
+            if (!response.ok) {
+                var errText = await response.text();
+                throw new Error(response.status + " " + errText);
             }
-            if (!isAuto) alert("上传成功！");
+
+            lastBackupTime = Date.now();
+            localStorage.setItem('gh_last_backup_time', lastBackupTime);
+
+            if (statusEl) {
+                statusEl.style.color = "#28a745";
+                statusEl.textContent = `✅ ${isAuto ? '自动' : ''}备份成功 (${new Date().toLocaleTimeString()})`;
+            }
+            if (!isAuto) alert("备份成功！");
+
         } catch (e) {
             console.error(e);
             if (statusEl) {
-                statusEl.style.color = "red";
-                statusEl.textContent = `❌ 失败: ${e.message}`;
+                statusEl.style.color = "#d73a49";
+                statusEl.textContent = `❌ 备份失败: ${e.message}`;
             }
-            if (!isAuto) alert(`备份失败: ${e.message}`);
+            if (!isAuto) alert("备份失败: " + e.message);
         }
     }
 
-    async function performRestore() {
-        readSettingsFromUI();
-        if (!confirm("确定要从 GitHub 下载并覆盖本地所有数据吗？此操作不可撤销！")) return;
+    function setupAutoBackup(intervalMinutes) {
+        if (autoBackupTimer) clearInterval(autoBackupTimer);
+        if (intervalMinutes > 0) {
+            console.log(`自动备份已开启：每 ${intervalMinutes} 分钟`);
+            checkAutoBackup();
+            autoBackupTimer = setInterval(checkAutoBackup, 60000);
+        }
+    }
+
+    function onIntervalChange() {
+        var val = document.getElementById('gh-auto-interval').value;
+        var interval = parseInt(val, 10);
+        if (isNaN(interval) || interval < 0) interval = 0;
+        localStorage.setItem('gh_saved_interval', interval);
+        setupAutoBackup(interval);
         
-        const statusEl = document.getElementById('gh-status-msg');
-        if (statusEl) statusEl.textContent = "正在下载...";
-
-        try {
-            const jsonString = await downloadFromRepo();
-            if (statusEl) statusEl.textContent = "正在恢复数据...";
-            
-            const importedRawData = JSON.parse(jsonString);
-            
-            // 清除旧数据
-            const APP_DATA_PREFIXES = [ 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' ];
-            for (let i = 0; i < localStorage.length; i++) {
-               const key = localStorage.key(i);
-               if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
-                   localStorage.removeItem(key);
-               }
-            }
-
-            // 写入新数据
-            const finalData = await conversationManager.makeDataPortable(importedRawData); // 复用转换逻辑
-            for (const key in finalData) {
-                if (Object.prototype.hasOwnProperty.call(finalData, key)) {
-                    localStorage.setItem(key, JSON.stringify(finalData[key]));
-                }
-            }
-
-            alert("恢复成功！页面即将刷新。");
-            location.reload();
-        } catch (e) {
-            console.error(e);
-            if (statusEl) {
-                statusEl.style.color = "red";
-                statusEl.textContent = `❌ 恢复失败: ${e.message}`;
-            }
-            alert(`恢复失败: ${e.message}`);
+        var statusEl = document.getElementById('gh-status-msg');
+        if (statusEl) {
+            if (interval > 0) statusEl.textContent = `已设置：每 ${interval} 分钟自动备份`;
+            else statusEl.textContent = `自动备份已关闭`;
         }
     }
 
     function checkAutoBackup() {
-        if (settings.autoInterval > 0 && settings.token) {
-            const now = Date.now();
-            const intervalMs = settings.autoInterval * 60 * 1000;
-            if (now - settings.lastBackupTime > intervalMs) {
+        var info = getRepoInfo();
+        if (info && info.autoInterval > 0) {
+            var now = Date.now();
+            var intervalMs = info.autoInterval * 60 * 1000;
+            var lastTime = parseInt(localStorage.getItem('gh_last_backup_time') || 0, 10);
+            if (now - lastTime > intervalMs) {
                 console.log("Triggering auto GitHub backup...");
                 performBackup(true);
             }
@@ -28328,29 +28602,27 @@ const cloudBackupManager = (function() {
     }
 
     function init() {
-        loadSettings();
-        updateUI();
+        var savedUrl = localStorage.getItem('gh_saved_url');
+        var savedToken = localStorage.getItem('gh_saved_token');
+        var savedFilename = localStorage.getItem('gh_saved_filename');
+        var savedInterval = localStorage.getItem('gh_saved_interval');
 
-        const saveBtn = document.getElementById('gh-save-btn');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => {
-                readSettingsFromUI();
-                alert("配置已保存！");
-            });
+        if (savedUrl) document.getElementById('gh-full-url').value = savedUrl;
+        if (savedToken) document.getElementById('gh-token').value = savedToken;
+        if (savedFilename) document.getElementById('gh-filename').value = savedFilename;
+        if (savedInterval) {
+            document.getElementById('gh-auto-interval').value = savedInterval;
+            setupAutoBackup(parseInt(savedInterval, 10));
         }
 
-        const backupBtn = document.getElementById('gh-backup-btn');
-        if (backupBtn) backupBtn.addEventListener('click', () => performBackup(false));
-
-        const restoreBtn = document.getElementById('gh-restore-btn');
-        if (restoreBtn) restoreBtn.addEventListener('click', performRestore);
-
-        if (settings.autoInterval > 0) {
-            autoBackupTimer = setInterval(checkAutoBackup, 60000);
-        }
+        // 绑定两个按钮的事件
+        document.getElementById('gh-init-btn').addEventListener('click', performInitialization);
+        document.getElementById('gh-backup-btn').addEventListener('click', () => performBackup(false));
+        
+        document.getElementById('gh-auto-interval').addEventListener('input', onIntervalChange);
     }
 
-    return { init };
+    return { init: init };
 })();
 // --- END: CLOUD BACKUP MANAGER ---
 
