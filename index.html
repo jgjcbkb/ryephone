@@ -7915,7 +7915,7 @@ ${timeContext}
 - **ABSOLUTE FORBIDDANCE:** You are **STRICTLY FORBIDDEN** from thinking, acting, or speaking as any other character. Even if you see posts from other people you know, you are merely observing as "${senderName}".
 
 ---
-\({contextHeader}\){momentsWorldBookContent}
+${contextHeader}${momentsWorldBookContent}
 # [ULTIMATE DIRECTIVE: THE ART OF SOCIALIZING ON MOMENTS]
 
 
@@ -10858,6 +10858,9 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     - Example (Private): <block type="text">你好呀</block>
 
 2.  **type="html"**: The content is a complete, multi-line HTML snippet (like <snippet> or <div>).
+    - **【标签纯净度铁律 (WRAPPER PURITY)】:** 你【绝对禁止】给 \`<snippet>\` 标签添加 \`style\` 属性。样式只能写在内部的 \`<div>\` 上。
+    - **❌ 错误:** \`<snippet style="...">\`
+    - **✅ 正确:** \`<snippet><div style="...">\`
     - **【布局诅咒警告 (必读)】:** 聊天气泡会强制保留所有换行和空格。为了避免你的HTML卡片出现巨大空白，你【必须】在最外层的 \`<div>\` 的 \`style\` 属性里加上 \`white-space: normal;\` 来破除这个诅咒。
     - Example (Group): <block type="html" sender="苏瓷言"><snippet><div style="white-space: normal;">...</div></snippet></block>
 
@@ -11214,8 +11217,13 @@ When generating a custom HTML card, you MUST adhere to the following rules witho
 
 4.  **Whitespace Curse:** You **MUST** add \`white-space: normal;\` to the style of your outermost \`<div>\`.
 
+5.  **[WRAPPER PURITY LAW - ABSOLUTE BAN]:**
+    *   You are **STRICTLY FORBIDDEN** from adding \`style="..."\` or ANY attributes to the \`<snippet>\` or \`<details>\` tags themselves. They must remain pure container tags.
+    *   **WRONG (CATASTROPHIC FAILURE):** \`<snippet style="width: 200px;">...\` OR \`<details style="color: red;">...\`
+    *   **RIGHT (ONLY WAY):** \`<snippet><div style="width: 200px;">...</div></snippet>\`
+
 // ******** 从这里开始插入全新的代码块 ********
-5.  **Command Isolation (ABSOLUTE LAW):** You are **STRICTLY PROHIBITED** from placing \`[sticker:...]\` or \`[emoji:...]\` commands **inside** any HTML block (\`<snippet>\`, \`<div>\`, etc.).
+6.  **Command Isolation (ABSOLUTE LAW):** You are **STRICTLY PROHIBITED** from placing \`[sticker:...]\` or \`[emoji:...]\` commands **inside** any HTML block (\`<snippet>\`, \`<div>\`, etc.).
     *   **Rationale:** The system cannot parse commands embedded within HTML. They will be displayed as ugly, broken text.
     *   **Correct Method:** If you want to send an HTML card AND a sticker, you MUST generate them in **two separate \`<block>\` elements**, one after the other.
 // ******** 全新代码块到此结束 ********
@@ -11542,6 +11550,9 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     - Example (Private): <block type="text">你好呀</block>
 
 2.  **type="html"**: The content is a complete, multi-line HTML snippet (like <snippet> or <div>).
+    - **【标签纯净度铁律 (WRAPPER PURITY)】:** 你【绝对禁止】给 \`<snippet>\` 标签添加 \`style\` 属性。样式只能写在内部的 \`<div>\` 上。
+    - **❌ 错误:** \`<snippet style="...">\`
+    - **✅ 正确:** \`<snippet><div style="...">\`
     - **【布局诅咒警告 (必读)】:** 聊天气泡会强制保留所有换行和空格。为了避免你的HTML卡片出现巨大空白，你【必须】在最外层的 \`<div>\` 的 \`style\` 属性里加上 \`white-space: normal;\` 来破除这个诅咒。
     - Example (Group): <block type="html" sender="苏瓷言"><snippet><div style="white-space: normal;">...</div></snippet></block>
 
