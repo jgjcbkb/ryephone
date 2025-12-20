@@ -15799,11 +15799,6 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
 
             if (!text || (typeof text === 'string' && text.trim() === '')) return;
 
-            // 【核心修复：在用户点击发送的瞬间，预加载并激活音频通道】
-            if (window.app && window.app.preloadNotificationSound) {
-                window.app.preloadNotificationSound();
-            }
-
             // --- 【核心修正】: 在所有检查之前，先加载当前群成员列表 ---
             if (contactInfo.isGroup) {
                 const currentMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
