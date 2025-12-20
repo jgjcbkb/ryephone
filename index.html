@@ -5266,7 +5266,54 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                         </div>
 <!-- ... -->
                         <input type="hidden" id="api-edit-index"></div>
-                    <div class="form-section danger-zone" style="margin-top: 20px;">
+
+<!-- 【新增：云端备份设置模块】 -->
+<div class="form-section" style="margin-top: 20px; border: 2px solid #24292e;">
+    <h3 style="color: #24292e; margin-top: 15px;">
+        <svg viewBox="0 0 24 24" style="width:20px;height:20px;vertical-align:middle;fill:#24292e;"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+        GitHub 仓库备份
+    </h3>
+    
+    <div class="form-group">
+        <label>GitHub 用户名 (Owner)</label>
+        <input type="text" id="gh-owner" placeholder="例如: yourname" class="modal-input">
+    </div>
+
+    <div class="form-group">
+        <label>仓库名称 (Repository)</label>
+        <input type="text" id="gh-repo" placeholder="例如: backup-data" class="modal-input">
+        <p class="form-hint">请务必先在 GitHub 网页上创建好这个空仓库！</p>
+    </div>
+
+    <div class="form-group">
+        <label>Token (必须勾选 repo 权限)</label>
+        <input type="password" id="gh-token" placeholder="ghp_..." class="modal-input">
+    </div>
+
+    <div class="form-group">
+        <label>备份文件名</label>
+        <input type="text" id="gh-filename" value="data_backup.json" class="modal-input">
+    </div>
+
+    <div class="form-group">
+        <label>自动备份</label>
+        <select id="gh-auto-interval" class="modal-input modal-select">
+            <option value="0">关闭 (仅手动)</option>
+            <option value="30">每 30 分钟</option>
+            <option value="60">每 1 小时</option>
+            <option value="1440">每天</option>
+        </select>
+    </div>
+
+    <div class="form-group" style="display: flex; gap: 10px;">
+        <button id="gh-save-btn" class="btn-primary" style="flex: 1; background-color: #24292e;">保存配置</button>
+        <button id="gh-backup-btn" class="btn-primary" style="flex: 1; background-color: #28a745;">上传备份</button>
+        <button id="gh-restore-btn" class="btn-primary" style="flex: 1; background-color: #0366d6;">下载恢复</button>
+    </div>
+    <p id="gh-status-msg" style="font-size: 12px; color: #666; text-align: center; margin-top: 10px; white-space: pre-wrap;"></p>
+</div>
+
+<div class="form-section danger-zone" style="margin-top: 20px;">
                         <h3>数据管理</h3>
                         <div class="data-management-buttons">
                             <button id="export-all-data-btn" class="data-management-btn">导出全部数据</button>
@@ -25070,6 +25117,9 @@ async function handleRemoveMember() {
         videoCallManager.init();
         actionMenuManager.initialize();
         
+        // 【新增：初始化云端备份管理器】
+        cloudBackupManager.init();
+        
         navigateTo('home');
     }
     const APP_DATA_PREFIXES = [ 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' ];
@@ -28031,7 +28081,278 @@ Your optional message to the user about the update.
     // --- END: ACCOUNT MANAGER ---
     
     
+        // --- START: CLOUD BACKUP MANAGER (GITHUB REPO VERSION) ---
+const cloudBackupManager = (function() {
+    let settings = {
+        owner: '',
+        repo: '',
+        token: '',
+        filename: 'data_backup.json',
+        autoInterval: 0,
+        lastBackupTime: 0
+    };
+    let autoBackupTimer = null;
+
+    // 解决中文乱码的 Base64 编码函数
+    function utf8_to_b64(str) {
+        return window.btoa(unescape(encodeURIComponent(str)));
+    }
+    function b64_to_utf8(str) {
+        return decodeURIComponent(escape(window.atob(str)));
+    }
+
+    // 获取完整数据
+    async function getFullBackupDataString() {
+        const APP_DATA_PREFIXES = [ 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' ];
+        const allData = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                const rawValue = localStorage.getItem(key);
+                let valueToProcess;
+                try { valueToProcess = JSON.parse(rawValue); } catch (e) { valueToProcess = rawValue; }
+                allData[key] = await conversationManager.makeDataPortable(valueToProcess);
+            }
+        }
+        return JSON.stringify(allData);
+    }
+
+    // 1. 获取文件 SHA (为了覆盖更新)
+    async function getFileSha(url) {
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `token ${settings.token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                return data.sha;
+            }
+        } catch (e) {
+            console.warn("File doesn't exist yet, creating new.");
+        }
+        return null;
+    }
+
+    // 2. 上传到仓库
+    async function uploadToRepo(content) {
+        if (!settings.owner || !settings.repo || !settings.token) throw new Error("请先填写完整的用户名、仓库名和Token");
+
+        const url = `https://api.github.com/repos/\({settings.owner}/\){settings.repo}/contents/${settings.filename}`;
         
+        // 先尝试获取现有的 SHA，以便覆盖
+        const sha = await getFileSha(url);
+        
+        const bodyData = {
+            message: `Backup from Black Rye Phone: ${new Date().toLocaleString()}`,
+            content: utf8_to_b64(content)
+        };
+        
+        if (sha) {
+            bodyData.sha = sha;
+        }
+
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${settings.token}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/vnd.github.v3+json'
+            },
+            body: JSON.stringify(bodyData)
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            let reason = `Status: ${response.status}`;
+            try {
+                const json = JSON.parse(errText);
+                reason = json.message || reason;
+            } catch(e){}
+            throw new Error(`GitHub 上传失败: ${reason}`);
+        }
+    }
+
+    // 3. 从仓库下载
+    async function downloadFromRepo() {
+        if (!settings.owner || !settings.repo || !settings.token) throw new Error("配置不完整");
+
+        const url = `https://api.github.com/repos/\({settings.owner}/\){settings.repo}/contents/${settings.filename}`;
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `token ${settings.token}`,
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+
+        if (!response.ok) {
+            if (response.status === 404) throw new Error("仓库中找不到该备份文件，请确认文件名正确。");
+            throw new Error(`下载失败: \({response.status} \){response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (data.content) {
+            // GitHub API 返回的内容可能有换行符，需要去掉
+            const cleanBase64 = data.content.replace(/\n/g, '');
+            return b64_to_utf8(cleanBase64);
+        }
+        throw new Error("文件内容为空");
+    }
+
+    function saveSettings() { saveToLocalStorage('app_gh_backup_settings', settings); }
+    function loadSettings() {
+        const loaded = loadFromLocalStorage('app_gh_backup_settings', {});
+        settings = { ...settings, ...loaded };
+    }
+
+    function updateUI() {
+        const ownerInput = document.getElementById('gh-owner');
+        if(ownerInput) ownerInput.value = settings.owner;
+        
+        const repoInput = document.getElementById('gh-repo');
+        if(repoInput) repoInput.value = settings.repo;
+        
+        const tokenInput = document.getElementById('gh-token');
+        if(tokenInput) tokenInput.value = settings.token;
+        
+        const fileInput = document.getElementById('gh-filename');
+        if(fileInput) fileInput.value = settings.filename;
+        
+        const autoInput = document.getElementById('gh-auto-interval');
+        if(autoInput) autoInput.value = settings.autoInterval;
+    }
+
+    function readSettingsFromUI() {
+        const ownerInput = document.getElementById('gh-owner');
+        if(!ownerInput) return;
+
+        settings.owner = ownerInput.value.trim();
+        settings.repo = document.getElementById('gh-repo').value.trim();
+        settings.token = document.getElementById('gh-token').value.trim();
+        settings.filename = document.getElementById('gh-filename').value.trim();
+        settings.autoInterval = parseInt(document.getElementById('gh-auto-interval').value, 10);
+        saveSettings();
+        
+        if (autoBackupTimer) clearInterval(autoBackupTimer);
+        if (settings.autoInterval > 0) {
+            autoBackupTimer = setInterval(checkAutoBackup, 60000);
+        }
+    }
+
+    async function performBackup(isAuto = false) {
+        if (!isAuto) readSettingsFromUI();
+        const statusEl = document.getElementById('gh-status-msg');
+        if (!isAuto && statusEl) statusEl.textContent = "正在打包数据...";
+
+        try {
+            const dataString = await getFullBackupDataString();
+            if (!isAuto && statusEl) statusEl.textContent = "正在上传到 GitHub...";
+            
+            await uploadToRepo(dataString);
+            
+            settings.lastBackupTime = Date.now();
+            saveSettings();
+            
+            const timeStr = new Date().toLocaleTimeString();
+            if (statusEl) {
+                statusEl.style.color = "green";
+                statusEl.textContent = `✅ 备份成功 (${timeStr})`;
+            }
+            if (!isAuto) alert("上传成功！");
+        } catch (e) {
+            console.error(e);
+            if (statusEl) {
+                statusEl.style.color = "red";
+                statusEl.textContent = `❌ 失败: ${e.message}`;
+            }
+            if (!isAuto) alert(`备份失败: ${e.message}`);
+        }
+    }
+
+    async function performRestore() {
+        readSettingsFromUI();
+        if (!confirm("确定要从 GitHub 下载并覆盖本地所有数据吗？此操作不可撤销！")) return;
+        
+        const statusEl = document.getElementById('gh-status-msg');
+        if (statusEl) statusEl.textContent = "正在下载...";
+
+        try {
+            const jsonString = await downloadFromRepo();
+            if (statusEl) statusEl.textContent = "正在恢复数据...";
+            
+            const importedRawData = JSON.parse(jsonString);
+            
+            // 清除旧数据
+            const APP_DATA_PREFIXES = [ 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' ];
+            for (let i = 0; i < localStorage.length; i++) {
+               const key = localStorage.key(i);
+               if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                   localStorage.removeItem(key);
+               }
+            }
+
+            // 写入新数据
+            const finalData = await conversationManager.makeDataPortable(importedRawData); // 复用转换逻辑
+            for (const key in finalData) {
+                if (Object.prototype.hasOwnProperty.call(finalData, key)) {
+                    localStorage.setItem(key, JSON.stringify(finalData[key]));
+                }
+            }
+
+            alert("恢复成功！页面即将刷新。");
+            location.reload();
+        } catch (e) {
+            console.error(e);
+            if (statusEl) {
+                statusEl.style.color = "red";
+                statusEl.textContent = `❌ 恢复失败: ${e.message}`;
+            }
+            alert(`恢复失败: ${e.message}`);
+        }
+    }
+
+    function checkAutoBackup() {
+        if (settings.autoInterval > 0 && settings.token) {
+            const now = Date.now();
+            const intervalMs = settings.autoInterval * 60 * 1000;
+            if (now - settings.lastBackupTime > intervalMs) {
+                console.log("Triggering auto GitHub backup...");
+                performBackup(true);
+            }
+        }
+    }
+
+    function init() {
+        loadSettings();
+        updateUI();
+
+        const saveBtn = document.getElementById('gh-save-btn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                readSettingsFromUI();
+                alert("配置已保存！");
+            });
+        }
+
+        const backupBtn = document.getElementById('gh-backup-btn');
+        if (backupBtn) backupBtn.addEventListener('click', () => performBackup(false));
+
+        const restoreBtn = document.getElementById('gh-restore-btn');
+        if (restoreBtn) restoreBtn.addEventListener('click', performRestore);
+
+        if (settings.autoInterval > 0) {
+            autoBackupTimer = setInterval(checkAutoBackup, 60000);
+        }
+    }
+
+    return { init };
+})();
+// --- END: CLOUD BACKUP MANAGER ---
 
 
     document.addEventListener('DOMContentLoaded', () => {
