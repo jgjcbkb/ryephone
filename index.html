@@ -5238,7 +5238,27 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 </div>
 
 
-<div class="form-group"><label for="api-url">API Endpoint URL</label><input type="text" id="api-url"></div><button id="fetch-models-btn" class="btn-primary btn-secondary" style="width: auto; padding: 8px 15px; margin-bottom: 10px;">获取模型列表</button><p id="api-fetch-status"></p><div class="form-group" id="model-select-group" style="display: none;"><label for="api-model-select">选择模型</label><select id="api-model-select"></select></div><div class="form-group"><label for="system-prompt">系统提示</label><textarea id="system-prompt"></textarea></div>
+<div class="form-group"><label for="api-url">API Endpoint URL</label><input type="text" id="api-url"></div>
+
+<!-- 【核心修改】：增加了手动填写按钮，并改造了模型选择区域 -->
+<div style="display:flex; gap:10px; margin-bottom: 10px;">
+    <button id="fetch-models-btn" class="btn-primary btn-secondary" style="flex:1; padding: 8px 15px;">获取模型列表</button>
+    <button id="manual-model-btn" class="btn-primary btn-secondary" style="flex:1; padding: 8px 15px;">手动填写</button>
+</div>
+
+<p id="api-fetch-status"></p>
+
+<div class="form-group" id="model-select-group" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+        <label for="api-model-select" style="margin-bottom: 0;">模型名称</label>
+        <span id="toggle-model-input-link" style="font-size: 12px; color: var(--primary-color); cursor: pointer; text-decoration: underline;">切换输入方式</span>
+    </div>
+    <select id="api-model-select"></select>
+    <input type="text" id="api-model-manual-input" class="modal-input" placeholder="输入模型名称 (如 gpt-4o)" style="display: none; margin-top: 5px;">
+</div>
+<!-- 【修改结束】 -->
+
+<div class="form-group"><label for="system-prompt">系统提示</label><textarea id="system-prompt"></textarea></div>
                         
                         <div class="form-group">
                             <label for="api-temperature">API 温度 (Temperature)</label>
@@ -9291,6 +9311,10 @@ You MUST use the custom \`<dm>\` tag format.
             tempInput.value = temperature;
             streamToggle.checked = profile.enableStream || false; // 【核心新增】
             apiEditIndexInput.value = index; 
+            
+            // 【核心修改】：编辑时，把模型名字也填入手动框，以防万一
+            document.getElementById('api-model-manual-input').value = profile.model || '';
+            
             if (profile.url && profile.key) fetchModels(profile.model); 
         } else { 
             apiFormTitle.textContent = '添加新配置'; 
@@ -9299,6 +9323,10 @@ You MUST use the custom \`<dm>\` tag format.
             apiUrlInput.value = ''; 
             systemPromptInput.value = 'You are a helpful assistant.'; 
             
+            // 【核心修改】：新建时清空手动框
+            document.getElementById('api-model-manual-input').value = '';
+            document.getElementById('model-select-group').style.display = 'none';
+
             providerSelect.value = 'custom';
             
             tempSlider.value = 0.7;
@@ -9379,21 +9407,73 @@ You MUST use the custom \`<dm>\` tag format.
     addNewProfileBtn.addEventListener('click', () => showApiForm());
     cancelApiFormBtn.addEventListener('click', hideApiForm);
     fetchModelsBtn.addEventListener('click', () => fetchModels());
-    saveApiProfileBtn.addEventListener('click', () => { 
+
+    // 【核心新增】：手动填写按钮逻辑
+    document.getElementById('manual-model-btn').addEventListener('click', () => {
+        const group = document.getElementById('model-select-group');
+        const select = document.getElementById('api-model-select');
+        const input = document.getElementById('api-model-manual-input');
+        const toggleLink = document.getElementById('toggle-model-input-link');
+
+        group.style.display = 'block'; // 显示区域
+        
+        // 切换到手动模式
+        select.style.display = 'none';
+        input.style.display = 'block';
+        toggleLink.textContent = '切换列表选择';
+        input.focus();
+    });
+
+    // 【核心新增】：切换输入方式链接逻辑
+    document.getElementById('toggle-model-input-link').addEventListener('click', () => {
+        const select = document.getElementById('api-model-select');
+        const input = document.getElementById('api-model-manual-input');
+        const toggleLink = document.getElementById('toggle-model-input-link');
+
+        if (input.style.display === 'none') {
+            // 切换到手动
+            input.style.display = 'block';
+            select.style.display = 'none';
+            toggleLink.textContent = '切换列表选择';
+            // 如果下拉框有值，自动填入输入框方便修改
+            if (select.value) input.value = select.value;
+        } else {
+            // 切换到列表
+            input.style.display = 'none';
+            select.style.display = 'block';
+            toggleLink.textContent = '切换手动输入';
+        }
+    });
+
+    saveApiProfileBtn.addEventListener('click', () => {
         const name = apiNameInput.value.trim(); 
         if (!name) return; 
         
+        // 【核心修改】：智能判断是保存下拉框的值，还是手动输入的值
+        let finalModel = null;
+        const manualInput = document.getElementById('api-model-manual-input');
+        const select = document.getElementById('api-model-select');
+        
+        // 如果手动输入框是显示的，就取输入框的值；否则取下拉框的值
+        if (document.getElementById('model-select-group').style.display !== 'none') {
+            if (manualInput.style.display !== 'none') {
+                finalModel = manualInput.value.trim();
+            } else {
+                finalModel = select.value;
+            }
+        }
+
         const profileData = { 
             name: name, 
             key: apiKeyInput.value.trim(), 
             url: apiUrlInput.value.trim(), 
             prompt: systemPromptInput.value.trim(), 
-            model: modelSelectGroup.style.display === 'block' ? apiModelSelect.value : null, 
+            model: finalModel, // 使用判断后的最终模型名
             temperature: parseFloat(document.getElementById('api-temperature').value),
             enableStream: document.getElementById('api-stream-toggle').checked // 【核心新增】
         }; 
         
-        const editIndex = apiEditIndexInput.value; 
+        const editIndex = apiEditIndexInput.value;
         if (editIndex !== '') {
             apiProfiles[editIndex] = profileData; 
         } else {
