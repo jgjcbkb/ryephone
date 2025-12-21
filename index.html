@@ -10769,7 +10769,8 @@ A girl with long pink hair is standing under a cherry blossom tree. She is weari
                     }).trim();
                 }
                 if (msg.side === 'sent' && msg.type === 'text') { mainText = mainText.replace(/@(\S+)/g, (match, username) => `[System Observation: The user is now specifically addressing and calling out "${username}". Your response should be directed towards this action.]\n${match}`); }
-                if (msg.replyTo) { const originalMsg = allMessages.find(m => m.id === msg.replyTo); let originalContentText = `(a previous message)`; if(originalMsg) { if(originalMsg.text) originalContentText = `"${originalMsg.text}"`; else originalContentText = `a ${originalMsg.type}`; } mainText = `[Replying to ${originalContentText}] ${mainText}`; }
+                // 【核心修复】将 allMessages 替换为 messages
+                if (msg.replyTo) { const originalMsg = messages.find(m => m.id === msg.replyTo); let originalContentText = `(a previous message)`; if(originalMsg) { if(originalMsg.text) originalContentText = `"${originalMsg.text}"`; else originalContentText = `a ${originalMsg.type}`; } mainText = `[Replying to ${originalContentText}] ${mainText}`; }
                 const stripRegex = /<div data-ai-strip="true"[\s\S]*?<\/div>/gm;
                 mainText = mainText.replace(stripRegex, '').trim();
                 if(mainText) { contentParts.unshift({ type: 'text', text: mainText }); }
