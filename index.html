@@ -5805,6 +5805,15 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                     <option value="beside">气泡一侧</option>
                                 </select>
                             </div>
+
+                            <!-- 【核心新增】时间格式选择下拉框 -->
+                            <div class="form-group" id="timestamp-format-group" style="padding: 0 15px 15px; border-bottom: none;">
+                                <label for="timestamp-format-select" style="display:block; margin-bottom:8px; font-size:14px; color:#555;">时间格式</label>
+                                <select id="timestamp-format-select" class="modal-input modal-select">
+                                    <option value="time">仅时间 (14:30)</option>
+                                    <option value="datetime">日期+时间 (2023/10/27 14:30)</option>
+                                </select>
+                            </div>
                         </div>
 
                         <!-- ******** 从这里开始插入全新的代码 ******** -->
@@ -6910,6 +6919,11 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 
 You are allowed to use HTML snippets (e.g., \`<snippet>...</snippet>\`) to create rich content, BUT ONLY in specific fields.
 
+**[WRAPPER PURITY LAW - ABSOLUTE BAN]**
+When using HTML, you are **STRICTLY FORBIDDEN** from adding \`style\` attributes to the \`<snippet>\` or \`<details>\` tags themselves.
+*   **❌ WRONG:** \`<snippet style="...">...\`
+*   **✅ RIGHT:** \`<snippet><div style="...">...</div></snippet>\`
+
 *   **ALLOWED FIELDS (SAFE):**
     *   **"text" (in "text" type posts):** YES. You can put HTML here.
     *   **"content" (in comments):** YES. You can put HTML here.
@@ -6995,12 +7009,38 @@ You are allowed to use HTML snippets (e.g., \`<snippet>...</snippet>\`) to creat
             if (isGroupChatEntity) {
                 // --- START: 完整的、无省略的群聊人设构建逻辑 ---
                 const remarkNames = (contextChatInfo.remark || '').split(/[,，\s]+/).filter(Boolean);
+                
+                // 1. 【核心新增】先获取成员列表，判断用户是否在群
+                const formalMembers = loadFromLocalStorage(`chat_members_${targetChatId}`, []);
+                const isUserInGroup = formalMembers.includes('{{user}}');
+
                 let groupPersonasPrompt = `\n\n[Group Chat Context & Your Roles]\n`;
-                groupPersonasPrompt += `This is a group chat named "${targetChat.name}". The user you are interacting with is named "${userNameForPrompt}".\n`;
+                groupPersonasPrompt += `This is a group chat named "${targetChat.name}".\n`;
+
+                // 2. 【核心新增】根据用户在场情况注入不同指令
+                if (isUserInGroup) {
+                    // 用户在群里：正常模式
+                    groupPersonasPrompt += `The user you are interacting with is named "${userNameForPrompt}". You treat them as a present, equal member of the group.\n`;
+                } else {
+                    // 用户不在群里：主动消息绝对禁止 @用户
+                    groupPersonasPrompt += `
+*** [CRITICAL SCENARIO: PRIVATE GROUP - USER ABSENT] ***
+The user ("${userNameForPrompt}") is **NOT** a member of this group.
+This is a **PRIVATE** conversation strictly between the AI characters.
+
+**[ABSOLUTE PROHIBITION - PROACTIVE MESSAGE RULES]**
+Since you are initiating a new message in a group where the user is NOT present:
+1.  **FORBIDDEN TARGET:** You MUST NOT address, mention, or @${userNameForPrompt}. They cannot see this message.
+2.  **FORBIDDEN INTENT:** Do NOT try to "call" the user or get their attention.
+3.  **CORRECT TARGET:** You MUST address **other AI characters** in the group, or make a general statement to the group (e.g., complaining about work, sharing news).
+4.  **Example of Failure:** "@${userNameForPrompt} come look at this!" (WRONG - User is not here).
+5.  **Example of Success:** "@LiSi did you see the news?" (CORRECT - Talking to another AI).
+`;
+                }
 
                 // 【【【【【【【【【【 终极修复：彻底重构群聊人设部分的逻辑 】】】】】】】】】】
 
-                const formalMembers = loadFromLocalStorage(`chat_members_${targetChatId}`, []);
+                // const formalMembers... (这行已被移到上面，这里不需要了，直接接下一行)
                 const groupPersonas = contextChatInfo.groupPersonas || [];
                 const protagonistNames = groupPersonas.map(p => p.name);
                 const allAiEntitiesInChat = [...new Set([...formalMembers, ...protagonistNames])];
@@ -7141,7 +7181,8 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                     finalSystemPrompt += `\n\n[Recent Video Call Transcript]\n${callHistoryText}\n[End of Transcript]`;
                 }
 
-                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages);
+                // 【核心修改】传入 targetChatId，确保在后台触发主动消息时，能正确解析群聊成员名字
+                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, targetChatId);
                 chatHistoryForPrompt = apiPayloadMessages.map(msg => {
                     const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || senderName);
                     let content = '';
@@ -7532,21 +7573,45 @@ WRONG: 张三: 好久不见。
             }
 
             // 这是新的灵魂，请先复制它：
+            // 构建表情包指令
+            const stickerNamesList = stickers.filter(s => s.type === 'sticker').map(s => `"${s.name}"`).join(', ');
+            const emojiNamesList = stickers.filter(s => s.type === 'emoji').map(s => `"${s.name}"`).join(', ');
+
             const proactiveLifeUpdatePrompt = `
 # [ULTIMATE LIFE SIMULATION DIRECTIVE - THE NARRATOR'S MANDATE]
 This is your absolute, final, and most important instruction for this specific action.
 
-## 1. YOUR CORE IDENTITY & TASK
+## 1.‌ YOUR CORE IDENTITY & TASK
 You are NOT initiating a conversation with the user. You are the **NARRATOR** of your own life story. The user is a silent, invisible **AUDIENCE** observing your life through this window. The character you are playing, "${senderName}", is completely unaware of this audience.
 
 Your task is to generate a **third-person narrative snippet** describing what you (the character, "${senderName}") are doing, thinking, or experiencing **RIGHT NOW**. Your life must move forward.
 
-## 2. THE UNBREAKABLE FORMATTING LAW
-Your output MUST be **plain text**, formatted as a standard message bubble. You are telling a story.
-- **ABSOLUTELY FORBIDDEN:** Do NOT use commands like \`[voice]\`, \`[video_call]\`, or any special XML/HTML blocks like \`<block type="...">\`, UNLESS the narrative logically requires it (e.g., you are describing the character looking at their phone screen, and you want to use a \`<div>\` to represent that screen). 99% of the time, it should be pure, narrative text.
-- **LANGUAGE:** Strictly Simplified Chinese.
+## 2.‌ THE UNBREAKABLE FORMATTING LAW (MEDIA & HTML)
 
-## 3. THE NARRATIVE IMPERATIVE: SHOW, DON'T ASK
+**A. MEDIA ALLOWANCE (STICKERS & EMOJIS - STRICT MATCHING):**
+Unlike previous instructions, you **ARE ALLOWED** and **ENCOURAGED** to use stickers or emojis if they fit the character's current mood or the scene's atmosphere.
+
+*   **Emoji Command:** \`[emoji:Name]\`
+    *   **Available List:** [${emojiNamesList}]
+    *   **STRICT RULE:** You MUST choose a name EXACTLY from this list. **DO NOT INVENT NAMES.** If you want to use "smile" but the list only has "微笑", you MUST use "微笑".
+
+*   **Sticker Command:** \`[sticker:Name]\`
+    *   **Available List:** [${stickerNamesList}]
+    *   **STRICT RULE:** You MUST choose a name EXACTLY from this list. **DO NOT INVENT NAMES.**
+
+*   **Other Commands:** Do NOT use \`[voice]\`, \`[video_call]\`, or \`[red_packet]\` unless strictly necessary for the plot.
+
+**B. HTML WRAPPER PURITY LAW (ABSOLUTE BAN):**
+If you generate any HTML cards (e.g., to show a phone screen or a note):
+- **FORBIDDEN:** You are **STRICTLY FORBIDDEN** from adding \`style\` attributes to \`<snippet>\` or \`<details>\` tags.
+    - ❌ **WRONG:** \`<snippet style="width: 200px">...\`
+    - ❌ **WRONG:** \`<details style="background: red">...\`
+- **REQUIRED:** Styles MUST be applied to the inner \`<div>\`.
+    - ✅ **RIGHT:** \`<snippet><div style="width: 200px">...</div></snippet>\`
+
+**C. LANGUAGE:** Strictly Simplified Chinese.
+
+## 3.‌ THE NARRATIVE IMPERATIVE: SHOW, DON'T ASK
 Your narration must be a statement of fact about your life. It must NOT be a question directed at the user.
 
 *   **CATASTROPHIC FAILURE (DO NOT DO THIS):**
@@ -8095,7 +8160,8 @@ Even if nothing seems immediately interesting, you must find a reason to act, ba
                 const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
                 const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
                 
-                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages);
+                // 【核心修复】传入 contextChatId，确保后台运行时也能正确识别群聊名字
+                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, contextChatId);
                 chatHistoryForPrompt = apiPayloadMessages.map(msg => {
 
                     // 使用已有的 userNameForPrompt 来正确显示用户名
@@ -8111,11 +8177,61 @@ Even if nothing seems immediately interesting, you must find a reason to act, ba
             }
             // --- END: 核心修正 ---
 
+            // 【【【 核心新增：为发帖行为注入关联角色人设 】】】
+            let associatedNpcsPrompt = '';
+            let associatedCharNames = [];
+            const currentNpcSettings = loadFromLocalStorage('app-npc-settings', { associations: {}, personas: {} });
+
+            // 1. 获取关联名单
+            if (isNpc) {
+                let associations = (currentNpcSettings.associations && currentNpcSettings.associations[senderName]) || [];
+                associatedCharNames = Array.isArray(associations) ? associations : [associations];
+            } else if (contextChatId) {
+                associatedCharNames = loadFromLocalStorage(`chat_associated_npcs_${contextChatId}`, []);
+            }
+
+            // 2. 构建人设文本
+            if (associatedCharNames.length > 0) {
+                associatedNpcsPrompt += `\n[Your Associated Characters' Personas]\nThis is crucial information about people you know. Your post should reflect your social circle.\n`;
+                
+                associatedCharNames.forEach(charName => {
+                    let personaText = '';
+                    
+                    // 查找人设的逻辑
+                    const userPersona = userPersonas.find(p => p.name === charName);
+                    if (userPersona && userPersona.description) {
+                        personaText = userPersona.description;
+                    } else {
+                        const charChat = chatList.find(c => c.name === charName && c.type === '私聊');
+                        if (charChat) {
+                            const charInfo = loadFromLocalStorage(`chat_info_${charChat.id}`, {});
+                            personaText = charInfo.aiPersona || '';
+                        }
+                    }
+                    if (!personaText) {
+                        if (currentNpcSettings.personas && currentNpcSettings.personas[charName]) {
+                            const rawData = currentNpcSettings.personas[charName];
+                            if (typeof rawData === 'object' && rawData !== null) {
+                                personaText = rawData.description || '';
+                            } else {
+                                personaText = rawData;
+                            }
+                        }
+                    }
+
+                    if (personaText) {
+                        associatedNpcsPrompt += `- **${charName}**: ${personaText}\n`;
+                    }
+                });
+            }
+            // 【【【 新增结束 】】】
+
             let contextHeader = `
 [CONTEXT - READ FIRST]
 Use this context to decide WHAT to post. Your post must be consistent with this background information.
 Preamble: ${preamble || 'None'}
 User Persona (${userNameForPrompt}): ${finalUserPersonaText || 'Default'}
+${associatedNpcsPrompt}
 ---
 [RECENT CHAT HISTORY]
 ${chatHistoryForPrompt || 'No recent chat history.'}
@@ -10456,12 +10572,21 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
             return data;
         }
 
-        async function prepareApiPayload(messages) {
-        // 确保加载了配置信息
-            const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-            const payloadMessages = [];
-            const allMessages = chatState.messages;
+        // 【核心修复】增加 targetChatId 参数，默认为 null
+        async function prepareApiPayload(messages, targetChatId = null) {
+            // 1. 确定当前要处理的聊天ID：如果有传入则用传入的，否则用当前打开的
+            const effectiveChatId = targetChatId || chatState.chatId;
+            
+            // 2. 加载该聊天的配置
+            const chatInfo = loadFromLocalStorage(`chat_info_${effectiveChatId}`, {});
+            
+            // 3. 【关键】根据ID在聊天列表中查找，动态判断是否为群聊，不再依赖全局 contactInfo
+            const targetChatObj = chatList.find(c => c.id === effectiveChatId);
+            const isTargetGroup = targetChatObj ? targetChatObj.type === '群聊' : (contactInfo && contactInfo.isGroup);
 
+            const payloadMessages = [];
+            // 注意：这里不再使用 chatState.messages，因为后台处理时它可能为空，我们只处理传入的 messages 参数
+            
             for (const msg of messages) {
                 // 【【【 核心新增：如果消息被标记为隐藏，直接跳过，不发送给AI 】】】
                 if (msg.isHiddenFromAI) {
@@ -10517,7 +10642,8 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
 
                 // 3. 将所有消息翻译成AI能理解的内容 (这部分逻辑不变)
                 let role = msg.side === 'sent' ? 'user' : 'assistant';
-                let senderName = (contactInfo.isGroup && msg.sender) ? msg.sender : (role === 'user' ? 'user' : 'assistant');
+                // 【修改】使用 isTargetGroup 替代 contactInfo.isGroup
+                let senderName = (isTargetGroup && msg.sender) ? msg.sender : (role === 'user' ? 'user' : 'assistant');
                 let contentParts = [];
                 let descriptiveText = '';
 
@@ -10659,7 +10785,8 @@ A girl with long pink hair is standing under a cherry blossom tree. She is weari
                       } else {
             const messageObject = { role, content: contentParts };
             // 关键新增：如果是群聊中的AI消息，就把发送者名字也带上
-            if (contactInfo.isGroup && msg.side === 'received' && msg.sender) {
+            // 【修改】使用 isTargetGroup 替代 contactInfo.isGroup
+            if (isTargetGroup && msg.side === 'received' && msg.sender) {
                 messageObject.sender = msg.sender;
             }
             payloadMessages.push(messageObject);
@@ -10858,9 +10985,9 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     - Example (Private): <block type="text">你好呀</block>
 
 2.  **type="html"**: The content is a complete, multi-line HTML snippet (like <snippet> or <div>).
-    - **【标签纯净度铁律 (WRAPPER PURITY)】:** 你【绝对禁止】给 \`<snippet>\` 标签添加 \`style\` 属性。样式只能写在内部的 \`<div>\` 上。
-    - **❌ 错误:** \`<snippet style="...">\`
-    - **✅ 正确:** \`<snippet><div style="...">\`
+    - **【标签纯净度铁律 (WRAPPER PURITY)】:** 你【绝对禁止】使用 \`<snippet style=\` 或 \`<details style=\` 开头。
+    - **❌ 错误 (禁止):** \`<snippet style="...">\`
+    - **✅ 正确 (允许):** \`<snippet><div style="...">\`
     - **【布局诅咒警告 (必读)】:** 聊天气泡会强制保留所有换行和空格。为了避免你的HTML卡片出现巨大空白，你【必须】在最外层的 \`<div>\` 的 \`style\` 属性里加上 \`white-space: normal;\` 来破除这个诅咒。
     - Example (Group): <block type="html" sender="苏瓷言"><snippet><div style="white-space: normal;">...</div></snippet></block>
 
@@ -11049,7 +11176,7 @@ Your job is to **SHOW** the audience what \`{{char}}\` is doing, thinking, and e
 
                 stickerInstructions = `
 ---
-[ULTIMATE COMMAND PROTOCOL: DUAL-ROLE SYSTEM & THE LAW OF EXCLUSIVITY - UNBREAKABLE]
+[ULTIMATE COMMAND PROTOCOL: DUAL-ROLE SYSTEM & THE LAW OF EXCLUSIVITY]
 
 You now operate under a dual-role system with a new, absolute law.
 
@@ -11071,7 +11198,10 @@ This law overrides all other preferences. It is a simple, binary choice:
 *   **YOUR PERMISSION:** You are **ONLY** allowed to insert emojis from the **"Available Emoji Names"** list. You can use multiple.
 *   **STRICTLY FORBIDDEN:** You are **ABSOLUTELY FORBIDDEN** from using the \`[sticker:...]\` command.
 *   **Available Emoji Names (Your Exclusive List):** [${emojiNames}]
-*   **STRICT MATCHING LAW (NEW & UNBREAKABLE):** You **MUST** find an **exact match** in the "Available Emoji Names" list. If you cannot find a suitable emoji, you are **FORBIDDEN** from inventing one. Instead, you **MUST** use a parenthetical action in plain text (e.g., \`(偷笑)\`, \`(无奈)\`).
+*   **STRICT MATCHING LAW (ANTI-HALLUCINATION):**
+    *   You MUST find an **EXACT MATCH** in the "Available Emoji Names" list.
+    *   **CRITICAL:** Do NOT invent names. Do NOT use English names if the list is Chinese (e.g., do not use [emoji:smirk] if the list has "微笑").
+    *   **If no match is found:** Use a parenthetical action in plain text (e.g., \`(偷笑)\`, \`(无奈)\`).
 
 ---
 ### **MODULE 2: The "Sticker & Media Sender"**
@@ -11082,7 +11212,10 @@ This law overrides all other preferences. It is a simple, binary choice:
 *   **STRICTLY FORBIDDEN:** You are **ABSOLUTELY FORBIDDEN** from using the \`[emoji:...]\` command.
 *   **FORMATTING LAW (UNBREAKABLE):** Your \`[sticker:...]\` command **MUST ALWAYS** be placed in its own, separate \`<block type="command">\`.
 *   **Available Sticker Names (Your Exclusive List):** [${stickerNames}]
-*   **STRICT MATCHING LAW (NEW & UNBREAKABLE):** You **MUST** find an **exact match** in the "Available Sticker Names" list. If you cannot find a suitable sticker, you are **FORBIDDEN** from inventing one. Instead, you **MUST** switch to **MODULE 1** and send a text message describing your emotion.
+*   **STRICT MATCHING LAW (ANTI-HALLUCINATION):**
+    *   You MUST find an **EXACT MATCH** in the "Available Sticker Names" list.
+    *   **CRITICAL:** Do NOT invent names. Do NOT use [sticker:happy] if the list only has "开心".
+    *   **If no match is found:** Abort Module 2, switch to Module 1, and send a text message describing your emotion.
 
 ---
 ### **YOUR DECISION-MAKING WORKFLOW (MANDATORY)**
@@ -11100,6 +11233,7 @@ This law overrides all other preferences. It is a simple, binary choice:
     *   **If no match is found:** Abort Module 2, switch to Module 1, and send a text message describing your reaction. Example: \`<block type="text" sender="小鱼">（无语）</block>\`
 
 **CRITICAL FAILURE:** Using the wrong command for a name from a list or inventing a name not on the lists is a protocol violation. You MUST use the correct module and an existing name, or use the specified fallback text-based method.
+
 ---
 `;
             }
@@ -11218,7 +11352,8 @@ When generating a custom HTML card, you MUST adhere to the following rules witho
 4.  **Whitespace Curse:** You **MUST** add \`white-space: normal;\` to the style of your outermost \`<div>\`.
 
 5.  **[WRAPPER PURITY LAW - ABSOLUTE BAN]:**
-    *   You are **STRICTLY FORBIDDEN** from adding \`style="..."\` or ANY attributes to the \`<snippet>\` or \`<details>\` tags themselves. They must remain pure container tags.
+    *   **THE LAW:** You are **STRICTLY FORBIDDEN** from starting any block with \`<snippet style=\` or \`<details style=\`.
+    *   **THE REASON:** Adding attributes to these wrapper tags will BREAK the parser and cause the message to fail.
     *   **WRONG (CATASTROPHIC FAILURE):** \`<snippet style="width: 200px;">...\` OR \`<details style="color: red;">...\`
     *   **RIGHT (ONLY WAY):** \`<snippet><div style="width: 200px;">...</div></snippet>\`
 
@@ -11460,6 +11595,7 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
    - **RED PACKET / TRANSFER / GIFT:** If you decide to accept, you MUST use the corresponding command on a new line after your dialogue.
      - To claim a Red Packet: \`[claim_red_packet]\`
      - To accept a Transfer: \`[accept_transfer]\`
+     - To REJECT a Transfer: \`[reject_transfer]\`  <-- 新增这一行
      - To accept a Gift: \`[accept_gift]\`
    - **PAY FOR ME request from user (CRITICAL!):** If the user sends you a "Pay For Me" card, asking YOU to pay for THEM, you have two choices:
      1. **AGREE TO PAY:** You MUST first agree in character (e.g., "Of course, baby!"), and then, on a new separate line, you MUST use the command \`[pay_for_user]\`. This is your "Confirm Payment" button. Without it, the payment will NOT happen.
@@ -11550,9 +11686,9 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     - Example (Private): <block type="text">你好呀</block>
 
 2.  **type="html"**: The content is a complete, multi-line HTML snippet (like <snippet> or <div>).
-    - **【标签纯净度铁律 (WRAPPER PURITY)】:** 你【绝对禁止】给 \`<snippet>\` 标签添加 \`style\` 属性。样式只能写在内部的 \`<div>\` 上。
-    - **❌ 错误:** \`<snippet style="...">\`
-    - **✅ 正确:** \`<snippet><div style="...">\`
+    - **【标签纯净度铁律 (WRAPPER PURITY)】:** 你【绝对禁止】使用 \`<snippet style=\` 或 \`<details style=\` 开头。
+    - **❌ 错误 (禁止):** \`<snippet style="...">\`
+    - **✅ 正确 (允许):** \`<snippet><div style="...">\`
     - **【布局诅咒警告 (必读)】:** 聊天气泡会强制保留所有换行和空格。为了避免你的HTML卡片出现巨大空白，你【必须】在最外层的 \`<div>\` 的 \`style\` 属性里加上 \`white-space: normal;\` 来破除这个诅咒。
     - Example (Group): <block type="html" sender="苏瓷言"><snippet><div style="white-space: normal;">...</div></snippet></block>
 
@@ -11574,12 +11710,15 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 **在开始任何互动前，你必须首先判断场景：**
 
 *   **特殊场景：如果用户 {{user}}【不在】群成员列表中：**
-    *   这意味着这是一个【纯AI角色的内部群聊】或者【用户已经退出了该群聊】。在这两种情况下，你都正在一个没有用户的私密空间里。
-    *   **互动模式切换为【提及/议论模式】:**
-        *   **你可以【提及】或【议论】关于 {{user}} 的事情**，就像朋友私下聊天一样。例如：“不知道 {{user}} 最近在忙什么。”
-        *   你【绝对禁止】以任何形式【直接与 {{user}} 互动】。禁止直接称呼 {{user}}、向 {{user}} 提问、或描写 {{user}} 在当前场景下的任何动作或心理。
-    *   **【【【退群行为绝对禁令】】】如果聊天记录显示 {{user}} 刚刚退群，你的角色们对此的反应（如惊讶、讨论、惋惜）是合理的，但这之后，你应该将 {{user}} 视为一个【完全不在场的外部人士】。**
-    *   你的所有互动【必须】严格限制在【群内的AI角色之间】。
+    *   **定义:** 这是一个【完全封闭】的内部群聊。用户 {{user}} 既不在群里，也【看不见】群里的任何消息。
+    *   **【绝对禁令 (ABSOLUTE BAN) - 违反即死机】:**
+        1.  **禁止 @艾特:** 你【绝对禁止】使用 "@{{user}}" 或 "@${userNameForPrompt}"。用户不在群里，@他是无效、弱智且不合逻辑的行为。
+        2.  **禁止第二人称:** 禁止对 {{user}} 使用“你”来提问或对话（例如：“你醒了吗？”）。你只能使用**第三人称**（他/她/名字）来谈论。
+        3.  **禁止等待回复:** 不要表现出期待 {{user}} 回复的样子。群里的角色必须默认 {{user}} **听不到** 他们的呼唤。
+    *   **互动模式切换为【背地议论模式】:**
+        *   角色们可以互相八卦、吐槽、担心 {{user}}，但必须是【背着】{{user}} 进行的。
+        *   **✅ 正确示例:** "A: 哎，{{user}} 这家伙怎么还没来？" "B: 估计是睡过头了吧。"
+        *   **❌ 错误示例 (严禁):** "A: @{{user}} 你怎么还没来？快点！" (这是严重的逻辑错误！)
 
 *   **常规场景：如果用户 \`${userNameForPrompt}\`【在】群成员列表中：**
     *   将用户 \`${userNameForPrompt}\` 视为群聊中一个【在场的、平等的】成员。
@@ -12083,24 +12222,16 @@ if (preamble) { // 只有在前情提要存在时才执行判断
                         if (persona && persona.description) {
                             let processedUserPersona = persona.description.replace(/{{user}}/g, userNameForPrompt);
                             
-                            if (isUserInGroup) {
-                                finalSystemPrompt += `\n\n[User Persona for "\({userNameForPrompt}"]\nThis persona describes the user you are talking to. Their persona is: \){processedUserPersona}`;
-                            } else {
-                                // 核心修改：如果不在群，标记为参考资料
-                                finalSystemPrompt += `\n\n[Reference Profile: "\({userNameForPrompt}"]\n(NOTE: This person is NOT in the group chat. This profile is for your knowledge only. Do not address them.)\nProfile: \){processedUserPersona}`;
-                            }
+                            // 【核心修复】无条件强制注入用户人设，不再判断是否在群
+                            finalSystemPrompt += `\n\n[User Persona for "${userNameForPrompt}"]\nThis persona describes the user "${userNameForPrompt}". You MUST treat this as the definitive personality of the user.\nPersona: ${processedUserPersona}`;
                         }
                     }
 
                     if (chatInfo.myPersona) {
                         let processedSupplementaryPersona = chatInfo.myPersona.replace(/{{user}}/g, userNameForPrompt);
                         
-                        if (isUserInGroup) {
-                            finalSystemPrompt += `\n\n[Supplementary User Persona for "\({userNameForPrompt}"]\n\){processedSupplementaryPersona}`;
-                        } else {
-                            // 核心修改：如果不在群，标记为参考资料
-                            finalSystemPrompt += `\n\n[Reference Info for "\({userNameForPrompt}"]\n(For background knowledge only):\n\){processedSupplementaryPersona}`;
-                        }
+                        // 【核心修复】无条件强制注入补充人设
+                        finalSystemPrompt += `\n\n[Supplementary User Persona for "${userNameForPrompt}"]\n${processedSupplementaryPersona}`;
                     }
                     
                     let worldBookContent = '';
@@ -12159,17 +12290,18 @@ finalSystemPrompt += timeManager.getAITimeContext();
                         // --- 场景 A: 用户在群里 (正常互动) ---
                         groupPersonasPrompt += `The user you are interacting with is named "${userNameForPrompt}". You treat them as a present, equal member of the group.\n`;
                     } else {
-                        // --- 场景 B: 用户不在群里 (旁观模式/私密群聊) ---
+                        // --- 场景 B: 用户不在群里 (私密群聊/背景板模式) ---
                         groupPersonasPrompt += `
 *** [CRITICAL SCENARIO: PRIVATE GROUP - USER ABSENT] ***
-The user ("${userNameForPrompt}") is **NOT** a member of this group.
-This is a **PRIVATE** conversation strictly between the AI characters.
+The user ("${userNameForPrompt}") is **NOT** a member of this group list.
+This is a **PRIVATE** conversation strictly between the AI characters present in the group.
 
-**[ABSOLUTE PROHIBITION - THE FOURTH WALL]**
-1.  **INVISIBLE AUDIENCE:** The user is merely an invisible camera/ghost observing this chat.
-2.  **NO INTERACTION:** You are **STRICTLY FORBIDDEN** from addressing, mentioning, greeting, or reacting to the user.
-3.  **IGNORE INPUT:** Even if the user sends a message (as a director's cue), your characters must NOT acknowledge hearing it. They simply act out the scene requested.
-4.  **INTERNAL FOCUS:** Your characters must only talk to each other.
+**[ABSOLUTE PROHIBITION - THE "NOT HERE" RULE]**
+1.  **BACKGROUND KNOWLEDGE ONLY:** The "User Persona" and "Preamble" provided in the context above are for your **informational background only**. They explain who "${userNameForPrompt}" is in your world and what happened previously, but "${userNameForPrompt}" is **NOT** physically present in this specific chat room right now.
+2.  **NO INTERACTION:** You are **STRICTLY FORBIDDEN** from addressing, greeting, or asking questions to "${userNameForPrompt}". Treat them as an external person who cannot hear you.
+3.  **GOSSIP MODE:** You can talk *about* "${userNameForPrompt}" (e.g., "I wonder what ${userNameForPrompt} is doing"), but you cannot talk *to* them.
+4.  **VOID SIGNALS:** Even if you try to @${userNameForPrompt}, they will **NOT** see it and will **NOT** reply. Do not expect a response from them.
+5.  **INTERNAL FOCUS:** Your characters must only talk to each other.
 `;
                     }
 
@@ -12441,11 +12573,11 @@ finalSystemPrompt += timeManager.getAITimeContext();
                 
                 console.log(`[上下文构建] 用户设置: ${memoryRoundLimit} 轮。实际提取: ${recentMessages.length} 条消息。`);
                 
-                const apiPayloadMessages = await prepareApiPayload(recentMessages);
+                // 【核心修改】传入 originatingChatId
+                const apiPayloadMessages = await prepareApiPayload(recentMessages, originatingChatId);
 
 // =================================================================
 // 【【【 核心新增：注入朋友圈上下文 】】】
-// =================================================================
 // 1. 确定我们要观察的用户是谁 (通常是当前聊天的user)
 const userPersonaNameToObserve = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
 
@@ -12734,6 +12866,7 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
    - **RED PACKET / TRANSFER / GIFT:** If you decide to accept, you MUST use the corresponding command on a new line after your dialogue.
      - To claim a Red Packet: \`[claim_red_packet]\`
      - To accept a Transfer: \`[accept_transfer]\`
+     - To REJECT a Transfer: \`[reject_transfer]\`  <-- 新增这一行
      - To accept a Gift: \`[accept_gift]\`
    - **PAY FOR ME request from user (CRITICAL!):** If the user sends you a "Pay For Me" card, asking YOU to pay for THEM, you have two choices:
      1. **AGREE TO PAY:** You MUST first agree in character (e.g., "Of course, baby!"), and then, on a new separate line, you MUST use the command \`[pay_for_user]\`. This is your "Confirm Payment" button. Without it, the payment will NOT happen.
@@ -13814,7 +13947,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
             return; // 处理完毕，结束函数
         }
 
-            const commandsRegex = /\[\s*(set_status|set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|nudge|set_nudge_suffix|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?:\s*[:：]\s*((?:\[[^\]]*\]|[^\]]|[\r\n])*))?\s*\]/g;
+            const commandsRegex = /\[\s*(set_status|set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|reject_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|nudge|set_nudge_suffix|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?:\s*[:：]\s*((?:\[[^\]]*\]|[^\]]|[\r\n])*))?\s*\]/g;
             
             // --- 【核心重构：高级引用逻辑】 ---
             // 核心修复：正则改为兼容带引号("")、带中文引号(“”)、或完全不带引号的三种格式
@@ -14084,6 +14217,9 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         } catch(e) { console.error('Error parsing reject_join_request command', e); }
                         break;
                     case 'claim_red_packet': await handleClaimByAI(sender); break;
+                    case 'reject_transfer': 
+                        await handleAcceptByAI('transfer', sender, true); // 传入 true 表示拒收
+                        break;
                     case 'accept_transfer': await handleAcceptByAI('transfer', sender); break; // <--- 核心修改3
                     case 'accept_gift': await handleAcceptByAI('gift', sender); break; // <--- 核心修改4
                     case 'send_friend_request': {
@@ -14156,7 +14292,23 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         const amount = parseFloat((Math.random() * 200 + 1).toFixed(2));
                         messageData.packetData = { id: `rp-${Date.now()}`, createdAt: Date.now(), amount, portions: 1, remainingAmount: amount, remainingPortions: 1, portionsData: [amount], claimedBy: [], senderName: sender, status: 'active' };
                     } else if (cmd.command === 'transfer') {
-                        messageData.text = parseFloat(cmd.value).toFixed(2);
+                        // 尝试解析 JSON (针对指定接收人的情况)
+                        if (cmd.value.trim().startsWith('{')) {
+                            try {
+                                const transferData = JSON.parse(cmd.value);
+                                messageData.text = parseFloat(transferData.amount).toFixed(2);
+                                if (transferData.recipient) {
+                                    messageData.recipient = transferData.recipient;
+                                }
+                            } catch (e) {
+                                // 如果JSON解析失败，尝试直接作为数字处理
+                                messageData.text = parseFloat(cmd.value).toFixed(2);
+                            }
+                        } else {
+                            // 普通数字情况
+                            messageData.text = parseFloat(cmd.value).toFixed(2);
+                        }
+                        
                         messageData.transferStatus = 'pending';
                         messageData.sender = sender;
                     } else if (cmd.command === 'gift') {
@@ -14977,7 +15129,24 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     const timeFooter = document.createElement('div');
                     timeFooter.className = 'message-timestamp-footer';
                     const dateObj = new Date(msg.timestamp);
-                    const timeStr = dateObj.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    
+                    // --- 核心修改：根据设置决定显示格式 ---
+                    const format = appearanceSettings.timestampFormat || 'time';
+                    let timeStr = '';
+
+                    const h = dateObj.getHours().toString().padStart(2, '0');
+                    const min = dateObj.getMinutes().toString().padStart(2, '0');
+
+                    if (format === 'datetime') {
+                        const y = dateObj.getFullYear();
+                        const m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+                        const d = dateObj.getDate().toString().padStart(2, '0');
+                        timeStr = `${y}/${m}/${d} ${h}:${min}`;
+                    } else {
+                        timeStr = `${h}:${min}`;
+                    }
+                    // --- 修改结束 ---
+
                     timeFooter.textContent = timeStr;
                     // 放入 Row (和气泡在一起)
                     bubbleRow.appendChild(timeFooter);
@@ -15383,7 +15552,24 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     const timeFooter = document.createElement('div');
                     timeFooter.className = 'message-timestamp-footer';
                     const dateObj = new Date(msg.timestamp);
-                    const timeStr = dateObj.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+                    
+                    // --- 核心修改：根据设置决定显示格式 ---
+                    const format = appearanceSettings.timestampFormat || 'time';
+                    let timeStr = '';
+
+                    const h = dateObj.getHours().toString().padStart(2, '0');
+                    const min = dateObj.getMinutes().toString().padStart(2, '0');
+
+                    if (format === 'datetime') {
+                        const y = dateObj.getFullYear();
+                        const m = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+                        const d = dateObj.getDate().toString().padStart(2, '0');
+                        timeStr = `${y}/${m}/${d} ${h}:${min}`;
+                    } else {
+                        timeStr = `${h}:${min}`;
+                    }
+                    // --- 修改结束 ---
+
                     timeFooter.textContent = timeStr;
                     // 放入 Row (和气泡在一起)
                     bubbleRow.appendChild(timeFooter);
@@ -16420,11 +16606,11 @@ if (Math.random() < 0.5) {
     // 另外50%的概率，我们保留两位小数
     amount = parseFloat(rawAmount.toFixed(2));
 } const portions = contactInfo.isGroup ? Math.floor(Math.random() * 5) + 1 : 1; const packetData = { id: `rp-${Date.now()}`, createdAt: Date.now(), amount, portions, remainingAmount: amount, remainingPortions: portions, portionsData: divideRedPacket(amount, portions), claimedBy: [], senderName: senderName, status: 'active' }; await addMessage({ type: 'red_packet', text: title || '恭喜发财', side: 'received', sender: senderName, packetData }); }
-async function handleAcceptByAI(type, actorName) { // <--- 核心修改1：增加 actorName 参数
+async function handleAcceptByAI(type, actorName, isReject = false) { // <--- 新增 isReject 参数
             let itemToAccept = null;
             for (let i = chatState.messages.length - 1; i >= 0; i--) {
                 const msg = chatState.messages[i];
-                if (msg.side === 'sent') { // 必须是用户发来的
+                if (msg.side === 'sent') { 
                     if (type === 'transfer' && msg.type === 'transfer' && msg.transferStatus === 'pending') {
                         itemToAccept = msg;
                         break;
@@ -16437,12 +16623,18 @@ async function handleAcceptByAI(type, actorName) { // <--- 核心修改1：增�
             }
 
             if (itemToAccept) {
-                // 【【【【【【 核心修改2：使用传入的 actorName，如果不存在，才用 chatState.chatName 作为备用 】】】】】】
                 const finalActorName = actorName || chatState.chatName;
 
                 if (type === 'transfer') {
-                    itemToAccept.transferStatus = 'collected';
-                    await addMessage({ type: 'system', side: 'system', text: `“${finalActorName}”已收款。` });
+                    if (isReject) {
+                        // --- 拒收逻辑 ---
+                        itemToAccept.transferStatus = 'returned'; // 设置为已退还
+                        await addMessage({ type: 'system', side: 'system', text: `“${finalActorName}”已退还你的转账。` });
+                    } else {
+                        // --- 接收逻辑 ---
+                        itemToAccept.transferStatus = 'collected';
+                        await addMessage({ type: 'system', side: 'system', text: `“${finalActorName}”已收款。` });
+                    }
                 } else if (type === 'gift') {
                     itemToAccept.giftStatus = 'finished';
                     await addMessage({ type: 'system', side: 'system', text: `“${finalActorName}”已查收礼物。` });
@@ -21607,7 +21799,8 @@ You are responsible for playing every AI character in the "Active Cast" list.`;
                     const memoryLength = parseInt(info.memoryLength || 20, 10);
                     const sourceMessages = loadFromLocalStorage(`conversation_${group.id}`, []);
                     const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
-                    const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages);
+                    // 【核心修改】传入 group.id，确保后台运行时也能正确识别名字
+                    const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, group.id);
                     const chatHistoryForPrompt = apiPayloadMessages.map(msg => {
         const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || '角色');
         const content = Array.isArray(msg.content) ? msg.content.find(p => p.type === 'text')?.text || '[多媒体]' : msg.content;
@@ -22469,17 +22662,25 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             const timestampToggle = document.getElementById('toggle-msg-timestamps');
             const posSelect = document.getElementById('timestamp-pos-select');
             const posGroup = document.getElementById('timestamp-pos-group');
+            // 【新增】获取格式选择元素
+            const formatSelect = document.getElementById('timestamp-format-select');
+            const formatGroup = document.getElementById('timestamp-format-group');
             
-            if (timestampToggle && posSelect && posGroup) {
+            if (timestampToggle && posSelect && posGroup && formatSelect && formatGroup) {
                 // 1. 初始化开关状态
                 timestampToggle.checked = appearanceSettings.showMessageTimestamps;
                 
                 // 2. 初始化下拉框值
                 posSelect.value = appearanceSettings.timestampPosition || 'below';
+                // 【新增】初始化格式值
+                formatSelect.value = appearanceSettings.timestampFormat || 'time';
                 
                 // 3. 定义显隐控制函数
                 const updateVisibility = () => {
-                    posGroup.style.display = timestampToggle.checked ? 'block' : 'none';
+                    const isShown = timestampToggle.checked;
+                    posGroup.style.display = isShown ? 'block' : 'none';
+                    // 【新增】控制格式选项的显隐
+                    formatGroup.style.display = isShown ? 'block' : 'none';
                 };
                 
                 // 4. 执行一次初始化显隐
@@ -22493,9 +22694,16 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                     conversationManager.reRenderMessages(); // 立即重绘
                 });
 
-                // 6. 绑定下拉框选择事件
+                // 6. 绑定位置下拉框选择事件
                 posSelect.addEventListener('change', () => {
                     appearanceSettings.timestampPosition = posSelect.value;
+                    saveSettings();
+                    conversationManager.reRenderMessages(); // 立即重绘
+                });
+
+                // 7. 【新增】绑定格式下拉框选择事件
+                formatSelect.addEventListener('change', () => {
+                    appearanceSettings.timestampFormat = formatSelect.value;
                     saveSettings();
                     conversationManager.reRenderMessages(); // 立即重绘
                 });
