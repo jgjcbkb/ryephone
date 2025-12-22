@@ -11,6 +11,9 @@
 <meta name="apple-mobile-web-app-title" content="黑麦手机">
 <link rel="apple-touch-icon" href="https://i.imgur.com/sE3924q.png">
 
+<!-- 【【【 核心新增：安卓APP安装配置文件 (Manifest) 】】】 -->
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoi6buR6bqm5omL5py6Iiwic2hvcnRfbmFtZSI6Ium7kem6puaJi+acuiIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjZjBmMmY1IiwidGhlbWVfY29sb3IiOiIjZjBmMmY1IiwiaWNvbnMiOlt7InNyYyI6Imh0dHBzOi8vaS5pbWd1ci5jb20vc0UzOTI0cS5wbmciLCJzaXplcyI6IjE5MngxOTIiLCJ0eXBlIjoiaW1hZ2UvcG5nIn1dfQ==">
+
 <style>
     @import url("https://fontsapi.zeoseven.com/111/main/result.css");
 
@@ -6405,8 +6408,37 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     
 
 <script>
-(function() {
+    // 【【【 核心新增：Service Worker 注册 (增强版) 】】】
+    if ('serviceWorker' in navigator) {
+        const swCode = `
+            self.addEventListener('install', (event) => self.skipWaiting());
+            self.addEventListener('activate', (event) => event.waitUntil(clients.claim()));
+            self.addEventListener('notificationclick', (event) => {
+                event.notification.close();
+                event.waitUntil(
+                    clients.matchAll({type: 'window', includeUncontrolled: true}).then(clientList => {
+                        // 如果有窗口打开，就聚焦
+                        for (const client of clientList) {
+                            if (client.url && 'focus' in client) return client.focus();
+                        }
+                        // 如果没有，尝试打开新窗口 (部分浏览器限制)
+                        if (clients.openWindow) return clients.openWindow('/');
+                    })
+                );
+            });
+        `;
+        const blob = new Blob([swCode], {type: 'application/javascript'});
+        const url = URL.createObjectURL(blob);
+        // 核心修改：添加 scope: '/' 确保接管整个页面
+        navigator.serviceWorker.register(url, { scope: '/' })
+            .then(reg => console.log('SW注册成功'))
+            .catch(err => console.log('SW注册失败', err));
+    }
+    // 【【【 插入结束 】】】
+
+    (function() {
     'use strict';
+    // ... 原有的代码 ...
     
     // =================================================================================
     // Global Helper Functions
@@ -15757,38 +15789,55 @@ You were receiving a video call from {{user}}, but they hung up before you could
             setTimeout(() => banner.classList.add('visible'), 50);
 
             // 【新增：弹出横幅时播放声音】
-            // 优化：如果页面在前台，播放网页音效；如果在后台，让系统通知负责响铃
-            if (!document.hidden && window.app && window.app.playNotificationSound) {
+            if (window.app && window.app.playNotificationSound) {
                 window.app.playNotificationSound();
             }
 
-            // 【【【 核心新增：同时发送系统级通知 (跨软件显示) 】】】
+            // 【【【 终极方案：安卓/iOS 分流处理 】】】
+            // 检测是否是苹果设备
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
             if ("Notification" in window && Notification.permission === "granted") {
                 try {
-                    // --- 终极精简版：不带头像，只发文字 ---
-                    // 安卓后台加载图片极易失败导致通知不弹，我们直接去掉 icon 属性
-                    // 这样系统会默认使用浏览器的图标，成功率 100%
-                    
-                    const sysNotification = new Notification(displayName, {
-                        body: previewText, 
-                        // icon: ...  <-- 彻底删除了图标字段
-                        tag: chatId + "_" + Date.now(), // 强制新消息
+                    if (isIOS) {
+                        // ==========================================
+                        // 🍎 iOS 专用通道：使用最原始的 new Notification
+                        // iOS 16.4+ 在 PWA 模式下，这个反而最稳定
+                        // ==========================================
+                        const iosNotify = new Notification(displayName, {
+                            body: previewText,
+                            tag: chatId, // 覆盖旧消息
+                            silent: true // iOS靠系统声音，网页声音设为静音防止重音
+                        });
                         
-                        silent: false,     // 允许响铃
-                        renotify: true,    // 强制震动
-                        requireInteraction: false 
-                    });
-
-                    // 点击通知跳转
-                    sysNotification.onclick = function() {
-                        window.focus(); 
-                        open(chatId);   
-                        this.close();   
-                    };
+                        iosNotify.onclick = function() {
+                            window.focus();
+                            open(chatId);
+                            this.close();
+                        };
+                    } else {
+                        // ==========================================
+                        // 🤖 安卓 专用通道：必须用 ServiceWorker
+                        // ==========================================
+                        if ("serviceWorker" in navigator) {
+                            navigator.serviceWorker.ready.then(function(registration) {
+                                registration.showNotification(displayName, {
+                                    body: previewText,
+                                    icon: avatarUrl,
+                                    badge: 'https://i.imgur.com/sE3924q.png',
+                                    tag: chatId,
+                                    renotify: true, // 强制重新提醒
+                                    requireInteraction: true, // 强制不消失
+                                    silent: false // 安卓强制响铃
+                                });
+                            });
+                        }
+                    }
                 } catch (e) {
-                    console.error("系统通知发送失败:", e);
+                    console.error("通知发送失败:", e);
                 }
             }
+            // 【【【 插入结束 】】】
 
             // 5秒后自动消失
             bannerTimeout = setTimeout(closeBanner, 5000);
@@ -29820,6 +29869,41 @@ const cloudBackupManager = (function() {
         window.app.openNovelReader = openReader;
         return { openReader };
     })();
+
+    // 【【【 核心新增：检测APP模式并自动全屏 】】】
+    function checkDisplayMode() {
+        // 检测是否在“安装模式/全屏模式”下运行
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+        
+        if (isStandalone) {
+            console.log("检测到 APP 模式，自动隐藏手机外壳");
+            
+            // 1. 强制给 body 添加隐藏外壳的类名
+            document.body.classList.add('frame-hidden');
+            
+            // 2. 注入一段强制样式，修正刘海屏顶部的遮挡问题
+            const style = document.createElement('style');
+            style.innerHTML = `
+                /* 隐藏模拟的状态栏，因为真手机有自己的状态栏 */
+                .status-bar { display: none !important; }
+                
+                /* 移除外壳圆角和阴影 */
+                .app-container { border-radius: 0 !important; }
+                .screen { border: none !important; box-shadow: none !important; }
+                
+                /* 针对全面屏手机，给顶部增加一点内边距，防止内容被摄像头挡住 */
+                .list-header, .chat-header, .app-header, .moments-title-bar {
+                    padding-top: max(20px, env(safe-area-inset-top)) !important;
+                    height: auto !important;
+                    min-height: 60px;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+    // 立即执行检查
+    checkDisplayMode();
+
     document.addEventListener('DOMContentLoaded', initializeApp);
 
 })();
