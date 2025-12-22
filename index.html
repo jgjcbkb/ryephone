@@ -8499,6 +8499,19 @@ ${timeContext}
         }
 
         console.log(`[诊断日志] 角色 "${senderName}": 正在向API发送请求...`);
+
+        // 【【【 核心修复：Gemini/代理渠道 强制兼容补丁 】】】
+        // 许多 Gemini 渠道（包括官方和代理）如果只收到 System Prompt 会直接报错 400。
+        // 在“刷朋友圈”或“发动态”时，往往没有历史记录。
+        // 所以，如果检测到只有一条 System 消息，必须手动塞一条 User 消息来“点火”。
+        if (finalMessages.length === 1 && finalMessages[0].role === 'system') {
+            finalMessages.push({
+                role: 'user',
+                content: 'System Action Triggered. Please proceed based on the instructions above.'
+            });
+        }
+        // 【【【 修复结束 】】】
+
         // =================================================================
         // ================= START: GEMINI COMPATIBILITY BLOCK (FINAL) ==========
         // =================================================================
