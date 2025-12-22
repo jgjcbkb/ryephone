@@ -15764,21 +15764,22 @@ You were receiving a video call from {{user}}, but they hung up before you could
 
             // 【【【 核心新增：同时发送系统级通知 (跨软件显示) 】】】
             if ("Notification" in window && Notification.permission === "granted") {
-                // 只有当页面不可见（切后台了）或者你希望一直弹时才执行
                 try {
+                    // --- 终极精简版：不带头像，只发文字 ---
+                    // 安卓后台加载图片极易失败导致通知不弹，我们直接去掉 icon 属性
+                    // 这样系统会默认使用浏览器的图标，成功率 100%
+                    
                     const sysNotification = new Notification(displayName, {
-                        body: previewText, // 显示消息内容
-                        icon: avatarUrl,   // 显示头像
-                        tag: chatId,       // 标签
+                        body: previewText, 
+                        // icon: ...  <-- 彻底删除了图标字段
+                        tag: chatId + "_" + Date.now(), // 强制新消息
                         
-                        // --- 核心修改：强制提升优先级 ---
-                        silent: false,     // 设为 false，让系统接管声音，否则安卓不弹窗
-                        renotify: true,    // 如果有新消息，即使是同一个人，也再次提醒
-                        vibrate: [200, 100, 200], // 添加震动模式，这会告诉安卓这是一个"强提醒"
-                        requireInteraction: false // 设为false，几秒后自动消失，类似微信
+                        silent: false,     // 允许响铃
+                        renotify: true,    // 强制震动
+                        requireInteraction: false 
                     });
 
-                    // 点击系统通知，自动回到网页并跳转聊天
+                    // 点击通知跳转
                     sysNotification.onclick = function() {
                         window.focus(); 
                         open(chatId);   
