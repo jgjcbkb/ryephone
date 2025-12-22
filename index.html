@@ -15757,33 +15757,37 @@ You were receiving a video call from {{user}}, but they hung up before you could
             setTimeout(() => banner.classList.add('visible'), 50);
 
             // 【新增：弹出横幅时播放声音】
-            if (window.app && window.app.playNotificationSound) {
+            // 优化：如果页面在前台，播放网页音效；如果在后台，让系统通知负责响铃
+            if (!document.hidden && window.app && window.app.playNotificationSound) {
                 window.app.playNotificationSound();
             }
 
             // 【【【 核心新增：同时发送系统级通知 (跨软件显示) 】】】
             if ("Notification" in window && Notification.permission === "granted") {
                 // 只有当页面不可见（切后台了）或者你希望一直弹时才执行
-                // 这里我们设置为：只要有权限就弹，确保不错过
                 try {
                     const sysNotification = new Notification(displayName, {
                         body: previewText, // 显示消息内容
-                        icon: avatarUrl,   // 尝试显示头像 (取决于系统支持)
-                        tag: chatId,       // 相同聊天的通知会覆盖，避免刷屏
-                        silent: true       // 静音，因为我们网页已经有提示音了
+                        icon: avatarUrl,   // 显示头像
+                        tag: chatId,       // 标签
+                        
+                        // --- 核心修改：强制提升优先级 ---
+                        silent: false,     // 设为 false，让系统接管声音，否则安卓不弹窗
+                        renotify: true,    // 如果有新消息，即使是同一个人，也再次提醒
+                        vibrate: [200, 100, 200], // 添加震动模式，这会告诉安卓这是一个"强提醒"
+                        requireInteraction: false // 设为false，几秒后自动消失，类似微信
                     });
 
                     // 点击系统通知，自动回到网页并跳转聊天
                     sysNotification.onclick = function() {
-                        window.focus(); // 尝试唤醒窗口
-                        open(chatId);   // 跳转到对应聊天
-                        this.close();   // 关闭通知
+                        window.focus(); 
+                        open(chatId);   
+                        this.close();   
                     };
                 } catch (e) {
                     console.error("系统通知发送失败:", e);
                 }
             }
-            // 【【【 插入结束 】】】
 
             // 5秒后自动消失
             bannerTimeout = setTimeout(closeBanner, 5000);
