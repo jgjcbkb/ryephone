@@ -4909,12 +4909,14 @@ body.preview-fullscreen-active .screen {
 }
 
 /* 在预览模式下，状态栏和刘海没有意义，需要隐藏 */
-body.preview-fullscreen-active .status-bar {
+/* 【修正】：只有当“隐藏外壳”(.frame-hidden) 也同时开启时，才隐藏刘海 */
+body.preview-fullscreen-active.frame-hidden .status-bar {
     display: none;
 }
 
 /* 隐藏状态栏后，需要调整聊天头部的内边距，防止内容顶上去 */
-body.preview-fullscreen-active #page-conversation .chat-header {
+/* 【修正】：同上，只有在刘海真正消失时，才减少顶部内边距 */
+body.preview-fullscreen-active.frame-hidden #page-conversation .chat-header {
     padding-top: 10px;
 }
 /* --- 新增：预览模式下隐藏聊天背景 --- */
@@ -5065,10 +5067,10 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     }
     
     /* 4. 预览模式：隐藏多余元素 */
-    #moments-view.moments-preview-active .post-options, /* 隐藏右上角操作 */
-    #moments-view.moments-preview-active .post-footer,   /* 隐藏点赞评论按钮 */
-    #moments-view.moments-preview-active .delete-comment-btn, /* 隐藏删除叉号 */
-    #moments-view.moments-preview-active .edit-comment-btn {  /* 隐藏编辑按钮 */
+    #moments-view.moments-preview-active .post-options, /* 隐藏右上角操作 (编辑/删除/可见范围) */
+    /* #moments-view.moments-preview-active .post-footer, */  /* 【已注释】不再隐藏底部的两个点按钮 (点赞/评论/转发入口) */
+    #moments-view.moments-preview-active .delete-comment-btn, /* 隐藏评论后的删除叉号 */
+    #moments-view.moments-preview-active .edit-comment-btn {  /* 隐藏评论后的编辑按钮 */
         display: none !important;
     }
 
@@ -5086,6 +5088,99 @@ body.preview-fullscreen-active #page-conversation .chat-content {
         margin-top: 5px;
         padding-bottom: 5px;
     }
+    /* 【【【 核心新增：APP 全屏模式适配样式 (V3 - 终极修复版) 】】】 */
+    body.frame-hidden {
+        background-color: #fff;
+    }
+    
+    body.frame-hidden .phone {
+        width: 100vw !important;
+        height: 100vh !important; /* 平时：锁定高度，像个原生APP */
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        border: none !important;
+    }
+
+    body.frame-hidden .screen {
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        height: 100% !important;
+        width: 100% !important;
+    }
+
+    body.frame-hidden .screen::before {
+        display: none !important;
+    }
+    
+    body.frame-hidden .app-container {
+        border-radius: 0 !important;
+    }
+
+    body.frame-hidden .status-bar {
+        display: none !important;
+    }
+
+    /* --- 顶栏避让逻辑 --- */
+    body.frame-hidden .list-header, 
+    body.frame-hidden .chat-header, 
+    body.frame-hidden .app-header, 
+    body.frame-hidden .moments-title-bar {
+        padding-top: max(30px, env(safe-area-inset-top)) !important;
+        height: auto !important;
+        min-height: 70px !important;
+        display: flex;
+        align-items: center; 
+        padding-bottom: 10px;
+        box-sizing: border-box;
+    }
+
+    /* --- 触发按钮位置 --- */
+    body.frame-hidden #page-conversation #dynamic-decoration-btn {
+        position: fixed !important;
+        top: max(35px, calc(env(safe-area-inset-top) + 15px)) !important;
+        left: 55px !important;
+        z-index: 2000 !important;
+    }
+    
+    body.frame-hidden .back-btn {
+        margin-top: 5px;
+    }
+
+/* 【【【 关键修复：预览模式下的特例 】】】 */
+    /* 当 body 同时拥有 frame-hidden (APP模式) 和 preview-fullscreen-active (预览模式) 时 */
+    /* 强制解除高度限制，允许页面无限延伸，从而支持长截图 */
+    body.frame-hidden.preview-fullscreen-active,
+    body.frame-hidden.preview-fullscreen-active .phone,
+    body.frame-hidden.preview-fullscreen-active .screen {
+        height: auto !important;       /* 解除 100vh 限制 */
+        min-height: 100vh !important;  /* 至少有一屏高 */
+        overflow: visible !important;  /* 允许溢出 */
+    }
+
+    /* 【【【 朋友圈预览终极修复：像聊天一样无限拉长 】】】 */
+    
+    /* 1. 预览模式下，强制隐藏底部导航栏，防止它挡在下面 */
+    body.preview-fullscreen-active .main-app-navbar {
+        display: none !important;
+    }
+
+    /* 2. 预览模式下，强制解锁朋友圈所有父容器的高度限制，让它们随内容撑开 */
+    /* 这一步非常关键，必须打通从外到内的每一层容器 */
+    body.preview-fullscreen-active .main-app-container,
+    body.preview-fullscreen-active .main-app-content,
+    body.preview-fullscreen-active .tab-content,
+    body.preview-fullscreen-active .moments-app-container,
+    body.preview-fullscreen-active #moments-view,
+    body.preview-fullscreen-active .moments-feed {
+        height: auto !important;       /* 高度自动 */
+        overflow: visible !important;  /* 允许溢出显示 */
+        position: static !important;   /* 解除定位限制 */
+        flex: none !important;         /* 解除Flex伸缩限制 */
+        max-height: none !important;   /* 移除最大高度 */
+    }
+    
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
