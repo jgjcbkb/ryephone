@@ -22253,6 +22253,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 showMessageTimestamps: false,
                 timestampPosition: 'below', // 新增这一行
                 enableBackgroundTasks: true, // 【【【核心新增：后台任务开关，默认开启】】】
+                enableVConsole: false, // 【核心新增：vConsole 调试工具开关】
                 // 【新增：提示音默认设置】
                 notificationSounds: [
                     { name: '默认(微信)', url: 'https://files.catbox.moe/x4yz5w.wav' },
@@ -22317,6 +22318,47 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         async function applySettings() {
             // --- 框架显示/隐藏状态 ---
             document.body.classList.toggle('frame-hidden', appearanceSettings.isFrameHidden);
+
+            // 【【【 核心新增：vConsole 调试工具加载逻辑 (精简版) 】】】
+            if (appearanceSettings.enableVConsole) {
+                // 如果开启，且尚未加载库
+                if (typeof VConsole === 'undefined') {
+                    const script = document.createElement('script');
+                    script.src = 'https://unpkg.com/vconsole@latest/dist/vconsole.min.js';
+                    script.onload = () => {
+                        // 脚本加载完毕后初始化
+                        if (!window.vConsoleInstance) {
+                            // 【核心修改】只保留 Log 和 Network
+                            window.vConsoleInstance = new VConsole({
+                                defaultPlugins: ['system', 'network', 'element', 'storage'], // 先加载所有，然后手动移除不需要的
+                                disableLogScrolling: true,
+                                theme: 'dark'
+                            });
+                            
+                            // 手动移除不需要的插件，只留 Log(default) 和 Network
+                            // 注意：'default' 是 Log 面板的内部名称，不能移除
+                            const pluginsToRemove = ['system', 'element', 'storage'];
+                            pluginsToRemove.forEach(id => window.vConsoleInstance.removePlugin(id));
+                            
+                            console.log('vConsole 已启动 (仅 Log & Network)');
+                        }
+                    };
+                    document.head.appendChild(script);
+                } else if (!window.vConsoleInstance) {
+                    // 如果库已加载但实例未创建
+                    window.vConsoleInstance = new VConsole({ theme: 'dark' });
+                    // 同样执行移除逻辑
+                    const pluginsToRemove = ['system', 'element', 'storage'];
+                    pluginsToRemove.forEach(id => window.vConsoleInstance.removePlugin(id));
+                }
+            } else {
+                // 如果关闭，销毁实例
+                if (window.vConsoleInstance) {
+                    window.vConsoleInstance.destroy();
+                    window.vConsoleInstance = null;
+                }
+            }
+            // 【【【 插入结束 】】】
 
             // --- 全局字体大小 ---
             const screenElement = document.querySelector('.screen');
@@ -22414,7 +22456,55 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 // 如果 showRawOutput 是 false (不显示), 开关应为 OFF (unchecked).
                 rawOutputToggle.checked = appearanceSettings.showRawOutput;
             }
+
+            // 【【【 核心新增：vConsole 开关渲染与监听 】】】
+            // 1. 动态插入开关 HTML (如果还没插入过)
+            let vConsoleGroup = document.getElementById('vconsole-toggle-group');
+            if (!vConsoleGroup && rawOutputToggle) {
+                const debugSection = rawOutputToggle.closest('.form-section');
+                if (debugSection) {
+                    const div = document.createElement('div');
+                    div.id = 'vconsole-toggle-group';
+                    div.className = 'form-group-toggle';
+                    div.style.borderTop = '1px solid var(--light-gray)'; // 加个分割线
+                    div.innerHTML = `
+                        <label for="toggle-vconsole" class="toggle-label">开启 vConsole (Network/Console)</label>
+                        <label class="switch">
+                            <input type="checkbox" id="toggle-vconsole">
+                            <span class="slider"></span>
+                        </label>
+                    `;
+                    debugSection.appendChild(div);
+                    
+                    // 添加提示文本
+                    const hint = document.createElement('p');
+                    hint.className = 'form-hint';
+                    hint.style.padding = '0 15px 15px';
+                    hint.textContent = '开启后，右下角会出现绿色按钮。点击可查看控制台报错、网络请求(Network)等详细信息。';
+                    debugSection.appendChild(hint);
+                }
+            }
+
+            // 2. 绑定状态和事件
+            const vConsoleToggle = document.getElementById('toggle-vconsole');
+            if (vConsoleToggle) {
+                vConsoleToggle.checked = appearanceSettings.enableVConsole || false;
+                
+                // 移除旧的监听器（防止重复绑定），使用 cloneNode 技巧
+                const newToggle = vConsoleToggle.cloneNode(true);
+                vConsoleToggle.parentNode.replaceChild(newToggle, vConsoleToggle);
+                
+                newToggle.addEventListener('change', () => {
+                    appearanceSettings.enableVConsole = newToggle.checked;
+                    saveSettings();
+                    applySettings(); // 立即生效
+                });
+            }
+            // 【【【 插入结束 】】】
             // ******** 全新代码到此结束 ********
+            
+
+// ...函数剩余部分
             
 
 // ...函数剩余部分
