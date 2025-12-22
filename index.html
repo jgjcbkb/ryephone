@@ -4948,9 +4948,9 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-3px); }
 }
-/* 【【【 核心新增：APP 全屏模式适配样式 】】】 */
+/* 【【【 核心新增：APP 全屏模式适配样式 (V2 - 修复重叠) 】】】 */
     body.frame-hidden {
-        background-color: #fff; /* 背景改白，去掉灰底 */
+        background-color: #fff;
     }
     
     body.frame-hidden .phone {
@@ -4971,35 +4971,120 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     }
 
     body.frame-hidden .screen::before {
-        display: none !important; /* 隐藏内边框 */
+        display: none !important;
     }
     
     body.frame-hidden .app-container {
         border-radius: 0 !important;
     }
 
-    /* 隐藏模拟的状态栏和刘海 */
     body.frame-hidden .status-bar {
         display: none !important;
     }
 
-    /* 【关键修复】给所有顶栏增加内边距，避开真机刘海 */
+    /* --- 关键修复：统一调整所有顶栏的高度和内边距 --- */
     body.frame-hidden .list-header, 
     body.frame-hidden .chat-header, 
     body.frame-hidden .app-header, 
     body.frame-hidden .moments-title-bar {
-        /* 优先使用环境变量，如果不支持则使用固定值 35px */
-        padding-top: max(35px, env(safe-area-inset-top)) !important;
+        /* 
+           解释：
+           env(safe-area-inset-top) 是手机刘海高度。
+           20px 是基础内边距。
+           max(...) 取两者中较大的那个。
+           但在电脑上 env 可能是 0，所以我们强制加一个基础高度 30px。
+        */
+        padding-top: max(30px, env(safe-area-inset-top)) !important;
+        
+        /* 强制设置高度，防止内容挤压 */
         height: auto !important;
-        min-height: 75px; /* 增加高度，防止拥挤 */
-        align-items: flex-end; /* 内容靠下对齐 */
-        padding-bottom: 10px; /* 底部留点空隙 */
+        min-height: 70px !important;
+        
+        /* 确保内容垂直居中偏下 */
+        display: flex;
+        align-items: center; 
+        padding-bottom: 10px;
+        box-sizing: border-box;
     }
 
-    /* 修复触发按钮的位置 */
+    /* --- 关键修复：单独调整触发按钮的位置 --- */
     body.frame-hidden #page-conversation #dynamic-decoration-btn {
-        /* 把它往下挪，和返回按钮对齐 */
-        top: max(45px, calc(env(safe-area-inset-top) + 10px)) !important;
+        /* 
+           让它相对于视口定位，而不是相对于父容器。
+           top: 35px 确保它在电脑上也不会贴顶。
+           如果有刘海，它会自动往下再挪一点。
+        */
+        position: fixed !important;
+        top: max(35px, calc(env(safe-area-inset-top) + 15px)) !important;
+        left: 55px !important; /* 稍微往右挪一点，避开返回键 */
+        z-index: 2000 !important;
+    }
+    
+    /* 修复返回按钮的位置，防止它乱跑 */
+    body.frame-hidden .back-btn {
+        margin-top: 5px; /* 微调 */
+    }
+
+    /* 【【【 核心新增：朋友圈多选预览样式 】】】 */
+    
+    /* 1. 多选模式下的交互反馈 */
+    .moments-select-mode .post-card {
+        cursor: pointer;
+        transition: transform 0.1s;
+    }
+    .moments-select-mode .comment-item {
+        cursor: pointer;
+        border-radius: 4px;
+        padding: 2px 4px; /* 增加一点点击区域 */
+    }
+    
+    /* 2. 选中状态样式 */
+    .post-card.selected {
+        outline: 2px solid #28a745; /* 帖子选中：绿框 */
+        box-shadow: 0 0 10px rgba(40, 167, 69, 0.2);
+    }
+    .comment-item.selected {
+        background-color: rgba(40, 167, 69, 0.2); /* 评论选中：绿底 */
+    }
+
+    /* 3. 预览模式：核心隐藏逻辑 */
+    #moments-view.moments-preview-active .post-card:not(.selected) {
+        display: none !important; /* 没选中的帖子：消失 */
+    }
+    #moments-view.moments-preview-active .comment-item:not(.selected) {
+        display: none !important; /* 没选中的评论：消失 */
+    }
+
+    /* 【核心修改】预览模式下，移除选中的视觉效果 (去绿框/去绿底) */
+    #moments-view.moments-preview-active .post-card.selected {
+        outline: none !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08) !important; /* 恢复默认阴影 */
+    }
+    #moments-view.moments-preview-active .comment-item.selected {
+        background-color: transparent !important;
+    }
+    
+    /* 4. 预览模式：隐藏多余元素 */
+    #moments-view.moments-preview-active .post-options, /* 隐藏右上角操作 */
+    #moments-view.moments-preview-active .post-footer,   /* 隐藏点赞评论按钮 */
+    #moments-view.moments-preview-active .delete-comment-btn, /* 隐藏删除叉号 */
+    #moments-view.moments-preview-active .edit-comment-btn {  /* 隐藏编辑按钮 */
+        display: none !important;
+    }
+
+/* 【核心新增】预览模式下，隐藏顶部的操作按钮 (保留发布按钮) */
+    #moments-view.moments-preview-active #moments-multi-select-btn,
+    #moments-view.moments-preview-active #moments-preview-btn,
+    #moments-view.moments-preview-active #moments-delete-selected-btn {
+        display: none !important;
+    }
+    
+
+    
+    /* 5. 预览模式：微调间距 */
+    #moments-view.moments-preview-active .interactions-section {
+        margin-top: 5px;
+        padding-bottom: 5px;
     }
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
@@ -5089,14 +5174,22 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                         <button class="back-btn" data-target="home" style="display: block !important;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
                                         
                                         <div style="display: flex; flex-direction: column; align-items: center; flex-grow: 1;">
-                                                <h1 id="moments-title" style="margin-bottom: 4px;">朋友圈</h1>
-                                                <select id="moments-user-persona-select" style="border: none; background: #f0f2f5; border-radius: 12px; padding: 2px 8px; font-size: 12px; font-weight: 500; max-width: 150px; text-align: center; outline: none;">
-                                                    <!-- 选项将由JS动态生成 -->
-                                                </select>
-                                            </div>
+                                    <h1 id="moments-title" style="margin-bottom: 4px;">朋友圈</h1>
+                                    <select id="moments-user-persona-select" style="border: none; background: #f0f2f5; border-radius: 12px; padding: 2px 8px; font-size: 12px; font-weight: 500; max-width: 150px; text-align: center; outline: none;">
+                                        <!-- 选项将由JS动态生成 -->
+                                    </select>
+                                </div>
+                                <!-- !!!!!!!!!! 新增和修改的部分到这里结束 !!!!!!!!!! -->
 
-                                            <button id="publish-btn" title="发布朋友圈"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.13,5.12L18.88,8.87M3,17.25V21H6.75L17.81,9.94L14.06,6.19L3,17.25Z" /></svg></button>
-                                        </div>
+                                <!-- 【核心修改】将原来的单个按钮改为按钮组 -->
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <button id="moments-multi-select-btn" style="font-size: 13px; padding: 4px 8px; border: 1px solid #ccc; background: transparent; border-radius: 4px; cursor: pointer;">多选</button>
+                                    <button id="moments-preview-btn" style="font-size: 13px; padding: 4px 8px; border: 1px solid #28a745; background: #28a745; color: white; border-radius: 4px; cursor: pointer; display: none;">预览</button>
+                                    <!-- 【核心新增】批量删除按钮 -->
+                                    <button id="moments-delete-selected-btn" style="font-size: 13px; padding: 4px 8px; border: 1px solid #dc3545; background: #dc3545; color: white; border-radius: 4px; cursor: pointer; display: none;">删除</button>
+                                    <button id="publish-btn" title="发布朋友圈"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.13,5.12L18.88,8.87M3,17.25V21H6.75L17.81,9.94L14.06,6.19L3,17.25Z" /></svg></button>
+                                </div>
+                            </div>
                                         <div class="moments-feed" id="feed-container"></div>
                                     </div>
                                     <div id="publish-page">
@@ -6034,7 +6127,12 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 </div>
                                 <!-- !!!!!!!!!! 新增和修改的部分到这里结束 !!!!!!!!!! -->
 
-                                <button id="publish-btn" title="发布朋友圈"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.13,5.12L18.88,8.87M3,17.25V21H6.75L17.81,9.94L14.06,6.19L3,17.25Z" /></svg></button>
+                                <!-- 【核心修改】将原来的单个按钮改为按钮组 -->
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <button id="moments-multi-select-btn" style="font-size: 13px; padding: 4px 8px; border: 1px solid #ccc; background: transparent; border-radius: 4px; cursor: pointer;">多选</button>
+                                    <button id="moments-preview-btn" style="font-size: 13px; padding: 4px 8px; border: 1px solid #28a745; background: #28a745; color: white; border-radius: 4px; cursor: pointer; display: none;">预览</button>
+                                    <button id="publish-btn" title="发布朋友圈"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.13,5.12L18.88,8.87M3,17.25V21H6.75L17.81,9.94L14.06,6.19L3,17.25Z" /></svg></button>
+                                </div>
                             </div>
                             <div class="moments-feed" id="feed-container"></div>
                         </div>
@@ -19415,6 +19513,10 @@ const momentsManager = (function() {
         let currentPrivacy = { type: 'public', list: [], days: null };
         let currentImageBlobKeys = []; // 改成数组
 
+        // 【核心新增】朋友圈多选和预览状态
+        let isMomentsSelectMode = false;
+        let isMomentsPreviewMode = false;
+
         const feedContainer = appRoot.querySelector('#feed-container');
         const momentsTitle = appRoot.querySelector('#moments-title');
         const publishBtn = appRoot.querySelector('#publish-btn');
@@ -20917,6 +21019,152 @@ function handleForwardFromAI(characterName, data) {
                 backBtnInMoments.outerHTML = backBtnInMoments.outerHTML; 
                 backBtnInMoments.style.display = 'none';
             }
+
+            // 【【【 核心新增：朋友圈多选与预览逻辑 】】】
+            
+            const multiSelectBtn = appRoot.querySelector('#moments-multi-select-btn');
+            const previewBtn = appRoot.querySelector('#moments-preview-btn');
+            const deleteSelectedBtn = appRoot.querySelector('#moments-delete-selected-btn'); // 【新增】
+            const momentsView = appRoot.querySelector('#moments-view');
+
+            // 1. 切换多选模式
+            multiSelectBtn.addEventListener('click', () => {
+                isMomentsSelectMode = !isMomentsSelectMode;
+                
+                if (isMomentsSelectMode) {
+                    multiSelectBtn.textContent = '取消';
+                    multiSelectBtn.style.color = 'red';
+                    multiSelectBtn.style.borderColor = 'red';
+                    previewBtn.style.display = 'inline-block';
+                    deleteSelectedBtn.style.display = 'inline-block'; // 【新增】显示删除按钮
+                    appRoot.classList.add('moments-select-mode');
+                } else {
+                    // 退出多选
+                    multiSelectBtn.textContent = '多选';
+                    multiSelectBtn.style.color = '';
+                    multiSelectBtn.style.borderColor = '';
+                    previewBtn.style.display = 'none';
+                    deleteSelectedBtn.style.display = 'none'; // 【新增】隐藏删除按钮
+                    appRoot.classList.remove('moments-select-mode');
+                    // 清除所有选中样式
+                    appRoot.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+                }
+            });
+
+            // 【核心新增】批量删除逻辑
+            deleteSelectedBtn.addEventListener('click', async () => {
+                // 1. 收集选中的帖子ID和评论ID
+                const selectedPostEls = Array.from(appRoot.querySelectorAll('.post-card.selected'));
+                const selectedCommentEls = Array.from(appRoot.querySelectorAll('.comment-item.selected'));
+                
+                if (selectedPostEls.length === 0 && selectedCommentEls.length === 0) {
+                    await conversationManager.customAlert('请先选择要删除的内容。');
+                    return;
+                }
+
+                const postIdsToDelete = selectedPostEls.map(el => el.id);
+                // 评论需要记录 { postId, commentId }
+                const commentsToDelete = selectedCommentEls.map(el => ({
+                    postId: el.closest('.post-card').id,
+                    commentId: el.dataset.commentId
+                }));
+
+                // 2. 确认提示
+                const msg = `确定要删除选中的 ${selectedPostEls.length} 条朋友圈和 ${selectedCommentEls.length} 条评论吗？`;
+                if (await conversationManager.customConfirm(msg)) {
+                    
+                    // 3. 执行删除：先删评论，再删帖子
+                    
+                    // 删除评论
+                    commentsToDelete.forEach(item => {
+                        const post = feedData.find(p => p.id === item.postId);
+                        if (post) {
+                            post.comments = post.comments.filter(c => c.id !== item.commentId);
+                        }
+                    });
+
+                    // 删除帖子
+                    if (postIdsToDelete.length > 0) {
+                        feedData = feedData.filter(p => !postIdsToDelete.includes(p.id));
+                    }
+
+                    // 4. 保存并刷新
+                    saveFeed();
+                    renderFeed();
+                    
+                    // 5. 退出多选模式
+                    multiSelectBtn.click();
+                    showNotification('删除成功');
+                }
+            });
+
+            // 2. 进入预览模式
+            previewBtn.addEventListener('click', () => {
+                isMomentsPreviewMode = true;
+                
+                // 界面变化：进入全屏，隐藏多选按钮
+                document.body.classList.add('preview-fullscreen-active'); // 复用聊天的全屏类
+                momentsView.classList.add('moments-preview-active');
+                
+                // 隐藏顶部操作按钮，只留标题和返回
+                multiSelectBtn.style.display = 'none';
+                previewBtn.style.display = 'none';
+                // 【核心修改】不再隐藏发布按钮
+                // publishBtn.style.display = 'none'; 
+                
+                // 退出选择模式的视觉效果（去手型）但保留选中状态
+                appRoot.classList.remove('moments-select-mode');
+                
+                showNotification('双击屏幕任意位置退出预览');
+            });
+
+            // 3. 点击选择逻辑 (事件委托)
+            feedContainer.addEventListener('click', (e) => {
+                // 如果不是多选模式，什么都不做，让原有逻辑运行
+                if (!isMomentsSelectMode) return;
+
+                // 拦截所有默认点击，防止触发点赞/评论/图片放大
+                e.preventDefault();
+                e.stopPropagation();
+
+                // 逻辑A：点击评论
+                const commentItem = e.target.closest('.comment-item');
+                if (commentItem) {
+                    commentItem.classList.toggle('selected');
+                    // 如果选中了评论，强制选中它所属的帖子（否则帖子隐藏了评论也看不见）
+                    if (commentItem.classList.contains('selected')) {
+                        const parentPost = commentItem.closest('.post-card');
+                        if (parentPost) parentPost.classList.add('selected');
+                    }
+                    return;
+                }
+
+                // 逻辑B：点击帖子 (必须在评论逻辑之后)
+                const postCard = e.target.closest('.post-card');
+                if (postCard) {
+                    postCard.classList.toggle('selected');
+                }
+            }, true); // 使用捕获阶段，确保最先执行
+
+            // 4. 双击退出预览
+            momentsView.addEventListener('dblclick', () => {
+                if (isMomentsPreviewMode) {
+                    isMomentsPreviewMode = false;
+                    
+                    // 恢复界面
+                    document.body.classList.remove('preview-fullscreen-active');
+                    momentsView.classList.remove('moments-preview-active');
+                    
+                    // 恢复按钮显示
+                    multiSelectBtn.style.display = 'inline-block';
+                    previewBtn.style.display = 'inline-block';
+                    publishBtn.style.display = 'inline-block';
+                    
+                    // 恢复选择模式状态
+                    appRoot.classList.add('moments-select-mode');
+                }
+            });
+            // 【【【 新增结束 】】】
 
             // 【【【 在这里粘贴下面的新代码块 】】】
 const momentsCommentStickerBtn = appRoot.querySelector('#moments-comment-sticker-btn');
