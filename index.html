@@ -5793,6 +5793,17 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                         </div>
                         <!-- 【新增结束】 -->
 
+                        <!-- 【【【 核心新增：系统通知权限开关 】】】 -->
+                        <div class="form-section">
+                            <h3>系统通知</h3>
+                            <div class="form-group" style="display: flex; justify-content: space-between; align-items: center;">
+                                <label style="margin: 0;">允许在后台/锁屏时接收通知</label>
+                                <button id="enable-system-notify-btn" class="btn-primary btn-secondary" style="padding: 6px 12px; font-size: 13px;">点击开启权限</button>
+                            </div>
+                            <p class="form-hint">开启后，即使你切到其他软件，也能收到消息推送。<br>注意：iOS用户需将本站“添加到主屏幕”才能生效。</p>
+                        </div>
+                        <!-- 【【【 插入结束 】】】 -->
+
                          <!-- ******** 从这里开始插入新代码 ******** -->
                          
                         <div class="form-section">
@@ -15750,6 +15761,30 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 window.app.playNotificationSound();
             }
 
+            // 【【【 核心新增：同时发送系统级通知 (跨软件显示) 】】】
+            if ("Notification" in window && Notification.permission === "granted") {
+                // 只有当页面不可见（切后台了）或者你希望一直弹时才执行
+                // 这里我们设置为：只要有权限就弹，确保不错过
+                try {
+                    const sysNotification = new Notification(displayName, {
+                        body: previewText, // 显示消息内容
+                        icon: avatarUrl,   // 尝试显示头像 (取决于系统支持)
+                        tag: chatId,       // 相同聊天的通知会覆盖，避免刷屏
+                        silent: true       // 静音，因为我们网页已经有提示音了
+                    });
+
+                    // 点击系统通知，自动回到网页并跳转聊天
+                    sysNotification.onclick = function() {
+                        window.focus(); // 尝试唤醒窗口
+                        open(chatId);   // 跳转到对应聊天
+                        this.close();   // 关闭通知
+                    };
+                } catch (e) {
+                    console.error("系统通知发送失败:", e);
+                }
+            }
+            // 【【【 插入结束 】】】
+
             // 5秒后自动消失
             bannerTimeout = setTimeout(closeBanner, 5000);
         }
@@ -22879,6 +22914,43 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             document.getElementById('sound-add-btn').addEventListener('click', showAddSoundModal);
             document.getElementById('sound-manage-btn').addEventListener('click', showSoundManagerModal);
             // --- 【新增结束】 ---
+
+            // 【【【 核心新增：绑定系统通知权限按钮事件 】】】
+            const notifyBtn = document.getElementById('enable-system-notify-btn');
+            if (notifyBtn) {
+                // 1. 初始化按钮状态
+                if (!("Notification" in window)) {
+                    notifyBtn.textContent = '不支持此设备';
+                    notifyBtn.disabled = true;
+                } else if (Notification.permission === 'granted') {
+                    notifyBtn.textContent = '已开启';
+                    notifyBtn.disabled = true;
+                    notifyBtn.style.backgroundColor = '#28a745';
+                    notifyBtn.style.color = 'white';
+                }
+
+                // 2. 绑定点击事件
+                notifyBtn.addEventListener('click', () => {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === "granted") {
+                            notifyBtn.textContent = '已开启';
+                            notifyBtn.disabled = true;
+                            notifyBtn.style.backgroundColor = '#28a745';
+                            notifyBtn.style.color = 'white';
+                            
+                            // 发送一条测试通知
+                            try {
+                                new Notification("黑麦手机", { body: "系统通知已成功开启！" });
+                            } catch (e) {
+                                console.error("测试通知发送失败", e);
+                            }
+                        } else {
+                            alert("权限被拒绝。请在手机系统的设置中允许浏览器/Web应用发送通知。");
+                        }
+                    });
+                });
+            }
+            // 【【【 插入结束 】】】
 
             document.querySelector('.home-icon-btn[data-page="appearance"]').addEventListener('click', renderPage);
 
