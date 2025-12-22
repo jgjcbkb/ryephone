@@ -4948,6 +4948,59 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-3px); }
 }
+/* 【【【 核心新增：APP 全屏模式适配样式 】】】 */
+    body.frame-hidden {
+        background-color: #fff; /* 背景改白，去掉灰底 */
+    }
+    
+    body.frame-hidden .phone {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        border: none !important;
+    }
+
+    body.frame-hidden .screen {
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        height: 100% !important;
+        width: 100% !important;
+    }
+
+    body.frame-hidden .screen::before {
+        display: none !important; /* 隐藏内边框 */
+    }
+    
+    body.frame-hidden .app-container {
+        border-radius: 0 !important;
+    }
+
+    /* 隐藏模拟的状态栏和刘海 */
+    body.frame-hidden .status-bar {
+        display: none !important;
+    }
+
+    /* 【关键修复】给所有顶栏增加内边距，避开真机刘海 */
+    body.frame-hidden .list-header, 
+    body.frame-hidden .chat-header, 
+    body.frame-hidden .app-header, 
+    body.frame-hidden .moments-title-bar {
+        /* 优先使用环境变量，如果不支持则使用固定值 35px */
+        padding-top: max(35px, env(safe-area-inset-top)) !important;
+        height: auto !important;
+        min-height: 75px; /* 增加高度，防止拥挤 */
+        align-items: flex-end; /* 内容靠下对齐 */
+        padding-bottom: 10px; /* 底部留点空隙 */
+    }
+
+    /* 修复触发按钮的位置 */
+    body.frame-hidden #page-conversation #dynamic-decoration-btn {
+        /* 把它往下挪，和返回按钮对齐 */
+        top: max(45px, calc(env(safe-area-inset-top) + 10px)) !important;
+    }
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -29944,38 +29997,31 @@ const cloudBackupManager = (function() {
         return { openReader };
     })();
 
-    // 【【【 核心新增：检测APP模式并自动全屏 】】】
+    // 【【【 核心新增：APP模式自动适配 (V2) 】】】
     function checkDisplayMode() {
-        // 检测是否在“安装模式/全屏模式”下运行
+        // 1. 检测是否是 APP 模式 (Standalone)
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
         
-        if (isStandalone) {
-            console.log("检测到 APP 模式，自动隐藏手机外壳");
-            
-            // 1. 强制给 body 添加隐藏外壳的类名
+        // 2. 或者检测是否是宽屏设备 (电脑网页)，如果是电脑网页，我们保持原样
+        // 但如果是手机网页 (屏幕窄)，我们也希望能全屏体验
+        const isMobile = window.innerWidth < 500;
+
+        // 逻辑：如果是 APP模式，或者用户在设置里手动关掉了外壳
+        const appearanceSettings = loadFromLocalStorage('app-appearance-settings', {});
+        
+        if (isStandalone || appearanceSettings.isFrameHidden) {
+            console.log("进入全屏沉浸模式");
             document.body.classList.add('frame-hidden');
             
-            // 2. 注入一段强制样式，修正刘海屏顶部的遮挡问题
-            const style = document.createElement('style');
-            style.innerHTML = `
-                /* 隐藏模拟的状态栏，因为真手机有自己的状态栏 */
-                .status-bar { display: none !important; }
-                
-                /* 移除外壳圆角和阴影 */
-                .app-container { border-radius: 0 !important; }
-                .screen { border: none !important; box-shadow: none !important; }
-                
-                /* 针对全面屏手机，给顶部增加一点内边距，防止内容被摄像头挡住 */
-                .list-header, .chat-header, .app-header, .moments-title-bar {
-                    padding-top: max(20px, env(safe-area-inset-top)) !important;
-                    height: auto !important;
-                    min-height: 60px;
-                }
-            `;
-            document.head.appendChild(style);
+            // 如果是 APP 模式，强制把设置里的开关也同步为“隐藏”
+            if (isStandalone && !appearanceSettings.isFrameHidden) {
+                appearanceSettings.isFrameHidden = true;
+                saveToLocalStorage('app-appearance-settings', appearanceSettings);
+            }
         }
     }
-    // 立即执行检查
+    
+    // 立即执行
     checkDisplayMode();
 
     document.addEventListener('DOMContentLoaded', initializeApp);
