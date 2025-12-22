@@ -9,10 +9,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="黑麦手机">
-<link rel="apple-touch-icon" href="https://i.imgur.com/sE3924q.png">
+<!-- 1. 苹果图标也换成新的 -->
+<link rel="apple-touch-icon" href="https://i.postimg.cc/MTSwWVtp/IMG-2146.png">
 
-<!-- 【核心修正】安卓APP安装配置文件 (修复版：补全了192和512双图标声明) -->
-<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoi6buR6bqm5omL5py6Iiwic2hvcnRfbmFtZSI6Ium7kem6puaJi+acuiIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjZjBmMmY1IiwidGhlbWVfY29sb3IiOiIjZjBmMmY1IiwiaWNvbnMiOlt7InNyYyI6Imh0dHBzOi8vaS5pbWd1ci5jb20vc0UzOTI0cS5wbmciLCJzaXplcyI6IjE5MngxOTIiLCJ0eXBlIjoiaW1hZ2UvcG5nIn0seyJzcmMiOiJodHRwczovL2kuaW1ndXIuY29tL3NFMzkyNHEucG5nIiwic2l6ZXMiOiI1MTJ4NTEyIiwidHlwZSI6ImltYWdlL3BuZyJdfQ==">
+<!-- 2. 安卓安装配置 (已更新为新图标，并强制声明了192和512尺寸) -->
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoi6buR6bqm5omL5py6Iiwic2hvcnRfbmFtZSI6Ium7kem6puaJi+acuiIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjZjBmMmY1IiwidGhlbWVfY29sb3IiOiIjZjBmMmY1IiwiaWNvbnMiOlt7InNyYyI6Imh0dHBzOi8vaS5wb3N0aW1nLmNjL01UU3dXVnRwL0lNRy0yMTQ2LnBuZyIsInNpemVzIjoiMTkyeDE5MiIsInR5cGUiOiJpbWFnZS9wbmcifSx7InNyYyI6Imh0dHBzOi8vaS5wb3N0aW1nLmNjL01UU3dXVnRwL0lNRy0yMTQ2LnBuZyIsInNpemVzIjoiNTEyeDUxMiIsInR5cGUiOiJpbWFnZS9wbmcifV19">
 
 <style>
     @import url("https://fontsapi.zeoseven.com/111/main/result.css");
@@ -6408,21 +6409,23 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     
 
 <script>
-// 【核心修正】PWA 安装引导程序 (V2)
+// 【核心修正】PWA 安装引导程序 (V3 - 终极版)
 if ('serviceWorker' in navigator) {
-    // 这是一个最小化的 Service Worker，只为了满足“可安装”标准
+    // 必须注册一个处理 fetch 事件的 SW，Chrome 才会显示“安装应用”
     const swCode = `
         self.addEventListener('install', (e) => self.skipWaiting());
         self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
-        self.addEventListener('fetch', (e) => { return; }); 
+        self.addEventListener('fetch', (e) => { 
+            // 这是一个空操作，仅为了满足PWA标准 
+        }); 
     `;
     const blob = new Blob([swCode], {type: 'application/javascript'});
     const swUrl = URL.createObjectURL(blob);
     
     window.addEventListener('load', () => {
         navigator.serviceWorker.register(swUrl)
-            .then(() => console.log('SW Registered for App Install'))
-            .catch(err => console.error('SW Fail', err));
+            .then(() => console.log('ServiceWorker 注册成功 (安装条件已满足)'))
+            .catch(err => console.error('ServiceWorker 注册失败', err));
     });
 }
 
