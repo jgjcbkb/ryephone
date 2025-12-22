@@ -6409,23 +6409,14 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     
 
 <script>
-// 【核心修正】PWA 安装引导程序 (V3 - 终极版)
+// 【核心修正】PWA 安装引导程序 (V4 - 标准文件版)
+// 解决 "blob protocol not supported" 报错
 if ('serviceWorker' in navigator) {
-    // 必须注册一个处理 fetch 事件的 SW，Chrome 才会显示“安装应用”
-    const swCode = `
-        self.addEventListener('install', (e) => self.skipWaiting());
-        self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
-        self.addEventListener('fetch', (e) => { 
-            // 这是一个空操作，仅为了满足PWA标准 
-        }); 
-    `;
-    const blob = new Blob([swCode], {type: 'application/javascript'});
-    const swUrl = URL.createObjectURL(blob);
-    
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register(swUrl)
-            .then(() => console.log('ServiceWorker 注册成功 (安装条件已满足)'))
-            .catch(err => console.error('ServiceWorker 注册失败', err));
+        // 这里直接引用你刚才新建的 sw.js 文件
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('✅ ServiceWorker 注册成功！'))
+            .catch(err => console.error('❌ ServiceWorker 注册失败:', err));
     });
 }
 
