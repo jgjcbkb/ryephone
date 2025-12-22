@@ -11,8 +11,8 @@
 <meta name="apple-mobile-web-app-title" content="黑麦手机">
 <link rel="apple-touch-icon" href="https://i.imgur.com/sE3924q.png">
 
-<!-- 【【【 核心新增：安卓APP安装配置文件 (Manifest) 】】】 -->
-<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoi6buR6bqm5omL5py6Iiwic2hvcnRfbmFtZSI6Ium7kem6puaJi+acuiIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjZjBmMmY1IiwidGhlbWVfY29sb3IiOiIjZjBmMmY1IiwiaWNvbnMiOlt7InNyYyI6Imh0dHBzOi8vaS5pbWd1ci5jb20vc0UzOTI0cS5wbmciLCJzaXplcyI6IjE5MngxOTIiLCJ0eXBlIjoiaW1hZ2UvcG5nIn1dfQ==">
+<!-- 【核心新增】安卓APP安装配置文件 (包含图标尺寸定义) -->
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoi6buR6bqm5omL5py6Iiwic2hvcnRfbmFtZSI6Ium7kem6puaJi+acuiIsInN0YXJ0X3VybCI6Ii4iLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjZjBmMmY1IiwidGhlbWVfY29sb3IiOiIjZjBmMmY1IiwiaWNvbnMiOlt7InNyYyI6Imh0dHBzOi8vaS5pbWd1ci5jb20vc0UzOTI0cS5wbmciLCJzaXplcyI6IjE5MngxOTIiLCJ0eXBlIjoiaW1hZ2UvcG5nIn0seyJzcmMiOiJodHRwczovL2kuaW1ndXIuY29tL3NFMzkyNHEucG5nIiwic2l6ZXMiOiI1MTJ4NTEyIiwidHlwZSI6ImltYWdlL3BuZyJdfQ==">
 
 <style>
     @import url("https://fontsapi.zeoseven.com/111/main/result.css");
@@ -6408,35 +6408,20 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     
 
 <script>
-    // 【【【 核心新增：Service Worker 注册 (增强版) 】】】
-    if ('serviceWorker' in navigator) {
-        const swCode = `
-            self.addEventListener('install', (event) => self.skipWaiting());
-            self.addEventListener('activate', (event) => event.waitUntil(clients.claim()));
-            self.addEventListener('notificationclick', (event) => {
-                event.notification.close();
-                event.waitUntil(
-                    clients.matchAll({type: 'window', includeUncontrolled: true}).then(clientList => {
-                        // 如果有窗口打开，就聚焦
-                        for (const client of clientList) {
-                            if (client.url && 'focus' in client) return client.focus();
-                        }
-                        // 如果没有，尝试打开新窗口 (部分浏览器限制)
-                        if (clients.openWindow) return clients.openWindow('/');
-                    })
-                );
-            });
-        `;
-        const blob = new Blob([swCode], {type: 'application/javascript'});
-        const url = URL.createObjectURL(blob);
-        // 核心修改：添加 scope: '/' 确保接管整个页面
-        navigator.serviceWorker.register(url, { scope: '/' })
-            .then(reg => console.log('SW注册成功'))
-            .catch(err => console.log('SW注册失败', err));
-    }
-    // 【【【 插入结束 】】】
+// 【核心新增】注册 PWA 服务线程 (骗过安卓，让它以为这是个离线APP)
+if ('serviceWorker' in navigator) {
+    const swCode = `
+        self.addEventListener('install', e => self.skipWaiting());
+        self.addEventListener('activate', e => e.waitUntil(clients.claim()));
+        // 关键：必须有一个 fetch 事件监听，哪怕什么都不做，安卓才认为这是个APP
+        self.addEventListener('fetch', e => {}); 
+    `;
+    const blob = new Blob([swCode], {type: 'application/javascript'});
+    navigator.serviceWorker.register(URL.createObjectURL(blob))
+        .catch(err => console.log('SW注册失败', err));
+}
 
-    (function() {
+(function() {
     'use strict';
     // ... 原有的代码 ...
     
