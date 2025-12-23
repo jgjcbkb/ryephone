@@ -16311,13 +16311,18 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     // 【核心修改】系统通知直接使用 specificContent (具体内容)，不带 "[5条]" 这种前缀，更像原生体验
                     const systemNotificationText = specificContent;
 
+                    // 【核心修正】生成一个唯一的 Tag。
+                    // 之前是用 chatId，导致新消息会覆盖旧消息。
+                    // 现在加上时间戳，保证每一条消息都是独立的通知，会在锁屏上叠罗汉显示。
+                    const uniqueTag = chatId + '_' + Date.now();
+
                     if (isIOS) {
                         // ==========================================
                         // 🍎 iOS 专用通道
                         // ==========================================
                         const iosNotify = new Notification(displayName, {
                             body: systemNotificationText, // <--- 使用具体内容
-                            tag: chatId, 
+                            tag: uniqueTag, // <--- 【修改】使用唯一标签，允许堆叠
                             silent: true 
                         });
                         
@@ -16336,7 +16341,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                                     body: systemNotificationText, // <--- 使用具体内容
                                     icon: avatarUrl,
                                     badge: 'https://i.imgur.com/sE3924q.png',
-                                    tag: chatId,
+                                    tag: uniqueTag, // <--- 【修改】使用唯一标签，允许堆叠
                                     renotify: true, 
                                     requireInteraction: true, 
                                     silent: false 
