@@ -8633,6 +8633,9 @@ ${timeContext}
             return;
         }
 
+        // 【核心新增】AI主动搞事时，也启动保活！这样你切出去刷抖音，它也能在后台跑完。
+        conversationManager.enableKeepAlive();
+
         console.log(`[诊断日志] 角色 "${senderName}": 正在向API发送请求...`);
 
         // 【【【 核心修复：Gemini/代理渠道 强制兼容补丁 】】】
@@ -9048,7 +9051,11 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
         }
     } catch (e) {
         console.error(`[诊断日志] 角色 "${senderName}": 在执行AI触发器时遇到严重错误:`, e.message, e.stack);
+    } finally {
+        // 【核心新增】无论成功还是报错，最后都要关闭保活，释放音频通道
+        conversationManager.disableKeepAlive();
     }
+
     if (typeof aiResponse !== 'undefined' && aiResponse !== null) {
         console.log(`[诊断日志] 角色 "${senderName}" 的朋友圈互动决策流程结束。API返回内容:`, aiResponse);
     } else {
@@ -10470,8 +10477,15 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                 keepAliveAudio.loop = true;
                 keepAliveAudio.volume = 0.01; // 极低音量，防止干扰
             }
-            keepAliveAudio.play().catch(e => console.log("保活音频播放失败(可能需要用户交互):", e));
-            console.log("🔥 后台保活机制已启动");
+            // 【核心修正】增加 catch 处理，防止因为“未产生用户交互”而导致整个程序报错停止
+            const playPromise = keepAliveAudio.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(e => {
+                    console.warn("⚠️ 保活音频启动受阻 (非用户主动操作，属正常现象):", e);
+                    // 这里不抛出错误，保证AI逻辑继续运行
+                });
+            }
+            console.log("🔥 后台保活尝试启动");
         }
 
         function disableKeepAlive() {
@@ -19376,7 +19390,10 @@ Third line (note 3), and so on...
             executeBackgroundUpdatesAndCleanText, 
             showBubbleSettingsModal,
             triggerAIContinuation, // <--- 注意这里加了逗号
-            reloadContactInfo // <--- 【核心新增】暴露这个函数
+            reloadContactInfo, // <--- 【核心新增】暴露这个函数
+            // 【核心新增】暴露保活控制函数，供主动行为使用
+            enableKeepAlive,
+            disableKeepAlive
         };
 })();
         
