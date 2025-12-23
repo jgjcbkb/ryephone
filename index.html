@@ -30041,6 +30041,19 @@ const cloudBackupManager = (function() {
         document.getElementById('gh-backup-btn').addEventListener('click', () => performBackup(false));
         
         document.getElementById('gh-auto-interval').addEventListener('input', onIntervalChange);
+
+        // 【核心新增】实时保存输入框内容，防止刷新丢失
+        document.getElementById('gh-full-url').addEventListener('input', (e) => {
+            localStorage.setItem('gh_saved_url', e.target.value.trim());
+        });
+        
+        document.getElementById('gh-token').addEventListener('input', (e) => {
+            localStorage.setItem('gh_saved_token', e.target.value.trim());
+        });
+
+        document.getElementById('gh-filename').addEventListener('input', (e) => {
+            localStorage.setItem('gh_saved_filename', e.target.value.trim());
+        });
     }
 
     return { init: init };
