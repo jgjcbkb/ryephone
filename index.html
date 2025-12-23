@@ -5180,6 +5180,39 @@ body.preview-fullscreen-active #page-conversation .chat-content {
         flex: none !important;         /* 解除Flex伸缩限制 */
         max-height: none !important;   /* 移除最大高度 */
     }
+
+    /* 【核心新增】高清保存按钮样式 */
+    #global-save-img-btn {
+        display: none; /* 默认隐藏 */
+        position: fixed;
+        bottom: 50px;
+        right: 30px;
+        width: 60px;
+        height: 60px;
+        background-color: #28a745;
+        color: white;
+        border-radius: 50%;
+        border: none;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        z-index: 10000; /* 保证在最顶层 */
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: bold;
+        flex-direction: column;
+        line-height: 1.2;
+    }
+    
+    /* 只有在预览模式下才显示这个按钮 */
+    body.preview-fullscreen-active #global-save-img-btn {
+        display: flex !important;
+    }
+
+    /* 截图进行时，隐藏这个按钮本身，防止把它自己也截进去 */
+    body.is-snapping #global-save-img-btn {
+        display: none !important;
+    }
     
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
@@ -6653,8 +6686,11 @@ body.preview-fullscreen-active #page-conversation .chat-content {
             </div>
         </div>
     </div>
+    <!-- 【核心新增】全局保存长图按钮 -->
+    <button id="global-save-img-btn">保存<br>长图</button>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script>
 // 【核心修正】PWA 安装引导程序 (V4 - 标准文件版)
@@ -10423,6 +10459,30 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
         let isMultiSelectMode = false, selectedMessageIds = [];
         let isPreviewMode = false; // --- 核心新增 ---
         let callAttemptState = { callId: null, closeUI: null }; // <--- 新增这一行
+
+        // 【【【 核心新增：后台保活机制 (隐形音频) 】】】
+        let keepAliveAudio = null;
+        
+        function enableKeepAlive() {
+            if (!keepAliveAudio) {
+                // 创建一个极其短小的无声 MP3
+                keepAliveAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAA=');
+                keepAliveAudio.loop = true;
+                keepAliveAudio.volume = 0.01; // 极低音量，防止干扰
+            }
+            keepAliveAudio.play().catch(e => console.log("保活音频播放失败(可能需要用户交互):", e));
+            console.log("🔥 后台保活机制已启动");
+        }
+
+        function disableKeepAlive() {
+            if (keepAliveAudio) {
+                keepAliveAudio.pause();
+                keepAliveAudio.currentTime = 0;
+                console.log("❄️ 后台保活机制已关闭");
+            }
+        }
+        // 【【【 新增结束 】】】
+
         async function executeBackgroundUpdatesAndCleanText(aiResponseText, targetChatId, senderName) {
             // 匹配所有后台更新标签，现在能捕获 sender 属性
             const updateRegex = /<background_update type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/background_update>/g;
@@ -11270,6 +11330,9 @@ if (loadingStates[originatingChatId]) {
 
 // 标记【当前聊天】为“加载中”状态
 loadingStates[originatingChatId] = true;
+
+// 【【【 核心新增：启动后台保活 】】】
+enableKeepAlive(); 
 
 // 只有当用户正看着这个聊天界面时，才显示转圈动画
 if (chatState.chatId === originatingChatId) {
@@ -13628,6 +13691,9 @@ Okay, that's all the context and rules. Now, generate your full response.
     // 标记【当前聊天】的加载状态为结束
     loadingStates[originatingChatId] = false;
     
+    // 【【【 核心新增：关闭后台保活 】】】
+    disableKeepAlive();
+
     // 只有当用户仍然停留在【这个聊天】的界面时，才移除转圈动画
     if (chatState.chatId === originatingChatId) {
         dynamicDecorationBtn.classList.remove('loading');
@@ -31018,6 +31084,56 @@ Format your response STRICTLY as follows, with NO extra text:
 
         console.log('[全局同步更新] 同步完成。');
     }
+
+    // 【核心新增】高清长图截图逻辑
+    document.getElementById('global-save-img-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('global-save-img-btn');
+        
+        // 1. 标记正在截图 (CSS会自动隐藏按钮)
+        document.body.classList.add('is-snapping');
+        
+        // 简单提示
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '生成中...';
+
+        try {
+            // 2. 稍微延迟一下，确保按钮隐藏的渲染已生效
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // 3. 调用 html2canvas 进行高清渲染
+            const canvas = await html2canvas(document.body, {
+                scale: 3, // 【关键】3倍高清采样，解决模糊问题
+                useCORS: true, // 允许跨域图片
+                allowTaint: true,
+                backgroundColor: '#ffffff', // 强制白底，防止透明
+                // 强制抓取完整滚动高度
+                windowWidth: document.body.scrollWidth,
+                windowHeight: document.body.scrollHeight,
+                x: 0,
+                y: 0,
+                width: document.body.scrollWidth,
+                height: document.body.scrollHeight
+            });
+
+            // 4. 导出并下载
+            const link = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[-T:\.Z]/g, '').slice(0, 14);
+            link.download = `黑麦长图_${timestamp}.png`;
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+        } catch (err) {
+            console.error(err);
+            alert('截图生成失败: ' + err.message);
+        } finally {
+            // 5. 恢复状态
+            document.body.classList.remove('is-snapping');
+            btn.innerHTML = originalText;
+        }
+    });
+
 </script>
 </body>
 </html>
