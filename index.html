@@ -10467,23 +10467,25 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
         let isPreviewMode = false; // --- 核心新增 ---
         let callAttemptState = { callId: null, closeUI: null }; // <--- 新增这一行
 
-        // 【【【 核心新增：后台保活机制 (隐形音频) 】】】
+        // 【【【 核心新增：后台保活机制 (用户提供资源版) 】】】
         let keepAliveAudio = null;
-        
+        let pipVideo = null;
+
+        // 1. 音频保活：使用你提供的 AAC 文件
         function enableKeepAlive() {
-            // 【核心新增】如果“画中画”正在运行，说明后台已经稳了，不需要再启动音频保活
-            // 这样可以避免和抖音抢声音，也避免报错
+            // 如果画中画正在运行，就不需要音频保活了
             if (document.pictureInPictureElement) {
-                console.log("📺 画中画运行中，跳过音频保活启动");
                 return;
             }
 
             if (!keepAliveAudio) {
-                keepAliveAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAA=');
-                keepAliveAudio.loop = true;
-                keepAliveAudio.volume = 0.01;
+                // 【核心修正】使用你提供的真实音频文件
+                keepAliveAudio = new Audio('https://files.catbox.moe/4stssk.aac');
+                keepAliveAudio.loop = true; // 循环播放
+                keepAliveAudio.volume = 0.01; // 极低音量
             }
             
+            // 防止重复播放
             if (!keepAliveAudio.paused && keepAliveAudio.currentTime > 0) {
                 return;
             }
@@ -10491,114 +10493,66 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
             const playPromise = keepAliveAudio.play();
             if (playPromise !== undefined) {
                 playPromise.catch(e => {
-                    console.warn("⚠️ 保活音频启动受阻:", e);
+                    // 这里的报错忽略，等待用户下一次点击屏幕时自动激活
+                    console.warn("⚠️ 音频保活启动受阻 (等待交互):", e);
                 });
             }
-            console.log("🔥 后台保活尝试启动");
+            console.log("🔥 音频保活已就绪 (AAC)");
         }
 
         function disableKeepAlive(forceStop = false) {
-            // 1. 读取设置
             const settings = loadFromLocalStorage('app-appearance-settings', {});
-            
-            // 2. 如果开启了“强力保活”，且不是强制停止(forceStop)，则忽略停止指令
-            // 这样 AI 回复完之后，音频依然会继续播放，保持后台存活
+            // 如果开启了强力模式，且不是强制停止，就继续播放
             if (settings.alwaysKeepAlive && !forceStop) {
-                console.log("🔥 强力保活模式：忽略停止指令，继续保持音频活跃...");
                 return;
             }
 
-            // 3. 正常停止逻辑
             if (keepAliveAudio) {
                 keepAliveAudio.pause();
                 keepAliveAudio.currentTime = 0;
-                console.log("❄️ 后台保活机制已关闭");
             }
         }
 
-        // 【【【 核心新增：画中画 (PiP) 保活逻辑 】】】
-        let pipVideo = null;
-        let pipCanvas = null;
-        let pipInterval = null;
-
+        // 2. 画中画保活：使用你提供的 MOV 视频
         async function enablePiPKeepAlive() {
-            if (!document.pictureInPictureEnabled) {
-                throw new Error("当前浏览器不支持画中画模式。");
-            }
-
-            // 1. 创建一个隐藏的 Canvas，用来画“监控画面”
-            if (!pipCanvas) {
-                pipCanvas = document.createElement('canvas');
-                pipCanvas.width = 300;
-                pipCanvas.height = 300;
-            }
-
-            // 2. 创建一个 Video 元素，源来自 Canvas
             if (!pipVideo) {
                 pipVideo = document.createElement('video');
-                pipVideo.muted = true; // 关键：静音，不占音频通道
-                pipVideo.playsInline = true;
-                pipVideo.style.display = 'none'; // 隐藏元素
+                pipVideo.crossOrigin = "anonymous"; 
+                pipVideo.muted = true; // 静音
+                pipVideo.playsInline = true; // iOS 必须
+                pipVideo.loop = true; // 循环播放
+                pipVideo.style.display = 'none';
+                
+                // 【核心修正】使用你提供的真实视频文件 (.mov 对 iOS 兼容性极佳)
+                pipVideo.src = 'https://files.catbox.moe/wwh544.mov'; 
+                
                 document.body.appendChild(pipVideo);
+                
+                // 监听退出事件
+                pipVideo.addEventListener('leavepictureinpicture', () => {
+                    const toggle = document.getElementById('toggle-pip-keep-alive');
+                    if (toggle) toggle.checked = false;
+                    disablePiPKeepAlive();
+                }, { once: true });
             }
 
-            const ctx = pipCanvas.getContext('2d');
-            const stream = pipCanvas.captureStream(1); // 1 FPS 足够了，省电
-            pipVideo.srcObject = stream;
-
-            // 3. 启动一个定时器，不断更新 Canvas 画面
-            // 这一步非常重要！如果画面静止，iOS 可能会暂停视频。
-            // 我们画一个动态的时间，假装是“系统监控”
-            if (pipInterval) clearInterval(pipInterval);
-            pipInterval = setInterval(() => {
-                const now = new Date();
-                ctx.fillStyle = '#000';
-                ctx.fillRect(0, 0, 300, 300);
-                
-                ctx.fillStyle = '#0f0';
-                ctx.font = '40px monospace';
-                ctx.textAlign = 'center';
-                ctx.fillText('SYSTEM', 150, 100);
-                
-                ctx.fillStyle = '#fff';
-                ctx.font = '30px monospace';
-                ctx.fillText(now.toLocaleTimeString(), 150, 160);
-                
-                ctx.fillStyle = '#0f0';
-                ctx.font = '20px monospace';
-                ctx.fillText('AI RUNNING...', 150, 220);
-                
-                // 画一个闪烁的点
-                if (now.getMilliseconds() < 500) {
-                    ctx.beginPath();
-                    ctx.arc(150, 260, 10, 0, 2 * Math.PI);
-                    ctx.fill();
-                }
-            }, 1000);
-
-            // 4. 播放并请求进入画中画
-            await pipVideo.play();
-            await pipVideo.requestPictureInPicture();
-            
-            // 监听退出事件（比如用户手动关掉了窗口）
-            pipVideo.addEventListener('leavepictureinpicture', () => {
-                const toggle = document.getElementById('toggle-pip-keep-alive');
-                if (toggle) toggle.checked = false;
-                disablePiPKeepAlive();
-            }, { once: true });
+            try {
+                // 先尝试播放
+                await pipVideo.play();
+                // 再请求画中画
+                await pipVideo.requestPictureInPicture();
+            } catch (e) {
+                console.error("画中画启动失败:", e);
+                throw new Error("启动失败: " + e.message + "\n(请确保在设置中允许了画中画权限)");
+            }
         }
 
         function disablePiPKeepAlive() {
-            if (pipInterval) {
-                clearInterval(pipInterval);
-                pipInterval = null;
-            }
             if (document.pictureInPictureElement && pipVideo) {
                 document.exitPictureInPicture().catch(() => {});
             }
             if (pipVideo) {
                 pipVideo.pause();
-                pipVideo.srcObject = null; // 断开流
             }
         }
         // 【【【 新增结束 】】】
