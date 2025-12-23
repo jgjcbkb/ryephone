@@ -26959,13 +26959,28 @@ async function handleRemoveMember() {
                         // 3. 写入新数据
                         for (const key in rehydratedData) {
                             if (Object.prototype.hasOwnProperty.call(rehydratedData, key)) {
-                                const value = rehydratedData[key];
+                                let value = rehydratedData[key];
                                 
-                                // 【核心修复在这里】
-                                // 无论 value 是对象还是字符串，都必须进行 JSON.stringify
-                                // 这样才能与 loadFromLocalStorage 中的 JSON.parse 兼容
-                                // 之前这里有一个错误的判断 typeof value === 'string' ? value : ... 导致了头像读取失败
-                                const valueToStore = JSON.stringify(value);
+                                // 【核心修复 V2】智能判断存储格式
+                                let valueToStore;
+
+                                // 如果是 GitHub 设置这种纯字符串配置，我们不需要额外的引号
+                                if (key.startsWith('gh_') && typeof value === 'string') {
+                                    // 如果它已经被 stringify 过了（带引号），就去掉引号
+                                    if (value.startsWith('"') && value.endsWith('"')) {
+                                        value = JSON.parse(value); 
+                                    }
+                                    valueToStore = value;
+                                } 
+                                // 对于其他复杂数据（如聊天记录数组、设置对象），必须 stringify
+                                else {
+                                    // 防止重复 stringify (如果导出时已经 stringify 过了)
+                                    if (typeof value !== 'string') {
+                                        valueToStore = JSON.stringify(value);
+                                    } else {
+                                        valueToStore = value;
+                                    }
+                                }
                                 
                                 localStorage.setItem(key, valueToStore);
                             }
