@@ -5500,8 +5500,10 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     </div>
     <select id="api-model-select"></select>
     <input type="text" id="api-model-manual-input" class="modal-input" placeholder="输入模型名称 (如 gpt-4o)" style="display: none; margin-top: 5px;">
+    
+    <!-- 【新增】自定义模型历史记录容器 -->
+    <div id="custom-model-tags" style="display: none; flex-wrap: wrap; gap: 8px; margin-top: 8px;"></div>
 </div>
-<!-- 【修改结束】 -->
 
 <div class="form-group"><label for="system-prompt">系统提示</label><textarea id="system-prompt"></textarea></div>
                         
@@ -6753,9 +6755,11 @@ if ('serviceWorker' in navigator) {
     // =================================================================================
     
     let chatList = [], worldBookEntries = [], apiProfiles = [], activeProfileIndex = null, myAvatar = null, customBubbles = [], stickers = [], appearanceSettings = {};
-    let userPersonas = []; // 新增：用户人设
+    let userPersonas = []; 
     let npcList = [], npcSettings = {}; 
-    let proactiveApiCallTimestamps = []; // <--- 在这里添加这一行代码
+    let proactiveApiCallTimestamps = []; 
+    // 【核心新增】加载自定义模型列表
+    let customModels = loadFromLocalStorage('app-custom-models', []);
     const avatarColors = ['#2d6a4f', '#40916c', '#52b788', '#74c69d', '#95d5b2', '#b7e4c7', '#d8f3e5', '#1b4332'];
     const pages = document.querySelectorAll('.page');
     
@@ -9388,7 +9392,7 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
     function loadWorldBook() { 
             let entries = loadFromLocalStorage('chat-worldbook', []);
             
-            // --- 核心新增：内置弹幕世界书 ---
+            // --- 核心新增：内置弹幕世界书 (已修正：禁止 Sticker) ---
             const DANMAKU_PRESET = {
                 name: "弹幕模式 (Danmaku Mode)(VC-IGNORE)",
                 keywords: "",
@@ -9424,6 +9428,11 @@ After your main response, you MUST create a "Danmaku Player" block.
 
 4.  **Quantity:** Generate 7 to 21 unique danmaku.
 
+5.  **CONTENT RESTRICTIONS (ABSOLUTE & UNBREAKABLE):**
+    *   **NO STICKERS:** You are **STRICTLY FORBIDDEN** from using the \`[sticker:...]\` command inside danmaku content.
+    *   **REASON:** Danmaku is a scrolling text stream. Large sticker images break the visual format and look terrible.
+    *   **ALTERNATIVE:** If you want to express specific emotions, you **MUST** use standard Unicode Emojis (e.g., 😂, 😭, 🐮🍺, 😡) or text-based emoticons (e.g., QAQ, www).
+
 **Formatting (ABSOLUTE & CRITICAL):**
 You MUST use the custom \`<dm>\` tag format.
 1.  Start with \`[DANMAKU_PLAYER]\`.
@@ -9436,12 +9445,12 @@ You MUST use the custom \`<dm>\` tag format.
 <block type="command">
 [DANMAKU_PLAYER]
 28876
-<dm username="一眼丁真" likes="130" dislikes="5">鉴定为：典！</dm>
+<dm username="一眼丁真" likes="130" dislikes="5">鉴定为：典！😂</dm>
 <dm username="马老师发生甚么事了" likes="99" dislikes="2">年轻人不讲武德，来骗，来偷袭！</dm>
-<dm username="退钱哥" likes="45" dislikes="18">RNM，退钱！剧情不好看，退钱！</dm>
+<dm username="退钱哥" likes="45" dislikes="18">RNM，退钱！剧情不好看，退钱！😡</dm>
 <dm username="iKun律师函" likes="15" dislikes="1">你干嘛~哎哟~</dm>
 <dm username="窝嫩叠" likes="188" dislikes="0">好好好，这么玩是吧</dm>
-<dm username="栓Q哥" likes="66" dislikes="8">我真的会谢，栓Q！</dm>
+<dm username="栓Q哥" likes="66" dislikes="8">我真的会谢，栓Q！😭</dm>
 <dm username="我是来看评论的" likes="200" dislikes="1">不懂就问，所以现在是什么情况？</dm>
 [/DANMAKU_PLAYER]
  </block>
@@ -9551,25 +9560,120 @@ You MUST use the custom \`<dm>\` tag format.
     function saveApiSettings() { saveToLocalStorage('chat-api-profiles', apiProfiles); localStorage.setItem('chat-active-profile-index', activeProfileIndex); }
     function loadApiSettings() { apiProfiles = loadFromLocalStorage('chat-api-profiles'); activeProfileIndex = JSON.parse(localStorage.getItem('chat-active-profile-index') || 'null'); }
     function renderApiProfiles() { apiProfilesList.innerHTML = ''; if (apiProfiles.length === 0) { apiProfilesList.innerHTML = '<p>无配置</p>'; return; } apiProfiles.forEach((profile, index) => { const item = document.createElement('div'); item.className = `api-profile-item ${index === activeProfileIndex ? 'active' : ''}`; item.innerHTML = `<strong>${profile.name}</strong><div class="api-profile-actions"><button onclick="window.app.selectProfile(${index})">激活</button><button onclick="window.app.editProfile(${index})">编辑</button><button onclick="window.app.deleteProfile(${index})">删除</button></div>`; apiProfilesList.appendChild(item); }); }
+        // --- 【核心新增】渲染模型下拉框的通用函数 ---
+    function renderModelSelectWithCustom(remoteModels = [], selectedValue = null) {
+        apiModelSelect.innerHTML = '';
+        
+        // 1. 先渲染自定义模型 (如果有)
+        if (customModels.length > 0) {
+            const customGroup = document.createElement('optgroup');
+            customGroup.label = "自定义 / 历史记录";
+            customModels.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                customGroup.appendChild(option);
+            });
+            apiModelSelect.appendChild(customGroup);
+        }
+
+        // 2. 再渲染云端模型 (如果有)
+        if (remoteModels.length > 0) {
+            const remoteGroup = document.createElement('optgroup');
+            remoteGroup.label = "云端获取";
+            
+            // 排序
+            remoteModels.sort((a, b) => (a.id || a.name).localeCompare(b.id || b.name));
+            
+            remoteModels.forEach(model => {
+                const modelId = model.id || model.name;
+                const modelDisplayName = modelId.startsWith('models/') ? modelId.substring(7) : modelId;
+                
+                // 去重：如果自定义里已经有了，云端就不显示了，避免重复
+                if (!customModels.includes(modelDisplayName)) {
+                    const option = document.createElement('option');
+                    option.value = modelDisplayName;
+                    option.textContent = modelDisplayName;
+                    remoteGroup.appendChild(option);
+                }
+            });
+            apiModelSelect.appendChild(remoteGroup);
+        }
+        
+        // 3. 恢复选中值
+        if (selectedValue) {
+            apiModelSelect.value = selectedValue;
+        } else if (apiModelSelect.options.length > 0) {
+            apiModelSelect.selectedIndex = 0;
+        }
+    }
+
+    // --- 【核心新增】管理自定义模型弹窗 ---
+    async function showCustomModelManager() {
+        if (customModels.length === 0) {
+            await conversationManager.customAlert('还没有自定义模型记录。');
+            return;
+        }
+
+        const listHtml = customModels.map((model, index) => `
+            <li class="snippet-management-item">
+                <span class="name">${model}</span>
+                <button class="delete-btn" data-index="${index}">删除</button>
+            </li>
+        `).join('');
+
+        await conversationManager.showCustomModal({
+            title: '管理自定义模型',
+            html: `<ul class="snippet-management-list" style="max-height: 300px; overflow-y: auto;">${listHtml}</ul>`,
+            showCloseButton: true,
+            buttons: [{ text: '完成', value: 'close', class: 'primary' }],
+            onRender: (modalDOM, closeModal) => {
+                modalDOM.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('delete-btn')) {
+                        const index = parseInt(e.target.dataset.index, 10);
+                        if (confirm(`确定删除模型 "${customModels[index]}" 吗？`)) {
+                            customModels.splice(index, 1);
+                            saveToLocalStorage('app-custom-models', customModels);
+                            
+                            // 刷新当前弹窗列表
+                            e.target.closest('li').remove();
+                            // 同时也刷新背后的下拉框
+                            renderModelSelectWithCustom([]); 
+                        }
+                    }
+                });
+            }
+        });
+    }
+
     function showApiForm(isEdit = false, index = null) { 
         const tempSlider = document.getElementById('api-temperature-slider');
         const tempInput = document.getElementById('api-temperature');
         const providerSelect = document.getElementById('api-provider');
-        const streamToggle = document.getElementById('api-stream-toggle'); // 【核心新增】
+        const streamToggle = document.getElementById('api-stream-toggle');
         
+        // --- 核心新增：动态插入“管理”按钮 ---
+        const btnContainer = document.getElementById('manual-model-btn').parentElement;
+        if (!document.getElementById('manage-models-btn')) {
+            const manageBtn = document.createElement('button');
+            manageBtn.id = 'manage-models-btn';
+            manageBtn.className = 'btn-primary btn-secondary';
+            manageBtn.style.flex = '0 0 auto'; // 不伸缩
+            manageBtn.style.padding = '8px 10px';
+            manageBtn.textContent = '管理';
+            manageBtn.title = "管理自定义模型列表";
+            manageBtn.onclick = showCustomModelManager;
+            btnContainer.appendChild(manageBtn);
+        }
+
         tempSlider.oninput = () => tempInput.value = tempSlider.value;
         tempInput.oninput = () => tempSlider.value = tempInput.value;
 
         providerSelect.onchange = () => {
             switch(providerSelect.value) {
-                case 'gemini':
-                    apiUrlInput.value = 'https://generativelanguage.googleapis.com/v1beta/';
-                    break;
-                case 'deepseek':
-                    apiUrlInput.value = 'https://api.deepseek.com/v1/';
-                    break;
-                case 'custom':
-                    break;
+                case 'gemini': apiUrlInput.value = 'https://generativelanguage.googleapis.com/v1beta/'; break;
+                case 'deepseek': apiUrlInput.value = 'https://api.deepseek.com/v1/'; break;
+                case 'custom': break;
             }
         };
 
@@ -9577,6 +9681,9 @@ You MUST use the custom \`<dm>\` tag format.
         apiFetchStatus.textContent = ''; 
         apiFormContainer.style.display = 'block'; 
         
+        // 每次打开表单，先用自定义模型填充下拉框
+        renderModelSelectWithCustom([]);
+
         if (isEdit) { 
             const profile = apiProfiles[index]; 
             apiFormTitle.textContent = '编辑配置'; 
@@ -9585,45 +9692,48 @@ You MUST use the custom \`<dm>\` tag format.
             apiUrlInput.value = profile.url; 
             systemPromptInput.value = profile.prompt; 
             
-            if (profile.url.includes('googleapis.com')) {
-                providerSelect.value = 'gemini';
-            } else if (profile.url.includes('api.deepseek.com')) {
-                providerSelect.value = 'deepseek';
-            } else {
-                providerSelect.value = 'custom';
-            }
+            if (profile.url.includes('googleapis.com')) providerSelect.value = 'gemini';
+            else if (profile.url.includes('api.deepseek.com')) providerSelect.value = 'deepseek';
+            else providerSelect.value = 'custom';
 
             const temperature = (profile.temperature !== undefined && profile.temperature !== null) ? profile.temperature : 0.7;
             tempSlider.value = temperature;
             tempInput.value = temperature;
-            streamToggle.checked = profile.enableStream || false; // 【核心新增】
+            streamToggle.checked = profile.enableStream || false;
             apiEditIndexInput.value = index; 
             
-            // 【核心修改】：编辑时，把模型名字也填入手动框，以防万一
             document.getElementById('api-model-manual-input').value = profile.model || '';
             
-            if (profile.url && profile.key) fetchModels(profile.model); 
+            // 如果有 URL 和 Key，尝试获取云端模型，同时选中当前模型
+            if (profile.url && profile.key) {
+                fetchModels(profile.model); 
+            } else {
+                // 如果不获取，直接显示下拉框（里面有自定义模型），并尝试选中
+                modelSelectGroup.style.display = 'block';
+                apiModelSelect.value = profile.model;
+                // 如果下拉框里没有这个模型（既不是自定义也不是云端），就切到手动模式
+                if (apiModelSelect.value !== profile.model) {
+                    document.getElementById('manual-model-btn').click();
+                }
+            }
         } else { 
             apiFormTitle.textContent = '添加新配置'; 
             apiNameInput.value = ''; 
             apiKeyInput.value = ''; 
             apiUrlInput.value = ''; 
             systemPromptInput.value = 'You are a helpful assistant.'; 
-            
-            // 【核心修改】：新建时清空手动框
             document.getElementById('api-model-manual-input').value = '';
             document.getElementById('model-select-group').style.display = 'none';
-
             providerSelect.value = 'custom';
-            
             tempSlider.value = 0.7;
             tempInput.value = 0.7;
-            streamToggle.checked = false; // 【核心新增】
+            streamToggle.checked = false;
             apiEditIndexInput.value = ''; 
         } 
     }
-// ===== 新版本的 showApiForm 函数到此结束 =====
+
     function hideApiForm() { apiFormContainer.style.display = 'none'; }
+
     async function fetchModels(profileToSelectModel = null) { 
         const apiKey = apiKeyInput.value.trim(); 
         let apiUrl = apiUrlInput.value.trim(); 
@@ -9635,97 +9745,69 @@ You MUST use the custom \`<dm>\` tag format.
         apiFetchStatus.textContent = '正在获取模型...'; 
         apiFetchStatus.className = 'status-loading'; 
         modelSelectGroup.style.display = 'none'; 
+        
         try { 
-            // ******** 核心修改区域 #4 开始 ********
             let modelsUrl;
             let headers;
 
-            // 根据URL判断是Gemini还是OpenAI兼容API
             if (apiUrl.includes('googleapis.com')) {
-                // Gemini 的模型列表URL和请求头
                 modelsUrl = `${apiUrl.endsWith('/') ? apiUrl : apiUrl + '/'}models?key=${apiKey}`;
                 headers = { 'Content-Type': 'application/json' };
             } else {
-                // OpenAI 兼容API的模型列表URL和请求头
                 modelsUrl = `${new URL(apiUrl).protocol}//${new URL(apiUrl).host}/v1/models`; 
                 headers = { 'Authorization': `Bearer ${apiKey}` };
             }
-            // ******** 核心修改区域 #4 结束 ********
 
             const response = await fetch(modelsUrl, { headers: headers }); 
             if (!response.ok) throw new Error(`服务器错误: ${response.status}`); 
             const data = await response.json(); 
 
-            // ******** 核心修改区域 #5 开始 ********
-            // 兼容 Gemini 和 OpenAI 的不同返回格式
             const models = data.data || data.models || data; 
-            // ******** 核心修改区域 #5 结束 ********
+            
+            // --- 核心修改：调用新的渲染函数，混合自定义和云端模型 ---
+            renderModelSelectWithCustom(models, profileToSelectModel);
 
-            apiModelSelect.innerHTML = ''; 
-            if (models && models.length > 0) { 
-                models.sort((a, b) => (a.id || a.name).localeCompare(b.id || b.name)); 
-                
-                models.forEach(model => { 
-                    // ******** 核心修改区域 #6 开始 ********
-                    // 兼容 Gemini (model.name) 和 OpenAI (model.id) 的不同字段
-                    const modelId = model.id || model.name;
-                    // Gemini 的模型名称包含 "models/" 前缀，需要去掉
-                    const modelDisplayName = modelId.startsWith('models/') ? modelId.substring(7) : modelId;
-                    // ******** 核心修改区域 #6 结束 ********
-
-                    const option = document.createElement('option'); 
-                    option.value = modelDisplayName; // 统一使用处理后的名字
-                    option.textContent = modelDisplayName;
-                    apiModelSelect.appendChild(option); 
-                });
-                modelSelectGroup.style.display = 'block'; 
-                apiFetchStatus.textContent = `成功获取 ${models.length} 个模型！`; 
-                apiFetchStatus.className = 'status-success'; 
-                if (profileToSelectModel) apiModelSelect.value = profileToSelectModel; 
-            } else { 
-                apiFetchStatus.textContent = '未找到模型。'; 
-                apiFetchStatus.className = 'status-error'; 
-            } 
+            modelSelectGroup.style.display = 'block'; 
+            apiFetchStatus.textContent = `成功获取 ${models.length} 个云端模型！`; 
+            apiFetchStatus.className = 'status-success'; 
+            
         } catch (error) { 
-            apiFetchStatus.textContent = `获取失败: ${error.message}`; 
+            apiFetchStatus.textContent = `获取失败: ${error.message} (已显示自定义模型)`; 
             apiFetchStatus.className = 'status-error'; 
+            // 即使失败，也要显示下拉框（里面有自定义模型）
+            renderModelSelectWithCustom([], profileToSelectModel);
+            modelSelectGroup.style.display = 'block';
         } 
     }
+
     addNewProfileBtn.addEventListener('click', () => showApiForm());
     cancelApiFormBtn.addEventListener('click', hideApiForm);
     fetchModelsBtn.addEventListener('click', () => fetchModels());
 
-    // 【核心新增】：手动填写按钮逻辑
     document.getElementById('manual-model-btn').addEventListener('click', () => {
         const group = document.getElementById('model-select-group');
         const select = document.getElementById('api-model-select');
         const input = document.getElementById('api-model-manual-input');
         const toggleLink = document.getElementById('toggle-model-input-link');
 
-        group.style.display = 'block'; // 显示区域
-        
-        // 切换到手动模式
+        group.style.display = 'block'; 
         select.style.display = 'none';
         input.style.display = 'block';
         toggleLink.textContent = '切换列表选择';
         input.focus();
     });
 
-    // 【核心新增】：切换输入方式链接逻辑
     document.getElementById('toggle-model-input-link').addEventListener('click', () => {
         const select = document.getElementById('api-model-select');
         const input = document.getElementById('api-model-manual-input');
         const toggleLink = document.getElementById('toggle-model-input-link');
 
         if (input.style.display === 'none') {
-            // 切换到手动
             input.style.display = 'block';
             select.style.display = 'none';
             toggleLink.textContent = '切换列表选择';
-            // 如果下拉框有值，自动填入输入框方便修改
             if (select.value) input.value = select.value;
         } else {
-            // 切换到列表
             input.style.display = 'none';
             select.style.display = 'block';
             toggleLink.textContent = '切换手动输入';
@@ -9736,15 +9818,24 @@ You MUST use the custom \`<dm>\` tag format.
         const name = apiNameInput.value.trim(); 
         if (!name) return; 
         
-        // 【核心修改】：智能判断是保存下拉框的值，还是手动输入的值
         let finalModel = null;
         const manualInput = document.getElementById('api-model-manual-input');
         const select = document.getElementById('api-model-select');
         
-        // 如果手动输入框是显示的，就取输入框的值；否则取下拉框的值
+        // 智能判断模型来源
         if (document.getElementById('model-select-group').style.display !== 'none') {
             if (manualInput.style.display !== 'none') {
                 finalModel = manualInput.value.trim();
+                
+                // --- 【核心新增】如果手动输入了模型，且不为空，自动保存到自定义列表 ---
+                if (finalModel && !customModels.includes(finalModel)) {
+                    customModels.push(finalModel);
+                    saveToLocalStorage('app-custom-models', customModels);
+                    // 顺便刷新一下下拉框，虽然马上要关闭了，但保持状态一致
+                    renderModelSelectWithCustom([]);
+                }
+                // --- 新增结束 ---
+
             } else {
                 finalModel = select.value;
             }
@@ -9755,9 +9846,9 @@ You MUST use the custom \`<dm>\` tag format.
             key: apiKeyInput.value.trim(), 
             url: apiUrlInput.value.trim(), 
             prompt: systemPromptInput.value.trim(), 
-            model: finalModel, // 使用判断后的最终模型名
+            model: finalModel, 
             temperature: parseFloat(document.getElementById('api-temperature').value),
-            enableStream: document.getElementById('api-stream-toggle').checked // 【核心新增】
+            enableStream: document.getElementById('api-stream-toggle').checked
         }; 
         
         const editIndex = apiEditIndexInput.value;
@@ -21239,11 +21330,8 @@ function handleForwardFromAI(characterName, data) {
                 const commentItem = e.target.closest('.comment-item');
                 if (commentItem) {
                     commentItem.classList.toggle('selected');
-                    // 如果选中了评论，强制选中它所属的帖子（否则帖子隐藏了评论也看不见）
-                    if (commentItem.classList.contains('selected')) {
-                        const parentPost = commentItem.closest('.post-card');
-                        if (parentPost) parentPost.classList.add('selected');
-                    }
+                    // 【已删除】删除了这里的“强制选中父帖子”逻辑
+                    // 现在点击评论只会选中评论自己，不会影响帖子
                     return;
                 }
 
