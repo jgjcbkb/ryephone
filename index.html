@@ -16229,7 +16229,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
         };
 
         let bannerTimeout;
-        function showNotificationBanner(chatId, msgData, unreadCount) { // <--- 1. 接收新的 unreadCount 参数
+        function showNotificationBanner(chatId, msgData, unreadCount) { 
             // 如果已有横幅，先移除
             const existingBanner = document.getElementById('notification-banner');
             if (existingBanner) {
@@ -16244,19 +16244,39 @@ You were receiving a video call from {{user}}, but they hung up before you could
             const displayName = chatInfo.remark || chat.name;
             const avatarUrl = loadFromLocalStorage(`chat_avatar_${chat.id}`, null) || generateDefaultAvatar(displayName);
 
-            // --- 2. 【核心修改】始终解析具体内容，不再用 "[x条消息]" 简单覆盖 ---
+            // --- 【核心修复 1】内容解析逻辑 (彻底消灭 "[新消息]") ---
             let specificContent = msgData.text || '';
-            if (msgData.type !== 'text') {
-                const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'transfer': '[转账]', 'red_packet': '[红包]', 'video': '[视频]', 'location': '[位置]', 'gift': '[礼物]', 'pay_for_me': '[代付]'};
-                specificContent = typeMap[msgData.type] || '[新消息]';
-            }
 
-            // 构造 APP 内横幅显示的文字 (可以带上未读数提示)
-            let bannerDisplayText = specificContent;
-            if (unreadCount > 1) {
-                bannerDisplayText = `[${unreadCount}条] ${specificContent}`;
+            // 只有当它是特殊的多媒体类型时，才使用简略标签
+            // 关键：排除 'text' 和 'system'，让它们直接显示原文！
+            if (msgData.type !== 'text' && msgData.type !== 'system') {
+                const typeMap = { 
+                    'photo': '[图片]', 
+                    'voice': '[语音]', 
+                    'video': '[视频]', 
+                    'photo-description': '[图文]',
+                    'location': '[位置]'
+                };
+                
+                // 对于红包、转账等，我们尝试显示得更具体一点
+                if (msgData.type === 'red_packet') {
+                    specificContent = `[红包] ${msgData.text}`;
+                } else if (msgData.type === 'transfer') {
+                    specificContent = `[转账] ¥${msgData.text}`;
+                } else if (msgData.type === 'gift') {
+                    specificContent = `[礼物] ${msgData.text}`;
+                } else if (msgData.type === 'pay_for_me') {
+                    specificContent = `[代付] ${msgData.text}`;
+                } else {
+                    // 如果在映射表里，就用映射表；如果不在，就保留原文本(以防万一)，实在没有才显示[新消息]
+                    specificContent = typeMap[msgData.type] || msgData.text || '[新消息]';
+                }
             }
-            // --- 修改结束 ---
+            // --- 修复结束 ---
+
+            // --- 【核心修复 2】彻底移除 "[x条]" 计数前缀 ---
+            // 无论有多少条未读，APP内横幅永远只显示最新这一条的具体内容
+            let bannerDisplayText = specificContent; 
 
             const banner = document.createElement('div');
             banner.id = 'notification-banner';
@@ -16265,7 +16285,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     <div class="avatar"></div>
                     <div class="content">
                         <div class="sender-name">${displayName}</div>
-                        <!-- 这里显示带数量的详细内容 -->
+                        <!-- 允许换行显示 -->
                         <div class="message-preview">${bannerDisplayText}</div>
                     </div>
                 </div>
@@ -16281,83 +16301,80 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 clearTimeout(bannerTimeout);
             };
 
-            // 点击可点击区域跳转
-            
-            banner.querySelector('#notification-banner-clickable-area').addEventListener('click', () => {
-                open(chatId);
-                closeBanner();
-            });
-            
-            // 点击关闭按钮
-            banner.querySelector('#notification-banner-close-btn').addEventListener('click', (e) => {
-                e.stopPropagation(); // 防止触发跳转
-                closeBanner();
-            });
-            
-            // 动画显示
-            setTimeout(() => banner.classList.add('visible'), 50);
-
-            // 【新增：弹出横幅时播放声音】
-            if (window.app && window.app.playNotificationSound) {
-                window.app.playNotificationSound();
+            let bannerTimeout;
+        function showNotificationBanner(chatId, msgData, unreadCount) { 
+            // 如果已有横幅，先移除
+            const existingBanner = document.getElementById('notification-banner');
+            if (existingBanner) {
+                existingBanner.remove();
+                clearTimeout(bannerTimeout);
             }
 
-            // 【【【 终极方案：安卓/iOS 分流处理 】】】
-            // 检测是否是苹果设备
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const chat = chatList.find(c => c.id === chatId);
+            if (!chat) return;
 
-            if ("Notification" in window && Notification.permission === "granted") {
-                try {
-                    // 【核心修改】系统通知直接使用 specificContent (具体内容)，不带 "[5条]" 这种前缀，更像原生体验
-                    const systemNotificationText = specificContent;
+            const chatInfo = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+            const displayName = chatInfo.remark || chat.name;
+            const avatarUrl = loadFromLocalStorage(`chat_avatar_${chat.id}`, null) || generateDefaultAvatar(displayName);
 
-                    // 【核心修正】生成一个唯一的 Tag。
-                    // 之前是用 chatId，导致新消息会覆盖旧消息。
-                    // 现在加上时间戳，保证每一条消息都是独立的通知，会在锁屏上叠罗汉显示。
-                    const uniqueTag = chatId + '_' + Date.now();
+            // --- 【核心修复 1】内容解析逻辑 (彻底消灭 "[新消息]") ---
+            let specificContent = msgData.text || '';
 
-                    if (isIOS) {
-                        // ==========================================
-                        // 🍎 iOS 专用通道
-                        // ==========================================
-                        const iosNotify = new Notification(displayName, {
-                            body: systemNotificationText, // <--- 使用具体内容
-                            tag: uniqueTag, // <--- 【修改】使用唯一标签，允许堆叠
-                            silent: true 
-                        });
-                        
-                        iosNotify.onclick = function() {
-                            window.focus();
-                            open(chatId);
-                            this.close();
-                        };
-                    } else {
-                        // ==========================================
-                        // 🤖 安卓 专用通道
-                        // ==========================================
-                        if ("serviceWorker" in navigator) {
-                            navigator.serviceWorker.ready.then(function(registration) {
-                                registration.showNotification(displayName, {
-                                    body: systemNotificationText, // <--- 使用具体内容
-                                    icon: avatarUrl,
-                                    badge: 'https://i.imgur.com/sE3924q.png',
-                                    tag: uniqueTag, // <--- 【修改】使用唯一标签，允许堆叠
-                                    renotify: true, 
-                                    requireInteraction: true, 
-                                    silent: false 
-                                });
-                            });
-                        }
-                    }
-                } catch (e) {
-                    console.error("通知发送失败:", e);
+            // 只有当它是特殊的多媒体类型时，才使用简略标签
+            // 关键：排除 'text' 和 'system'，让它们直接显示原文！
+            if (msgData.type !== 'text' && msgData.type !== 'system') {
+                const typeMap = { 
+                    'photo': '[图片]', 
+                    'voice': '[语音]', 
+                    'video': '[视频]', 
+                    'photo-description': '[图文]',
+                    'location': '[位置]'
+                };
+                
+                // 对于红包、转账等，我们尝试显示得更具体一点
+                if (msgData.type === 'red_packet') {
+                    specificContent = `[红包] ${msgData.text}`;
+                } else if (msgData.type === 'transfer') {
+                    specificContent = `[转账] ¥${msgData.text}`;
+                } else if (msgData.type === 'gift') {
+                    specificContent = `[礼物] ${msgData.text}`;
+                } else if (msgData.type === 'pay_for_me') {
+                    specificContent = `[代付] ${msgData.text}`;
+                } else {
+                    // 如果在映射表里，就用映射表；如果不在，就保留原文本(以防万一)，实在没有才显示[新消息]
+                    specificContent = typeMap[msgData.type] || msgData.text || '[新消息]';
                 }
             }
-            // 【【【 插入结束 】】】
+            // --- 修复结束 ---
 
-            // 5秒后自动消失
-            bannerTimeout = setTimeout(closeBanner, 5000);
-        }
+            // --- 【核心修复 2】彻底移除 "[x条]" 计数前缀 ---
+            // 无论有多少条未读，APP内横幅永远只显示最新这一条的具体内容
+            let bannerDisplayText = specificContent; 
+
+            const banner = document.createElement('div');
+            banner.id = 'notification-banner';
+            banner.innerHTML = `
+                <div id="notification-banner-clickable-area">
+                    <div class="avatar"></div>
+                    <div class="content">
+                        <div class="sender-name">${displayName}</div>
+                        <!-- 允许换行显示 -->
+                        <div class="message-preview">${bannerDisplayText}</div>
+                    </div>
+                </div>
+                <button id="notification-banner-close-btn">×</button>
+            `;
+
+            document.querySelector('.app-container').appendChild(banner);
+            setImageSrc(banner.querySelector('.avatar'), avatarUrl);
+            
+            const closeBanner = () => {
+                banner.classList.remove('visible');
+                banner.addEventListener('transitionend', () => banner.remove(), { once: true });
+                clearTimeout(bannerTimeout);
+            };
+
+            
 
 const reRenderMessages = (isInitialLoad = false) => {
     // 1. 清空容器
