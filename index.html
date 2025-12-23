@@ -9325,6 +9325,18 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
 
     document.querySelectorAll('.back-btn').forEach(btn => btn.addEventListener('click', (e) => {
         const targetPage = e.currentTarget.dataset.target;
+        
+        // 【核心修复】如果目标是返回“聊天窗口”(conversation)
+        // 说明我们可能是从“聊天信息页”回来的，那里可能发生了踢人、改名等操作
+        // 所以必须强制调用 open() 重新加载数据，而不仅仅是切换页面
+        if (targetPage === 'conversation') {
+            const currentId = conversationManager.getCurrentChatId();
+            if (currentId) {
+                conversationManager.open(currentId); // 重新加载数据并渲染
+                return; // 阻止后续默认的 navigateTo
+            }
+        }
+
         if (targetPage) {
             navigateTo(targetPage);
         }
@@ -16377,9 +16389,13 @@ You were receiving a video call from {{user}}, but they hung up before you could
             }
             // --- 修复结束 ---
 
-            // --- 【核心修复 2】彻底移除 "[x条]" 计数前缀 ---
-            // 无论有多少条未读，APP内横幅永远只显示最新这一条的具体内容
+            // --- 【核心修改】恢复 "[x条]" 计数前缀 ---
+            // 逻辑：如果未读数大于1，就在消息前面加上 "[x条]"
             let bannerDisplayText = specificContent; 
+            
+            if (unreadCount > 1) {
+                bannerDisplayText = `[${unreadCount}条] ${specificContent}`;
+            }
 
             const banner = document.createElement('div');
             banner.id = 'notification-banner';
@@ -19260,10 +19276,14 @@ async function showBranchHistoryModal(chatId) {
         const searchResults = document.getElementById('search-results');
         const searchBtn = document.getElementById('header-search-btn');
         const closeSearchBtn = document.getElementById('close-search-btn');
+        const dynamicBtn = document.getElementById('dynamic-decoration-btn'); // 获取触发按钮
 
         if (searchBtn) {
             searchBtn.addEventListener('click', () => {
                 searchOverlay.classList.add('visible');
+                // 【核心修复】打开搜索时，隐藏触发按钮
+                if (dynamicBtn) dynamicBtn.style.display = 'none';
+                
                 searchInput.value = '';
                 searchResults.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">输入关键词搜索</div>';
                 searchInput.focus();
@@ -19273,6 +19293,8 @@ async function showBranchHistoryModal(chatId) {
         if (closeSearchBtn) {
             closeSearchBtn.addEventListener('click', () => {
                 searchOverlay.classList.remove('visible');
+                // 【核心修复】关闭搜索时，恢复触发按钮
+                if (dynamicBtn) dynamicBtn.style.display = '';
             });
         }
 
@@ -19326,6 +19348,9 @@ async function showBranchHistoryModal(chatId) {
                 const msgId = item.dataset.msgId;
                 jumpToMessage(msgId);
                 searchOverlay.classList.remove('visible');
+                
+                // 【核心修复】跳转并关闭搜索层后，恢复触发按钮
+                if (dynamicBtn) dynamicBtn.style.display = '';
             });
         }
 
@@ -21948,18 +21973,27 @@ checkMomentsUpdates(); // <--- 新增这一行
                 loadStickers();
                 isManageMode = false;
 
+                // 【核心修改】重写 HTML 结构：
+                // 1. sticker-panel-header 改为 flex-direction: column (垂直排列)
+                // 2. 搜索框占满第一行
+                // 3. 按钮组放在第二行，用 flex 布局均匀分布
                 const result = await conversationManager.showCustomModal({
                     html: `
                         <div class="sticker-panel-tabs">
                             <button class="sticker-tab active" data-type="sticker">表情包</button>
                             <button class="sticker-tab" data-type="emoji">Emoji</button>
                         </div>
-                        <div class="sticker-panel-header">
-                            <input type="search" id="sticker-search-input" placeholder="搜索..." />
-                            <button class="modal-button secondary" data-value="manage">管理</button>
-                            <button class="modal-button primary" data-value="import">导入</button>
-                            <button class="modal-button secondary" data-value="close">关闭</button>
+                        
+                        <div class="sticker-panel-header" style="flex-direction: column; height: auto; gap: 10px; padding: 10px;">
+                            <input type="search" id="sticker-search-input" placeholder="搜索..." style="width: 100%; margin: 0;" />
+                            
+                            <div style="display: flex; width: 100%; gap: 8px;">
+                                <button class="modal-button secondary" data-value="manage" style="flex: 1; padding: 8px 0;">管理</button>
+                                <button class="modal-button primary" data-value="import" style="flex: 1; padding: 8px 0;">导入</button>
+                                <button class="modal-button secondary" data-value="close" style="flex: 1; padding: 8px 0;">关闭</button>
+                            </div>
                         </div>
+
                         <div class="sticker-grid-container"></div>
                     `,
                     customClass: 'sticker-panel-modal',
@@ -25455,22 +25489,49 @@ async function handleRemoveMember() {
                 const reader = new FileReader();
                 reader.onload = async (event) => {
                     try {
-                        const importedMessages = JSON.parse(event.target.result);
-                        if (!Array.isArray(importedMessages)) {
-                            throw new Error('文件格式不正确，需要是消息数组。');
+                        let importedData = JSON.parse(event.target.result);
+                        let messagesToMerge = [];
+
+                        // 【核心修复】智能识别备份格式
+                        if (Array.isArray(importedData)) {
+                            // 情况 A: 旧版纯数组备份
+                            messagesToMerge = importedData;
+                        } else if (importedData && typeof importedData === 'object') {
+                            // 情况 B: 新版完整备份对象
+                            if (importedData.type === "RyePhoneChatBackup" && Array.isArray(importedData.main_conversation)) {
+                                messagesToMerge = importedData.main_conversation;
+                            } 
+                            // 情况 C: 可能是其他格式，尝试找 conversation 字段
+                            else if (Array.isArray(importedData.conversation)) {
+                                messagesToMerge = importedData.conversation;
+                            }
                         }
 
-                        const confirmed = await conversationManager.customConfirm('这将把备份文件中的消息合并到当前聊天记录之前，确定要合并吗？');
+                        if (!Array.isArray(messagesToMerge) || messagesToMerge.length === 0) {
+                            throw new Error('文件格式不正确，未能提取到有效的消息数组。请确认这是正确的备份文件。');
+                        }
+
+                        const confirmed = await conversationManager.customConfirm(`检测到 ${messagesToMerge.length} 条消息。这将把它们合并到当前聊天记录中，确定要合并吗？`);
                         if (!confirmed) return;
                         
-                        // 1. 读取现有的新消息
+                        // 1. 读取现有的消息
                         const existingMessages = loadFromLocalStorage(`conversation_${chatId}`, []);
                         
-                        // 2. 将新旧消息合并
-                        const mergedMessages = [...importedMessages, ...existingMessages];
+                        // 2. 将导入的消息和现有消息合并
+                        const mergedMessages = [...messagesToMerge, ...existingMessages];
                         
-                        // 3. 去重并排序，确保万无一失
-                        const uniqueMessages = Array.from(new Map(mergedMessages.map(item => [item.id || item.timestamp, item])).values());
+                        // 3. 去重并排序 (使用 ID 作为唯一标识，如果 ID 冲突，保留现有的)
+                        // Map 会保留最后一个键值对，所以我们先放导入的，再放现有的，这样现有的会覆盖导入的（防止旧数据覆盖新修改）
+                        const uniqueMap = new Map();
+                        
+                        // 先放入导入的消息
+                        messagesToMerge.forEach(msg => uniqueMap.set(msg.id || msg.timestamp, msg));
+                        // 再放入现有的消息 (如果有重复ID，现有的会覆盖导入的)
+                        existingMessages.forEach(msg => uniqueMap.set(msg.id || msg.timestamp, msg));
+                        
+                        const uniqueMessages = Array.from(uniqueMap.values());
+                        
+                        // 按时间戳重新排序
                         uniqueMessages.sort((a, b) => a.timestamp - b.timestamp);
                         
                         // 4. 处理图片并保存
@@ -25481,6 +25542,7 @@ async function handleRemoveMember() {
                         conversationManager.open(chatId);
 
                     } catch (error) {
+                        console.error(error);
                         await conversationManager.customAlert('合并失败: ' + error.message);
                     }
                 };
