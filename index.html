@@ -10467,33 +10467,46 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
         let isPreviewMode = false; // --- 核心新增 ---
         let callAttemptState = { callId: null, closeUI: null }; // <--- 新增这一行
 
-        // 【【【 核心新增：后台保活机制 (用户提供资源版) 】】】
+        // 【【【 核心新增：后台保活机制 (iOS 终极修正版) 】】】
         let keepAliveAudio = null;
-        let pipVideo = null;
+        
+        // 1. 预先初始化视频元素 (关键修复：提前创建并加载，防止点击时因网络延迟被拦截)
+        // 我们把它放在函数外面，保证页面一加载它就开始准备
+        let pipVideo = document.createElement('video');
+        pipVideo.crossOrigin = "anonymous";
+        pipVideo.muted = true; // 静音
+        pipVideo.playsInline = true; // iOS 必须
+        pipVideo.loop = true; // 循环播放
+        pipVideo.style.display = 'none';
+        // 使用你提供的真实 MOV 文件
+        pipVideo.src = 'https://files.catbox.moe/wwh544.mov'; 
+        document.body.appendChild(pipVideo);
+        // 关键：立即触发加载，但不播放
+        pipVideo.load();
 
-        // 1. 音频保活：使用你提供的 AAC 文件
+        // 监听退出事件
+        pipVideo.addEventListener('leavepictureinpicture', () => {
+            const toggle = document.getElementById('toggle-pip-keep-alive');
+            if (toggle) toggle.checked = false;
+            // 注意：这里只暂停，不销毁元素，留着下次用
+            pipVideo.pause();
+        });
+
+        // 2. 音频保活 (AAC)
         function enableKeepAlive() {
-            // 如果画中画正在运行，就不需要音频保活了
-            if (document.pictureInPictureElement) {
-                return;
-            }
+            if (document.pictureInPictureElement) return; // 画中画优先
 
             if (!keepAliveAudio) {
-                // 【核心修正】使用你提供的真实音频文件
                 keepAliveAudio = new Audio('https://files.catbox.moe/4stssk.aac');
-                keepAliveAudio.loop = true; // 循环播放
-                keepAliveAudio.volume = 0.01; // 极低音量
+                keepAliveAudio.loop = true;
+                keepAliveAudio.volume = 0.01;
             }
             
-            // 防止重复播放
-            if (!keepAliveAudio.paused && keepAliveAudio.currentTime > 0) {
-                return;
-            }
+            if (!keepAliveAudio.paused && keepAliveAudio.currentTime > 0) return;
 
             const playPromise = keepAliveAudio.play();
             if (playPromise !== undefined) {
                 playPromise.catch(e => {
-                    // 这里的报错忽略，等待用户下一次点击屏幕时自动激活
                     console.warn("⚠️ 音频保活启动受阻 (等待交互):", e);
                 });
             }
@@ -10502,10 +10515,7 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
 
         function disableKeepAlive(forceStop = false) {
             const settings = loadFromLocalStorage('app-appearance-settings', {});
-            // 如果开启了强力模式，且不是强制停止，就继续播放
-            if (settings.alwaysKeepAlive && !forceStop) {
-                return;
-            }
+            if (settings.alwaysKeepAlive && !forceStop) return;
 
             if (keepAliveAudio) {
                 keepAliveAudio.pause();
@@ -10513,37 +10523,31 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
             }
         }
 
-        // 2. 画中画保活：使用你提供的 MOV 视频
+        // 3. 画中画保活 (MOV)
         async function enablePiPKeepAlive() {
-            if (!pipVideo) {
-                pipVideo = document.createElement('video');
-                pipVideo.crossOrigin = "anonymous"; 
-                pipVideo.muted = true; // 静音
-                pipVideo.playsInline = true; // iOS 必须
-                pipVideo.loop = true; // 循环播放
-                pipVideo.style.display = 'none';
-                
-                // 【核心修正】使用你提供的真实视频文件 (.mov 对 iOS 兼容性极佳)
-                pipVideo.src = 'https://files.catbox.moe/wwh544.mov'; 
-                
-                document.body.appendChild(pipVideo);
-                
-                // 监听退出事件
-                pipVideo.addEventListener('leavepictureinpicture', () => {
-                    const toggle = document.getElementById('toggle-pip-keep-alive');
-                    if (toggle) toggle.checked = false;
-                    disablePiPKeepAlive();
-                }, { once: true });
-            }
-
             try {
-                // 先尝试播放
+                // 尝试播放。因为我们提前 load() 了，这里应该很快。
                 await pipVideo.play();
-                // 再请求画中画
+                
+                // 检查视频是否真的准备好了
+                if (pipVideo.readyState < 1) {
+                    throw new Error("视频正在缓冲，请稍等几秒再试...");
+                }
+                
+                // 请求画中画
                 await pipVideo.requestPictureInPicture();
+                
             } catch (e) {
                 console.error("画中画启动失败:", e);
-                throw new Error("启动失败: " + e.message + "\n(请确保在设置中允许了画中画权限)");
+                
+                // 针对 iOS 的特定错误进行“人话”提示
+                if (e.name === 'NotAllowedError' || e.message.includes('user activation')) {
+                    // 如果是因为网络卡顿导致超时，提示用户重试
+                    // 因为第一次点击已经触发了加载，第二次点击通常就能成功
+                    throw new Error("启动超时(iOS限制)。\n\n请【关闭开关】，然后【立即再次打开】即可成功！");
+                }
+                
+                throw e; // 抛出其他错误
             }
         }
 
