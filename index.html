@@ -26825,7 +26825,19 @@ async function handleRemoveMember() {
         
         navigateTo('home');
     }
-    const APP_DATA_PREFIXES = [ 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' ];
+        // 【核心修复】补全所有可能的数据前缀，包括 GitHub设置(gh_)、自动回复(auto_)、视频通话(video_)、临时数据(pending_)
+    const APP_DATA_PREFIXES = [ 
+        'app-', 'app_', 
+        'chat-', 'chat_', 
+        'my_', 
+        'conversation_', 
+        'moments_', 
+        'gh_',           // GitHub 仓库、Token 设置
+        'auto_',         // 自动回复设置
+        'video_',        // 视频通话背景
+        'pending_',      // 小说分享等临时状态
+        'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+    ];
 
     function base64ToBlob(base64, contentType = '', sliceSize = 512) {
         const byteCharacters = atob(base64.split(',')[1]);
@@ -26928,10 +26940,17 @@ async function handleRemoveMember() {
                         const rehydratedData = await rehydrateDataFromPortable(importedRawData);
 
                         // 2. 清除当前相关的旧数据
+                        // 【核心修复】重新定义一遍完整的前缀列表，确保清理彻底
+                        const CLEANUP_PREFIXES = [ 
+                            'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
+                            'gh_', 'auto_', 'video_', 'pending_',
+                            'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+                        ];
+
                         const keysToRemove = [];
                         for (let i = 0; i < localStorage.length; i++) {
                            const key = localStorage.key(i);
-                           if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                           if (CLEANUP_PREFIXES.some(prefix => key.startsWith(prefix))) {
                                keysToRemove.push(key);
                            }
                         }
@@ -29822,7 +29841,19 @@ const cloudBackupManager = (function() {
     async function getCompressedBackupData() {
         if (typeof JSZip === 'undefined') throw new Error("JSZip 未加载");
         
-        const APP_DATA_PREFIXES = [ 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' ];
+        // 【核心修复】同步更新云端备份的前缀白名单
+        const APP_DATA_PREFIXES = [ 
+            'app-', 'app_', 
+            'chat-', 'chat_', 
+            'my_', 
+            'conversation_', 
+            'moments_', 
+            'gh_',           // GitHub 设置
+            'auto_',         // 自动回复
+            'video_',        // 视频通话
+            'pending_',      // 临时状态
+            'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+        ];
         const allData = {};
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
