@@ -10467,32 +10467,47 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
         let isPreviewMode = false; // --- 核心新增 ---
         let callAttemptState = { callId: null, closeUI: null }; // <--- 新增这一行
 
-        // 【【【 核心新增：后台保活机制 (暴力直连版) 】】】
+        // 【【【 核心新增：后台保活机制 (PWA适配版) 】】】
         let keepAliveAudio = null;
         let pipVideo = null;
 
-        // 1. 音频保活 (AAC) - 保持不变，作为辅助
+        // 1. 音频保活 (AAC) - APP模式的唯一救星
         function enableKeepAlive() {
+            // 如果画中画正在运行，就不需要音频保活了
             if (document.pictureInPictureElement) return;
 
             if (!keepAliveAudio) {
+                // 【核心修正】使用你提供的真实 AAC 文件
                 keepAliveAudio = new Audio('https://files.catbox.moe/4stssk.aac');
-                keepAliveAudio.loop = true;
-                keepAliveAudio.volume = 0.01;
+                keepAliveAudio.loop = true; // 循环播放
+                keepAliveAudio.volume = 0.01; // 极低音量
+                
+                // iOS PWA 特殊处理：不仅要 loop，还要监听结束强行重播，防止系统杀后台
+                keepAliveAudio.onended = function() {
+                    this.play().catch(() => {});
+                };
             }
             
-            if (!keepAliveAudio.paused && keepAliveAudio.currentTime > 0) return;
+            // 防止重复播放
+            if (!keepAliveAudio.paused && keepAliveAudio.currentTime > 0) {
+                return;
+            }
 
             const playPromise = keepAliveAudio.play();
             if (playPromise !== undefined) {
-                playPromise.catch(e => console.warn("⚠️ 音频保活等待交互:", e));
+                playPromise.catch(e => {
+                    console.warn("⚠️ 音频保活启动受阻 (等待交互):", e);
+                });
             }
-            console.log("🔥 音频保活已就绪");
+            console.log("🔥 音频保活已就绪 (AAC)");
         }
 
         function disableKeepAlive(forceStop = false) {
             const settings = loadFromLocalStorage('app-appearance-settings', {});
-            if (settings.alwaysKeepAlive && !forceStop) return;
+            // 如果开启了强力模式，且不是强制停止，就继续播放
+            if (settings.alwaysKeepAlive && !forceStop) {
+                return;
+            }
 
             if (keepAliveAudio) {
                 keepAliveAudio.pause();
@@ -10500,19 +10515,23 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
             }
         }
 
-        // 2. 画中画保活 (MOV) - 暴力显示版
+        // 2. 画中画保活 (MOV) - 仅限浏览器模式
         async function enablePiPKeepAlive() {
-            // 如果视频元素还没创建，现在创建
+            // 【核心新增】检测是否为 iOS PWA (添加到主屏幕) 模式
+            const isIOSPWA = window.navigator.standalone === true;
+            if (isIOSPWA) {
+                throw new Error("苹果限制：【添加到主屏幕】模式下不支持画中画。\n\n👉 请使用上方的【🔥 强力音频保活】开关即可！");
+            }
+
             if (!pipVideo) {
                 pipVideo = document.createElement('video');
                 pipVideo.crossOrigin = "anonymous";
-                pipVideo.muted = true; // 静音
-                pipVideo.playsInline = true; // iOS 必须
-                pipVideo.loop = true; // 循环播放
-                // 【核心修改】开启原生控件，让用户能手动操作
-                pipVideo.controls = true; 
+                pipVideo.muted = true; 
+                pipVideo.playsInline = true;
+                pipVideo.loop = true;
+                pipVideo.controls = true; // 显示控件，方便手动点击
                 
-                // 【核心修改】不再隐藏！直接固定在右下角，让你看得到
+                // 样式：固定在右下角
                 pipVideo.style.cssText = `
                     position: fixed;
                     bottom: 80px;
@@ -10526,15 +10545,14 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                     border: 2px solid #28a745;
                 `;
                 
+                // 使用你提供的真实 MOV 文件
                 pipVideo.src = 'https://files.catbox.moe/wwh544.mov'; 
                 document.body.appendChild(pipVideo);
 
-                // 监听：如果进入了画中画，就把网页上的小窗隐藏掉，免得碍眼
                 pipVideo.addEventListener('enterpictureinpicture', () => {
                     pipVideo.style.display = 'none';
                 });
 
-                // 监听：如果退出了画中画，把开关关掉，并清理视频
                 pipVideo.addEventListener('leavepictureinpicture', () => {
                     const toggle = document.getElementById('toggle-pip-keep-alive');
                     if (toggle) toggle.checked = false;
@@ -10542,18 +10560,17 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                 });
             }
 
-            // 显示视频（防止之前被隐藏了）
             pipVideo.style.display = 'block';
 
             try {
                 await pipVideo.play();
-                // 尝试自动进入画中画
                 await pipVideo.requestPictureInPicture();
             } catch (e) {
-                console.warn("自动画中画被拦截，转为手动模式:", e);
-                // 【核心逻辑】如果自动失败，不报错，而是弹窗提示用户手动点
-                // 视频窗口已经显示在右下角了，用户点一下上面的画中画图标即可
-                alert("由于iOS限制，自动弹出失败。\n\n✅ 视频已显示在右下角。\n👉 请手动点击视频上的【画中画图标】即可！");
+                console.warn("自动画中画被拦截:", e);
+                // 只有非 PWA 模式才提示手动点击
+                if (!isIOSPWA) {
+                    alert("自动弹出失败 (iOS限制)。\n\n✅ 视频已显示在右下角。\n👉 请手动点击视频上的【画中画图标】即可！");
+                }
             }
         }
 
@@ -10563,7 +10580,7 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
             }
             if (pipVideo) {
                 pipVideo.pause();
-                pipVideo.style.display = 'none'; // 隐藏播放器
+                pipVideo.style.display = 'none';
             }
         }
         // 【【【 新增结束 】】】
