@@ -10471,28 +10471,134 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
         let keepAliveAudio = null;
         
         function enableKeepAlive() {
+            // 【核心新增】如果“画中画”正在运行，说明后台已经稳了，不需要再启动音频保活
+            // 这样可以避免和抖音抢声音，也避免报错
+            if (document.pictureInPictureElement) {
+                console.log("📺 画中画运行中，跳过音频保活启动");
+                return;
+            }
+
             if (!keepAliveAudio) {
-                // 创建一个极其短小的无声 MP3
                 keepAliveAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAA=');
                 keepAliveAudio.loop = true;
-                keepAliveAudio.volume = 0.01; // 极低音量，防止干扰
+                keepAliveAudio.volume = 0.01;
             }
-            // 【核心修正】增加 catch 处理，防止因为“未产生用户交互”而导致整个程序报错停止
+            
+            if (!keepAliveAudio.paused && keepAliveAudio.currentTime > 0) {
+                return;
+            }
+
             const playPromise = keepAliveAudio.play();
             if (playPromise !== undefined) {
                 playPromise.catch(e => {
-                    console.warn("⚠️ 保活音频启动受阻 (非用户主动操作，属正常现象):", e);
-                    // 这里不抛出错误，保证AI逻辑继续运行
+                    console.warn("⚠️ 保活音频启动受阻:", e);
                 });
             }
             console.log("🔥 后台保活尝试启动");
         }
 
-        function disableKeepAlive() {
+        function disableKeepAlive(forceStop = false) {
+            // 1. 读取设置
+            const settings = loadFromLocalStorage('app-appearance-settings', {});
+            
+            // 2. 如果开启了“强力保活”，且不是强制停止(forceStop)，则忽略停止指令
+            // 这样 AI 回复完之后，音频依然会继续播放，保持后台存活
+            if (settings.alwaysKeepAlive && !forceStop) {
+                console.log("🔥 强力保活模式：忽略停止指令，继续保持音频活跃...");
+                return;
+            }
+
+            // 3. 正常停止逻辑
             if (keepAliveAudio) {
                 keepAliveAudio.pause();
                 keepAliveAudio.currentTime = 0;
                 console.log("❄️ 后台保活机制已关闭");
+            }
+        }
+
+        // 【【【 核心新增：画中画 (PiP) 保活逻辑 】】】
+        let pipVideo = null;
+        let pipCanvas = null;
+        let pipInterval = null;
+
+        async function enablePiPKeepAlive() {
+            if (!document.pictureInPictureEnabled) {
+                throw new Error("当前浏览器不支持画中画模式。");
+            }
+
+            // 1. 创建一个隐藏的 Canvas，用来画“监控画面”
+            if (!pipCanvas) {
+                pipCanvas = document.createElement('canvas');
+                pipCanvas.width = 300;
+                pipCanvas.height = 300;
+            }
+
+            // 2. 创建一个 Video 元素，源来自 Canvas
+            if (!pipVideo) {
+                pipVideo = document.createElement('video');
+                pipVideo.muted = true; // 关键：静音，不占音频通道
+                pipVideo.playsInline = true;
+                pipVideo.style.display = 'none'; // 隐藏元素
+                document.body.appendChild(pipVideo);
+            }
+
+            const ctx = pipCanvas.getContext('2d');
+            const stream = pipCanvas.captureStream(1); // 1 FPS 足够了，省电
+            pipVideo.srcObject = stream;
+
+            // 3. 启动一个定时器，不断更新 Canvas 画面
+            // 这一步非常重要！如果画面静止，iOS 可能会暂停视频。
+            // 我们画一个动态的时间，假装是“系统监控”
+            if (pipInterval) clearInterval(pipInterval);
+            pipInterval = setInterval(() => {
+                const now = new Date();
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, 300, 300);
+                
+                ctx.fillStyle = '#0f0';
+                ctx.font = '40px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('SYSTEM', 150, 100);
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = '30px monospace';
+                ctx.fillText(now.toLocaleTimeString(), 150, 160);
+                
+                ctx.fillStyle = '#0f0';
+                ctx.font = '20px monospace';
+                ctx.fillText('AI RUNNING...', 150, 220);
+                
+                // 画一个闪烁的点
+                if (now.getMilliseconds() < 500) {
+                    ctx.beginPath();
+                    ctx.arc(150, 260, 10, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            }, 1000);
+
+            // 4. 播放并请求进入画中画
+            await pipVideo.play();
+            await pipVideo.requestPictureInPicture();
+            
+            // 监听退出事件（比如用户手动关掉了窗口）
+            pipVideo.addEventListener('leavepictureinpicture', () => {
+                const toggle = document.getElementById('toggle-pip-keep-alive');
+                if (toggle) toggle.checked = false;
+                disablePiPKeepAlive();
+            }, { once: true });
+        }
+
+        function disablePiPKeepAlive() {
+            if (pipInterval) {
+                clearInterval(pipInterval);
+                pipInterval = null;
+            }
+            if (document.pictureInPictureElement && pipVideo) {
+                document.exitPictureInPicture().catch(() => {});
+            }
+            if (pipVideo) {
+                pipVideo.pause();
+                pipVideo.srcObject = null; // 断开流
             }
         }
         // 【【【 新增结束 】】】
@@ -18044,9 +18150,12 @@ actionMenu.addEventListener('click', async (e) => {
     }
 });
 footerSendBtn.addEventListener('click', async () => { 
+    // 【核心新增】点击瞬间立即激活保活音频！
+    conversationManager.enableKeepAlive();
+
     await handleSendMessageAttempt('text', footerMessageInput.value.trim()); 
     footerMessageInput.value = ''; 
-    footerMessageInput.style.height = '38px'; // 发送后重置高度
+    footerMessageInput.style.height = '38px'; 
     footerMessageInput.dispatchEvent(new Event('input')); 
 });
 
@@ -18100,9 +18209,14 @@ footerStickerBtn.addEventListener('click', () => {
         inputEl.dispatchEvent(new Event('input', { bubbles: true }));
     });
 });
-dynamicDecorationBtn.addEventListener('click', triggerAIContinuation);
 
-headerMoreBtn.addEventListener('click', async () => { 
+// 【核心修改】给重新生成按钮也加上保活激活
+dynamicDecorationBtn.addEventListener('click', () => {
+    conversationManager.enableKeepAlive(); // 点击瞬间激活
+    triggerAIContinuation();
+});
+
+headerMoreBtn.addEventListener('click', async () => {
         const menuButtons = [ 
             { text: '聊天信息', value: 'chat_info', class: 'primary' },
             { text: '设置状态', value: 'set_status', class: 'primary' },
@@ -19393,7 +19507,9 @@ Third line (note 3), and so on...
             reloadContactInfo, // <--- 【核心新增】暴露这个函数
             // 【核心新增】暴露保活控制函数，供主动行为使用
             enableKeepAlive,
-            disableKeepAlive
+            disableKeepAlive,
+            enablePiPKeepAlive, // 画中画
+            disablePiPKeepAlive
         };
 })();
         
@@ -23027,6 +23143,98 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 // 如果 showRawOutput 是 false (不显示), 开关应为 OFF (unchecked).
                 rawOutputToggle.checked = appearanceSettings.showRawOutput;
             }
+
+            // 【【【 核心新增：强力后台保活开关 】】】
+            // 1. 动态插入开关 HTML
+            let keepAliveGroup = document.getElementById('keep-alive-toggle-group');
+            if (!keepAliveGroup && rawOutputToggle) {
+                const debugSection = rawOutputToggle.closest('.form-section');
+                if (debugSection) {
+                    const div = document.createElement('div');
+                    div.id = 'keep-alive-toggle-group';
+                    div.className = 'form-group-toggle';
+                    div.style.borderTop = '1px solid var(--light-gray)';
+                    div.innerHTML = `
+                        <label for="toggle-keep-alive" class="toggle-label" style="color: #d35400;">🔥 强力后台保活 (实验性)</label>
+                        <label class="switch">
+                            <input type="checkbox" id="toggle-keep-alive">
+                            <span class="slider"></span>
+                        </label>
+                    `;
+                    debugSection.appendChild(div);
+                    
+                    const hint = document.createElement('p');
+                    hint.className = 'form-hint';
+                    hint.style.padding = '0 15px 15px';
+                    hint.innerHTML = '开启后，网页将持续播放静音音频以欺骗系统不冻结后台。<br><b>注意：</b>刷视频/打电话可能会打断保活。';
+                    debugSection.appendChild(hint);
+
+                    // --- 【核心新增：画中画保活开关】 ---
+                    const divPiP = document.createElement('div');
+                    divPiP.className = 'form-group-toggle';
+                    divPiP.style.borderTop = '1px solid var(--light-gray)';
+                    divPiP.innerHTML = `
+                        <label for="toggle-pip-keep-alive" class="toggle-label" style="color: #2980b9;">📺 画中画保活 (推荐)</label>
+                        <label class="switch">
+                            <input type="checkbox" id="toggle-pip-keep-alive">
+                            <span class="slider"></span>
+                        </label>
+                    `;
+                    debugSection.appendChild(divPiP);
+
+                    const hintPiP = document.createElement('p');
+                    hintPiP.className = 'form-hint';
+                    hintPiP.style.padding = '0 15px 15px';
+                    hintPiP.innerHTML = '<b>强烈推荐 iOS 用户使用。</b><br>开启后会弹出一个“监控窗口”。只要这个窗口在，AI 就能在后台一直运行，且<b>不会打断你的音乐</b>。';
+                    debugSection.appendChild(hintPiP);
+                }
+            }
+
+            // 2. 绑定事件
+            const keepAliveToggle = document.getElementById('toggle-keep-alive');
+            if (keepAliveToggle) {
+                keepAliveToggle.checked = appearanceSettings.alwaysKeepAlive || false;
+                
+                const newToggle = keepAliveToggle.cloneNode(true);
+                keepAliveToggle.parentNode.replaceChild(newToggle, keepAliveToggle);
+                
+                newToggle.addEventListener('change', () => {
+                    appearanceSettings.alwaysKeepAlive = newToggle.checked;
+                    saveSettings();
+                    
+                    // 立即生效：如果开启，马上启动音频；如果关闭，马上停止
+                    if (appearanceSettings.alwaysKeepAlive) {
+                        conversationManager.enableKeepAlive();
+                        alert("强力保活已启动！\n请不要关闭网页，直接切换到其他应用即可。\n如果听到声音中断，说明保活失效了。");
+                    } else {
+                        conversationManager.disableKeepAlive(true); // 强制关闭
+                    }
+                });
+            }
+
+            // 【核心新增：画中画事件绑定】
+            const pipToggle = document.getElementById('toggle-pip-keep-alive');
+            if (pipToggle) {
+                // 画中画状态不保存到本地，因为每次刷新都需要用户手动触发
+                pipToggle.checked = false; 
+                
+                const newPiPToggle = pipToggle.cloneNode(true);
+                pipToggle.parentNode.replaceChild(newPiPToggle, pipToggle);
+                
+                newPiPToggle.addEventListener('change', async () => {
+                    if (newPiPToggle.checked) {
+                        try {
+                            await conversationManager.enablePiPKeepAlive();
+                        } catch (e) {
+                            newPiPToggle.checked = false;
+                            alert("启动画中画失败：\n" + e.message + "\n\n请确保在浏览器设置中允许了“画中画”权限。");
+                        }
+                    } else {
+                        conversationManager.disablePiPKeepAlive();
+                    }
+                });
+            }
+            // 【【【 插入结束 】】】
 
             // 【【【 核心新增：vConsole 开关渲染与监听 】】】
             // 1. 动态插入开关 HTML (如果还没插入过)
