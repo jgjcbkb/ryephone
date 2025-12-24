@@ -273,10 +273,8 @@
     white-space: pre-wrap; 
 }
 #page-conversation .message.text {
-    display: flex;
-    flex-direction: row; /* 改为水平排列 */
-    flex-wrap: wrap; /* 允许内容自动换行 */
-    gap: 0 5px; /* 设置垂直间距为0，水平间距为5px */
+    /* 【核心修复】移除 flex 布局，改回 block 模式以支持正常的文字流式排版 */
+    display: block !important; 
     /* 核心修复：强制让内部内容（如HTML卡片）水平居中，防止贴边 */
     align-items: center; 
 }
@@ -4193,8 +4191,11 @@ input:checked + .slider:before {
 #page-conversation .message .mention {
     color: #5d6d94; /* 一个醒目的蓝色，与朋友圈链接颜色统一 */
     font-weight: 600; /* 加粗 */
+    /* 【核心修复】强制设为标准行内元素，并移除可能导致换行的间距 */
+    display: inline !important;
+    padding: 0 2px;
+    margin: 0;
     
-    padding: 1px 3px;
     border-radius: 4px;
     cursor: pointer;
 }
@@ -4282,19 +4283,30 @@ input:checked + .slider:before {
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important; 
-    overflow: visible !important; 
+    /* 【核心修复】必须设置为 hidden，强制切掉溢出部分，或者让内部元素受限 */
+    overflow: hidden !important; 
     
     /* CRITICAL FIX: Set a maximum size for the sticker container */
-    max-width: 80px;  
-    max-height: 80px; 
+    width: 80px !important; /* 强制宽度 */
+    height: 80px !important; /* 强制高度 */
+    max-width: 80px !important;  
+    max-height: 80px !important; 
+    
+    /* 确保容器本身是块级或flex，以便控制尺寸 */
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
 }
 
 #page-conversation .message[data-is-sticker="true"] img {
     /* The image inside will fit within the container */
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
+    width: 100% !important; /* 强制撑满容器宽度 */
+    height: 100% !important; /* 强制撑满容器高度 */
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: contain !important; /* 保持比例缩放 */
     border-radius: 0 !important;
+    display: block !important; /* 消除底部空隙 */
 }
 
 /* 2. Rule for Stickers INSIDE the Moments comments section */
@@ -5932,7 +5944,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 <div class="form-group">
     <label for="preamble-end-time">前情提要结束时间 (选填)</label>
     <input type="datetime-local" id="preamble-end-time" class="modal-input" style="padding: 10px; background-color: #f7f7f7; font-family: inherit; font-size: 1rem;">
-    <p class="form-hint">如果设置了此时间，当聊天记录中的最新时间已超过它时，上述前情提要将自动失效，不再发送给AI。</p>
+    <p class="form-hint">设置此时间后，AI将明确知道“前情提要”中的事件全部发生在此时刻之前。这有助于AI在长线剧情中理清过去与现在的逻辑关系。</p>
 </div>
                             
                             <!-- ******** 新增的聊天总结模块从这里开始 ******** -->
@@ -7520,16 +7532,22 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                     finalSystemPrompt += `\n\n[Recent Video Call Transcript]\n${callHistoryText}\n[End of Transcript]`;
                 }
 
-                // 【核心修改】传入 targetChatId，确保在后台触发主动消息时，能正确解析群聊成员名字
+                // 【核心修复】传入 targetChatId，确保在后台触发主动消息时，能正确解析群聊成员名字
                 const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, targetChatId);
                 chatHistoryForPrompt = apiPayloadMessages.map(msg => {
-                    const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || senderName);
                     let content = '';
                     if (Array.isArray(msg.content)) {
                         content = msg.content.find(part => part.type === 'text')?.text || '[Image Content]';
                     } else {
                         content = msg.content;
                     }
+
+                    // 【核心修改】如果是日期分割线，直接返回内容，不加姓名
+                    if (content.startsWith('[---')) {
+                        return content;
+                    }
+
+                    const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || senderName);
                     return `${role}: ${content}`;
                 }).join('\n');
             }
@@ -7588,7 +7606,12 @@ if (momentsData && momentsData.allVisibleMoments.length > 0) {
              interactions += ` (Comments: ${commentsText})`;
          }
          
-         momentsContext += `Post #${i+1} by ${author}: "${content}"${interactions}\n`;
+         // 【核心新增】格式化朋友圈发布时间
+         const pDate = new Date(post.timestamp);
+         const pTimeStr = `${pDate.getFullYear()}年${pDate.getMonth() + 1}月${pDate.getDate()}日 ${pDate.getHours().toString().padStart(2, '0')}:${pDate.getMinutes().toString().padStart(2, '0')}`;
+
+         // 【核心修改】在摘要中注入 [Posted at: 时间]
+         momentsContext += `Post #${i+1} by ${author} [Posted at: ${pTimeStr}]: "${content}"${interactions}\n`;
     });
 }
 
@@ -8161,8 +8184,12 @@ if (isGroupPersona) {
                 }
                 const privacyInfo = `(Privacy: ${post.privacy.type})`;
                 
-                // 【【【核心修改：从下面的 return 字符串中删除 ${authorPersonaInfo} 】】】
-                return `Post #${i + 1} (ID: ${post.id}) by ${authorLabel} ${privacyInfo}: "${contentDescription}" ${imageInfo}\n  Recent Comments:\n${commentsPreview || '  - No comments yet.'}`;
+                // 【核心新增】格式化帖子的绝对发布时间
+                const pDate = new Date(post.timestamp);
+                const pTimeStr = `${pDate.getFullYear()}年${pDate.getMonth() + 1}月${pDate.getDate()}日 ${pDate.getHours().toString().padStart(2, '0')}:${pDate.getMinutes().toString().padStart(2, '0')}`;
+
+                // 【核心修改】在返回给AI的字符串中注入 [Posted at: 时间]
+                return `Post #${i + 1} (ID: ${post.id}) by ${authorLabel} [Posted at: ${pTimeStr}] ${privacyInfo}: "${contentDescription}" ${imageInfo}\n  Recent Comments:\n${commentsPreview || '  - No comments yet.'}`;
             }).join('\n\n');
             
             // --- START: 需求 1 & 2 的核心修改 - 加载聊天记录 ---
@@ -8361,7 +8388,7 @@ ${momentsContext}
 
 **[ABSOLUTE RULES FOR THE DESCRIPTION - UNBREAKABLE]**
 
-1.  **THE IMMERSION LAW (MOST IMPORTANT):** You **MUST** assume the image is a real photograph of a real scene. You are **STRICTLY FORBIDDEN** from mentioning the image's style.
+1.  **THE IMMERSION LAW (MOST IMPORTANT):** You **MUST** assume the images are real photographs of real scenes. You are **STRICTLY FORBIDDEN** from mentioning the image's style.
     *   **FORBIDDEN WORDS:** "anime style", "cartoon", "illustration", "drawing", "2D", "photograph", "picture", "image", "动漫风格", "卡通", "插画", "图片", "照片", "二次元".
     *   **CORRECT APPROACH:** Directly describe the content.
         *   **WRONG:** "This is an anime-style drawing of a girl with pink hair."
@@ -8369,9 +8396,16 @@ ${momentsContext}
 
 2.  **FORMATTING LAW:** The description **MUST** be wrapped in \`<moment_img_desc id="POST_ID">...</moment_img_desc>\` tags. The ID must match the post you are describing.
 
-3.  **CONTENT LAW:** The description must be **objective and detailed**, focusing on "who, what, where, when, and how."
+3.  **MULTI-IMAGE GALLERY PROTOCOL (NEW):** If a post contains multiple images (a gallery), you MUST provide a comprehensive and cinematic description of the entire set. 
+    *   **Narrative Flow:** If the images show a sequence, describe the story they tell. 
+    *   **Atmospheric Consistency:** Describe the overall mood (e.g., "a melancholic rainy afternoon," "a vibrant summer festival").
+    *   **Key Highlights:** Mention specific, striking details from different photos in the set to show you have analyzed all of them.
 
-**Example:** \`<moment_img_desc id="post_12345">A golden retriever dog running on a grassy field under a blue sky.</moment_img_desc>\`
+4.  **CONTENT LAW (VIVID & ELABORATE):** The description MUST be highly detailed (at least 5-8 sentences for galleries). Focus on lighting (golden hour glows, flickering neon), textures (wet asphalt, soft knit sweaters), and spatial relationships. Describe the characters' expressions, the clutter on a desk, or the specific type of flowers in a garden.
+
+5.  **LANGUAGE:** You MUST write the description in **English** to ensure the highest level of detail and conceptual clarity for your internal memory.
+
+**Example:** \`<moment_img_desc id="post_12345">A cinematic gallery of six photos capturing a late-night study session. The first few images show a cluttered wooden desk illuminated by a single warm desk lamp, with open textbooks, handwritten notes, and a half-empty mug of coffee. Another photo is a close-up of a window with rain droplets reflecting the city's blue and purple neon lights outside. The final images capture the character leaning back in a leather chair, eyes tired but determined, with the soft glow of a laptop screen reflecting in their pupils, creating an atmosphere of quiet, focused solitude.</moment_img_desc>\`
 
 
 ---
@@ -8566,10 +8600,18 @@ Even if nothing seems immediately interesting, you must find a reason to act, ba
             }
             // 【【【 新增结束 】】】
 
+            // 【核心修复】在主动发消息逻辑中，也加入对前情提要时间的逻辑描述
+            let preambleStatus = "Preamble Context";
+            if (contextChatInfo.preambleEndTime) {
+                const pEnd = new Date(contextChatInfo.preambleEndTime).getTime();
+                const now = Date.now();
+                preambleStatus = now > pEnd ? `Historical Preamble (Events happened before ${contextChatInfo.preambleEndTime})` : "Current Preamble";
+            }
+
             let contextHeader = `
 [CONTEXT - READ FIRST]
 Use this context to decide WHAT to post. Your post must be consistent with this background information.
-Preamble: ${preamble || 'None'}
+${preambleStatus}: ${preamble || 'None'}
 User Persona (${userNameForPrompt}): ${finalUserPersonaText || 'Default'}
 ${associatedNpcsPrompt}
 ---
@@ -11326,16 +11368,26 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
             const isTargetGroup = targetChatObj ? targetChatObj.type === '群聊' : (contactInfo && contactInfo.isGroup);
 
             const payloadMessages = [];
-            // 注意：这里不再使用 chatState.messages，因为后台处理时它可能为空，我们只处理传入的 messages 参数
-            
-            for (const msg of messages) {
-                // 【【【 核心新增：如果消息被标记为隐藏，直接跳过，不发送给AI 】】】
-                if (msg.isHiddenFromAI) {
-                    continue;
-                }
-                // 【【【 新增结束 】】】
+        // 【核心新增】用于追踪日期变化
+        let lastDateStr = "";
+        
+        for (const msg of messages) {
+            // 【【【 核心新增：如果消息被标记为隐藏，直接跳过，不发送给AI 】】】
+            if (msg.isHiddenFromAI) {
+                continue;
+            }
+            // 【【【 新增结束 】】】
 
-                // 1. 系统消息处理 (终极修正：全通透模式)
+            // 【核心新增】天数变化检测逻辑
+            const msgDate = new Date(msg.timestamp);
+            const currentDateStr = `${msgDate.getFullYear()}年${msgDate.getMonth() + 1}月${msgDate.getDate()}日`;
+            if (currentDateStr !== lastDateStr) {
+                // 如果日期变了，先往 payload 里塞一条日期提示消息
+                payloadMessages.push({ role: 'user', content: `[--- ${currentDateStr} ---]` });
+                lastDateStr = currentDateStr;
+            }
+
+            // 1. 系统消息处理 (终极修正：全通透模式)
                 if (msg.side === 'system') {
                     let observationText = null;
                     const text = msg.text;
@@ -11514,7 +11566,11 @@ A girl with long pink hair is standing under a cherry blossom tree. She is weari
                 if (msg.replyTo) { const originalMsg = messages.find(m => m.id === msg.replyTo); let originalContentText = `(a previous message)`; if(originalMsg) { if(originalMsg.text) originalContentText = `"${originalMsg.text}"`; else originalContentText = `a ${originalMsg.type}`; } mainText = `[Replying to ${originalContentText}] ${mainText}`; }
                 const stripRegex = /<div data-ai-strip="true"[\s\S]*?<\/div>/gm;
                 mainText = mainText.replace(stripRegex, '').trim();
-                if(mainText) { contentParts.unshift({ type: 'text', text: mainText }); }
+                
+                // 【核心修改】恢复纯净文本，不再每条都加时间戳
+                if(mainText) { 
+                    contentParts.unshift({ type: 'text', text: mainText }); 
+                }
 
                 if (contentParts.length > 0) {
                     const currentChatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
@@ -12930,36 +12986,32 @@ Your entire focus MUST be on your own actions, thoughts, and interactions with O
                     const preamble = chatInfo.preamble || '';
 const preambleEndTime = chatInfo.preambleEndTime;
 
-if (preamble) { // 只有在前情提要存在时才执行判断
-    let includePreamble = true; // 默认总是包含
-
-    if (preambleEndTime) { // 检查用户是否设置了结束时间
+if (preamble) {
+    let preambleHeader = "[Preamble - Highest Priority Context]";
+    
+    // 【核心修复】不再判断是否“失效”，而是判断是否属于“过去的历史”
+    if (preambleEndTime) {
         try {
             const preambleEndTimestamp = new Date(preambleEndTime).getTime();
-            
-            // 获取当前聊天记录中的“最新时间点”
             const lastMessage = chatState.messages.length > 0 ? chatState.messages[chatState.messages.length - 1] : null;
             const currentSimulatedTimestamp = lastMessage ? lastMessage.timestamp : Date.now();
 
-            // 核心判断：如果当前聊天时间已经晚于前情提要的结束时间
             if (currentSimulatedTimestamp > preambleEndTimestamp) {
-                includePreamble = false; // 那么就不包含前情提要
-                console.log("[Preamble Logic] 前情提要因已过设定的结束时间而被忽略。");
+                // 如果当前时间已超过设定时间，告诉AI这是“历史背景”
+                preambleHeader = `[Historical Preamble - Events occurred BEFORE ${preambleEndTime}]`;
+            } else {
+                // 如果还没到那个时间，告诉AI这是“即将发生或正在发生的背景”
+                preambleHeader = `[Current Preamble - Immediate Background Context]`;
             }
         } catch (e) {
-            console.error("解析前情提要结束时间时出错:", e);
+            console.error("Preamble time check error:", e);
         }
     }
 
-    // 只有在需要包含时，才将其拼接到系统提示中
-    if (includePreamble) {
-        if (isUserInGroup) {
-            // 用户在群里，正常注入
-            finalSystemPrompt = `[Preamble - Highest Priority Context]\n${preamble}\n\n` + finalSystemPrompt;
-        } else {
-            // 用户不在群里，标记为“背景参考”，并警告不要互动
-            finalSystemPrompt = `[Background Context / Preamble]\n(NOTE: The user is NOT present in this scene. This is for background logic only. DO NOT interact with them.)\n${preamble}\n\n` + finalSystemPrompt;
-        }
+    if (isUserInGroup) {
+        finalSystemPrompt = `${preambleHeader}\n${preamble}\n\n` + finalSystemPrompt;
+    } else {
+        finalSystemPrompt = `${preambleHeader}\n(NOTE: The user is NOT present in this scene. This is for background logic only.)\n${preamble}\n\n` + finalSystemPrompt;
     }
 }
                     
@@ -13418,8 +13470,12 @@ const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 
                      interactions += ` (Comments: ${commentsText})`;
                  }
                  
-                 // 使用带有强制标签的 authorLabel
-                 momentsContext += `Post #${i+1} by ${authorLabel}: "${content}"${interactions}\n`;
+                 // 【核心新增】格式化朋友圈发布时间
+                 const pDate = new Date(post.timestamp);
+                 const pTimeStr = `${pDate.getFullYear()}年${pDate.getMonth() + 1}月${pDate.getDate()}日 ${pDate.getHours().toString().padStart(2, '0')}:${pDate.getMinutes().toString().padStart(2, '0')}`;
+
+                 // 【核心修改】在摘要中注入 [Posted at: 时间]
+                 momentsContext += `Post #${i+1} by ${authorLabel} [Posted at: ${pTimeStr}]: "${content}"${interactions}\n`;
             });
             }
 
@@ -14058,54 +14114,58 @@ Okay, that's all the context and rules. Now, generate your full response.
                 const existingSummary = chatInfo.chatSummary || '(这是第一份总结)';
                 
                 const taskPrompt = `
-# [ULTIMATE DIRECTIVE: THE NARRATIVE EDITOR]
+# [ULTIMATE DIRECTIVE: THE NARRATIVE HISTORIAN]
 
-You are a professional narrative editor. Your task is to distill the raw conversation logs into a concise, high-density plot summary.
+You are a professional narrative historian. Your task is to perform a "Narrative Reconstruction" of the provided logs. You are NOT just summarizing; you are recording the definitive history of this story.
 
 ---
 ## **[CONTEXTUAL DATA]**
 
-**[PREAMBLE]** (Do not repeat):
+**[PREAMBLE]** (Background context):
+
 ---
 ${preambleText}
 ---
 
-**[EXISTING ARCHIVE]** (Do not repeat):
+**[EXISTING ARCHIVE]** (Previous story beats):
+
 ---
 ${existingSummary}
 ---
 
-**[NEW EVIDENCE]** (To be summarized):
+**[NEW EVIDENCE]** (The raw logs to be processed):
+
 ---
 ${newHistoryText}
 ---
 
 ---
-## **[YOUR MISSION: DISTILL AND APPEND - THE "NO FLUFF" PROTOCOL]**
+## **[YOUR MISSION: COMPREHENSIVE RECONSTRUCTION - THE "NO LOSS" PROTOCOL]**
 
-You MUST summarize the **"NEW EVIDENCE"** based on the following strict filtering rules.
+You MUST process the **"NEW EVIDENCE"** by expanding on the substance while ignoring the mechanical micro-actions.
 
-**1.  【WHAT TO KEEP (THE SIGNAL)】 - Record these:**
-    *   **Plot Advancement:** Any event that moves the story forward (e.g., a decision made, a truth revealed, a task completed).
-    *   **Relationship Shifts:** Concrete changes in how characters feel about each other (e.g., an argument, a reconciliation, a confession).
-    *   **Key Information:** New facts or items acquired that are relevant to the future.
-    *   **Critical Timestamps:** Specific times mentioned for future events (e.g., "Tomorrow at 8 PM").
+**1.  【SCENE STRUCTURE (MANDATORY)】:**
+    *   **The Setup:** How did this interaction begin? What was the initial tension or goal?
+    *   **The Conflict/Dialogue:** Detail the specific arguments, topics, or revelations discussed. Do NOT generalize. If they discussed a specific secret, name the secret.
+    *   **The Turning Point:** Identify the exact moment the vibe or relationship shifted. Explain the "Why."
+    *   **The Resolution:** What is the new status quo at the end of this log?
 
-**2.  【WHAT TO DISCARD (THE NOISE) - ABSOLUTE BAN】 - Do NOT record these:**
-    *   **Micro-Actions:** "Tapping fingers", "sipping tea", "looking out the window", "nodding". Unless an action directly causes a major consequence (like slapping someone), DISCARD IT.
-    *   **Micro-Expressions:** "With a playful look", "smiling gently", "frowning". DISCARD IT. Use the *meaning* of the dialogue instead.
-    *   **Chatter:** Small talk like "Hello", "How are you", "What did you eat" that has no plot relevance.
+**2.  【SUBSTANCE OVER SURFACE】:**
+    *   **IGNORE:** "Frowning," "nodding," "walking," "adjusting clothes," or generic descriptions of "talking."
+    *   **RECORD:** The *intent* behind the words, the *emotional breakthroughs*, the *specific information shared*, and the *consequences* of the interaction.
 
-**3.  【THE "NO REPETITION" OATH】**
-    *   You swear an oath to **NEVER** repeat any information already contained within the **"PREAMBLE"** or the **"EXISTING ARCHIVE"**. Your focus is exclusively on the **"NEW EVIDENCE"**.
+**3.  【LENGTH & DENSITY MANDATE (CRITICAL)】:**
+    *   **MINIMUM LENGTH:** Your response MUST be at least **300 to 500 Chinese characters**. 
+    *   **DETAIL DENSITY:** If the raw log is long, your reconstruction MUST be long. You are forbidden from collapsing a complex 50-message argument into a single sentence. Give each "beat" of the argument its own description.
 
-**4.  【FORMATTING】**
+**4.  【STYLE】:**
     *   **Language:** Simplified Chinese.
-    *   **Style:** Concise, objective, third-person narrative. High information density.
-    *   **Example of Good Summary:** "A向B坦白了秘密，B感到震惊但选择原谅。两人约定明晚去探查旧宅。"
-    *   **Example of Bad Summary:** "A看着B，眼神闪烁，手指敲着桌子，犹豫了一会儿说出了秘密。B听完后瞪大了眼睛，深吸一口气，说没关系。" (TOO VERBOSE)
+    *   **Tone:** Engaging, literary, third-person narrative. It should read like a high-quality "Story Recap" found in a novel.
 
-**Output:** Your entire response MUST be the appended summary text ONLY.
+**5.  【THE "NO REPETITION" OATH】:**
+    *   Focus ONLY on the developments within the **"NEW EVIDENCE"**. Do not re-state the **"PREAMBLE"** or **"ARCHIVE"**.
+
+**Output:** Your entire response MUST be the reconstructed narrative text ONLY.
 `;
 
                 const finalMessages = [
@@ -18608,6 +18668,11 @@ function calculateApiPayloadSize() {
     const activeRules = globalRules.filter(rule => enabledRegexNames.includes(rule.name) && rule.enabled);
 
     const contextChars = recentMessages.reduce((sum, msg) => {
+        // 【核心修复】如果消息被标记为“屏蔽”（对AI隐藏），则不计入字数统计
+        if (msg.isHiddenFromAI) {
+            return sum;
+        }
+
         if (!msg.text || typeof msg.text !== 'string' || msg.text.startsWith('indexeddb:')) {
             return sum;
         }
@@ -22795,6 +22860,7 @@ You are responsible for playing every AI character in the "Active Cast" list.`;
                     const chatHistoryForPrompt = apiPayloadMessages.map(msg => {
         const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || '角色');
         const content = Array.isArray(msg.content) ? msg.content.find(p => p.type === 'text')?.text || '[多媒体]' : msg.content;
+        // 【核心修复】利用 prepareApiPayload 已经生成的带时间戳内容
         return `${role}: ${content}`;
     }).join('\n');
 
@@ -23154,11 +23220,15 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                     script.onload = () => {
                         // 脚本加载完毕后初始化
                         if (!window.vConsoleInstance) {
-                            // 【核心修改】只保留 Log 和 Network
+                            // 【核心修复】同时调高请求和响应的长度限制，确保完整显示世界书和人设
                             window.vConsoleInstance = new VConsole({
                                 defaultPlugins: ['system', 'network', 'element', 'storage'], // 先加载所有，然后手动移除不需要的
                                 disableLogScrolling: true,
-                                theme: 'dark'
+                                theme: 'dark',
+                                // 【关键新增】设置请求数据（提示词）上限为 50MB
+                                maxNetworkRequestLen: 52428800, 
+                                // 【关键新增】设置响应数据（AI回复）上限为 50MB
+                                maxNetworkResponseLen: 52428800
                             });
                             
                             // 手动移除不需要的插件，只留 Log(default) 和 Network
@@ -23166,7 +23236,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                             const pluginsToRemove = ['system', 'element', 'storage'];
                             pluginsToRemove.forEach(id => window.vConsoleInstance.removePlugin(id));
                             
-                            console.log('vConsole 已启动 (仅 Log & Network)');
+                            console.log('vConsole 已启动 (全量抓取模式)');
                         }
                     };
                     document.head.appendChild(script);
@@ -23324,7 +23394,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                     const hintPiP = document.createElement('p');
                     hintPiP.className = 'form-hint';
                     hintPiP.style.padding = '0 15px 15px';
-                    hintPiP.innerHTML = '<b>强烈推荐 iOS 用户使用。</b><br>开启后会弹出一个“监控窗口”。只要这个窗口在，AI 就能在后台一直运行，且<b>不会打断你的音乐</b>。';
+                    hintPiP.innerHTML = '开启后会弹出一个“监控窗口”。只要这个窗口在，AI 就能在后台一直运行，且<b>不会打断你的音乐</b>。';
                     debugSection.appendChild(hintPiP);
                 }
             }
@@ -27199,7 +27269,8 @@ async function handleRemoveMember() {
                 .npe-side-selector legend { font-size: 12px; margin-bottom: 5px; color: #555; font-weight: bold; }
                 .npe-side-options { display: flex; gap: 5px; }
                 .npe-side-options label { font-size: 12px; padding: 6px 10px; border: 1px solid #ddd; border-radius: 15px; cursor: pointer; transition: all 0.2s; }
-                .npe-side-options input { display: none; }
+                /* 【核心修复】只隐藏单选框和复选框，不要隐藏数字输入框 */
+                .npe-side-options input[type="radio"], .npe-side-options input[type="checkbox"] { display: none; }
                 .npe-side-options input:checked + label { background-color: #3498db; color: white; border-color: #3498db; }
                 .npe-stretch-line-selector { display: flex; flex-direction: column; align-items: center; }
                 .npe-stretch-line-options { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
@@ -27222,6 +27293,8 @@ async function handleRemoveMember() {
                     <div class="npe-actions-wrapper">
     <fieldset class="npe-side-selector side-selector-fieldset" style="margin: 0;"><legend>图片原朝向</legend><div class="npe-side-options"><input type="radio" id="npe-img-left" name="npe-img-dir" value="left"><label for="npe-img-left">左</label><input type="radio" id="npe-img-right" name="npe-img-dir" value="right" checked><label for="npe-img-right">右</label></div></fieldset>
     <fieldset class="npe-side-selector side-selector-fieldset" style="margin: 0;"><legend>保存为</legend><div class="npe-side-options"><input type="radio" id="npe-target-receiver" name="npe-target" value="received" checked><label for="npe-target-receiver">接收方</label><input type="radio" id="npe-target-sender" name="npe-target" value="sent"><label for="npe-target-sender">发送方</label></div></fieldset>
+    <!-- 【核心修复】增加事件阻止冒泡，确保输入框可点击并获得焦点 -->
+    <fieldset class="npe-side-selector" style="margin: 0;"><legend>缩放比例</legend><div class="npe-side-options"><input type="number" id="npe-scale-factor" value="18" step="0.5" min="1" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()" onclick="this.focus()" style="display: block !important; width: 50px; height: 28px; border: 1px solid #ddd; border-radius: 4px; text-align: center; font-size: 13px; background: white; color: black;"></div></fieldset>
     <div class="npe-stretch-line-selector stretch-line-controls" style="display: none;"><legend>拉伸线</legend><div class="npe-stretch-line-options"><button class="line-control-btn" data-line="top">上/下</button><button class="line-control-btn" data-line="left">左/右</button></div></div>
     <button class="npe-action-btn" id="npe-open-file-btn">本地</button>
     <button class="npe-action-btn" id="npe-link-btn">链接</button>
@@ -27571,7 +27644,9 @@ async function handleRemoveMember() {
             const imageUrlForCss = config.imageUrl ? config.imageUrl : imageToBase64(config.image);
             // --- 修改结束 ---
 
-            const scaleFactor = 18; // 黑麦手机默认使用18作为缩放因子
+            // 【核心修复】从界面输入框读取缩放比例，不再写死为 18
+            const scaleInput = document.getElementById('npe-scale-factor');
+            const scaleFactor = (scaleInput && scaleInput.value) ? parseFloat(scaleInput.value) : 18;
 
             
             const { image, regions } = config;
