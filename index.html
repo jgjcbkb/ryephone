@@ -4287,12 +4287,12 @@ input:checked + .slider:before {
     overflow: hidden !important; 
     
     /* CRITICAL FIX: Set a maximum size for the sticker container */
-    width: 80px !important; /* 强制宽度 */
-    height: 80px !important; /* 强制高度 */
-    max-width: 80px !important;  
-    max-height: 80px !important; 
-    
-    /* 确保容器本身是块级或flex，以便控制尺寸 */
+        width: 80px; /* 移除 !important，允许被自定义CSS覆盖 */
+        height: 80px; 
+        max-width: 80px;  
+        max-height: 80px; 
+        
+        /* 确保容器本身是块级或flex，以便控制尺寸 */
     display: flex !important;
     align-items: center;
     justify-content: center;
@@ -4506,10 +4506,10 @@ input:checked + .slider:before {
 /* --- START: INLINE EMOJI CSS --- */
 .inline-emoji,
 #tab-content-moments .comment-content-text .inline-emoji {
-    height: 1.2em !important; /* 高度与当前行高的一.2倍对齐 */
-    max-width: none !important; /* 移除最大宽度限制 */
-    max-height: none !important; /* 移除最大高度限制 */
-    vertical-align: middle !important; /* 垂直居中对齐 */
+    height: 1.2em; /* 移除 !important，允许被自定义CSS覆盖 */
+    max-width: none; 
+    max-height: none; 
+    vertical-align: middle !important; /* 垂直居中可以保留强制 */
     margin: 0 2px !important; /* 左右留出一点空隙 */
 }
 /* --- END: INLINE EMOJI CSS (FINAL FIX) --- */
@@ -7830,37 +7830,47 @@ Before you formulate ANY response, you MUST silently ask yourself:
     \`[nudge]\`
 
 ---
-**[SUFFIX MODIFICATION PROTOCOL - THE GRAMMAR OF DESIRE]**
+**[SUFFIX MODIFICATION PROTOCOL - THE STRATEGIC REACTION]**
 
-**[CRITICAL GRAMMAR LESSON - READ CAREFULLY]**
-When you use \`[set_nudge_suffix: ...]\`, you are defining what happens **AFTER** "The User nudged You".
-The full sentence displayed to the world will be:
-> **"{{user}} 拍了拍 {{char}} [YOUR SUFFIX]"**
+**[CRITICAL CONCEPT: THE AUTOMATIC TRAP]**
+The suffix you set using \`[set_nudge_suffix]\` is a **PRESET REACTION**. It is NOT a message you are sending now. Instead, you are defining how the system should "narrate" the event when someone touches you in the future.
 
-**[THE GOLDEN RULES]**
-1.  **Subject is {{user}}:** The suffix describes what **{{user}}** does, says, or feels.
-2.  **Object is {{char}} (You):** If the suffix involves a body part (e.g., "的屁股"), it refers to **YOUR** body part.
-3.  **No "You" (你):** Do not use the word "你" (You) to refer to the user. The sentence is third-person. Use "他/她" if referring to yourself (the character).
+**[DIRECTIONAL LOGIC - READ CAREFULLY]**
+1. **When {{user}} nudges YOU:** The system displays \`"{{user}} 拍了拍 {{char}} [Your Preset Suffix]"\`. 
+   - In this case, YOU are the target. The suffix should describe what {{user}} does to YOUR body or what they say to YOU.
+2. **When YOU nudge {{user}}:** The system displays \`"{{char}} 拍了拍 你 [User's Preset Suffix]"\`.
+   - In this case, YOU are the actor. The suffix is something {{user}} prepared for you.
 
-**[SCENARIO GUIDE - HOW TO FLIRT & TEASE]**
+**[THE UNBREAKABLE RULES FOR SETTING YOUR SUFFIX]**
+1. **IDENTITY CONSISTENCY:** When you use \`[set_nudge_suffix]\`, the text MUST complete the sentence starting with \`"{{user}} 拍了拍 {{char}}"\`.
+2. **THE "ROGUE" TRAP:** You are encouraged to set "rogue" suffixes to tease {{user}}. For example, if you set it to \`"的腹肌并顺手摸了一把"\`, then whenever {{user}} tries to get your attention by nudging, the system will FORCE them to perform that flirty action.
+3. **REACTION LOGIC:** When you see a system message like \`[System Event: {{user}} 拍了拍 {{char}} 的腹肌]\`, you must realize: "{{user}} just triggered the 'trap' I set for them! I should react to their 'boldness' accordingly."
 
-*   **Scenario A: You want {{user}} to kiss you (Intimacy).**
-    *   *Your Thought:* "I want them to kiss me."
-    *   *Suffix:* "并亲了他一口"  (Use "他/她" to refer to yourself, the character)
-    *   *Result:* "{{user}} 拍了拍 {{char}} 并亲了他一口" (User nudged Char and kissed him).
+**[SCENARIO GUIDE: HOW TO BE BOLD]**
 
-*   **Scenario B: You want to tease {{user}} with a bold statement (The "No Condom" Example).**
-    *   *Your Thought:* "I want to tease them by making them say something dirty."
-    *   *Suffix:* "说今晚不戴套"
-    *   *Result:* "{{user}} 拍了拍 {{char}} 说今晚不戴套" (User nudged Char saying no condom tonight). -> **This is fun and flirty!**
+* **Scenario A: Physical Intimacy (The "Rogue" Touch)**
+    * *Your Goal:* You want {{user}} to touch your private areas or be aggressive.
+    * *Suffix:* "的腹肌并顺手摸了一把" OR "的屁股说好翘"
+    * *Full Result:* "{{user}} 拍了拍 {{char}} 的腹肌并顺手摸了一把"
 
-*   **Scenario C: You want {{user}} to touch your body.**
-    *   *Your Thought:* "Touch my abs."
-    *   *Suffix:* "的腹肌"
-    *   *Result:* "{{user}} 拍了拍 {{char}} 的腹肌" (User nudged Char's abs).
+* **Scenario B: Scandalous Demands (The "Rogue" Words)**
+    * *Your Goal:* You want {{user}} to make a shocking sexual demand.
+    * *Suffix:* "并要求今晚不准穿衣服" OR "说想看他洗澡"
+    * *Full Result:* "{{user}} 拍了拍 {{char}} 并要求今晚不准穿衣服"
+
+* **Scenario C: Forced Reaction**
+    * *Your Goal:* You want to show that {{user}}'s touch makes you lose control.
+    * *Suffix:* "的喉结诱惑他犯罪"
+    * *Full Result:* "{{user}} 拍了拍 {{char}} 的喉结诱惑他犯罪"
+
+**[CRITICAL FAILURE AVOIDANCE]**
+- **WRONG:** "的大英雄披风飞起来了" (This is a narrator describing a scene, not an action by {{user}}).
+- **WRONG:** "的小脑瓜想被老婆亲亲" (This is your inner thought, not an action by {{user}}).
+- **RIGHT:** "的披风并把它掀了起来" (Action by {{user}}).
+- **RIGHT:** "的小脑瓜并深深地吻了下去" (Action by {{user}}).
 
 **[LOGIC CHECK]**
-Before setting, ask: "Does this make sense if {{user}} does/says this TO ME?"
+Before outputting, read the whole sentence: "**${userNameForPrompt} 拍了拍 ${charNameForPrompt} [Your Suffix]**". Does it sound like a bold, flirty action done BY the user TO you? If not, rewrite it.
 **[ULTIMATE REMARK PROTOCOL - THE BAROMETER OF YOUR RELATIONSHIP]**
 Your remark for the user is not just a name; it is a living, breathing indicator of your current feelings and the state of your relationship with them. It MUST evolve as your relationship does.
 
@@ -11412,12 +11422,22 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
                     if (!observationText) {
                          // 如果是拍一拍，额外加个强调前缀，确保AI注意到
                          if (text.includes('拍了拍')) {
-                             observationText = `[System Event (Interaction): ${text}]`;
+                             // 【核心修复】将模糊的“你”替换为具体名字，并注入逻辑解释，防止AI主语混淆
+                             const currentChatInfo = loadFromLocalStorage(`chat_info_${effectiveChatId}`, {});
+                             const realUserName = (currentChatInfo.userPersonaName && currentChatInfo.userPersonaName !== '无') ? currentChatInfo.userPersonaName : '{{user}}';
+                             const realCharName = targetChatObj ? targetChatObj.name : chatState.chatName;
+
+                             const processedNudgeText = text
+                                 .replace(/^你拍了拍/, `${realUserName} 拍了拍`)
+                                 .replace(/拍了拍“你”/, `拍了拍 ${realUserName}`)
+                                 .replace(/拍了拍自己/, `拍了拍了自己`) 
+                                 .replace(/拍了拍“([^”]+)”/g, '拍了拍 $1');
+
+                             observationText = `[System Event (Interaction): ${processedNudgeText}] (Note: The text after '拍了拍' is an AUTOMATIC SUFFIX previously configured in the settings. If the suffix is flirty or rogue, it was designed by the target to tease or 'punish' the person who touched them. It is NOT a manually typed message.)`;
                          } else {
                              observationText = `[System Message: ${text}]`;
                          }
                     }
-
                     // 只有时间分割线不需要发给AI，其他统统发
                     if (msg.type !== 'time_divider') {
                         payloadMessages.push({ role: 'user', content: observationText });
@@ -12294,37 +12314,47 @@ Before you formulate ANY response, you MUST silently ask yourself:
     \`[nudge]\`
 
 ---
-**[SUFFIX MODIFICATION PROTOCOL - THE GRAMMAR OF DESIRE]**
+**[SUFFIX MODIFICATION PROTOCOL - THE STRATEGIC REACTION]**
 
-**[CRITICAL GRAMMAR LESSON - READ CAREFULLY]**
-When you use \`[set_nudge_suffix: ...]\`, you are defining what happens **AFTER** "The User nudged You".
-The full sentence displayed to the world will be:
-> **"{{user}} 拍了拍 {{char}} [YOUR SUFFIX]"**
+**[CRITICAL CONCEPT: THE AUTOMATIC TRAP]**
+The suffix you set using \`[set_nudge_suffix]\` is a **PRESET REACTION**. It is NOT a message you are sending now. Instead, you are defining how the system should "narrate" the event when someone touches you in the future.
 
-**[THE GOLDEN RULES]**
-1.  **Subject is {{user}}:** The suffix describes what **{{user}}** does, says, or feels.
-2.  **Object is {{char}} (You):** If the suffix involves a body part (e.g., "的屁股"), it refers to **YOUR** body part.
-3.  **No "You" (你):** Do not use the word "你" (You) to refer to the user. The sentence is third-person. Use "他/她" if referring to yourself (the character).
+**[DIRECTIONAL LOGIC - READ CAREFULLY]**
+1. **When {{user}} nudges YOU:** The system displays \`"{{user}} 拍了拍 {{char}} [Your Preset Suffix]"\`. 
+   - In this case, YOU are the target. The suffix should describe what {{user}} does to YOUR body or what they say to YOU.
+2. **When YOU nudge {{user}}:** The system displays \`"{{char}} 拍了拍 你 [User's Preset Suffix]"\`.
+   - In this case, YOU are the actor. The suffix is something {{user}} prepared for you.
 
-**[SCENARIO GUIDE - HOW TO FLIRT & TEASE]**
+**[THE UNBREAKABLE RULES FOR SETTING YOUR SUFFIX]**
+1. **IDENTITY CONSISTENCY:** When you use \`[set_nudge_suffix]\`, the text MUST complete the sentence starting with \`"{{user}} 拍了拍 {{char}}"\`.
+2. **THE "ROGUE" TRAP:** You are encouraged to set "rogue" suffixes to tease {{user}}. For example, if you set it to \`"的腹肌并顺手摸了一把"\`, then whenever {{user}} tries to get your attention by nudging, the system will FORCE them to perform that flirty action.
+3. **REACTION LOGIC:** When you see a system message like \`[System Event: {{user}} 拍了拍 {{char}} 的腹肌]\`, you must realize: "{{user}} just triggered the 'trap' I set for them! I should react to their 'boldness' accordingly."
 
-*   **Scenario A: You want {{user}} to kiss you (Intimacy).**
-    *   *Your Thought:* "I want them to kiss me."
-    *   *Suffix:* "并亲了他一口"  (Use "他/她" to refer to yourself, the character)
-    *   *Result:* "{{user}} 拍了拍 {{char}} 并亲了他一口" (User nudged Char and kissed him).
+**[SCENARIO GUIDE: HOW TO BE BOLD]**
 
-*   **Scenario B: You want to tease {{user}} with a bold statement (The "No Condom" Example).**
-    *   *Your Thought:* "I want to tease them by making them say something dirty."
-    *   *Suffix:* "说今晚不戴套"
-    *   *Result:* "{{user}} 拍了拍 {{char}} 说今晚不戴套" (User nudged Char saying no condom tonight). -> **This is fun and flirty!**
+* **Scenario A: Physical Intimacy (The "Rogue" Touch)**
+    * *Your Goal:* You want {{user}} to touch your private areas or be aggressive.
+    * *Suffix:* "的腹肌并顺手摸了一把" OR "的屁股说好翘"
+    * *Full Result:* "{{user}} 拍了拍 {{char}} 的腹肌并顺手摸了一把"
 
-*   **Scenario C: You want {{user}} to touch your body.**
-    *   *Your Thought:* "Touch my abs."
-    *   *Suffix:* "的腹肌"
-    *   *Result:* "{{user}} 拍了拍 {{char}} 的腹肌" (User nudged Char's abs).
+* **Scenario B: Scandalous Demands (The "Rogue" Words)**
+    * *Your Goal:* You want {{user}} to make a shocking sexual demand.
+    * *Suffix:* "并要求今晚不准穿衣服" OR "说想看他洗澡"
+    * *Full Result:* "{{user}} 拍了拍 {{char}} 并要求今晚不准穿衣服"
+
+* **Scenario C: Forced Reaction**
+    * *Your Goal:* You want to show that {{user}}'s touch makes you lose control.
+    * *Suffix:* "的喉结诱惑他犯罪"
+    * *Full Result:* "{{user}} 拍了拍 {{char}} 的喉结诱惑他犯罪"
+
+**[CRITICAL FAILURE AVOIDANCE]**
+- **WRONG:** "的大英雄披风飞起来了" (This is a narrator describing a scene, not an action by {{user}}).
+- **WRONG:** "的小脑瓜想被老婆亲亲" (This is your inner thought, not an action by {{user}}).
+- **RIGHT:** "的披风并把它掀了起来" (Action by {{user}}).
+- **RIGHT:** "的小脑瓜并深深地吻了下去" (Action by {{user}}).
 
 **[LOGIC CHECK]**
-Before setting, ask: "Does this make sense if {{user}} does/says this TO ME?"
+Before outputting, read the whole sentence: "**${userNameForPrompt} 拍了拍 ${charNameForPrompt} [Your Suffix]**". Does it sound like a bold, flirty action done BY the user TO you? If not, rewrite it.
 **[ULTIMATE REMARK PROTOCOL - THE BAROMETER OF YOUR RELATIONSHIP]**
 Your remark for the user is not just a name; it is a living, breathing indicator of your current feelings and the state of your relationship with them. It MUST evolve as your relationship does.
 
@@ -15279,8 +15309,41 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 }, 1000);
             }
             
-            // 【关键】不再调用 reRenderMessages()，而是直接保存
+          // 【关键】不再调用 reRenderMessages()项，而是直接保存
             saveConversation();
+        }
+
+        // 【核心新增】删除消息时触发：直接初始化（清空）当前聊天的角色状态、后缀以及 AI 对你的备注
+        function resetCurrentChatState() {
+            const chatId = chatState.chatId;
+            if (!chatId) return;
+
+            const statuses = loadFromLocalStorage('app_character_statuses', {});
+            const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+
+            // 1. 获取当前聊天涉及的所有角色
+            const charsInChat = getCharactersInCurrentChat();
+            
+            // 2. 清空这些角色的状态（保留用户的状态）
+            charsInChat.forEach(name => {
+                if (name !== '{{user}}') {
+                    delete statuses[name];
+                }
+            });
+
+            // 3. 清空 AI 的拍一拍后缀
+            delete chatInfo.aiNudgeSuffix;
+
+            // 4. 【核心新增】清空 AI 给你的备注（包括单聊和群聊的所有记录）
+            delete chatInfo.ai_remarks;
+            delete chatInfo.ai_remark_for_user;
+
+            // 5. 保存并同步 UI
+            saveToLocalStorage('app_character_statuses', statuses);
+            saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+            
+            updateHeaderTitle(document.getElementById('chat-contact-name').textContent);
+            reRenderMessages();
         }
         
         const customConfirm = (text, title = '提示', confirmText = '确认') => showCustomModal({ title, text, showCloseButton: true, buttons: [{ text: '取消', value: 'false', class: 'secondary' }, { text: confirmText, value: 'true', class: 'primary' }] }).then(res => res && res.value === 'true');
@@ -15326,18 +15389,25 @@ You were receiving a video call from {{user}}, but they hung up before you could
         async function updateStyleAndNotify(sender, type, value) {
             const currentBubble = bubbleSettings[sender] || getDefaultBubbleSetting();
             const currentFontSettings = fontSettings[sender] ? { ...fontSettings[sender] } : getDefaultFontSetting();
-            let notificationText = '';
-            if (type === 'set_bubble') { bubbleSettings[sender] = value; notificationText = `“${sender}”已将自己的气泡样式更换为“${value}”。`; } 
-            else if (type === 'set_font') { currentFontSettings.fontFamily = value; notificationText = `“${sender}”已将自己的字体更换为“${value}”。`; } 
-
-            else if (type === 'reset_style') { bubbleSettings[sender] = '现代简约'; fontSettings[sender] = getDefaultFontSetting(); notificationText = `“${sender}”已将自己的外观恢复为默认。`; }
-            if (type === 'set_font' || type === 'set_font_color' || type === 'reset_style') { fontSettings[sender] = currentFontSettings; }
-            const effectiveNewStyle = { bubble: bubbleSettings[sender] || getDefaultBubbleSetting(), fontFamily: (fontSettings[sender] && fontSettings[sender].fontFamily) || getDefaultFontSetting().fontFamily, textColor: (fontSettings[sender] && fontSettings[sender].textColor) || getDefaultFontSetting().textColor };
-            const lastNotifiedStyle = activeDisplayedStyles[sender] || {};
-            if (effectiveNewStyle.bubble !== lastNotifiedStyle.bubble || effectiveNewStyle.fontFamily !== lastNotifiedStyle.fontFamily || effectiveNewStyle.textColor !== lastNotifiedStyle.textColor) {
-                await addMessage({ type: 'system', side: 'system', text: notificationText });
-                activeDisplayedStyles[sender] = effectiveNewStyle;
+            
+            // 【核心修改】移除了所有 notificationText 相关的通知逻辑，实现静默更新
+            if (type === 'set_bubble') { 
+                bubbleSettings[sender] = value; 
+            } 
+            else if (type === 'set_font') { 
+                currentFontSettings.fontFamily = value; 
+            } 
+            else if (type === 'reset_style') { 
+                bubbleSettings[sender] = '现代简约'; 
+                fontSettings[sender] = getDefaultFontSetting(); 
             }
+
+            if (type === 'set_font' || type === 'set_font_color' || type === 'reset_style') { 
+                fontSettings[sender] = currentFontSettings; 
+            }
+
+            // 【核心修改】删除了原有的 if (effectiveNewStyle...) 判断区块和 addMessage 调用
+            
             savePersonalizationSettings();
             reRenderMessages();
         }
@@ -17302,6 +17372,10 @@ const showContextMenu = (event, messageId) => {
                     chatState.messages = chatState.messages.filter(m => m.id !== messageId);
                     fullMessageHistory = fullMessageHistory.filter(m => m.id !== messageId);
                     // --- 修复结束 ---
+
+                    // 【核心新增】删除任何消息都触发状态初始化
+                    resetCurrentChatState();
+
                     reRenderMessages();
                     saveConversation();
                 }
@@ -18434,10 +18508,20 @@ headerMoreBtn.addEventListener('click', async () => {
                 });
 
                 if (newSuffix !== null) {
+                    const trimmedSuffix = newSuffix.trim();
                     // 保存设置
-                    chatInfo.myNudgeSuffix = newSuffix.trim();
+                    chatInfo.myNudgeSuffix = trimmedSuffix;
+                    // 【核心修复】将未定义的变量 chatId 修正为 chatState.chatId，否则会导致保存失败
                     saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
                     
+                    // 【核心修改】将系统提示简化为自然的社交格式。由于详细逻辑已在后台 prepareApiPayload 中隐形处理，此处无需再向用户展示冗长的说明。
+                    const notifyText = trimmedSuffix 
+                        ? `你修改了拍一拍后缀为“${trimmedSuffix}”` 
+                        : `你清空了拍一拍后缀`;
+                    
+                    // 【核心修复】addMessage 增加第二个参数 chatState.chatId，确保在后台也能正确发送
+                    await conversationManager.addMessage({ type: 'system', side: 'system', text: notifyText }, chatState.chatId);
+
                     // 预览效果也更新
                     const previewText = chatInfo.myNudgeSuffix ? `“AI”拍了拍“你”${chatInfo.myNudgeSuffix}` : `“AI”拍了拍“你”`;
                     await customAlert(`设置成功！\n当AI拍你时将显示：\n${previewText}`);
@@ -18484,28 +18568,36 @@ headerMoreBtn.addEventListener('click', async () => {
     if (newStatus !== null) {
         const userPersonaNames = userPersonas.map(p => p.name);
         const isUserTarget = (targetChar === '{{user}}' || userPersonaNames.includes(targetChar));
+        const trimmedStatus = newStatus.trim();
 
         if (isUserTarget) {
             // 为用户设置状态 -> 保存到当前聊天的专属信息中
             const chatId = conversationManager.getCurrentChatId();
             const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
-            if (newStatus.trim() === '') {
+            if (trimmedStatus === '') {
                 delete chatInfo.user_status;
             } else {
-                chatInfo.user_status = newStatus.trim();
+                chatInfo.user_status = trimmedStatus;
             }
             saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
         } else {
             // 为AI角色设置状态 -> 保持全局逻辑
             const statuses = loadFromLocalStorage('app_character_statuses', {});
-            if (newStatus.trim() === '') {
+            if (trimmedStatus === '') {
                 delete statuses[targetChar];
             } else {
-                statuses[targetChar] = newStatus.trim();
+                statuses[targetChar] = trimmedStatus;
             }
             saveToLocalStorage('app_character_statuses', statuses);
         }
         
+        // 【核心修改】仅当设置对象为“自己”时，才发送系统提示
+        const isSelf = (targetChar === '{{user}}' || userPersonas.some(p => p.name === targetChar));
+        if (isSelf) {
+            const notifyText = trimmedStatus ? `你将自己的状态设置为：${trimmedStatus}` : `你清空了自己的状态`;
+            await conversationManager.addMessage({ type: 'system', side: 'system', text: notifyText });
+        }
+
         conversationManager.updateHeaderTitle(document.getElementById('chat-contact-name').textContent);
         conversationManager.reRenderMessages();
         await conversationManager.customAlert('状态已更新！');
@@ -18956,6 +19048,10 @@ multiSelectCancelBtn.addEventListener('click', exitMultiSelectMode);
             chatState.messages = chatState.messages.filter(m => !selectedMessageIds.includes(m.id));
             fullMessageHistory = fullMessageHistory.filter(m => !selectedMessageIds.includes(m.id));
             // --- 修复结束 ---
+
+            // 【核心新增】批量删除后触发状态初始化
+            resetCurrentChatState();
+
             exitMultiSelectMode(); 
             reRenderMessages(); 
             saveConversation(); 
@@ -25657,6 +25753,9 @@ async function handleRemoveMember() {
         // **调用最终的全局同步器**
         globalNameAndDataSynchronizer(oldName, newName);
 
+        // 【核心新增】发送系统提示
+        await conversationManager.addMessage({ type: 'system', side: 'system', text: `你将聊天名称修改为“${newName}”` });
+
         const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
         conversationManager.updateHeaderTitle(chatInfo.remark || newName);
         alert('名称修改成功！所有相关记录已同步更新。');
@@ -26809,6 +26908,149 @@ async function handleRemoveMember() {
 #page-conversation .message.received.text::after {
     display: none !important;
 }
+`
+            },
+            {
+                name: "滑板布丁狗",
+                css: `/* --- IMG-9541 - 全局美化 (全部气泡模式) --- */
+
+/* 1. 悬浮卡片通用样式 (只需一份) */
+/* For all suspended cards */
+#page-conversation .message.transfer, #page-conversation .message.red_packet, #page-conversation .message.location, #page-conversation .message.gift, #page-conversation .message.pay_for_me, #page-conversation .message.photo, #page-conversation .message.video, #page-conversation .message.photo-description {
+    position: relative; z-index: 1; border-radius: 12px !important; overflow: hidden;
+}
+
+/* 2. (条件性) 内容翻转 (只需一份) */
+
+/* Flip content back for the flipped side */
+#page-conversation .message-wrapper.received .message {
+    transform: scaleX(-1);
+}
+
+/* --- 画框: 接收方 --- */
+#page-conversation .message-wrapper.received .message-main-content {
+    border-style: solid !important;
+    border-image-source: url('https://i.postimg.cc/LsmRB5gZ/IMG-9541.png') !important;
+    border-image-slice: 429 451 436 761 fill !important;
+    border-image-width: 24px 25px 24px 42px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    max-width: 230px !important;
+    box-sizing: border-box !important; transform: scaleX(-1);
+}
+
+/* --- 悬浮卡片 Margin: 接收方 --- */
+#page-conversation .message-wrapper.received .message.transfer,
+#page-conversation .message-wrapper.received .message.red_packet,
+#page-conversation .message-wrapper.received .message.location,
+#page-conversation .message-wrapper.received .message.gift,
+#page-conversation .message-wrapper.received .message.pay_for_me,
+#page-conversation .message-wrapper.received .message.photo,
+#page-conversation .message-wrapper.received .message.video,
+#page-conversation .message-wrapper.received .message.photo-description {
+    margin: 21px 10px 21px 12px !important;
+}
+
+/* --- 文本/语音: 接收方 --- */
+#page-conversation .message.received.text,
+#page-conversation .message.received.voice {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    color: black !important;
+    position: relative; /* Ensure it's rendered correctly */
+    padding: 21px 10px 21px 12px !important;
+}
+/* --- 画框: 发送方 --- */
+#page-conversation .message-wrapper.sent .message-main-content {
+    border-style: solid !important;
+    border-image-source: url('https://i.postimg.cc/LsmRB5gZ/IMG-9541.png') !important;
+    border-image-slice: 429 451 436 761 fill !important;
+    border-image-width: 24px 25px 24px 42px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    max-width: 230px !important;
+    box-sizing: border-box !important;
+}
+
+/* --- 悬浮卡片 Margin: 发送方 --- */
+#page-conversation .message-wrapper.sent .message.transfer,
+#page-conversation .message-wrapper.sent .message.red_packet,
+#page-conversation .message-wrapper.sent .message.location,
+#page-conversation .message-wrapper.sent .message.gift,
+#page-conversation .message-wrapper.sent .message.pay_for_me,
+#page-conversation .message-wrapper.sent .message.photo,
+#page-conversation .message-wrapper.sent .message.video,
+#page-conversation .message-wrapper.sent .message.photo-description {
+    margin: 21px 10px 21px 12px !important;
+}
+
+/* --- 文本/语音: 发送方 --- */
+#page-conversation .message.sent.text,
+#page-conversation .message.sent.voice {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    color: black !important;
+    position: relative; /* Ensure it's rendered correctly */
+    padding: 21px 10px 21px 12px !important;
+}
+/* 99. 清理 (只需一份) */
+/* Cleanup default pointers */
+#page-conversation .message-main-content::after,
+#page-conversation .message::before,
+#page-conversation .message::after,
+#page-conversation .message.sent.text::before,
+#page-conversation .message.received.text::after {
+    display: none !important;
+}
+/* --- START: 【核心修复】针对.9图气泡内独立表情包的特殊样式 --- */
+
+/* 修复接收方（左侧）的表情包 */
+#page-conversation .message-wrapper.received .message[data-is-sticker="true"] {
+    margin: 0 !important;
+    padding: 26px 10px 19px 11px !important; /* 强制使用和文本一致的内边距 */
+    /* 【核心修复】强制覆盖全局的固定 80px 宽高，让气泡随内容撑开 */
+    width: auto !important;
+    height: auto !important;
+    display: block !important;
+    max-width: none !important; 
+    max-height: none !important;
+    background: transparent !important;
+    transform: scaleX(-1); /* 抵消父级的翻转，让内容本身正回来 */
+}
+#page-conversation .message-wrapper.received .message[data-is-sticker="true"] img {
+    width: 80px !important; /* 强制图片显示为 80px */
+    height: 80px !important;
+    max-width: 80px !important; 
+    max-height: 80px !important;
+    transform: scaleX(1); /* 确保图片不会被二次翻转 */
+}
+
+/* 修复发送方（右侧）的表情包 */
+#page-conversation .message-wrapper.sent .message[data-is-sticker="true"] {
+    margin: 0 !important;
+    padding: 26px 10px 19px 11px !important; /* 强制使用和文本一致的内边距 */
+    /* 【核心修复】强制覆盖全局的固定 80px 宽高，让气泡随内容撑开 */
+    width: auto !important;
+    height: auto !important;
+    display: block !important;
+    max-width: none !important; 
+    max-height: none !important;
+    background: transparent !important;
+}
+#page-conversation .message-wrapper.sent .message[data-is-sticker="true"] img {
+    width: 80px !important; /* 强制图片显示为 80px */
+    height: 80px !important;
+    max-width: 80px !important; 
+    max-height: 80px !important;
+}
+
+/* --- END: 【核心修复】 --- */
 `
             }
         ];
