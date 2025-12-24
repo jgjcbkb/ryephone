@@ -265,11 +265,10 @@
         line-height: 1.5; word-wrap: break-word; position: relative; 
     }
     #page-conversation .message.text, #page-conversation .message.voice { 
-    max-width: 230px;
+    max-width: 230px; /* 这里的数值现在只是一个默认参考值 */
     padding: 10px 18px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
     width: -moz-fit-content; width: fit-content;
     min-width: 30px;
-    /* 【核心修复】：强制保留换行符和空格 */
     white-space: pre-wrap; 
 }
 #page-conversation .message.text {
