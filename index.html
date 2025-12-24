@@ -7911,7 +7911,7 @@ ${stickerInstructions}
   - For short artistic text: \`[photo-description: A short, moody text.]\`
 - To send a VOICE message: \`[voice: Text to be spoken]\`
 **4. Financial, Gifting & Requests (MUST USE COMMANDS):**
-- To send a RED PACKET: \`[red_packet: Blessing Text]\`
+- To send a RED PACKET: You can send a simple one \`[red_packet: Blessing Text]\` (random amount) or a specific one \`[red_packet: {"text": "Blessing Text", "amount": 88.54}]\`. The amount must be between 0.01 and 200.
 - To send a money TRANSFER: \`[transfer: Amount]\`
 - To send a GIFT: \`[gift: Gift Name]\`
 - To perform the action of requesting a "Pay For Me" (代付): You MUST generate the command on a new line after your dialogue.
@@ -11448,7 +11448,16 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
                 if (msg.side === 'received') {
                     // 【【【核心修复 2】】】
                     if (msg.type === 'pay_for_me' && msg.payStatus === 'paid') { payloadMessages.push({ role: 'user', content: `[System observation: A previously sent 'Pay For Me' request for "${msg.text}" has been successfully paid by the user.]` }); continue; }
-                    if (msg.type === 'red_packet' && msg.packetData && msg.packetData.status !== 'active') { payloadMessages.push({ role: 'user', content: `[System observation: A previously sent red packet with the message "${msg.text}" is now finished (claimed or expired).]` }); continue; }
+                    if (msg.type === 'red_packet' && msg.packetData && msg.packetData.status !== 'active') { 
+                        // 【核心修复】在红包完结后，如果 AI 参与了领取，告知它领到了多少钱
+                        let claimDetail = "";
+                        const myClaim = msg.packetData.claimedBy.find(c => c.name === (msg.sender || chatState.chatName));
+                        if (myClaim) {
+                            claimDetail = ` You specifically received ¥${myClaim.amount.toFixed(2)} from this packet.`;
+                        }
+                        payloadMessages.push({ role: 'user', content: `[System observation: A previously sent red packet with the message "${msg.text}" is now finished (claimed or expired).${claimDetail}]` }); 
+                        continue; 
+                    }
                     if (msg.type === 'transfer' && msg.transferStatus !== 'pending') { payloadMessages.push({ role: 'user', content: `[System observation: A previously sent money transfer of ¥${msg.text} is now finished.]` }); continue; }
                 }
 
@@ -11543,7 +11552,12 @@ A girl with long pink hair is standing under a cherry blossom tree. She is weari
                         break;
                     case 'voice': descriptiveText = `[${senderName} sent a voice message. The content is: "${msg.text}"]`; break;
                     case 'transfer': const amount = parseFloat(msg.text).toFixed(2); if (msg.recipient) { descriptiveText = `[${senderName} sent a transfer of ¥${amount} specifically to ${msg.recipient}.]`; } else { descriptiveText = `[${senderName} sent a transfer of ¥${amount}.]`; } break;
-                    case 'red_packet': descriptiveText = `[${senderName} sent a red packet with the message: "${msg.text}"]`; break;
+                    case 'red_packet': {
+                        // 【核心修复】提取红包金额数据，告知 AI 这个红包的总价值
+                        const rpAmount = msg.packetData ? msg.packetData.amount.toFixed(2) : 'unknown amount';
+                        descriptiveText = `[${senderName} sent a red packet worth ¥${rpAmount} with the message: "${msg.text}"]`;
+                        break;
+                    }
                     case 'gift': descriptiveText = `[${senderName} sent a gift: "${msg.text}"]`; break;
                     case 'location': try { const loc = JSON.parse(msg.text); descriptiveText = `[${senderName} shared a location: "${loc.title}" at "${loc.address}"]`; } catch (e) {} break;
                     case 'pay_for_me': descriptiveText = `[${senderName} sent a 'Pay For Me' request for "${msg.text}" with the amount ¥${msg.details.amount || 'N/A'}.]`; break;
@@ -12395,7 +12409,7 @@ ${stickerInstructions}
   - For short artistic text: \`[photo-description: A short, moody text.]\`
 - To send a VOICE message: \`[voice: Text to be spoken]\`
 **4. Financial, Gifting & Requests (MUST USE COMMANDS):**
-- To send a RED PACKET: \`[red_packet: Blessing Text]\`
+- To send a RED PACKET: You can send a simple one \`[red_packet: Blessing Text]\` (random amount) or a specific one \`[red_packet: {"text": "Blessing Text", "amount": 88.54}]\`. The amount must be between 0.01 and 200.
 - To send a money TRANSFER: \`[transfer: Amount]\`
 - To send a GIFT: \`[gift: Gift Name]\`
 - To perform the action of requesting a "Pay For Me" (代付): You MUST generate the command on a new line after your dialogue.
@@ -15127,8 +15141,35 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         } catch (e) { console.error('Failed to parse pay_for_me data from AI:', e); continue; }
                     }
                     if (cmd.command === 'red_packet') {
-                        const amount = parseFloat((Math.random() * 200 + 1).toFixed(2));
-                        messageData.packetData = { id: `rp-${Date.now()}`, createdAt: Date.now(), amount, portions: 1, remainingAmount: amount, remainingPortions: 1, portionsData: [amount], claimedBy: [], senderName: sender, status: 'active' };
+                        // 【核心修复】增加对 JSON 格式红包指令的解析，允许 AI 自定义金额
+                        let rpText = cmd.value;
+                        let rpAmount = parseFloat((Math.random() * 199 + 1).toFixed(2)); // 默认随机
+
+                        if (cmd.value.trim().startsWith('{')) {
+                            try {
+                                const rpData = JSON.parse(cmd.value);
+                                rpText = rpData.text || '恭喜发财';
+                                if (rpData.amount && !isNaN(parseFloat(rpData.amount))) {
+                                    rpAmount = parseFloat(parseFloat(rpData.amount).toFixed(2));
+                                }
+                            } catch (e) {
+                                console.warn("Failed to parse AI red_packet JSON, falling back to text.");
+                            }
+                        }
+                        
+                        messageData.text = rpText; // 更新显示的祝福语
+                        messageData.packetData = { 
+                            id: `rp-${Date.now()}`, 
+                            createdAt: Date.now(), 
+                            amount: rpAmount, 
+                            portions: 1, 
+                            remainingAmount: rpAmount, 
+                            remainingPortions: 1, 
+                            portionsData: [rpAmount], 
+                            claimedBy: [], 
+                            senderName: sender, 
+                            status: 'active' 
+                        };
                     } else if (cmd.command === 'transfer') {
                         // 尝试解析 JSON (针对指定接收人的情况)
                         if (cmd.value.trim().startsWith('{')) {
@@ -17542,16 +17583,43 @@ function handleRecallByAI(senderName) {
             }
         }
 async function handleClaimByAI(senderName) { let packetToClaim = null; for (let i = chatState.messages.length - 1; i >= 0; i--) { const msg = chatState.messages[i]; if (msg.type === 'red_packet' && msg.packetData && msg.packetData.status === 'active' && !msg.packetData.claimedBy.some(c => c.name === senderName)) { packetToClaim = msg; break; } } if (packetToClaim) { const packetData = packetToClaim.packetData; if (packetData.remainingPortions > 0) { const claimedAmount = packetData.portionsData.pop(); packetData.remainingAmount = parseFloat((packetData.remainingAmount - claimedAmount).toFixed(2)); packetData.remainingPortions--; packetData.claimedBy.push({ name: senderName, amount: claimedAmount }); if (packetData.remainingPortions === 0) { packetData.status = 'depleted'; } await handlePacketStateChange(packetData, 'claimed', senderName); await addMessage(packetToClaim); } else { await addMessage({ type: 'system', side: 'system', text: `“${senderName}”试图领取红包，但红包已被领完。`}); } } }
-async function handleSendRedPacketByAI(senderName, title) { // 将上面那一行替换为下面这个代码块：
-let amount;
-const rawAmount = Math.random() * 199 + 1; // 生成一个1到200之间的原始随机数
-if (Math.random() < 0.5) {
-    // 50%的概率，我们将其变为一个整数
-    amount = Math.round(rawAmount);
-} else {
-    // 另外50%的概率，我们保留两位小数
-    amount = parseFloat(rawAmount.toFixed(2));
-} const portions = contactInfo.isGroup ? Math.floor(Math.random() * 5) + 1 : 1; const packetData = { id: `rp-${Date.now()}`, createdAt: Date.now(), amount, portions, remainingAmount: amount, remainingPortions: portions, portionsData: divideRedPacket(amount, portions), claimedBy: [], senderName: senderName, status: 'active' }; await addMessage({ type: 'red_packet', text: title || '恭喜发财', side: 'received', sender: senderName, packetData }); }
+async function handleSendRedPacketByAI(senderName, title, customAmount = null) {
+    let amount;
+    if (customAmount !== null && !isNaN(parseFloat(customAmount))) {
+        // 如果 AI 指定了金额，就用 AI 的
+        amount = parseFloat(parseFloat(customAmount).toFixed(2));
+    } else {
+        // 否则走随机逻辑
+        const rawAmount = Math.random() * 199 + 1;
+        if (Math.random() < 0.5) {
+            amount = Math.round(rawAmount);
+        } else {
+            amount = parseFloat(rawAmount.toFixed(2));
+        }
+    }
+    
+    const portions = contactInfo.isGroup ? Math.floor(Math.random() * 5) + 1 : 1;
+    const packetData = { 
+        id: `rp-${Date.now()}`, 
+        createdAt: Date.now(), 
+        amount, 
+        portions, 
+        remainingAmount: amount, 
+        remainingPortions: portions, 
+        portionsData: divideRedPacket(amount, portions), 
+        claimedBy: [], 
+        senderName: senderName, 
+        status: 'active' 
+    };
+    
+    await addMessage({ 
+        type: 'red_packet', 
+        text: title || '恭喜发财', 
+        side: 'received', 
+        sender: senderName, 
+        packetData 
+    });
+}
 async function handleAcceptByAI(type, actorName, isReject = false) { // <--- 新增 isReject 参数
             let itemToAccept = null;
             for (let i = chatState.messages.length - 1; i >= 0; i--) {
