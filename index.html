@@ -23138,14 +23138,83 @@ You are responsible for playing every AI character in the "Active Cast" list.`;
     }).join('\n');
 
                     if (chatHistoryForPrompt) {
+                        fullContextPrompt += `\n\n[RECENT CHAT HISTORY]\n${chatHistoryForPrompt}`;
+                    }
+                    
+                    // =================================================================
+                    // 【【【 核心新增：注入朋友圈上下文 (群组场景版) 】】】
+                    // =================================================================
+                    const aiCharacterNameForMoments = 'assistant'; 
+                    const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterNameForMoments, 5); 
 
-                                        fullContextPrompt += `\n\n[RECENT CHAT HISTORY]\n${chatHistoryForPrompt}`;
-                                    }
-                                    
-                                    // =================================================================
+                    let momentsContext = "";
+                    if (momentsData && momentsData.allVisibleMoments.length > 0) {
+                        momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible in this social circle. Use this to inform the scene if relevant.\n\n`;
+                        
+                        const knownMap = new Map(momentsData.knownPeople.map(p => [p.name, p.relationship]));
+                        const allUserPersonaNames = userPersonas.map(p => p.name);
 
-                                    // 8. 最后，附加“场景通告”指令
-                                    const scenePrompt = `
+                        momentsData.allVisibleMoments.forEach((post, i) => {
+                             let authorLabel = post.userName;
+
+                             if (post.userName === aiCharacterNameForMoments) {
+                                 authorLabel = "You (one of the characters)";
+                             } 
+                             else if (knownMap.has(post.userName) && knownMap.get(post.userName).includes('(the user')) {
+                                 authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
+                             } 
+                             else if (allUserPersonaNames.includes(post.userName)) {
+                                 authorLabel = `${post.userName} (Stranger/Other User)`;
+                             }
+                             else if (knownMap.has(post.userName)) {
+                                 authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
+                             } 
+                             else {
+                                 authorLabel = `${post.userName} (Stranger/Other User)`;
+                             }
+                             
+                             let content = post.text || post.content || ""; 
+                             
+                             if (post.image) {
+                                 if (post.imageDescription) {
+                                     content += ` [图片内容: ${post.imageDescription}]`;
+                                 } else {
+                                     content += ` [图片(未描述)]`;
+                                 }
+                             } else if (post.type === 'video' && !content) {
+                                 content = "[视频]";
+                             }
+                             
+                             if (!content.trim()) content = "[分享]";
+
+                             let interactions = "";
+                             if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
+                                 interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
+                             }
+                             if (post.comments.length > 0) {
+                                 const commentsText = post.comments.map(c => {
+                                     let rawText = c.text || "";
+                                     const codeBlockRegex = /(<snippet>[\s\S]*?<\/snippet>)|(<div[\s\S]*?>[\s\S]*?<\/div>)/g;
+                                     let cleanText = rawText.replace(codeBlockRegex, "").trim();
+                                     return `${c.user}: ${cleanText}`; 
+                                 }).join(' | ');
+                                 interactions += ` (Comments: ${commentsText})`;
+                             }
+                             
+                             const pDate = new Date(post.timestamp);
+                             const pTimeStr = `${pDate.getFullYear()}年${pDate.getMonth() + 1}月${pDate.getDate()}日 ${pDate.getHours().toString().padStart(2, '0')}:${pDate.getMinutes().toString().padStart(2, '0')}`;
+
+                             momentsContext += `Post #${i+1} by ${authorLabel} [Posted at: ${pTimeStr}]: "${content}"${interactions}\n`;
+                        });
+                    }
+
+                    if (momentsContext) {
+                        fullContextPrompt += momentsContext;
+                    }
+                    // =================================================================
+
+                    // 8. 最后，附加“场景通告”指令
+                    const scenePrompt = `
 # [ULTIMATE DIRECTOR'S BRIEF: SCENE START]
 
 You are the **Group Director** for the chat group named "${group.name}". The group has been quiet for a while, and it's time to bring it back to life.
