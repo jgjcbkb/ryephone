@@ -5584,43 +5584,68 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 <!-- ... -->
                         <input type="hidden" id="api-edit-index"></div>
 
-<!-- 【GitHub 仓库备份 (仅备份版)】 -->
-<div class="form-section" style="margin-top: 20px; border: 2px solid #d73a49; padding: 20px; border-radius: 12px;">
-    <h3 style="color: #24292e; margin-top: 0; margin-bottom: 15px;">
-        GitHub 仓库备份
-    </h3>
-    
-    <div class="form-group">
-        <label>仓库链接</label>
-        <input type="text" id="gh-full-url" placeholder="https://github.com/用户名/仓库名" class="modal-input">
+<div class="form-section" style="margin-top: 20px; border: 2px solid #28a745; padding: 20px; border-radius: 12px; background-color: #fff;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3 style="color: #24292e; margin: 0;">云端同步备份</h3>
+        <select id="backup-mode-select" class="modal-input" style="width: auto; margin: 0; padding: 4px 8px; font-size: 13px;">
+            <option value="webdav">WebDAV (坚果云等)</option>
+            <option value="github">GitHub</option>
+        </select>
     </div>
 
-    <div class="form-group">
-        <label>Token</label>
-        <input type="text" id="gh-token" placeholder="ghp_..." class="modal-input">
-    </div>
-
-    <div class="form-group">
-        <label>备份文件名</label>
-        <input type="text" id="gh-filename" value="data_backup.zip" class="modal-input">
-    </div>
-
-    <div class="form-group">
-        <label>自动备份间隔</label>
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <input type="number" id="gh-auto-interval" placeholder="0" class="modal-input" style="margin-bottom: 0;">
-            <span style="flex-shrink: 0; font-size: 14px; color: #666;">分钟 (0为关闭)</span>
+    <!-- WebDAV 配置区 -->
+    <div id="section-webdav">
+        <div class="form-group">
+            <label>服务器地址</label>
+            <input type="text" id="dav-url" placeholder="坚果云: https://dav.jianguoyun.com/dav/" class="modal-input">
         </div>
-        <p class="form-hint" style="margin-top: 5px;">例如输入 30 代表每 30 分钟备份一次。</p>
+        <div class="form-group">
+            <label>账号</label>
+            <input type="text" id="dav-user" placeholder="邮箱账号" class="modal-input">
+        </div>
+        <div class="form-group">
+            <label>应用密码</label>
+            <input type="password" id="dav-pass" placeholder="在坚果云后台生成的应用密码" class="modal-input">
+        </div>
+        <div class="form-group">
+            <label>CORS 代理 (解决 Failed to fetch)</label>
+            <input type="text" id="dav-proxy" placeholder="示例: https://cors-anywhere.azm.workers.dev/" class="modal-input">
+            <p class="form-hint">如果备份提示 Failed to fetch，请填写代理地址。留空则直连。</p>
+        </div>
     </div>
 
-    <!-- 【修改：双按钮布局 (初始化 + 备份)】 -->
-    <div class="form-group" style="display: flex; gap: 10px; margin-top: 20px;">
-        <button id="gh-init-btn" class="btn-primary" style="flex: 1; background-color: #6f42c1;">初始化仓库</button>
-        <button id="gh-backup-btn" class="btn-primary" style="flex: 1; background-color: #28a745;">立即备份</button>
+    <!-- GitHub 配置区 -->
+    <div id="section-github" style="display: none;">
+        <div class="form-group">
+            <label>仓库链接</label>
+            <input type="text" id="gh-full-url" placeholder="https://github.com/用户名/仓库名" class="modal-input">
+        </div>
+        <div class="form-group">
+            <label>Token</label>
+            <input type="text" id="gh-token" placeholder="ghp_..." class="modal-input">
+        </div>
+        <div class="form-group" style="margin-top: 10px;">
+            <button id="gh-init-btn" class="btn-primary" style="width: 100%; background-color: #6f42c1; font-size: 13px; padding: 8px;">初始化 GitHub 仓库 (仅限首次)</button>
+        </div>
+    </div>
+
+    <!-- 公共配置区 -->
+    <div class="form-group" style="margin-top: 15px; border-top: 1px dashed #eee; padding-top: 15px;">
+        <label>备份文件名</label>
+        <input type="text" id="backup-filename" value="rye_phone_backup.zip" class="modal-input">
+    </div>
+
+    <div class="form-group">
+        <label>自动备份间隔 (分钟)</label>
+        <input type="number" id="backup-auto-interval" placeholder="0 为关闭" class="modal-input">
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+        <button id="cloud-backup-btn" class="btn-primary" style="background-color: #28a745;">立即上传备份</button>
+        <button id="cloud-restore-btn" class="btn-primary" style="background-color: #007bff;">从云端恢复</button>
     </div>
     
-    <p id="gh-status-msg" style="font-size: 12px; color: #666; text-align: center; margin-top: 10px; min-height: 1.5em;"></p>
+    <p id="cloud-status-msg" style="font-size: 12px; color: #666; text-align: center; margin-top: 10px; min-height: 1.5em;"></p>
 </div>
 
 <div class="form-section danger-zone" style="margin-top: 20px;">
@@ -27274,6 +27299,7 @@ async function handleRemoveMember() {
         'conversation_', 
         'moments_', 
         'gh_',           // GitHub 仓库、Token 设置
+        'dav_',          // WebDAV (坚果云) 设置
         'auto_',         // 自动回复设置
         'video_',        // 视频通话背景
         'pending_',      // 小说分享等临时状态
@@ -30264,262 +30290,225 @@ Your optional message to the user about the update.
     // --- END: ACCOUNT MANAGER ---
     
     
-        // --- START: CLOUD BACKUP MANAGER (含初始化功能) ---
+        // --- START: CLOUD BACKUP MANAGER (GitHub + WebDAV 混合双模版) ---
 const cloudBackupManager = (function() {
     let autoBackupTimer = null;
     let lastBackupTime = 0;
-    
-    function getRepoInfo() {
-        var urlInput = document.getElementById('gh-full-url').value.trim();
-        var token = document.getElementById('gh-token').value.trim();
-        var filename = document.getElementById('gh-filename').value.trim() || 'data_backup.zip';
-        var autoInterval = parseInt(document.getElementById('gh-auto-interval').value, 10);
-        if (isNaN(autoInterval) || autoInterval < 0) autoInterval = 0;
 
-        if (!urlInput || !token) return null;
+    // 获取当前配置信息
+    function getSettings() {
+        const mode = document.getElementById('backup-mode-select').value;
+        const filename = document.getElementById('backup-filename').value.trim() || 'rye_phone_backup.zip';
+        const interval = parseInt(document.getElementById('backup-auto-interval').value, 10) || 0;
 
-        var clean = urlInput.replace(/\/+$/, '').replace(/\.git$/, '');
-        var parts = clean.split('/');
-        var repo = parts[parts.length - 1];
-        var owner = parts[parts.length - 2];
-        return { owner: owner, repo: repo, token: token, filename: filename, autoInterval: autoInterval };
+        const settings = { mode, filename, interval };
+
+        if (mode === 'github') {
+            const url = document.getElementById('gh-full-url').value.trim();
+            const token = document.getElementById('gh-token').value.trim();
+            if (!url || !token) return null;
+            const clean = url.replace(/\/+$/, '').replace(/\.git$/, '');
+            const parts = clean.split('/');
+            settings.gh = { owner: parts[parts.length - 2], repo: parts[parts.length - 1], token };
+        } else {
+            const url = document.getElementById('dav-url').value.trim();
+            const user = document.getElementById('dav-user').value.trim();
+            const pass = document.getElementById('dav-pass').value.trim();
+            const proxy = document.getElementById('dav-proxy').value.trim();
+            if (!url || !user || !pass) return null;
+            settings.dav = { 
+                url: url.endsWith('/') ? url : url + '/', 
+                user, 
+                pass,
+                proxy: proxy ? (proxy.endsWith('/') ? proxy : proxy + '/') : '' 
+            };
+        }
+        return settings;
     }
 
-    async function getFileSha(apiBase, token) {
-        try {
-            const response = await fetch(apiBase, {
-                method: 'GET',
-                headers: { 'Authorization': 'token ' + token }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                return data.sha;
-            }
-        } catch (e) { }
-        return null;
-    }
-
-    async function getCompressedBackupData() {
-        if (typeof JSZip === 'undefined') throw new Error("JSZip 未加载");
-        
-        // 【核心修复】同步更新云端备份的前缀白名单
-        const APP_DATA_PREFIXES = [ 
-            'app-', 'app_', 
-            'chat-', 'chat_', 
-            'my_', 
-            'conversation_', 
-            'moments_', 
-            'gh_',           // GitHub 设置
-            'auto_',         // 自动回复
-            'video_',        // 视频通话
-            'pending_',      // 临时状态
-            'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
-        ];
+    // 核心：压缩数据
+    async function getZipData(type = "base64") {
+        if (typeof JSZip === 'undefined') throw new Error("JSZip 库未加载");
         const allData = {};
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
-                const rawValue = localStorage.getItem(key);
-                let valueToProcess;
-                try { valueToProcess = JSON.parse(rawValue); } catch (e) { valueToProcess = rawValue; }
-                allData[key] = await conversationManager.makeDataPortable(valueToProcess);
+                const raw = localStorage.getItem(key);
+                let val; try { val = JSON.parse(raw); } catch(e) { val = raw; }
+                allData[key] = await conversationManager.makeDataPortable(val);
             }
         }
-        const jsonStr = JSON.stringify(allData);
-
-        var zip = new JSZip();
-        zip.file("backup_content.json", jsonStr);
-        return await zip.generateAsync({ type: "base64", compression: "DEFLATE", compressionOptions: { level: 9 } });
+        const zip = new JSZip();
+        zip.file("backup_content.json", JSON.stringify(allData));
+        return await zip.generateAsync({ type: type, compression: "DEFLATE" });
     }
 
-    // 【新增】初始化仓库逻辑
-    async function performInitialization() {
-        var info = getRepoInfo();
-        if (!info) return alert("请先填写仓库链接和Token！");
-
-        var statusEl = document.getElementById('gh-status-msg');
-        statusEl.textContent = "正在初始化...";
-
+    // GitHub 专用：获取文件 SHA
+    async function getGhSha(info, filename) {
+        const url = `https://api.github.com/repos/${info.gh.owner}/${info.gh.repo}/contents/${filename}`;
         try {
-            // 目标：创建一个 README.md 文件
-            var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/README.md";
-            
-            // 简单的内容 Base64 编码
-            var content = btoa("# Backup Repository\nInitialized by Black Rye Phone.");
-            
-            var bodyData = {
-                message: "Initialize Repo",
-                content: content
-            };
-
-            var response = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'token ' + info.token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(bodyData)
-            });
-
-            if (!response.ok) {
-                // 如果返回 422，通常说明文件已存在，这其实算成功
-                if (response.status === 422) {
-                    statusEl.textContent = "✅ 仓库已准备就绪 (文件已存在)";
-                    alert("仓库已经初始化过了，可以直接备份！");
-                    return;
-                }
-                var errText = await response.text();
-                throw new Error(response.status + " " + errText);
-            }
-
-            // 保存配置
-            localStorage.setItem('gh_saved_url', document.getElementById('gh-full-url').value);
-            localStorage.setItem('gh_saved_token', info.token);
-
-            statusEl.textContent = "✅ 初始化成功！";
-            alert("初始化成功！现在可以点击“立即备份”了。");
-
-        } catch (e) {
-            console.error(e);
-            statusEl.textContent = "❌ " + e.message;
-            alert("初始化失败: " + e.message);
-        }
+            const res = await fetch(url, { headers: { 'Authorization': `token ${info.gh.token}` } });
+            if (res.ok) { const data = await res.json(); return data.sha; }
+        } catch(e) {}
+        return null;
     }
 
+    // 立即备份
     async function performBackup(isAuto = false) {
-        var info = getRepoInfo();
-        if (!info) {
-            if (!isAuto) alert("请先填写仓库链接和Token！");
-            return;
-        }
+        const info = getSettings();
+        if (!info) { if (!isAuto) alert("请完整填写备份配置！"); return; }
 
-        localStorage.setItem('gh_saved_url', document.getElementById('gh-full-url').value);
-        localStorage.setItem('gh_saved_token', info.token);
-        localStorage.setItem('gh_saved_filename', info.filename);
-        localStorage.setItem('gh_saved_interval', info.autoInterval);
+        const statusEl = document.getElementById('cloud-status-msg');
+        statusEl.textContent = isAuto ? "正在自动同步..." : "正在上传云端...";
+        statusEl.style.color = "#666";
 
-        if (!isAuto) setupAutoBackup(info.autoInterval);
-
-        var statusEl = document.getElementById('gh-status-msg');
-        if (statusEl) statusEl.textContent = isAuto ? "正在自动备份..." : "正在处理...";
-        
         try {
-            var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/" + info.filename;
-            var contentBase64 = await getCompressedBackupData();
-            var sha = await getFileSha(apiUrl, info.token);
-            
-            var bodyData = {
-                message: (isAuto ? "Auto " : "Manual ") + "Backup: " + new Date().toLocaleString(),
-                content: contentBase64
-            };
-            if (sha) bodyData.sha = sha;
-
-            var response = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'token ' + info.token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(bodyData)
-            });
-
-            if (!response.ok) {
-                var errText = await response.text();
-                throw new Error(response.status + " " + errText);
+            if (info.mode === 'github') {
+                const sha = await getGhSha(info, info.filename);
+                const content = await getZipData("base64");
+                const url = `https://api.github.com/repos/${info.gh.owner}/${info.gh.repo}/contents/${info.filename}`;
+                const res = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `token ${info.gh.token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: `Backup ${new Date().toLocaleString()}`, content, sha })
+                });
+                if (!res.ok) throw new Error(await res.text());
+            } else {
+                const content = await getZipData("blob");
+                const auth = btoa(`${info.dav.user}:${info.dav.pass}`);
+                // 【核心修复】如果设置了代理，则将请求发送至代理服务器
+                const finalUrl = `${info.dav.proxy}${info.dav.url}${info.filename}`;
+                const res = await fetch(finalUrl, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Basic ${auth}` },
+                    body: content
+                });
+                if (!res.ok) throw new Error(`WebDAV 错误: ${res.status}`);
             }
 
             lastBackupTime = Date.now();
-            localStorage.setItem('gh_last_backup_time', lastBackupTime);
-
-            if (statusEl) {
-                statusEl.style.color = "#28a745";
-                statusEl.textContent = `✅ ${isAuto ? '自动' : ''}备份成功 (${new Date().toLocaleTimeString()})`;
-            }
-            if (!isAuto) alert("备份成功！");
-
+            localStorage.setItem('cloud_last_backup_time', lastBackupTime);
+            statusEl.textContent = `✅ 同步成功 (${new Date().toLocaleTimeString()})`;
+            statusEl.style.color = "#28a745";
+            if (!isAuto) alert("云端备份成功！");
         } catch (e) {
             console.error(e);
-            if (statusEl) {
-                statusEl.style.color = "#d73a49";
-                statusEl.textContent = `❌ 备份失败: ${e.message}`;
-            }
-            if (!isAuto) alert("备份失败: " + e.message);
+            statusEl.textContent = `❌ 同步失败: ${e.message}`;
+            statusEl.style.color = "#d73a49";
         }
     }
 
-    function setupAutoBackup(intervalMinutes) {
+    // 从云端恢复
+    async function performRestore() {
+        const info = getSettings();
+        if (!info) return alert("请先填写配置以定位云端文件！");
+        if (!await conversationManager.customConfirm("确定要从云端恢复吗？这将覆盖本地所有数据！")) return;
+
+        const statusEl = document.getElementById('cloud-status-msg');
+        statusEl.textContent = "正在从云端拉取...";
+
+        try {
+            let zipBuffer;
+            if (info.mode === 'github') {
+                const url = `https://api.github.com/repos/${info.gh.owner}/${info.gh.repo}/contents/${info.filename}`;
+                const res = await fetch(url, { headers: { 'Authorization': `token ${info.gh.token}` } });
+                if (!res.ok) throw new Error("找不到云端文件");
+                const data = await res.json();
+                zipBuffer = base64ToBlob(data.content, 'application/zip');
+            } else {
+                const auth = btoa(`${info.dav.user}:${info.dav.pass}`);
+                // 【核心修复】如果设置了代理，则通过代理下载文件
+                const finalUrl = `${info.dav.proxy}${info.dav.url}${info.filename}`;
+                const res = await fetch(finalUrl, {
+                    headers: { 'Authorization': `Basic ${auth}` }
+                });
+                if (!res.ok) throw new Error("下载失败，请检查配置");
+                zipBuffer = await res.blob();
+            }
+            const zip = await JSZip.loadAsync(zipBuffer);
+            const jsonStr = await zip.file("backup_content.json").async("text");
+            const importedData = JSON.parse(jsonStr);
+            const rehydrated = await rehydrateDataFromPortable(importedData);
+
+            // 清理并写入
+            APP_DATA_PREFIXES.forEach(pref => {
+                Object.keys(localStorage).forEach(k => { if(k.startsWith(pref)) localStorage.removeItem(k); });
+            });
+
+            for (const k in rehydrated) {
+                let v = rehydrated[k];
+                localStorage.setItem(k, (typeof v === 'string') ? v : JSON.stringify(v));
+            }
+
+            alert("同步恢复成功！应用即将刷新。");
+            location.reload();
+        } catch (e) {
+            alert("恢复失败: " + e.message);
+        }
+    }
+
+    function setupAutoBackup(min) {
         if (autoBackupTimer) clearInterval(autoBackupTimer);
-        if (intervalMinutes > 0) {
-            console.log(`自动备份已开启：每 ${intervalMinutes} 分钟`);
-            checkAutoBackup();
-            autoBackupTimer = setInterval(checkAutoBackup, 60000);
-        }
-    }
-
-    function onIntervalChange() {
-        var val = document.getElementById('gh-auto-interval').value;
-        var interval = parseInt(val, 10);
-        if (isNaN(interval) || interval < 0) interval = 0;
-        localStorage.setItem('gh_saved_interval', interval);
-        setupAutoBackup(interval);
-        
-        var statusEl = document.getElementById('gh-status-msg');
-        if (statusEl) {
-            if (interval > 0) statusEl.textContent = `已设置：每 ${interval} 分钟自动备份`;
-            else statusEl.textContent = `自动备份已关闭`;
-        }
-    }
-
-    function checkAutoBackup() {
-        var info = getRepoInfo();
-        if (info && info.autoInterval > 0) {
-            var now = Date.now();
-            var intervalMs = info.autoInterval * 60 * 1000;
-            var lastTime = parseInt(localStorage.getItem('gh_last_backup_time') || 0, 10);
-            if (now - lastTime > intervalMs) {
-                console.log("Triggering auto GitHub backup...");
-                performBackup(true);
-            }
-        }
+        if (min > 0) autoBackupTimer = setInterval(() => {
+            const now = Date.now();
+            if (now - lastBackupTime > min * 60000) performBackup(true);
+        }, 60000);
     }
 
     function init() {
-        var savedUrl = localStorage.getItem('gh_saved_url');
-        var savedToken = localStorage.getItem('gh_saved_token');
-        var savedFilename = localStorage.getItem('gh_saved_filename');
-        var savedInterval = localStorage.getItem('gh_saved_interval');
+        // 加载保存的配置
+        const mode = localStorage.getItem('dav_mode') || 'webdav';
+        document.getElementById('backup-mode-select').value = mode;
+        document.getElementById('dav-url').value = localStorage.getItem('dav_url') || '';
+        document.getElementById('dav-user').value = localStorage.getItem('dav_user') || '';
+        document.getElementById('dav-pass').value = localStorage.getItem('dav_pass') || '';
+        document.getElementById('dav-proxy').value = localStorage.getItem('dav_proxy') || '';
+        document.getElementById('gh-full-url').value = localStorage.getItem('gh_saved_url') || '';
+        document.getElementById('gh-token').value = localStorage.getItem('gh_saved_token') || '';
+        document.getElementById('backup-filename').value = localStorage.getItem('cloud_filename') || 'rye_phone_backup.zip';
+        const interval = localStorage.getItem('cloud_interval') || 0;
+        document.getElementById('backup-auto-interval').value = interval;
 
-        if (savedUrl) document.getElementById('gh-full-url').value = savedUrl;
-        if (savedToken) document.getElementById('gh-token').value = savedToken;
-        if (savedFilename) document.getElementById('gh-filename').value = savedFilename;
-        if (savedInterval) {
-            document.getElementById('gh-auto-interval').value = savedInterval;
-            setupAutoBackup(parseInt(savedInterval, 10));
-        }
+        // 切换显示
+        const updateUI = () => {
+            const m = document.getElementById('backup-mode-select').value;
+            document.getElementById('section-webdav').style.display = m === 'webdav' ? 'block' : 'none';
+            document.getElementById('section-github').style.display = m === 'github' ? 'block' : 'none';
+            localStorage.setItem('dav_mode', m);
+        };
+        document.getElementById('backup-mode-select').onchange = updateUI;
+        updateUI();
 
-        // 绑定两个按钮的事件
-        document.getElementById('gh-init-btn').addEventListener('click', performInitialization);
-        document.getElementById('gh-backup-btn').addEventListener('click', () => performBackup(false));
-        
-        document.getElementById('gh-auto-interval').addEventListener('input', onIntervalChange);
-
-        // 【核心新增】实时保存输入框内容，防止刷新丢失
-        document.getElementById('gh-full-url').addEventListener('input', (e) => {
-            localStorage.setItem('gh_saved_url', e.target.value.trim());
+        // 实时保存
+        const inputs = ['dav-url', 'dav-user', 'dav-pass', 'dav-proxy', 'gh-full-url', 'gh-token', 'backup-filename', 'backup-auto-interval'];
+        inputs.forEach(id => {
+            document.getElementById(id).oninput = (e) => {
+                const key = id.replace(/-/g, '_').replace('gh_full_url', 'gh_saved_url').replace('gh_token', 'gh_saved_token').replace('backup_', 'cloud_');
+                localStorage.setItem(key, e.target.value);
+                if (id === 'backup-auto-interval') setupAutoBackup(parseInt(e.target.value));
+            };
         });
-        
-        document.getElementById('gh-token').addEventListener('input', (e) => {
-            localStorage.setItem('gh_saved_token', e.target.value.trim());
-        });
 
-        document.getElementById('gh-filename').addEventListener('input', (e) => {
-            localStorage.setItem('gh_saved_filename', e.target.value.trim());
-        });
+        document.getElementById('cloud-backup-btn').onclick = () => performBackup(false);
+        document.getElementById('cloud-restore-btn').onclick = performRestore;
+        document.getElementById('gh-init-btn').onclick = async () => {
+            const info = getSettings();
+            if (!info || !info.gh) return alert("请先填写 GitHub 配置！");
+            try {
+                const res = await fetch(`https://api.github.com/repos/${info.gh.owner}/${info.gh.repo}/contents/README.md`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `token ${info.gh.token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: "init", content: btoa("Rye Phone Backup Repo") })
+                });
+                alert(res.ok ? "初始化成功！" : "已存在或初始化失败");
+            } catch(e) { alert(e.message); }
+        };
+
+        setupAutoBackup(parseInt(interval));
     }
 
-    return { init: init };
+    return { init };
 })();
-// --- END: CLOUD BACKUP MANAGER ---
 
 
     document.addEventListener('DOMContentLoaded', () => {
