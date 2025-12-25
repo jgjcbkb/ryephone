@@ -5623,13 +5623,27 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     <p id="gh-status-msg" style="font-size: 12px; color: #666; text-align: center; margin-top: 10px; min-height: 1.5em;"></p>
 </div>
 
+<!-- 【Catbox 图床设置】 -->
+<div class="form-section" style="margin-top: 20px; border: 2px solid #3498db; padding: 20px; border-radius: 12px;">
+    <h3 style="color: #2c3e50; margin-top: 0; margin-bottom: 15px;">
+        Catbox 图床设置
+    </h3>
+    <div class="form-group">
+        <label>Userhash (可选)</label>
+        <input type="text" id="catbox-userhash" placeholder="前往 catbox.moe/user/manage.php 获取" class="modal-input">
+        <p class="form-hint">填入 Userhash 可将图片上传到你的账户下。不填则匿名上传。</p>
+    </div>
+</div>
+
 <div class="form-section danger-zone" style="margin-top: 20px;">
                         <h3>数据管理</h3>
                         <div class="data-management-buttons">
                             <button id="export-all-data-btn" class="data-management-btn">导出全部数据</button>
                             <button id="import-all-data-btn" class="data-management-btn danger">导入全部数据</button>
+                            <button id="convert-catbox-url-btn" class="data-management-btn" style="background-color: #f39c12; color: white;">转换 Catbox 链接</button>
                         </div>
                          <p class="form-hint" style="padding: 0 15px 15px;">导入会覆盖所有现有数据，请谨慎操作！</p>
+                         <p class="form-hint" style="padding: 0 15px 15px; color: #e67e22;"><b>链接转换：</b>一键将所有 catbox.moe 链接替换为国内可用的镜像链接。</p>
                     </div></div></div>
                 <!-- PAGE 5: Conversation -->
                 <div id="page-conversation" class="page">
@@ -22632,7 +22646,10 @@ checkMomentsUpdates(); // <--- 新增这一行
                             <div class="sticker-grid-container"></div>
                             <div id="sticker-manage-footer" class="sticker-panel-footer">
                                  <label style="display:flex; align-items:center; gap:5px;"><input type="checkbox" id="sticker-select-all">全选</label>
-                                 <button id="sticker-delete-selected-btn" class="sticker-footer-button" data-value="delete">删除选中</button>
+                                 <div style="display:flex; gap:8px;">
+                                     <button id="sticker-upload-catbox-btn" class="sticker-footer-button" data-value="upload_catbox" style="background-color: #3498db;">上传到云端</button>
+                                     <button id="sticker-delete-selected-btn" class="sticker-footer-button" data-value="delete">删除选中</button>
+                                 </div>
                             </div>`,
                         customClass: 'sticker-panel-modal',
                         showCloseButton: true,
@@ -22647,12 +22664,93 @@ checkMomentsUpdates(); // <--- 新增这一行
                                 modalDOM.querySelectorAll('.sticker-item-checkbox').forEach(cb => cb.checked = e.target.checked);
                             });
 
-                            modalDOM.addEventListener('click', e => {
+                            // 【核心修复：这里加了 async】
+                            modalDOM.addEventListener('click', async e => {
                                 const button = e.target.closest('button[data-value]');
                                 if (!button) return;
 
                                 e.stopPropagation();
                                 const value = button.dataset.value;
+
+                                // --- 【核心新增：上传逻辑】 ---
+                                if (value === 'upload_catbox') {
+                                    const selectedCheckboxes = Array.from(modalDOM.querySelectorAll('.sticker-item-checkbox:checked'));
+                                    const selectedNames = selectedCheckboxes.map(cb => cb.dataset.name);
+                                    
+                                    if (selectedNames.length === 0) {
+                                        alert('请先选择要上传的表情包！');
+                                        return;
+                                    }
+
+                                    if (!confirm(`确定要将选中的 ${selectedNames.length} 个表情包上传到 Catbox 吗？\n注意：仅上传本地(indexeddb)存储的图片。`)) {
+                                        return;
+                                    }
+
+                                    const userHash = localStorage.getItem('catbox_userhash') || '';
+                                    let successCount = 0;
+                                    let failCount = 0;
+
+                                    // 按钮变态
+                                    const btn = button;
+                                    const originalText = btn.textContent;
+                                    btn.disabled = true;
+                                    btn.textContent = '上传中...';
+
+                                    for (const name of selectedNames) {
+                                        const sticker = stickers.find(s => s.name === name);
+                                        // 只处理本地存储的图片
+                                        if (sticker && sticker.url.startsWith('indexeddb:')) {
+                                            try {
+                                                const key = sticker.url.substring(10);
+                                                const blob = await imageStore.getItem(key);
+                                                
+                                                if (!blob) throw new Error("Local file not found");
+
+                                                const formData = new FormData();
+                                                formData.append('reqtype', 'fileupload');
+                                                
+                            if (userHash) formData.append('userhash', userHash);
+                                                formData.append('fileToUpload', blob, `${name}.png`);
+
+                                                // 尝试上传 (通过 corsproxy.io 代理绕过浏览器限制)
+                                                const targetUrl = 'https://catbox.moe/user/api.php';
+                                                const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
+
+                                                const response = await fetch(proxyUrl, {
+                                                    method: 'POST',
+                                                    body: formData
+                                                });
+
+                                                if (response.ok) {
+                                                    const remoteUrl = await response.text();
+                                                    if (remoteUrl.startsWith('http')) {
+                                                        // 上传成功，更新数据
+                                                        sticker.url = remoteUrl.trim();
+                                                        successCount++;
+                                                    } else {
+                                                        throw new Error("Invalid response: " + remoteUrl);
+                                                    }
+                                                } else {
+                                                    throw new Error("Upload failed: " + response.status);
+                                                }
+                                            } catch (err) {
+                                                console.error(`Upload failed for ${name}:`, err);
+                                                failCount++;
+                                            }
+                                        }
+                                    }
+
+                                    saveStickers();
+                                    renderPanel(modalDOM); // 刷新界面
+                                    
+                                    btn.disabled = false;
+                                    btn.textContent = originalText;
+                                    
+                                    let msg = `上传完成！\n成功: ${successCount}\n失败: ${failCount}`;
+                                    if (failCount > 0) msg += `\n\n注意：如果失败，通常是因为 Catbox 服务器拒绝了跨域请求(CORS)。这在普通网页上很难绕过，建议在支持跨域的环境下使用。`;
+                                    alert(msg);
+                                }
+                                // --- 【新增结束】 ---
 
                                 if (value === 'delete') {
                                     const selectedNames = Array.from(modalDOM.querySelectorAll('.sticker-item-checkbox:checked')).map(cb => cb.dataset.name);
@@ -22661,7 +22759,6 @@ checkMomentsUpdates(); // <--- 新增这一行
                                     closeModal({value: 'done'});
                                 }
                             });
-                            
                             renderPanel(modalDOM);
                         }
                     });
@@ -23407,7 +23504,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                                 maxNetworkResponseLen: 52428800
                             });
                             
-                            // 手动移除不需要的插件，只留 Log(default) 和 Network
+                            // 手动移除不需要的插件，只留 Log(default)标 和 Network
                             // 注意：'default' 是 Log 面板的内部名称，不能移除
                             const pluginsToRemove = ['system', 'element', 'storage'];
                             pluginsToRemove.forEach(id => window.vConsoleInstance.removePlugin(id));
@@ -23446,8 +23543,23 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             const activeFont = savedFonts.find(f => f.name === activeFontName);
             if (activeFont && activeFont.url) {
                 const fontName = `GlobalCustomFont_${activeFont.name.replace(/\s/g, '_')}`;
-                // 【核心修复】对于可能是Base64的本地字体，直接使用其值
-                fontStyleTag.innerHTML = `@font-face { font-family: '${fontName}'; src: url('${activeFont.url}'); } body, .screen, input, textarea, button, select { font-family: '${fontName}', -apple-system, sans-serif !important; }`;
+                let finalUrl = activeFont.url;
+
+                // 【核心新增】：处理本地存储的字体链接
+                if (finalUrl.startsWith('indexeddb:')) {
+                    const key = finalUrl.substring(10);
+                    const blob = await imageStore.getItem(key);
+                    if (blob) {
+                        // 如果之前已经创建过临时链接，先释放掉，防止内存泄漏
+                        if (window._currentFontBlobUrl) {
+                            URL.revokeObjectURL(window._currentFontBlobUrl);
+                        }
+                        window._currentFontBlobUrl = URL.createObjectURL(blob);
+                        finalUrl = window._currentFontBlobUrl;
+                    }
+                }
+
+                fontStyleTag.innerHTML = `@font-face { font-family: '${fontName}'; src: url('${finalUrl}'); } body, .screen, input, textarea, button, select { font-family: '${fontName}', -apple-system, sans-serif !important; }`;
             } else {
                 fontStyleTag.innerHTML = '';
             }
@@ -23835,30 +23947,91 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
 // ===== 新版本的 showCssManagerModal 函数到这里结束 =====
         
         async function showAddFontModal() {
-            const fontName = await conversationManager.showContentInputModal({ title: '添加新字体', placeholder: '为字体命名 (例如: 可爱圆体)' });
-            if (!fontName || !fontName.trim()) return;
+            // 1. 先询问来源
+            const result = await conversationManager.showCustomModal({
+                title: '添加新字体',
+                text: '请选择字体来源：',
+                buttons: [
+                    { text: '本地上传 (自动命名)', value: 'upload', class: 'primary' },
+                    { text: '输入链接 (手动命名)', value: 'url', class: 'secondary' },
+                    { text: '取消', value: 'cancel', class: 'secondary' }
+                ]
+            });
 
-            if (savedFonts.some(f => f.name === fontName.trim())) {
-                await conversationManager.customAlert('该字体名称已存在！');
-                return;
+            if (!result || result.value === 'cancel' || result.value === 'close') return;
+
+            if (result.value === 'upload') {
+                // --- 逻辑 A: 本地上传 ---
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = '.ttf,.otf,.woff,.woff2';
+                fileInput.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    // 【关键】：自动获取文件名（去掉后缀）
+                    let fontName = file.name.replace(/\.[^/.]+$/, "");
+                    
+                    // 检查重名并自动加数字后缀，防止覆盖
+                    let finalName = fontName;
+                    let count = 1;
+                    while (savedFonts.some(f => f.name === finalName)) {
+                        finalName = `${fontName}_${count}`;
+                        count++;
+                    }
+
+                    const dbKey = `font-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+                    try {
+                        await imageStore.setItem(dbKey, file);
+                        savedFonts.push({ name: finalName, url: `indexeddb:${dbKey}` });
+                        activeFontName = finalName;
+                        saveSettings();
+                        await applySettings();
+                        renderPage();
+                        await conversationManager.customAlert(`字体 "${finalName}" 已添加并应用！`);
+                    } catch (err) {
+                        alert('保存失败: ' + err.message);
+                    }
+                };
+                fileInput.click();
+
+            } else if (result.value === 'url') {
+                // --- 逻辑 B: 输入链接（保持手动命名） ---
+                const fontName = await conversationManager.showContentInputModal({ 
+                    title: '字体命名', 
+                    placeholder: '为这个云端字体起个名字' 
+                });
+                
+                if (!fontName || !fontName.trim()) return;
+
+                if (savedFonts.some(f => f.name === fontName.trim())) {
+                    await conversationManager.customAlert('该名称已存在，请重新输入。');
+                    return;
+                }
+
+                const fontUrl = await conversationManager.showContentInputModal({ 
+                    title: '输入链接', 
+                    placeholder: '输入 .woff, .woff2, .ttf 格式链接' 
+                });
+
+                if (fontUrl && fontUrl.trim()) {
+                    savedFonts.push({ name: fontName.trim(), url: fontUrl.trim() });
+                    activeFontName = fontName.trim();
+                    saveSettings();
+                    applySettings();
+                    renderPage();
+                    await conversationManager.customAlert('云端字体已添加并应用！');
+                }
             }
-
-            const fontUrl = await conversationManager.showContentInputModal({ title: `字体链接`, placeholder: '输入 .woff, .woff2, .ttf 格式链接' });
-            if (!fontUrl || !fontUrl.trim()) return;
-
-            savedFonts.push({ name: fontName.trim(), url: fontUrl.trim() });
-            activeFontName = fontName.trim();
-            saveSettings();
-            applySettings();
-            renderPage();
-            await conversationManager.customAlert('字体已添加并应用！');
         }
         
                 // --- 【修复版：字体管理器 (带滚动 + 编辑内容)】 ---
         async function showFontManagerModal() {
             // 1. 构建列表 HTML (优化布局，显示链接预览，增加编辑按钮)
             let listHtml = savedFonts.length > 0
-                ? savedFonts.map((font, index) => `
+                ? savedFonts.map((font, index) => {
+                    const isLocal = font.url.startsWith('indexeddb:');
+                    return `
                     <li class="snippet-management-item" style="flex-direction: column; align-items: stretch; gap: 8px; padding: 12px; border-bottom: 1px solid #eee;">
                         
                         <!-- 顶部：名称 -->
@@ -23869,16 +24042,17 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
 
                         <!-- 中部：链接预览 (截断显示) -->
                         <div style="font-size: 12px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #f9f9f9; padding: 4px; border-radius: 4px;">
-                            ${escapeHtml(font.url)}
+                            ${isLocal ? '本地存储字体' : escapeHtml(font.url)}
                         </div>
 
                         <!-- 底部：操作按钮组 -->
                         <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+                            ${isLocal ? `<button class="modal-button primary" data-action="upload_cloud" data-index="${index}" style="padding: 6px 12px; font-size: 13px; width: auto; flex: 0 0 auto; background-color: #3498db;">上传云端</button>` : ''}
                             <button class="modal-button secondary" data-action="edit_name" data-index="${index}" style="padding: 6px 12px; font-size: 13px; width: auto; flex: 0 0 auto;">改名</button>
                             <button class="modal-button secondary" data-action="edit_url" data-index="${index}" style="padding: 6px 12px; font-size: 13px; width: auto; flex: 0 0 auto;">改链接</button>
                             <button class="modal-button danger" data-action="delete" data-index="${index}" style="padding: 6px 12px; font-size: 13px; width: auto; flex: 0 0 auto;">删除</button>
                         </div>
-                    </li>`).join('')
+                    </li>`}).join('')
                 : '<p style="padding: 40px 20px; text-align: center; color: #888;">没有已保存的字体</p>';
             
             await conversationManager.showCustomModal({
@@ -23897,7 +24071,48 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                         const index = parseInt(button.dataset.index, 10);
                         const font = savedFonts[index];
 
-                        if (action === 'delete') {
+                        if (action === 'upload_cloud') {
+                            const userHash = localStorage.getItem('catbox_userhash') || '';
+                            const btn = button;
+                            const originalText = btn.textContent;
+                            btn.disabled = true;
+                            btn.textContent = '上传中...';
+
+                            try {
+                                const key = font.url.substring(10);
+                                const blob = await imageStore.getItem(key);
+                                if (!blob) throw new Error("本地文件已丢失");
+
+                                const formData = new FormData();
+                                formData.append('reqtype', 'fileupload');
+                                if (userHash) formData.append('userhash', userHash);
+                                formData.append('fileToUpload', blob, `${font.name}.ttf`);
+
+                                const targetUrl = 'https://catbox.moe/user/api.php';
+                                const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
+
+                                const response = await fetch(proxyUrl, { method: 'POST', body: formData });
+                                if (!response.ok) throw new Error("上传失败");
+
+                                const remoteUrl = await response.text();
+                                if (remoteUrl.startsWith('http')) {
+                                    font.url = remoteUrl.trim();
+                                    saveSettings();
+                                    await applySettings();
+                                    alert('上传成功！已自动切换为云端链接。');
+                                    closeModal();
+                                    setTimeout(showFontManagerModal, 50);
+                                } else {
+                                    throw new Error(remoteUrl);
+                                }
+                            } catch (err) {
+                                alert('上传失败: ' + err.message);
+                            } finally {
+                                btn.disabled = false;
+                                btn.textContent = originalText;
+                            }
+                        }
+                        else if (action === 'delete') {
                             if (await conversationManager.customConfirm(`确定要删除字体 "${font.name}" 吗？`)) {
                                 if (activeFontName === font.name) {
                                     activeFontName = '默认'; // 如果删除了正在用的，重置为默认
@@ -27310,16 +27525,26 @@ async function handleRemoveMember() {
     }
 
     async function rehydrateDataFromPortable(data) {
-        if (typeof data === 'string' && data.startsWith('data:image')) {
+        // 【核心修复】：去掉 .startsWith('data:image') 的限制，改为只要是 data: 开头的 Base64 全部拦截
+        // 这样字体文件 (data:font/...) 也会被正确存入数据库，而不是挤占 localStorage
+        if (typeof data === 'string' && data.startsWith('data:')) {
             try {
-                const contentType = data.match(/data:(.*?);/)[1];
+                const match = data.match(/data:(.*?);/);
+                if (!match) return data;
+                
+                const contentType = match[1];
                 const blob = base64ToBlob(data, contentType);
-                const key = `imported-image-${Date.now()}-${Math.random()}`;
+                // 使用更通用的 key 名字
+                const key = `imported-file-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+                
+                // 将大文件存入 IndexedDB
                 await imageStore.setItem(key, blob);
+                
+                // 返回引用标签，这个标签很短，存入 localStorage 没压力
                 return `indexeddb:${key}`;
             } catch (e) {
                 console.error(`Failed to rehydrate Base64 string:`, e);
-                return data; // Return original if fails
+                return data; 
             }
         }
         if (Array.isArray(data)) {
@@ -30528,6 +30753,14 @@ const cloudBackupManager = (function() {
         document.getElementById('gh-filename').addEventListener('input', (e) => {
             localStorage.setItem('gh_saved_filename', e.target.value.trim());
         });
+
+        // 【Catbox 设置初始化】
+        const savedCatboxHash = localStorage.getItem('catbox_userhash');
+        if (savedCatboxHash) document.getElementById('catbox-userhash').value = savedCatboxHash;
+        
+        document.getElementById('catbox-userhash').addEventListener('input', (e) => {
+            localStorage.setItem('catbox_userhash', e.target.value.trim());
+        });
     }
 
     return { init: init };
@@ -30540,6 +30773,53 @@ const cloudBackupManager = (function() {
          const importBtn = document.getElementById('import-all-data-btn');
          if(exportBtn) exportBtn.addEventListener('click', exportAllData);
          if(importBtn) importBtn.addEventListener('click', importAllData);
+
+         // 【核心新增：Catbox 链接一键转换逻辑】
+         const convertBtn = document.getElementById('convert-catbox-url-btn');
+         if (convertBtn) {
+             convertBtn.addEventListener('click', async () => {
+                 const confirmed = await conversationManager.customConfirm(
+                     '确定要将所有 "files.catbox.moe" 链接替换为 "image.uglycat.cc" 吗？\n\n这将处理所有聊天记录、朋友圈、头像和表情包。',
+                     '链接转换确认'
+                 );
+
+                 if (!confirmed) return;
+
+                 let affectedKeysCount = 0;
+                 const oldDomain = 'files.catbox.moe';
+                 const newDomain = 'image.uglycat.cc';
+
+                 try {
+                     for (let i = 0; i < localStorage.length; i++) {
+                         const key = localStorage.key(i);
+                         
+                         // 只处理属于黑麦手机的数据前缀
+                         const APP_DATA_PREFIXES = [ 
+                            'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
+                            'gh_', 'auto_', 'video_', 'pending_',
+                            'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+                         ];
+
+                         if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                             const rawValue = localStorage.getItem(key);
+                             if (rawValue && rawValue.includes(oldDomain)) {
+                                 // 执行全局替换
+                                 const newValue = rawValue.split(oldDomain).join(newDomain);
+                                 localStorage.setItem(key, newValue);
+                                 affectedKeysCount++;
+                             }
+                         }
+                     }
+
+                     await conversationManager.customAlert(`转换完成！\n共处理了 ${affectedKeysCount} 个数据模块。\n页面即将刷新以应用更改。`);
+                     location.reload();
+
+                 } catch (error) {
+                     console.error("URL Conversion failed:", error);
+                     await conversationManager.customAlert('转换过程中出错: ' + error.message);
+                 }
+             });
+         }
 
         // --- 从这里开始粘贴新的JS代码 ---
         
