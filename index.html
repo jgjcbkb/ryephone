@@ -83,7 +83,7 @@
     .status-bar { 
         position: absolute; top: 8px; left: 0; width: 100%; height: 28px;
         z-index: 101; pointer-events: none; padding: 0 25px; box-sizing: border-box;
-        display: flex; justify-content: flex-end; align-items: center;
+        display: flex; justify-content: space-between; align-items: center;
     }
     .notch { 
         position: absolute; top: -10px; left: 50%; transform: translateX(-50%); 
@@ -94,9 +94,9 @@
     .earpiece { width: 55px; height: 5px; background: var(--earpiece-color); border-radius: 2.5px; }
     .camera { width: 7px; height: 7px; background: var(--camera-color); border-radius: 50%; }
     .status-info { display: flex; align-items: center; }
-    .battery-icon { width: 28px; height: 14px; border: 1.8px solid var(--battery-icon-color); border-radius: 4px; position: relative; background-color: transparent; }
+    .battery-icon { width: 28px; height: 14px; border: 1.8px solid var(--battery-icon-color); border-radius: 4px; position: relative; background-color: transparent; display: flex; align-items: center; padding: 1.5px; box-sizing: border-box; }
     .battery-icon::after { content: ''; position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 2.5px; height: 6px; background-color: var(--battery-icon-color); border-radius: 0 1.5px 1.5px 0; }
-    .battery-icon .battery-text { color: var(--battery-text-color); font-size: 10px; font-weight: bold; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2; }
+    .battery-icon .battery-text { color: var(--battery-text-color); font-size: 8px; font-weight: 800; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2; text-shadow: 0 0 2px white; }
     
     .app-container { 
         flex-grow: 1; display: flex; flex-direction: column; position: relative;
@@ -200,7 +200,22 @@
     #page-conversation .chat-app-container * { box-sizing: border-box; }
     #page-conversation .chat-app-container { width: 100%; height: 100%; position: relative; display: flex; flex-direction: column; background-color: var(--page-background); }
     #page-conversation .hidden, #page-chat-info .hidden, #page-dynamics .hidden { display: none !important; }
-    #page-conversation #dynamic-decoration-btn { position: absolute; top: 15px; left: 20px; width: 48px; height: 24px; background-image: url('https://i.postimg.cc/rp8LmRK5/IMG-4714.png'); background-size: contain; background-repeat: no-repeat; background-position: center; cursor: pointer; animation: pulse-glow 2s infinite ease-in-out; transition: transform 0.2s ease-out, filter 0.2s ease-out; z-index: 102; pointer-events: auto; }
+    #page-conversation #dynamic-decoration-btn { 
+        position: absolute; 
+        top: 52px; 
+        left: 60px; 
+        width: 48px; 
+        height: 24px; 
+        background-image: url('https://i.postimg.cc/rp8LmRK5/IMG-4714.png'); 
+        background-size: contain; 
+        background-repeat: no-repeat; 
+        background-position: center; 
+        cursor: pointer; 
+        animation: pulse-glow 2s infinite ease-in-out; 
+        transition: transform 0.2s ease-out, filter 0.2s ease-out; 
+        z-index: 102; 
+        pointer-events: auto; 
+    }
     @keyframes pulse-glow { 0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px rgba(40, 167, 69, 0.5)); } 50% { transform: scale(1.05); filter: drop-shadow(0 0 4px rgba(40, 167, 69, 1)); } }
     #page-conversation #dynamic-decoration-btn.triggered { animation: none; transform: scale(1.2); filter: drop_shadow(0 0 8px #ffffff) drop_shadow(0 0 4px var(--send-button-color)); }
     #page-conversation #dynamic-decoration-btn.loading { animation: spin 1.2s linear infinite; pointer-events: none; filter: none; }
@@ -840,9 +855,107 @@
 }
     #page-conversation .caller-avatar { width: 80px; height: 80px; border-radius: 50%; background-size: cover; background-position: center; border: 4px solid #ffffff; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin: 0 auto 15px; cursor:pointer; }
     @keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-    #page-conversation #message-context-menu { position: absolute; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); z-index: 2100; overflow: hidden; padding: 5px 0; }
-    #page-conversation .context-menu-item { padding: 8px 16px; font-size: 15px; color: var(--primary-text); cursor: pointer; white-space: nowrap; }
-    #page-conversation .context-menu-item:hover { background-color: #f0f0f0; }
+    #page-conversation #message-context-menu { 
+        position: absolute; 
+        background-color: rgba(255, 255, 255, 0.9); 
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        border-radius: 14px; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
+        z-index: 2100; 
+        overflow: hidden; 
+        padding: 6px; 
+        min-width: 160px;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    #page-conversation .context-menu-item { 
+        padding: 10px 16px; 
+        font-size: 14px; 
+        font-weight: 500;
+        color: #1c1c1e; 
+        cursor: pointer; 
+        white-space: nowrap; 
+        display: block;
+        border-radius: 8px;
+        margin-bottom: 2px;
+        transition: background-color 0.1s;
+    }
+    #page-conversation .context-menu-item:last-child { margin-bottom: 0; }
+    #page-conversation .context-menu-item:hover { background-color: rgba(0, 0, 0, 0.05); }
+    #page-conversation .context-menu-item:active { background-color: rgba(0, 0, 0, 0.1); }
+
+    /* 【核心新增：身份选项样式】 */
+    .identity-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 15px;
+        background: #f8f8f8;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+    }
+    .identity-item.active {
+        background: #e8f5e9;
+        border-color: #28a745;
+    }
+    .identity-item .avatar-mini {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background-size: cover;
+        background-position: center;
+        flex-shrink: 0;
+    }
+    .identity-item .name-info {
+        flex-grow: 1;
+        font-size: 15px;
+        font-weight: 500;
+        color: #333;
+    }
+    .identity-item .tag {
+        font-size: 10px;
+        padding: 2px 6px;
+        background: #ddd;
+        border-radius: 4px;
+        color: #666;
+    }
+    
+    /* 危险操作样式：变红 */
+    #page-conversation .context-menu-item.danger {
+        color: #ff3b30;
+    }
+
+    /* 分割线样式 */
+    #page-conversation .context-menu-divider {
+        height: 1px;
+        background-color: rgba(0, 0, 0, 0.05);
+        margin: 4px 8px;
+    }
+
+    /* 【核心新增：收藏夹切换标签样式】 */
+    .fav-tabs {
+        display: flex;
+        border-bottom: 1px solid #eee;
+        margin-bottom: 10px;
+    }
+    .fav-tab {
+        flex: 1;
+        padding: 10px;
+        text-align: center;
+        font-size: 14px;
+        color: #888;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+    }
+    .fav-tab.active {
+        color: #28a745;
+        border-bottom-color: #28a745;
+        font-weight: 600;
+    }
+
+    /* 图标样式 */
     #page-conversation #multi-select-bar { position: absolute; bottom: 0; left: 0; width: 100%; background-color: #fff; border-top: 1px solid #ddd; padding: 10px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
     #page-conversation #multi-select-bar button { padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; }
     #page-conversation #multi-select-delete-btn { background-color: var(--danger-color); color: white; }
@@ -4265,7 +4378,10 @@ input:checked + .slider:before {
 
         /* 核心修复：隐藏状态栏和刘海 */
         body.frame-hidden .status-bar {
-            display: none;
+            display: flex;
+            top: 0;
+            padding: 5px 20px;
+            height: 35px;
         }
 
         /* 核心修复：移除因隐藏状态栏而产生的多余顶部内边距 */
@@ -4998,6 +5114,10 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     }
 
     body.frame-hidden .status-bar {
+        display: flex !important;
+    }
+    
+    body.frame-hidden .notch {
         display: none !important;
     }
 
@@ -5030,12 +5150,11 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     body.frame-hidden #page-conversation #dynamic-decoration-btn {
         /* 
            让它相对于视口定位，而不是相对于父容器。
-           top: 35px 确保它在电脑上也不会贴顶。
-           如果有刘海，它会自动往下再挪一点。
+           将基础 top 调至 55px，确保避开状态栏时间。
         */
         position: fixed !important;
-        top: max(35px, calc(env(safe-area-inset-top) + 15px)) !important;
-        left: 55px !important; /* 稍微往右挪一点，避开返回键 */
+        top: max(55px, calc(env(safe-area-inset-top) + 20px)) !important;
+        left: 60px !important; 
         z-index: 2000 !important;
     }
     
@@ -5136,6 +5255,10 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     }
 
     body.frame-hidden .status-bar {
+        display: flex !important;
+    }
+    
+    body.frame-hidden .notch {
         display: none !important;
     }
 
@@ -5256,7 +5379,16 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     </svg>
     <div class="phone">
         <div class="screen">
-            <div class="status-bar"><div class="notch"><div class="earpiece"></div><div class="camera"></div></div><div class="status-info"></div></div>
+            <div class="status-bar">
+    <span id="status-time" style="font-size: 12px; font-weight: 600; color: var(--battery-icon-color); z-index: 102;"></span>
+    <div class="notch"><div class="earpiece"></div><div class="camera"></div></div>
+    <div class="status-info">
+        <div class="battery-icon" id="status-battery-wrapper">
+            <div id="battery-level-fill" style="height: 100%; background-color: var(--battery-icon-color); border-radius: 1px; transition: width 0.3s; width: 0%;"></div>
+            <span class="battery-text" id="battery-percentage"></span>
+        </div>
+    </div>
+</div>
             <div class="app-container">
                 <!-- 【核心修复】静态输入框 (iOS专用配置) -->
                 <input type="file" id="novel-upload-input" class="visually-hidden" accept=".txt" multiple>
@@ -5667,6 +5799,22 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                         </div>
                     </div>
                         <div id="dynamic-decoration-btn" class="dynamic-decoration"></div>
+                        <!-- 【核心新增：身份切换小圆点 - 移除固定定位】 -->
+        <div id="identity-switcher-dot" style="position: absolute; left: calc(100% - 57px); top: 100px; width: 42px; height: 42px; background: rgba(0,0,0,0.4); border: 2.5px solid rgba(255,255,255,0.7); border-radius: 50%; z-index: 1000; cursor: pointer; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); touch-action: none; user-select: none;">
+            <div style="width: 20px; height: 20px; border: 3px solid white; border-radius: 50%; opacity: 0.9; pointer-events: none;"></div>
+        </div>
+
+                        <!-- 【核心新增：身份选择菜单层】 -->
+                        <div id="identity-menu-overlay" class="hidden" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 2005; display: flex; align-items: flex-end; justify-content: center;">
+                            <div style="width: 100%; background: white; border-radius: 20px 20px 0 0; padding: 20px; box-sizing: border-box; max-height: 60%; display: flex; flex-direction: column;">
+                                <h3 style="margin: 0 0 15px 0; text-align: center; font-size: 16px; color: #666;">选择当前扮演身份</h3>
+                                <div id="identity-list-container" style="flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                                    <!-- 身份列表将由 JS 动态生成 -->
+                                </div>
+                                <button id="close-identity-menu" style="margin-top: 15px; padding: 12px; border: none; background: #f0f0f0; border-radius: 10px; font-weight: 600; cursor: pointer;">取消</button>
+                            </div>
+                        </div>
+
                         <div id="chat-view">
                             <div class="chat-header">
                                 <button id="back-button" class="back-btn" data-target="chat"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
@@ -6129,6 +6277,21 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                         </div>
                         <!-- ******** 新代码到此结束 ******** -->
                         <!-- 新增：消息显示设置 -->
+                        <div class="form-section">
+                            <h3>状态栏信息</h3>
+                            <div class="form-group-toggle">
+                                <label for="toggle-status-bar-info" class="toggle-label">显示实时时间与电量</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-status-bar-info">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="form-group" id="low-battery-threshold-group" style="padding: 0 15px 15px;">
+                                <label style="font-size: 14px; color: #555; margin-bottom: 8px; display: block;">低电量提醒阈值 (%)</label>
+                                <input type="number" id="low-battery-threshold-input" min="1" max="99" class="modal-input" style="margin-bottom: 0;">
+                            </div>
+                        </div>
+
                         <div class="form-section">
                             <h3>消息显示</h3>
                             <div class="form-group-toggle">
@@ -7421,7 +7584,15 @@ Since you are initiating a new message in a group where the user is NOT present:
                 const groupPersonas = contextChatInfo.groupPersonas || [];
                 const protagonistNames = groupPersonas.map(p => p.name);
                 const allAiEntitiesInChat = [...new Set([...formalMembers, ...protagonistNames])];
-                const activeAiMembers = allAiEntitiesInChat.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+                
+                // 【核心修复：在后台触发时，也要获取该聊天当前的变身身份】
+                const currentIdentityInThisChat = loadFromLocalStorage(`chat_identity_${targetChatId}`, '{{user}}');
+
+                const activeAiMembers = allAiEntitiesInChat.filter(name => 
+                    name !== '{{user}}' && 
+                    name !== userNameForPrompt && 
+                    name !== currentIdentityInThisChat
+                );
 
 
                 groupPersonasPrompt += `
@@ -7483,9 +7654,13 @@ For any characters mentioned in the conversation that are NOT listed in the Char
 
 ${contextChatInfo.ensemblePersona || 'No general ensemble persona has been defined for this group.'}
 `;
+                // 【核心修复：使用正确的变量 targetChatId】
+                const currentIdentityInThisChatForRemark = loadFromLocalStorage(`chat_identity_${targetChatId}`, '{{user}}');
+                const filteredRemarkNames = remarkNames.filter(name => name !== currentIdentityInThisChatForRemark);
+
                 groupPersonasPrompt += `
 [Proactive Behavior Mandate]
-When you need to initiate a PROACTIVE action (like starting a new conversation, posting on Moments, liking/commenting), you MUST act as one of the characters listed in the group's "remark" field. These are your designated active identities: **[${remarkNames.length > 0 ? remarkNames.join(', ') : 'None specified, you may choose any character from the Active Cast'}]**. Their personality MUST still be based on the complete Character Dossiers.
+When you need to initiate a PROACTIVE action (like starting a new conversation, posting on Moments, liking/commenting), you MUST act as one of the characters listed in the group's "remark" field. These are your designated active identities: **[${filteredRemarkNames.length > 0 ? filteredRemarkNames.join(', ') : 'None specified, you may choose any character from the Active Cast'}]**. Their personality MUST still be based on the complete Character Dossiers.
 \n`;
                 groupPersonasPrompt += `
 ---
@@ -11138,12 +11313,24 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                 renderChatList();
             }
             
+            // 【核心新增：离开当前聊天前，保存草稿】
+            if (chatState.chatId) {
+                const drafts = loadFromLocalStorage('app_chat_drafts', {});
+                drafts[chatState.chatId] = footerMessageInput.value;
+                saveToLocalStorage('app_chat_drafts', drafts);
+            }
+
             chatState.chatId = chatId;
             chatState.chatName = chatInfoData.name;
             contactInfo.isGroup = chatInfoData.type === '群聊';
             const savedChatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
             updateHeaderTitle(savedChatInfo.remark || chatInfoData.name);
-            footerMessageInput.value = ''; footerMessageInput.dispatchEvent(new Event('input'));
+            
+            // 【核心修改：进入新聊天时，读取该角色的草稿】
+            const currentDrafts = loadFromLocalStorage('app_chat_drafts', {});
+            footerMessageInput.value = currentDrafts[chatId] || ''; 
+            footerMessageInput.dispatchEvent(new Event('input'));
+
             actionMenu.classList.remove('active');
             cancelReply();
             initializeFromStorage(chatId);
@@ -11204,6 +11391,12 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
         }
 
         function initializeFromStorage(chatId) {
+            // 【核心新增：初始化当前身份】
+            // 默认身份为 '{{user}}'
+            const currentIdentity = loadFromLocalStorage(`chat_identity_${chatId}`, '{{user}}');
+            chatState.currentIdentity = currentIdentity;
+            updateIdentityDotUI();
+
             // 1. 将完整的历史记录加载到我们新的“保险柜”数组中
             fullMessageHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
             const messagesToLoad = 40;
@@ -11324,9 +11517,157 @@ let isLoadingMore = false;
 
         // 为消息容器添加滚动事件监听
         messagesContainer.addEventListener('scroll', () => {
-            // 当滚动到最顶部时，触发加载更多
             if (messagesContainer.scrollTop === 0) {
                 loadMoreMessages();
+            }
+        });
+
+        // 【【【 核心重构：变身身份切换系统 】】】
+        
+        // 1. 更新小圆点颜色的函数
+        function updateIdentityDotUI() {
+            const dot = document.getElementById('identity-switcher-dot');
+            if (!dot) return;
+            const isActing = chatState.currentIdentity && chatState.currentIdentity !== '{{user}}';
+            // 变身后圆点变绿，且有呼吸灯效果
+            dot.style.backgroundColor = isActing ? 'rgba(40, 167, 69, 0.9)' : 'rgba(0,0,0,0.4)';
+            dot.style.boxShadow = isActing ? '0 0 15px rgba(40, 167, 69, 0.6)' : '0 4px 12px rgba(0,0,0,0.3)';
+        }
+
+        // 【核心重构：可拖拽身份切换球逻辑】
+        (function() {
+            const dot = document.getElementById('identity-switcher-dot');
+            if (!dot) return;
+
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+            let hasMoved = false;
+
+            const onStart = (e) => {
+                const touch = e.touches ? e.touches[0] : e;
+                startX = touch.clientX;
+                startY = touch.clientY;
+                initialLeft = dot.offsetLeft;
+                initialTop = dot.offsetTop;
+                isDragging = true;
+                hasMoved = false;
+                dot.style.transition = 'none'; // 拖拽时禁用动画
+            };
+
+            const onMove = (e) => {
+                if (!isDragging) return;
+                const touch = e.touches ? e.touches[0] : e;
+                const dx = touch.clientX - startX;
+                const dy = touch.clientY - startY;
+
+                // 判断是否产生了有效移动（阈值5px）
+                if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                    hasMoved = true;
+                }
+
+                // 计算新位置并限制在屏幕内
+                const parent = dot.parentElement;
+                let newLeft = initialLeft + dx;
+                let newTop = initialTop + dy;
+
+                newLeft = Math.max(0, Math.min(newLeft, parent.clientWidth - dot.clientWidth));
+                newTop = Math.max(0, Math.min(newTop, parent.clientHeight - dot.clientHeight));
+
+                dot.style.left = `${newLeft}px`;
+                dot.style.top = `${newTop}px`;
+            };
+
+            const onEnd = async (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                dot.style.transition = 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+
+                // 自动吸附到边缘逻辑
+                const parent = dot.parentElement;
+                const centerX = parent.clientWidth / 2;
+                const currentLeft = parseInt(dot.style.left);
+                
+                if (currentLeft + dot.clientWidth / 2 < centerX) {
+                    dot.style.left = '10px';
+                } else {
+                    dot.style.left = (parent.clientWidth - dot.clientWidth - 10) + 'px';
+                }
+
+                // 如果没有移动，则视为点击，打开菜单
+                if (!hasMoved) {
+                    openIdentityMenu();
+                }
+            };
+
+            async function openIdentityMenu() {
+                const menu = document.getElementById('identity-menu-overlay');
+                const list = document.getElementById('identity-list-container');
+                if (!menu || !list) return;
+
+                const allUserPersonas = userPersonas.map(p => ({ name: p.name, type: '用户人设', avatar: p.avatar }));
+                const allNpcs = npcList.map(name => {
+                    const npcData = (npcSettings.personas && npcSettings.personas[name]) || {};
+                    return { name: name, type: 'NPC', avatar: npcData.avatar };
+                });
+                
+                const allDynamicChars = getAllUniqueCharacters()
+                    .filter(name => name !== '{{user}}' && !userPersonas.some(p => p.name === name) && !npcList.includes(name))
+                    .map(name => ({ name: name, type: '角色', avatar: null }));
+
+                const identities = [
+                    { name: '{{user}}', type: '原始身份', avatar: myAvatar },
+                    ...allUserPersonas,
+                    ...allNpcs,
+                    ...allDynamicChars
+                ];
+
+                list.innerHTML = identities.map(id => `
+                    <div class="identity-item ${chatState.currentIdentity === id.name ? 'active' : ''}" data-name="${id.name}">
+                        <div class="avatar-mini" id="id-avatar-${id.name.replace(/[^a-zA-Z0-9]/g, '')}"></div>
+                        <div class="name-info">
+                            <div style="font-weight: 600; color: #000;">${id.name === '{{user}}' ? '原本的用户' : id.name}</div>
+                            <div style="font-size: 11px; color: #8e8e93; margin-top: 2px;">${id.type}</div>
+                        </div>
+                        ${chatState.currentIdentity === id.name ? '<div style="color: #28a745; font-weight: bold;">✓</div>' : ''}
+                    </div>
+                `).join('');
+
+                identities.forEach(id => {
+                    const el = list.querySelector(`#id-avatar-${id.name.replace(/[^a-zA-Z0-9]/g, '')}`);
+                    if (el) setImageSrc(el, id.avatar || generateDefaultAvatar(id.name));
+                });
+
+                menu.classList.remove('hidden');
+            }
+
+            // 绑定事件
+            dot.addEventListener('mousedown', onStart);
+            dot.addEventListener('touchstart', onStart, { passive: false });
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('touchmove', onMove, { passive: false });
+            window.addEventListener('mouseup', onEnd);
+            window.addEventListener('touchend', onEnd);
+        })();
+
+        // 3. 选择身份逻辑
+        document.body.addEventListener('click', (e) => {
+            const item = e.target.closest('.identity-item');
+            if (item) {
+                const newId = item.dataset.name;
+                chatState.currentIdentity = newId;
+                // 保存到当前聊天的特定设置中
+                saveToLocalStorage(`chat_identity_${chatState.chatId}`, newId);
+                updateIdentityDotUI();
+                document.getElementById('identity-menu-overlay').classList.add('hidden');
+                
+                // 提示
+                const displayMsg = newId === '{{user}}' ? '已切回原本身份' : `已变身为: ${newId}`;
+                conversationManager.customAlert(displayMsg);
+            }
+
+            // 取消按钮
+            if (e.target.id === 'close-identity-menu' || e.target.id === 'identity-menu-overlay') {
+                document.getElementById('identity-menu-overlay').classList.add('hidden');
             }
         });
 
@@ -11490,8 +11831,19 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
 
                 // 3. 将所有消息翻译成AI能理解的内容 (这部分逻辑不变)
                 let role = msg.side === 'sent' ? 'user' : 'assistant';
-                // 【修改】使用 isTargetGroup 替代 contactInfo.isGroup
-                let senderName = (isTargetGroup && msg.sender) ? msg.sender : (role === 'user' ? 'user' : 'assistant');
+                
+                // 【核心修改：身份伪装逻辑】
+                let senderName;
+                if (msg.side === 'sent') {
+                    if (msg.isActing && msg.sender) {
+                        // 如果用户正在扮演，告诉 AI 这是一个扮演行为
+                        senderName = msg.sender;
+                    } else {
+                        senderName = 'user';
+                    }
+                } else {
+                    senderName = (isTargetGroup && msg.sender) ? msg.sender : 'assistant';
+                }
                 let contentParts = [];
                 let descriptiveText = '';
 
@@ -11621,7 +11973,16 @@ A girl with long pink hair is standing under a cherry blossom tree. She is weari
                         }
                     }).trim();
                 }
-                if (msg.side === 'sent' && msg.type === 'text') { mainText = mainText.replace(/@(\S+)/g, (match, username) => `[System Observation: The user is now specifically addressing and calling out "${username}". Your response should be directed towards this action.]\n${match}`); }
+                if (msg.side === 'sent' && msg.type === 'text') { 
+                    mainText = mainText.replace(/@(\S+)/g, (match, username) => `[System Observation: The user is now specifically addressing and calling out "${username}". Your response should be directed towards this action.]\n${match}`); 
+                    
+                    // 【核心修复：变身欺骗逻辑】
+                    // 如果这条消息标记了 isActing，说明是用户在扮演某个角色说话
+                    // 我们必须在发给 AI 的文本最前面加上“名字: ”，AI 才能识别出是谁在说话
+                    if (msg.isActing && msg.sender) {
+                        mainText = `${msg.sender}: ${mainText}`;
+                    }
+                }
                 // 【核心修复】将 allMessages 替换为 messages
                 if (msg.replyTo) { const originalMsg = messages.find(m => m.id === msg.replyTo); let originalContentText = `(a previous message)`; if(originalMsg) { if(originalMsg.text) originalContentText = `"${originalMsg.text}"`; else originalContentText = `a ${originalMsg.type}`; } mainText = `[Replying to ${originalContentText}] ${mainText}`; }
                 const stripRegex = /<div data-ai-strip="true"[\s\S]*?<\/div>/gm;
@@ -13181,10 +13542,14 @@ This is a **PRIVATE** conversation strictly between the AI characters present in
                     // 【继续构建软移出名单】
                     const softRemovedMembers = chatInfo.softRemovedMembers || [];
 
+                    // 【核心修复：从 AI 扮演名单中剔除用户当前占用的身份】
+                    const currentUserActiveIdentity = chatState.currentIdentity || '{{user}}';
+
                     // 【继续构建活跃名单】
                     const activeAiMembers = allAiEntitiesInChat.filter(name => 
                         name !== '{{user}}' && 
                         name !== userNameForPrompt &&
+                        name !== currentUserActiveIdentity &&
                         !softRemovedMembers.includes(name)
                     );
 
@@ -13247,10 +13612,13 @@ For any characters mentioned in the conversation that are NOT listed in the Char
 
 ${chatInfo.ensemblePersona || 'No general ensemble persona has been defined for this group.'}
 `;
-                    // 6. 定义行动权 (逻辑不变)
+                    // 【核心修复：使用正确的变量 originatingChatId】
+                    const currentIdentityInThisChatForRemarkReply = loadFromLocalStorage(`chat_identity_${originatingChatId}`, '{{user}}');
+                    const filteredRemarkNamesReply = remarkNames.filter(name => name !== currentIdentityInThisChatForRemarkReply);
+
                     groupPersonasPrompt += `
 [Proactive Behavior Mandate]
-When you need to initiate a PROACTIVE action (like starting a new conversation, posting on Moments, liking/commenting), you MUST act as one of the characters listed in the group's "remark" field. These are your designated active identities: **[${remarkNames.length > 0 ? remarkNames.join(', ') : 'None specified, you may choose any character from the Active Cast'}]**. Their personality MUST still be based on the complete Character Dossiers.
+When you need to initiate a PROACTIVE action (like starting a new conversation, posting on Moments, liking/commenting), you MUST act as one of the characters listed in the group's "remark" field. These are your designated active identities: **[${filteredRemarkNamesReply.length > 0 ? filteredRemarkNamesReply.join(', ') : 'None specified, you may choose any character from the Active Cast'}]**. Their personality MUST still be based on the complete Character Dossiers.
 \n`;
                     // 7. 添加防扮演用户禁令 (逻辑不变)
                     groupPersonasPrompt += `
@@ -14314,6 +14682,14 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
         // ===== 从这里开始，完整复制下面所有的代码 =====
 
     async function regenerateFromMessage(messageId) {
+        // 【核心新增：重新生成前的二次确认】
+        const confirmed = await conversationManager.customConfirm(
+            '确定要从这条消息开始重新生成吗？\n这将清除此后的所有对话，并将其存入历史分支。',
+            '重新生成确认',
+            '确定'
+        );
+        if (!confirmed) return;
+
         const clickedIndex = chatState.messages.findIndex(m => m.id === messageId);
         if (clickedIndex === -1) {
             await customAlert('错误：找不到目标消息。');
@@ -14333,7 +14709,7 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
              return;
         }
         
-        // 保存即将被覆盖的时间线为分支 (这部分逻辑是正确的，予以保留)
+        // 保存即将被覆盖的时间线为分支 (这部分逻辑和之前一致)
         const messagesToBranch = chatState.messages.slice(spliceIndex);
         
         if (messagesToBranch.length > 0) {
@@ -15862,6 +16238,36 @@ You were receiving a video call from {{user}}, but they hung up before you could
                                 avatarUrlKey = myAvatar;
                             }
                         }
+                    } else {
+                        // 【核心修复：群聊成员头像多级查找】
+                        if (contactInfo.isGroup && msg.sender) {
+                            // 1. 优先级：尝试从该角色的单聊记录中获取头像
+                            const characterChat = chatList.find(c => c.name === msg.sender && c.type === '私聊');
+                            if (characterChat) {
+                                const savedAvatar = loadFromLocalStorage(`chat_avatar_${characterChat.id}`, null);
+                                if (savedAvatar) avatarUrlKey = savedAvatar;
+                            }
+                            
+                            // 2. 优先级：如果是群聊主角，获取其群内专用头像
+                            if (avatarUrlKey === contactInfo.avatarUrl) {
+                                const groupInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                                const groupPersona = (groupInfo.groupPersonas || []).find(p => p.name === msg.sender);
+                                if (groupPersona && groupPersona.avatar) avatarUrlKey = groupPersona.avatar;
+                            }
+
+                            // 3. 优先级：尝试从NPC管理中获取头像
+                            if (avatarUrlKey === contactInfo.avatarUrl) {
+                                const npcSettingsData = loadFromLocalStorage('app-npc-settings', {});
+                                if (npcSettingsData.personas && npcSettingsData.personas[msg.sender] && npcSettingsData.personas[msg.sender].avatar) {
+                                    avatarUrlKey = npcSettingsData.personas[msg.sender].avatar;
+                                }
+                            }
+                            
+                            // 4. 兜底：使用该角色的默认生成的AI头像
+                            if (avatarUrlKey === contactInfo.avatarUrl) {
+                                avatarUrlKey = generateDefaultAvatar(msg.sender);
+                            }
+                        }
                     }
                     setImageSrc(avatarDiv, avatarUrlKey);
                     contentRow.appendChild(avatarDiv);
@@ -15877,31 +16283,77 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 const chatInfoForDisplay = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
                 const isGroupOfflineMode = contactInfo.isGroup && chatInfoForDisplay.mode === 'offline';
 
-                if (contactInfo.isGroup && msg.side === 'received' && msg.sender && !isGroupOfflineMode) {
+                // 【核心重构：群聊全员名称与状态显示系统 - 视觉对齐修正版】
+                const isGroup = contactInfo.isGroup;
+                const isOffline = isGroupOfflineMode;
+                const shouldShowNameInBubble = isGroup && !isOffline;
+
+                if (shouldShowNameInBubble) {
                     const senderNameDiv = document.createElement('div');
                     senderNameDiv.className = 'group-sender-name';
                     
-                    // 获取该发送者的状态
-                    const statuses = loadFromLocalStorage('app_character_statuses', {});
-                    const statusText = statuses[msg.sender];
-                    
-                    let nameHtml = escapeHtml(msg.sender);
-                    
-                    if (statusText) {
-                        // 【核心修复】增加表情包解析逻辑
-                        let processedStatus = escapeHtml(statusText).replace(/\[emoji[:：]([^\]]+)\]/g, (match, name) => {
-                            const item = stickers.find(s => s.name === name && s.type === 'emoji');
-                            if (item) {
-                                // 群聊状态字号较小，图片高度设为 12px
-                                return `<img src="${item.url}" alt="${name}" style="height: 12px; width: auto; vertical-align: middle; margin: 0 1px;">`;
-                            }
-                            return match;
-                        });
+                    // 1. 确定要显示的名称
+                    let displayName = "";
+                    if (msg.side === 'sent') {
+                        // 优先级：变身名 > 聊天设置的人设名 > 全局 {{user}}
+                        displayName = msg.sender || (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无' ? chatInfo.userPersonaName : '{{user}}');
+                    } else {
+                        displayName = msg.sender || chatState.chatName;
+                    }
 
-                        nameHtml += `<span class="group-sender-status">${processedStatus}</span>`;
+                    // 2. 获取该角色的状态 (核心修复：确保读取到 user_status)
+                    const allStatuses = loadFromLocalStorage('app_character_statuses', {});
+                    let statusText = "";
+                    
+                    // 判断当前说话的人是不是“我”（包含变身和人设马甲）
+                    const isMe = (msg.side === 'sent');
+                    
+                    if (isMe) {
+                        // 如果是我在说话：强制读取当前聊天的“用户状态”设置
+                        statusText = chatInfo.user_status || "";
+                    } else {
+                        // 如果是AI在说话：从全局状态表里读
+                        statusText = allStatuses[displayName] || "";
+                    }
+
+                    // 3. 处理状态中的 Emoji
+                    let processedStatusHtml = "";
+                    if (statusText) {
+                        processedStatusHtml = escapeHtml(statusText).replace(/\[emoji[:：]([^\]]+)\]/g, (match, name) => {
+                            const item = stickers.find(s => s.name === name && s.type === 'emoji');
+                            return item ? `<img src="${item.url}" alt="${name}" class="inline-emoji" style="height: 12px; vertical-align: middle;">` : match;
+                        });
+                    }
+
+                    // 4. 构建 HTML 并处理物理顺序
+                    senderNameDiv.style.display = 'flex';
+                    senderNameDiv.style.alignItems = 'center';
+                    senderNameDiv.style.gap = '4px';
+
+                    if (msg.side === 'sent') {
+                        // 【我方消息】：右对齐，顺序为 [状态] + [名字]
+                        senderNameDiv.style.justifyContent = 'flex-end';
+                        senderNameDiv.style.width = '100%';
+                        
+                        let html = "";
+                        if (processedStatusHtml) {
+                            // 状态在左，名字在右
+                            html += `<span class="group-sender-status" style="margin: 0 6px 0 0;">${processedStatusHtml}</span>`;
+                        }
+                        html += `<span>${escapeHtml(displayName)}</span>`;
+                        senderNameDiv.innerHTML = html;
+                    } else {
+                        // 【对方消息】：左对齐，顺序为 [名字] + [状态]
+                        senderNameDiv.style.justifyContent = 'flex-start';
+                        
+                        let html = `<span>${escapeHtml(displayName)}</span>`;
+                        if (processedStatusHtml) {
+                            // 名字在左，状态在右
+                            html += `<span class="group-sender-status" style="margin: 0 0 0 6px;">${processedStatusHtml}</span>`;
+                        }
+                        senderNameDiv.innerHTML = html;
                     }
                     
-                    senderNameDiv.innerHTML = nameHtml;
                     mainContentAndNameWrapper.appendChild(senderNameDiv);
                 }
 
@@ -16239,31 +16691,77 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 const chatInfoForDisplay = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
                 const isGroupOfflineMode = contactInfo.isGroup && chatInfoForDisplay.mode === 'offline';
 
-                if (contactInfo.isGroup && msg.side === 'received' && msg.sender && !isGroupOfflineMode) {
+                // 【核心重构：群聊全员名称与状态显示系统 - 视觉对齐修正版】
+                const isGroup = contactInfo.isGroup;
+                const isOffline = isGroupOfflineMode;
+                const shouldShowNameInBubble = isGroup && !isOffline;
+
+                if (shouldShowNameInBubble) {
                     const senderNameDiv = document.createElement('div');
                     senderNameDiv.className = 'group-sender-name';
                     
-                    // 获取该发送者的状态
-                    const statuses = loadFromLocalStorage('app_character_statuses', {});
-                    const statusText = statuses[msg.sender];
-                    
-                    let nameHtml = escapeHtml(msg.sender);
-                    
-                    if (statusText) {
-                        // 【核心修复】增加表情包解析逻辑
-                        let processedStatus = escapeHtml(statusText).replace(/\[emoji[:：]([^\]]+)\]/g, (match, name) => {
-                            const item = stickers.find(s => s.name === name && s.type === 'emoji');
-                            if (item) {
-                                // 群聊状态字号较小，图片高度设为 12px
-                                return `<img src="${item.url}" alt="${name}" style="height: 12px; width: auto; vertical-align: middle; margin: 0 1px;">`;
-                            }
-                            return match;
-                        });
+                    // 1. 确定要显示的名称
+                    let displayName = "";
+                    if (msg.side === 'sent') {
+                        // 优先级：变身名 > 聊天设置的人设名 > 全局 {{user}}
+                        displayName = msg.sender || (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无' ? chatInfo.userPersonaName : '{{user}}');
+                    } else {
+                        displayName = msg.sender || chatState.chatName;
+                    }
 
-                        nameHtml += `<span class="group-sender-status">${processedStatus}</span>`;
+                    // 2. 获取该角色的状态 (核心修复：确保读取到 user_status)
+                    const allStatuses = loadFromLocalStorage('app_character_statuses', {});
+                    let statusText = "";
+                    
+                    // 判断当前说话的人是不是“我”（包含变身和人设马甲）
+                    const isMe = (msg.side === 'sent');
+                    
+                    if (isMe) {
+                        // 如果是我在说话：强制读取当前聊天的“用户状态”设置
+                        statusText = chatInfo.user_status || "";
+                    } else {
+                        // 如果是AI在说话：从全局状态表里读
+                        statusText = allStatuses[displayName] || "";
+                    }
+
+                    // 3. 处理状态中的 Emoji
+                    let processedStatusHtml = "";
+                    if (statusText) {
+                        processedStatusHtml = escapeHtml(statusText).replace(/\[emoji[:：]([^\]]+)\]/g, (match, name) => {
+                            const item = stickers.find(s => s.name === name && s.type === 'emoji');
+                            return item ? `<img src="${item.url}" alt="${name}" class="inline-emoji" style="height: 12px; vertical-align: middle;">` : match;
+                        });
+                    }
+
+                    // 4. 构建 HTML 并处理物理顺序
+                    senderNameDiv.style.display = 'flex';
+                    senderNameDiv.style.alignItems = 'center';
+                    senderNameDiv.style.gap = '4px';
+
+                    if (msg.side === 'sent') {
+                        // 【我方消息】：右对齐，顺序为 [状态] + [名字]
+                        senderNameDiv.style.justifyContent = 'flex-end';
+                        senderNameDiv.style.width = '100%';
+                        
+                        let html = "";
+                        if (processedStatusHtml) {
+                            // 状态在左，名字在右
+                            html += `<span class="group-sender-status" style="margin: 0 6px 0 0;">${processedStatusHtml}</span>`;
+                        }
+                        html += `<span>${escapeHtml(displayName)}</span>`;
+                        senderNameDiv.innerHTML = html;
+                    } else {
+                        // 【对方消息】：左对齐，顺序为 [名字] + [状态]
+                        senderNameDiv.style.justifyContent = 'flex-start';
+                        
+                        let html = `<span>${escapeHtml(displayName)}</span>`;
+                        if (processedStatusHtml) {
+                            // 名字在左，状态在右
+                            html += `<span class="group-sender-status" style="margin: 0 0 0 6px;">${processedStatusHtml}</span>`;
+                        }
+                        senderNameDiv.innerHTML = html;
                     }
                     
-                    senderNameDiv.innerHTML = nameHtml;
                     mainContentAndNameWrapper.appendChild(senderNameDiv);
                 }
 
@@ -17010,14 +17508,21 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
             if (contactInfo.isGroup) {
                 const currentMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
                 
-                // 【最优先检查】: 如果您根本就不在成员列表里
-                if (!currentMembers.includes('{{user}}')) {
+                if (contactInfo.isGroup) {
+                const currentMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
+                
+                // 【核心修正：获取当前活跃身份】
+                const activeId = chatState.currentIdentity || '{{user}}';
+                
+                // 【最优先检查】: 检查当前扮演的身份是否在成员列表里
+                if (!currentMembers.includes(activeId)) {
                     const verificationMessage = await showContentInputModal({
                         title: '申请加入群聊',
-                        placeholder: '你还不是群成员，需要发送申请才能加入。'
+                        placeholder: `当前身份 "${activeId === '{{user}}' ? '你' : activeId}" 还不是群成员，需要发送申请才能加入。`
                     });
                     if (verificationMessage !== null) {
-                        await addMessage({ type: 'system', side: 'system', text: `你发送了加群申请，附言：${verificationMessage}` });
+                        const actionText = activeId === '{{user}}' ? '你' : `你代表 "${activeId}"`;
+                        await addMessage({ type: 'system', side: 'system', text: `${actionText}发送了加群申请，附言：${verificationMessage}` });
                     }
                     return; // 无论如何，终止本次发言
                 }
@@ -17028,12 +17533,14 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
                 const chatId = conversationManager.getCurrentChatId();
                 const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
                 const softRemovedMembers = chatInfo.softRemovedMembers || [];
+                const activeId = chatState.currentIdentity || '{{user}}';
 
                 if (relationship.groupStatus === 'disbanded') {
                     await customAlert('该群聊已解散，无法发送消息。');
                     return;
                 }
-                if (relationship.myStatus === 'exited') {
+                // 仅当以原始用户身份发言时，才检查“已退出”状态
+                if (activeId === '{{user}}' && relationship.myStatus === 'exited') {
                     const confirmed = await customConfirm(`你已退出群聊“${chatState.chatName}”，是否重新加入？`, '提示', '重新加入');
                     if (confirmed) {
                         relationship.myStatus = 'normal';
@@ -17042,17 +17549,19 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
                         return;
                     }
                 }
-                // 核心新增：检查用户是否在软移除名单中
-                if (relationship.myStatus === 'removed' || softRemovedMembers.includes('{{user}}')) {
+                // 核心修改：检查当前扮演身份是否在软移除名单中
+                if (softRemovedMembers.includes(activeId)) {
                     const verificationMessage = await showContentInputModal({
                         title: '申请加入群聊',
-                        placeholder: '你已被移出群聊，需要发送申请才能重新加入。'
+                        placeholder: `身份 "${activeId === '{{user}}' ? '你' : activeId}" 已被移出群聊，需要发送申请才能重新加入。`
                     });
                     if (verificationMessage !== null) {
-                        await addMessage({ type: 'system', side: 'system', text: `你发送了加群申请，附言：${verificationMessage}` });
+                        const actionText = activeId === '{{user}}' ? '你' : `你代表 "${activeId}"`;
+                        await addMessage({ type: 'system', side: 'system', text: `${actionText}发送了加群申请，附言：${verificationMessage}` });
                     }
                     return;
                 }
+            }
             }
 
             if (!contactInfo.isGroup && relationship.contactStatusToMe === 'blacklisted') {
@@ -17084,6 +17593,14 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
             }
 
             const messageData = { type, text, side: 'sent', ...extraData };
+
+            // 【核心修复：发送时锁定身份】
+            // 每次发送消息时，实时检查当前小圆点选中的身份
+            if (chatState.currentIdentity && chatState.currentIdentity !== '{{user}}') {
+                messageData.sender = chatState.currentIdentity;
+                messageData.isActing = true;
+            }
+
             if (currentReplyContext) {
                 messageData.replyTo = currentReplyContext;
                 cancelReply();
@@ -17322,29 +17839,67 @@ const recallMessage = async (messageId) => {
 };
 // ...
 const showContextMenu = (event, messageId) => {
-    hideContextMenu(); const message = chatState.messages.find(m => m.id === messageId); if (!message) return;
+    hideContextMenu(); 
+    const message = chatState.messages.find(m => m.id === messageId); 
+    if (!message) return;
+
     let menuItems = [];
-    if (message.side === 'sent') { 
-        menuItems = [ { label: '引用', action: 'quote' }, { label: '撤回', action: 'recall' }, { label: '编辑', action: 'edit' }, { label: '从此处重新生成', action: 'regenerate_from' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
-    } else { 
-        menuItems = [ { label: '引用', action: 'quote' }, { label: '代我回复', action: 'reply_for_me' }, { label: '编辑', action: 'edit' }, { label: '从此处重新生成', action: 'regenerate_from' }, { label: '插入消息', action: 'insert' }, { label: '多选', action: 'multi-select' }, { label: '删除', action: 'delete' } ]; 
-        if (contactInfo.isGroup) { menuItems.unshift({ label: '@ Ta', action: 'at' }); } 
+
+    // --- 第一区：社交与基础互动 ---
+    if (contactInfo.isGroup && message.side === 'received') {
+        menuItems.push({ label: '@ Ta', action: 'at' });
     }
 
-    // --- 核心新增：检查收藏状态并动态添加菜单项 ---
     const chatId = conversationManager.getCurrentChatId();
     const favoritesKey = `chat_favorites_${chatId}`;
     const favorites = loadFromLocalStorage(favoritesKey, []);
     const isFavorited = favorites.some(fav => fav.id === messageId);
 
     if (isFavorited) {
-        menuItems.unshift({ label: '取消收藏', action: 'unfavorite' });
+        menuItems.push({ label: '取消收藏', action: 'unfavorite' });
     } else {
-        menuItems.unshift({ label: '收藏', action: 'favorite' });
+        menuItems.push({ label: '收藏', action: 'favorite' });
     }
-    // --- 新增结束 ---
 
-    messageContextMenu.innerHTML = ''; menuItems.forEach(item => { const div = document.createElement('div'); div.className = 'context-menu-item'; div.textContent = item.label; div.dataset.action = item.action; messageContextMenu.appendChild(div); });
+    menuItems.push({ label: '引用', action: 'quote' });
+
+    if (message.side === 'sent') {
+        menuItems.push({ label: '撤回', action: 'recall' });
+    }
+
+    menuItems.push({ label: '编辑', action: 'edit' });
+    menuItems.push({ label: '多选', action: 'multi-select' });
+
+    // --- 分割线 ---
+    menuItems.push({ label: 'divider', action: null });
+
+    // --- 第二区：进阶与危险操作 (你要求的位置) ---
+    menuItems.push({ label: '插入消息', action: 'insert' });
+
+    if (message.side === 'received') {
+        menuItems.push({ label: '代我回复', action: 'reply_for_me' });
+    }
+
+    menuItems.push({ label: '从此处重新生成', action: 'regenerate_from', isDanger: true });
+    menuItems.push({ label: '删除', action: 'delete', isDanger: true });
+
+    // 渲染菜单
+    messageContextMenu.innerHTML = ''; 
+    menuItems.forEach(item => {
+        if (item.label === 'divider') {
+            const hr = document.createElement('div');
+            hr.className = 'context-menu-divider';
+            messageContextMenu.appendChild(hr);
+            return;
+        }
+
+        const div = document.createElement('div');
+        div.className = 'context-menu-item';
+        if (item.isDanger) div.classList.add('danger');
+        div.textContent = item.label;
+        div.dataset.action = item.action;
+        messageContextMenu.appendChild(div);
+    });
 
     messageContextMenu.style.left = `${event.clientX}px`; messageContextMenu.style.top = `${event.clientY}px`; messageContextMenu.classList.remove('hidden');
     const rect = messageContextMenu.getBoundingClientRect(); const screenRect = appRoot.getBoundingClientRect();
@@ -17827,16 +18382,28 @@ function renderGroupMemberList(chatId) {
                     const userPersonaName = chatInfo.userPersonaName;
                     const selectedPersona = userPersonaName ? userPersonas.find(p => p.name === userPersonaName) : null;
                     avatarUrl = (selectedPersona && selectedPersona.avatar) ? selectedPersona.avatar : (myAvatar || generateDefaultAvatar(name));
-                } else if (groupPersona && groupPersona.avatar) {
-                    // 优先级1：如果这个成员是群聊主角，并且设置了头像，就使用它
-                    avatarUrl = groupPersona.avatar;
                 } else {
-                    // 优先级2：检查它是否是一个独立的AI角色，并使用其私聊头像
+                    // 【核心修复：统一成员列表头像查找逻辑】
+                    // 1. 优先级：单聊设置的头像
                     const characterChat = chatList.find(c => c.name === name && c.type === '私聊');
                     if (characterChat) {
                         avatarUrl = loadFromLocalStorage(`chat_avatar_${characterChat.id}`, null);
                     }
-                    // 优先级3：如果以上都没有，就使用默认头像
+                    
+                    // 2. 优先级：群聊主角专用头像
+                    if (!avatarUrl && groupPersona && groupPersona.avatar) {
+                        avatarUrl = groupPersona.avatar;
+                    }
+
+                    // 3. 优先级：NPC管理中的头像
+                    if (!avatarUrl) {
+                        const npcSettingsData = loadFromLocalStorage('app-npc-settings', {});
+                        if (npcSettingsData.personas && npcSettingsData.personas[name] && npcSettingsData.personas[name].avatar) {
+                            avatarUrl = npcSettingsData.personas[name].avatar;
+                        }
+                    }
+
+                    // 4. 兜底：默认AI头像
                     if (!avatarUrl) {
                         avatarUrl = generateDefaultAvatar(name);
                     }
@@ -18503,6 +19070,12 @@ footerSendBtn.addEventListener('click', async () => {
     conversationManager.enableKeepAlive();
 
     await handleSendMessageAttempt('text', footerMessageInput.value.trim()); 
+    
+    // 【核心新增：发送成功后，清除本地存储中的草稿】
+    const drafts = loadFromLocalStorage('app_chat_drafts', {});
+    delete drafts[chatState.chatId];
+    saveToLocalStorage('app_chat_drafts', drafts);
+
     footerMessageInput.value = ''; 
     footerMessageInput.style.height = '38px'; 
     footerMessageInput.dispatchEvent(new Event('input')); 
@@ -18529,6 +19102,12 @@ footerMessageInput.addEventListener('keydown', async (e) => {
         if (!footerMessageInput.value.trim()) return; // 空内容不发送
         
         await handleSendMessageAttempt('text', footerMessageInput.value.trim()); 
+
+        // 【核心新增：回车发送成功后，清除本地存储中的草稿】
+        const drafts = loadFromLocalStorage('app_chat_drafts', {});
+        delete drafts[chatState.chatId];
+        saveToLocalStorage('app_chat_drafts', drafts);
+
         footerMessageInput.value = ''; 
         footerMessageInput.style.height = '38px'; // 发送后重置高度
         footerMessageInput.dispatchEvent(new Event('input')); 
@@ -19657,35 +20236,26 @@ async function showBranchHistoryModal(chatId) {
 // =========================================================================
 
         async function showFavoritesModal(chatId) {
-            const favoritesKey = `chat_favorites_${chatId}`;
-            let favorites = loadFromLocalStorage(favoritesKey, []);
+            let currentTab = 'chat'; // 默认显示聊天记录收藏
 
-            if (favorites.length === 0) {
-                await conversationManager.customAlert('还没有任何收藏。');
-                return;
-            }
-
-            // 用于生成预览文本的辅助函数 (这是修改后的版本)
-            const createPreview = (msg) => {
-                if (msg.type !== 'text') {
-                    const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'transfer': '[转账]', 'red_packet': '[红包]', 'video': '[视频]', 'location': '[位置]', 'gift': '[礼物]', 'pay_for_me': '[代付]'};
-                    return typeMap[msg.type] || '[消息]';
-                }
-                
-                let content = msg.text || '';
-                
-                // 如果内容是复杂的HTML卡片，则显示一个占位符，而不是混乱的源码
-                if (content.trim().startsWith('<div') || content.trim().startsWith('<snippet>')) {
-                    return '[卡片/格式化消息]';
-                }
-                
-                // 对于普通文本，进行转义并替换换行符，完整显示
-                return escapeHtml(content).replace(/\n/g, '<br>');
-            };
-            
-            const favoritesHtml = `
-                <div id="favorites-list-container" style="max-height: 60vh; overflow-y: auto; text-align: left;">
-                    ${favorites.map(msg => `
+            const renderContent = (tab, container) => {
+                if (tab === 'chat') {
+                    const favoritesKey = `chat_favorites_${chatId}`;
+                    const favorites = loadFromLocalStorage(favoritesKey, []);
+                    if (favorites.length === 0) {
+                        container.innerHTML = '<p style="text-align: center; color: #888; padding: 40px 20px;">还没有收藏的聊天记录</p>';
+                        return;
+                    }
+                    const createPreview = (msg) => {
+                        if (msg.type !== 'text') {
+                            const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'transfer': '[转账]', 'red_packet': '[红包]', 'video': '[视频]', 'location': '[位置]', 'gift': '[礼物]', 'pay_for_me': '[代付]'};
+                            return typeMap[msg.type] || '[消息]';
+                        }
+                        let content = msg.text || '';
+                        if (content.trim().startsWith('<div') || content.trim().startsWith('<snippet>')) return '[卡片/格式化消息]';
+                        return escapeHtml(content).replace(/\n/g, '<br>');
+                    };
+                    container.innerHTML = favorites.map(msg => `
                         <div class="favorite-item" style="padding: 12px; border-bottom: 1px solid #eee;">
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
                                 <strong style="color: #333;">${escapeHtml(msg.sender || (msg.side === 'sent' ? '我' : chatState.chatName))}</strong>
@@ -19694,53 +20264,84 @@ async function showBranchHistoryModal(chatId) {
                             <p style="margin: 0 0 10px 0; color: #555; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;">${createPreview(msg)}</p>
                             <div style="text-align: right;">
                                 <button class="modal-button secondary" data-action="jump" data-msg-id="${msg.id}" style="padding: 4px 10px; font-size: 12px;">跳转</button>
-                                <button class="modal-button danger" data-action="delete" data-msg-id="${msg.id}" style="padding: 4px 10px; font-size: 12px; margin-left: 8px;">移除</button>
+                                <button class="modal-button danger" data-action="delete-chat" data-msg-id="${msg.id}" style="padding: 4px 10px; font-size: 12px; margin-left: 8px;">移除</button>
                             </div>
-                        </div>
-                    `).join('')}
-                </div>`;
+                        </div>`).join('');
+                } else {
+                    const moodFavs = loadFromLocalStorage('app_mood_favorites', []);
+                    if (moodFavs.length === 0) {
+                        container.innerHTML = '<p style="text-align: center; color: #888; padding: 40px 20px;">还没有收藏的心事</p>';
+                        return;
+                    }
+                    container.innerHTML = moodFavs.map(mood => `
+                        <div class="favorite-item" style="padding: 12px; border-bottom: 1px solid #eee;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                                <strong style="color: #333;">心事卡片</strong>
+                                <span style="font-size: 11px; color: #999;">${new Date(mood.timestamp).toLocaleString()}</span>
+                            </div>
+                            <p style="margin: 0 0 10px 0; color: #555; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(mood.content)}</p>
+                            <div style="text-align: right;">
+                             <button class="modal-button danger" data-action="delete-mood" data-mood-id="${mood.id}" style="padding: 4px 10px; font-size: 12px;">移除</button>
+                            </div>
+                        </div>`).join('');
+                }
+            };
 
-            await conversationManager.showCustomModal({
+            const favoritesHtml = `
+                <div class="fav-tabs">
+                    <div class="fav-tab active" data-tab="chat">聊天记录</div>
+                    <div class="fav-tab" data-tab="mood">心事卡片</div>
+                </div>
+                <div id="favorites-list-container" style="max-height: 60vh; overflow-y: auto; text-align: left;"></div>`;
+
+            await showCustomModal({
                 title: '收藏夹',
                 html: favoritesHtml,
                 showCloseButton: true,
                 buttons: [{ text: '关闭', value: 'close', class: 'secondary' }],
                 onRender: (modalDOM, closeModal) => {
                     const listContainer = modalDOM.querySelector('#favorites-list-container');
+                    const tabs = modalDOM.querySelectorAll('.fav-tab');
+                    
+                    renderContent('chat', listContainer);
+
+                    modalDOM.querySelector('.fav-tabs').addEventListener('click', (e) => {
+                        const tab = e.target.closest('.fav-tab');
+                        if (!tab) return;
+                        tabs.forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        currentTab = tab.dataset.tab;
+                        renderContent(currentTab, listContainer);
+                    });
+
                     listContainer.addEventListener('click', async (e) => {
                         const button = e.target.closest('button[data-action]');
                         if (!button) return;
-
                         const action = button.dataset.action;
-                        const msgId = button.dataset.msgId;
 
                         if (action === 'jump') {
-                            closeModal(); // 先关闭收藏夹
-                            jumpToMessage(msgId); // 调用已有的搜索跳转函数
-                        } else if (action === 'delete') {
-                            const confirmed = await conversationManager.customConfirm('确定要移除这条收藏吗？');
-                            if (confirmed) {
-                                // 从数据中移除
-                                favorites = favorites.filter(fav => fav.id !== msgId);
-                                saveToLocalStorage(favoritesKey, favorites);
-                                
-                                // 从视图中移除
-                                const itemToRemove = button.closest('.favorite-item');
-                                itemToRemove.style.transition = 'opacity 0.3s, transform 0.3s';
-                                itemToRemove.style.opacity = '0';
-                                itemToRemove.style.transform = 'translateX(-20px)';
-                                setTimeout(() => {
-                                    itemToRemove.remove();
-                                    if (listContainer.children.length === 0) {
-                                        listContainer.innerHTML = '<p style="text-align: center; color: #888; padding: 20px;">收藏夹已清空</p>';
-                                    }
-                                }, 300);
+                            closeModal();
+                            jumpToMessage(button.dataset.msgId);
+                        } else if (action === 'delete-chat') {
+                            if (await conversationManager.customConfirm('确定要移除这条记录吗？')) {
+                                const favoritesKey = `chat_favorites_${chatId}`;
+                                let favs = loadFromLocalStorage(favoritesKey, []);
+                                favs = favs.filter(f => f.id !== button.dataset.msgId);
+                                saveToLocalStorage(favoritesKey, favs);
+                                renderContent('chat', listContainer);
+                            }
+                        } else if (action === 'delete-mood') {
+                            if (await conversationManager.customConfirm('确定要移除这条心事吗？')) {
+                                let moodFavs = loadFromLocalStorage('app_mood_favorites', []);
+                                moodFavs = moodFavs.filter(f => f.id !== button.dataset.moodId);
+                                saveToLocalStorage('app_mood_favorites', moodFavs);
+                                renderContent('mood', listContainer);
                             }
                         }
                     });
                 }
             });
-        }
+        }   
 // =========================================================================
 // =================== END: FAVORITES MANAGEMENT (NEW) =====================
 // =========================================================================
@@ -21991,6 +22592,9 @@ checkMomentsUpdates(); // <--- 新增这一行
     
     const stickerManager = (function() {
         let isManageMode = false;
+        // 【核心新增：从本地存储读取排序设置，默认为 oldest (最早在前)】
+        let sortOrder = loadFromLocalStorage('app-sticker-sort-order', 'oldest');
+
         async function processBatchStickerImport(files) {
             // 1. 准备所有图片的 Base64 和 IndexedDB 存储
             const imagePayloads = [];
@@ -22197,9 +22801,16 @@ checkMomentsUpdates(); // <--- 新增这一行
             if (searchTerm) {
                 filteredStickers = filteredStickers.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()));
             }
+
+            // 【核心新增：排序处理】
+            // 因为 stickers 数组是通过 push 增加的，所以默认是“最早在前”
+            let displayList = [...filteredStickers];
+            if (sortOrder === 'newest') {
+                displayList.reverse(); // 如果设置是“最新在前”，则反转数组
+            }
             
-            grid.innerHTML = filteredStickers.length > 0 
-                ? filteredStickers.map(s => {
+            grid.innerHTML = displayList.length > 0 
+                ? displayList.map(s => {
                     const originalIndex = stickers.indexOf(s);
                     
                     // 【核心修复】判断是否为本地 IndexedDB 链接
@@ -22242,10 +22853,12 @@ checkMomentsUpdates(); // <--- 新增这一行
                         <div class="sticker-panel-header" style="flex-direction: column; height: auto; gap: 10px; padding: 10px;">
                             <input type="search" id="sticker-search-input" placeholder="搜索..." style="width: 100%; margin: 0;" />
                             
-                            <div style="display: flex; width: 100%; gap: 8px;">
-                                <button class="modal-button secondary" data-value="manage" style="flex: 1; padding: 8px 0;">管理</button>
-                                <button class="modal-button primary" data-value="import" style="flex: 1; padding: 8px 0;">导入</button>
-                                <button class="modal-button secondary" data-value="close" style="flex: 1; padding: 8px 0;">关闭</button>
+                            <div style="display: flex; width: 100%; gap: 8px; flex-wrap: wrap;">
+                                <!-- 【核心新增：排序切换按钮】 -->
+                                <button class="modal-button secondary" id="sticker-sort-btn" style="flex: 1; padding: 8px 0; min-width: 80px;">${sortOrder === 'newest' ? '最新在前' : '最早在前'}</button>
+                                <button class="modal-button secondary" data-value="manage" style="flex: 1; padding: 8px 0; min-width: 60px;">管理</button>
+                                <button class="modal-button primary" data-value="import" style="flex: 1; padding: 8px 0; min-width: 60px;">导入</button>
+                                <button class="modal-button secondary" data-value="close" style="flex: 1; padding: 8px 0; min-width: 60px;">关闭</button>
                             </div>
                         </div>
 
@@ -22327,6 +22940,22 @@ checkMomentsUpdates(); // <--- 新增这一行
                             });
                             
                             searchInput.addEventListener('input', (e) => renderPanel(modalDOM, e.target.value, currentType));
+
+                            // 【核心新增：排序按钮点击事件】
+                            const sortBtn = modalDOM.querySelector('#sticker-sort-btn');
+                            if (sortBtn) {
+                                sortBtn.addEventListener('click', (e) => {
+                                    e.stopPropagation();
+                                    // 切换排序状态
+                                    sortOrder = (sortOrder === 'newest' ? 'oldest' : 'newest');
+                                    // 保存设置到本地
+                                    saveToLocalStorage('app-sticker-sort-order', sortOrder);
+                                    // 更新按钮文字
+                                    sortBtn.textContent = (sortOrder === 'newest' ? '最新在前' : '最早在前');
+                                    // 重新渲染列表
+                                    renderPanel(modalDOM, searchInput.value, currentType);
+                                });
+                            }
                             
                             gridContainer.addEventListener('click', (e) => {
                                 // 【核心修改】如果刚刚触发了长按，则拦截这次点击，不发送表情
@@ -23485,8 +24114,10 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 isFrameHidden: false,
                 showRawOutput: false,
                 showMessageTimestamps: false,
-                timestampPosition: 'below', // 新增这一行
-                enableBackgroundTasks: true, // 【【【核心新增：后台任务开关，默认开启】】】
+                timestampPosition: 'below', 
+                enableBackgroundTasks: true,
+                showStatusBarInfo: true, // 是否显示状态栏电量时间
+                lowBatteryAlertThreshold: 20, // 触发提醒的电量阈值
                 enableVConsole: false, // 【核心新增：vConsole 调试工具开关】
                 // 【新增：提示音默认设置】
                 notificationSounds: [
@@ -23542,10 +24173,80 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             savedFonts = appearanceSettings.savedFonts || [];
             activeFontName = appearanceSettings.activeFontName || '默认';
         }
-        function saveSettings() {
+      
+function saveSettings() {
             appearanceSettings.savedFonts = savedFonts;
             appearanceSettings.activeFontName = activeFontName;
             saveToLocalStorage('app-appearance-settings', appearanceSettings);
+        }
+
+        // --- 全新：状态栏实时监控系统 ---
+        function startStatusBarMonitor() {
+            const timeEl = document.getElementById('status-time');
+            const batteryWrapper = document.getElementById('status-battery-wrapper');
+            const batteryFill = document.getElementById('battery-level-fill');
+            const batteryText = document.getElementById('battery-percentage');
+            let hasAlerted = false;
+
+            // 1. 时间更新逻辑
+            const updateTime = () => {
+                const now = new Date();
+                if (timeEl) {
+                    timeEl.textContent = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+                }
+            };
+
+            // 2. 电量更新逻辑 (安卓支持，苹果自动隐藏)
+            const updateBattery = async () => {
+                if ('getBattery' in navigator) {
+                    try {
+                        const battery = await navigator.getBattery();
+                        const refreshBatteryUI = () => {
+                            const level = Math.round(battery.level * 100);
+                            if (batteryFill) batteryFill.style.width = level + '%';
+                            if (batteryText) batteryText.textContent = level;
+                            
+                            // 变色逻辑：电量低变红
+                            if (batteryFill) {
+                                batteryFill.style.backgroundColor = level <= 20 ? '#ff3b30' : 'var(--battery-icon-color)';
+                            }
+
+                            // 低电量弹窗提醒
+                            const threshold = appearanceSettings.lowBatteryAlertThreshold || 20;
+                            if (level <= threshold && !hasAlerted) {
+                                conversationManager.customAlert(`手机电量已低于 ${threshold}%，请及时充电。`, '低电量提醒');
+                                hasAlerted = true;
+                            } else if (level > threshold) {
+                                hasAlerted = false; // 充电后重置提醒状态
+                            }
+                        };
+                        battery.addEventListener('levelchange', refreshBatteryUI);
+                        refreshBatteryUI();
+                        if (batteryWrapper) batteryWrapper.style.display = 'flex';
+                    } catch (e) {
+                        if (batteryWrapper) batteryWrapper.style.display = 'none';
+                    }
+                } else {
+                    // 苹果设备或不支持的浏览器，直接隐藏电量图标
+                    if (batteryWrapper) batteryWrapper.style.display = 'none';
+                }
+            };
+
+            // 3. 显隐控制
+            const toggleVisibility = () => {
+                const isShown = appearanceSettings.showStatusBarInfo !== false;
+                if (timeEl) timeEl.style.display = isShown ? 'block' : 'none';
+                if (!isShown) {
+                    if (batteryWrapper) batteryWrapper.style.display = 'none';
+                } else {
+                    updateBattery(); // 重新检查电量显示
+                }
+            };
+
+            // 启动定时器
+            setInterval(updateTime, 1000);
+            updateTime();
+            toggleVisibility();
         }
         
         // ===== 请用下面这个完整的新版本替换上面的旧版本 =====
@@ -24359,6 +25060,50 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                     // 这个设置不需要重新应用，因为它只在JS逻辑里用
                 });
             }
+
+            // 【核心新增：状态栏信息与低电量提醒事件绑定】
+            const statusInfoToggle = document.getElementById('toggle-status-bar-info');
+            const thresholdInput = document.getElementById('low-battery-threshold-input');
+            
+            if (statusInfoToggle && thresholdInput) {
+                // 初始化界面显示状态
+                statusInfoToggle.checked = appearanceSettings.showStatusBarInfo !== false;
+                thresholdInput.value = appearanceSettings.lowBatteryAlertThreshold || 20;
+
+                // 监听显示开关
+                statusInfoToggle.addEventListener('change', () => {
+                    appearanceSettings.showStatusBarInfo = statusInfoToggle.checked;
+                    saveSettings();
+                    
+                    // 立即更新顶部状态栏的显隐，无需刷新页面
+                    const timeEl = document.getElementById('status-time');
+                    const batteryWrapper = document.getElementById('status-battery-wrapper');
+                    if (timeEl && batteryWrapper) {
+                        const isShown = statusInfoToggle.checked;
+                        timeEl.style.display = isShown ? 'block' : 'none';
+                        // 如果是开启，且浏览器支持电量API，则显示电量图标
+                        if (isShown && 'getBattery' in navigator) {
+                            batteryWrapper.style.display = 'flex';
+                        } else {
+                            batteryWrapper.style.display = 'none';
+                        }
+                    }
+                });
+
+                // 监听提醒阈值输入
+                thresholdInput.addEventListener('change', () => {
+                    let val = parseInt(thresholdInput.value, 10);
+                    // 安全校验：确保输入的是1-99之间的数字
+                    if (isNaN(val) || val < 1) val = 1;
+                    if (val > 99) val = 99;
+                    
+                    thresholdInput.value = val;
+                    appearanceSettings.lowBatteryAlertThreshold = val;
+                    saveSettings();
+                });
+            }
+            // 【核心新增结束】
+
             // ******** 全新代码到此结束 ********
             
             // --- 新增：时间戳开关与位置选择监听 ---
@@ -24713,6 +25458,7 @@ fileInput.style.display = 'none';
             // ========================================================================
             // ================= 【【【 新增逻辑结束 】】】 ==========================
             // ========================================================================
+            startStatusBarMonitor();
         }
 
         // --- 【新增：提示音相关逻辑函数 (终极激活版)】 ---
@@ -29393,16 +30139,45 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             // 调整按钮显示，当卡片存在时，显示删除和编辑
             const editBtn = document.getElementById('edit-current-mood-btn');
             if (editBtn) editBtn.remove();
+            const favBtn = document.getElementById('fav-current-mood-btn');
+            if (favBtn) favBtn.remove();
             
             if (cards.length > 0) {
+                const currentMood = moods[currentCardIndex];
+                const favs = loadFromLocalStorage('app_mood_favorites', []);
+                const isFavorited = favs.some(f => f.id === currentMood.id);
+
+                const newFavBtn = document.createElement('button');
+                newFavBtn.id = 'fav-current-mood-btn';
+                newFavBtn.textContent = isFavorited ? '取消收藏' : '收藏心事';
+                newFavBtn.className = 'modal-button secondary';
+                newFavBtn.style.color = isFavorited ? '#f39c12' : '';
+                
                 const newEditBtn = document.createElement('button');
                 newEditBtn.id = 'edit-current-mood-btn';
                 newEditBtn.textContent = '编辑心事';
                 newEditBtn.className = 'modal-button secondary';
                 
-                // 确保编辑按钮在删除按钮旁边
+                // 确保按钮顺序
+                deleteCardBtn.before(newFavBtn);
                 deleteCardBtn.before(newEditBtn);
+
                 newEditBtn.addEventListener('click', handleEditMood);
+                newFavBtn.addEventListener('click', () => {
+                    let currentFavs = loadFromLocalStorage('app_mood_favorites', []);
+                    if (isFavorited) {
+                        currentFavs = currentFavs.filter(f => f.id !== currentMood.id);
+                    } else {
+                        currentFavs.unshift({
+                            id: currentMood.id,
+                            content: currentMood.content,
+                            timestamp: Date.now(),
+                            chatId: conversationManager.getCurrentChatId()
+                        });
+                    }
+                    saveToLocalStorage('app_mood_favorites', currentFavs);
+                    updateMainUI();
+                });
             }
         }
         
