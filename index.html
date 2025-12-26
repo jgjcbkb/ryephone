@@ -11544,6 +11544,8 @@ let isLoadingMore = false;
             let hasMoved = false;
 
             const onStart = (e) => {
+                // 核心修复：阻止默认行为，防止移动端触发滚动或长按菜单，确保事件流完整
+                if (e.cancelable) e.preventDefault(); 
                 const touch = e.touches ? e.touches[0] : e;
                 startX = touch.clientX;
                 startY = touch.clientY;
@@ -11560,8 +11562,8 @@ let isLoadingMore = false;
                 const dx = touch.clientX - startX;
                 const dy = touch.clientY - startY;
 
-                // 判断是否产生了有效移动（阈值5px）
-                if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                // 核心修复：提高移动阈值到 10px，防止手指点击时的微小抖动被误判为“拖拽”而导致无法打开菜单
+                if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
                     hasMoved = true;
                 }
 
@@ -11585,7 +11587,8 @@ let isLoadingMore = false;
                 // 自动吸附到边缘逻辑
                 const parent = dot.parentElement;
                 const centerX = parent.clientWidth / 2;
-                const currentLeft = parseInt(dot.style.left);
+                // 核心修复：处理初始状态下 style.left 为空导致的 NaN 问题，使用 initialLeft 兜底
+                const currentLeft = parseInt(dot.style.left) || initialLeft;
                 
                 if (currentLeft + dot.clientWidth / 2 < centerX) {
                     dot.style.left = '10px';
@@ -11604,6 +11607,9 @@ let isLoadingMore = false;
                 const list = document.getElementById('identity-list-container');
                 if (!menu || !list) return;
 
+                // 核心修复 1：先显示菜单，再处理复杂逻辑，防止计算过程中的潜在错误导致界面无响应
+                menu.classList.remove('hidden');
+
                 const allUserPersonas = userPersonas.map(p => ({ name: p.name, type: '用户人设', avatar: p.avatar }));
                 const allNpcs = npcList.map(name => {
                     const npcData = (npcSettings.personas && npcSettings.personas[name]) || {};
@@ -11615,29 +11621,28 @@ let isLoadingMore = false;
                     .map(name => ({ name: name, type: '角色', avatar: null }));
 
                 const identities = [
-                    { name: '{{user}}', type: '原始身份', avatar: myAvatar },
+                    { name: '{{user}}', type: '原本的用户', avatar: myAvatar },
                     ...allUserPersonas,
                     ...allNpcs,
                     ...allDynamicChars
                 ];
 
-                list.innerHTML = identities.map(id => `
-                    <div class="identity-item ${chatState.currentIdentity === id.name ? 'active' : ''}" data-name="${id.name}">
-                        <div class="avatar-mini" id="id-avatar-${id.name.replace(/[^a-zA-Z0-9]/g, '')}"></div>
+                // 核心修复 2：使用数字索引 index 作为 ID，彻底解决中文名或特殊字符名导致的 selector 匹配失败和 ID 重复问题
+                list.innerHTML = identities.map((id, index) => `
+                    <div class="identity-item ${chatState.currentIdentity === id.name ? 'active' : ''}" data-name="${escapeHtml(id.name)}">
+                        <div class="avatar-mini" id="id-avatar-item-${index}"></div>
                         <div class="name-info">
-                            <div style="font-weight: 600; color: #000;">${id.name === '{{user}}' ? '原本的用户' : id.name}</div>
+                            <div style="font-weight: 600; color: #000;">${id.name === '{{user}}' ? '原本的用户' : escapeHtml(id.name)}</div>
                             <div style="font-size: 11px; color: #8e8e93; margin-top: 2px;">${id.type}</div>
                         </div>
                         ${chatState.currentIdentity === id.name ? '<div style="color: #28a745; font-weight: bold;">✓</div>' : ''}
                     </div>
                 `).join('');
 
-                identities.forEach(id => {
-                    const el = list.querySelector(`#id-avatar-${id.name.replace(/[^a-zA-Z0-9]/g, '')}`);
+                identities.forEach((id, index) => {
+                    const el = list.querySelector(`#id-avatar-item-${index}`);
                     if (el) setImageSrc(el, id.avatar || generateDefaultAvatar(id.name));
                 });
-
-                menu.classList.remove('hidden');
             }
 
             // 绑定事件
