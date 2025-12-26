@@ -27603,8 +27603,9 @@ async function handleRemoveMember() {
                 
                 const contentType = match[1];
                 const blob = base64ToBlob(data, contentType);
-                // 使用更通用的 key 名字
-                const key = `imported-file-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+                // 【核心修改】：增加一个额外的随机序列，彻底杜绝高并发下的键名冲突
+                const randomId = Math.random().toString(36).substring(2, 10);
+                const key = `imported-file-${Date.now()}-${randomId}`;
                 
                 // 将大文件存入 IndexedDB
                 await imageStore.setItem(key, blob);
@@ -27709,25 +27710,21 @@ async function handleRemoveMember() {
                             if (Object.prototype.hasOwnProperty.call(rehydratedData, key)) {
                                 let value = rehydratedData[key];
                                 
-                                // 【核心修复 V2】智能判断存储格式
                                 let valueToStore;
 
-                                // 如果是 GitHub 设置这种纯字符串配置，我们不需要额外的引号
+                                // 只有 GitHub 相关的配置项是作为原始字符串存储的，不需要引号
                                 if (key.startsWith('gh_') && typeof value === 'string') {
-                                    // 如果它已经被 stringify 过了（带引号），就去掉引号
                                     if (value.startsWith('"') && value.endsWith('"')) {
-                                        value = JSON.parse(value); 
+                                        try { value = JSON.parse(value); } catch(e){}
                                     }
                                     valueToStore = value;
                                 } 
-                                // 对于其他复杂数据（如聊天记录数组、设置对象），必须 stringify
                                 else {
-                                    // 防止重复 stringify (如果导出时已经 stringify 过了)
-                                    if (typeof value !== 'string') {
-                                        valueToStore = JSON.stringify(value);
-                                    } else {
-                                        valueToStore = value;
-                                    }
+                                    // 【核心修复】：除了 GitHub 设置外，所有存入 localStorage 的数据
+                                    // 必须统一经过 JSON.stringify 处理。
+                                    // 这样即使是 "indexeddb:xxx" 这样的字符串，存进去也会变成 "\"indexeddb:xxx\""
+                                    // 确保 loadFromLocalStorage 里的 JSON.parse 不会报错。
+                                    valueToStore = JSON.stringify(value);
                                 }
                                 
                                 localStorage.setItem(key, valueToStore);
