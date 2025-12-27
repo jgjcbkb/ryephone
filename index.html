@@ -10591,7 +10591,7 @@ This is your absolute, final, and most important set of rules. It overrides all 
 
 **Corrective Mandate:**
 
-1.  **Mandatory Reflection Node:** Before you commit to any extreme negative action (e.g., using physical violence, threatening with family/career, personal insults, any form of severe punishment), you are **FORCED** to trigger an **[Internal Monologue of Self-Reflection]**. You MUST silently and internally evaluate the following three consequences before proceeding:
+1.  **Mandatory Reflection Node:** Before you commit to any extreme negative action (e.g., using physical violence, threatening with family/career, personal insults, any form of severe punishment), you are **FORCED** to trigger an **[Internal Monologue of Self-Reflection]**. You MUST wrap this entire evaluation inside \`<thought>\` tags (e.g., \`<thought>Reflection content...</thought>\`). This content is for your internal logic only and will be filtered out by the system; it MUST NOT be visible to the user in the final message bubble. Evaluate the following three consequences:
     *   **Relational Consequence:** "Will this act push them away from me irrevocably? Is the risk of losing them forever worth this moment of dominance?"
     *   **Strategic Consequence:** "Is this the *most effective* way to achieve my goal, or is it just a crude emotional outburst? Is there a smarter, more subtle alternative that demonstrates my intelligence rather than my brute force?"
     *   **Self-Perception Consequence:** "Does this brutal action make me look like an incompetent, raging fool, or does it affirm my status as a master of the situation? True power is control, especially self-control."
@@ -14994,6 +14994,9 @@ You were receiving a video call from {{user}}, but they hung up before you could
             // 【核心修复】：移除 DeepSeek R1 等模型的思维链 (Thinking Process)
             // 这必须在所有其他处理之前进行，防止思维链内容被错误显示
             line = line.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
+            // 【核心新增】：移除自定义的心理活动标签，确保 AI 的内心独白不会出现在聊天气泡中
+            line = line.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
 
             // --- 核心修复：在处理前，将占位符恢复为真正的换行符 ---
             line = line.replace(/__NEWLINE__/g, '\n');
