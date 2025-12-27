@@ -14235,8 +14235,11 @@ Okay, that's all the context and rules. Now, generate your full response.
                         }
                     }
                     
-                    // 【核心修复2】将流式结果赋值给全局变量，交由函数底部的公共逻辑统一处理
-                    aiResponse = fullResponseText; 
+                    // 核心修复：在处理流式回复的完整文本时，也进行源头清理
+                    let cleanedFullResponse = fullResponseText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                    cleanedFullResponse = cleanedFullResponse.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+                    
+                    aiResponse = cleanedFullResponse;
 
                     // 【已删除重复的处理逻辑，防止出现双重回复】
 
