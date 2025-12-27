@@ -14306,7 +14306,8 @@ Okay, that's all the context and rules. Now, generate your full response.
                 // --- 【【【诊断代码结束】】】 ---
         
                if (aiResponse && aiResponse.trim()) {
-                    let responseToProcess = aiResponse.trim();
+                    // 核心修复：在解析任何 <block> 之前，先全局清理掉所有的 <thought> 内容
+                    let responseToProcess = aiResponse.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
 
                     // --- 核心修改：在这里解析并提取图片描述 ---
                     const descriptionRegex = /<private_note type="image_description">([\s\S]*?)<\/private_note>/;
