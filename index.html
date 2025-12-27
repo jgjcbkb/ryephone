@@ -7051,18 +7051,15 @@ if ('serviceWorker' in navigator) {
             // 用于检测开始和结束标签的辅助函数
             const countTags = (line) => {
                 let count = 0;
-                // --- 【核心、唯一的修改点 1/2】: 在这里加上 style ---
-                // 查找所有 <div, <details, <block, <snippet, <style 开始标签
-                count += (line.match(/<(div|details|block|snippet|style)\s*[^>]*>/gi) || []).length;
-                // 查找所有 </div, </details>, </block>, </snippet, </style> 结束标签
-                count -= (line.match(/<\/(div|details|block|snippet|style)\s*[^>]*>/gi) || []).length;
+                // 核心修复：将 thought 标签加入容器追踪名单，确保多行思考内容被视为一个整体，不被拆分成多个气泡
+                count += (line.match(/<(div|details|block|snippet|style|thought)\s*[^>]*>/gi) || []).length;
+                count -= (line.match(/<\/(div|details|block|snippet|style|thought)\s*[^>]*>/gi) || []).length;
                 return count;
             };
             
-            // 检查当前行是否是需要跟踪的容器的开始标签
             const startsContainer = (trimmedLine) => {
-                // --- 【核心、唯一的修改点 2/2】: 在这里也加上 style ---
-                return trimmedLine.startsWith('<div') || trimmedLine.startsWith('<details') || trimmedLine.startsWith('<block') || trimmedLine.startsWith('<snippet') || trimmedLine.startsWith('<style');
+                // 核心修复：将 thought 标签识别为容器的起始，防止解析器在标签内部进行错误切割
+                return trimmedLine.startsWith('<div') || trimmedLine.startsWith('<details') || trimmedLine.startsWith('<block') || trimmedLine.startsWith('<snippet') || trimmedLine.startsWith('<style') || trimmedLine.startsWith('<thought');
             };
 
             for (const line of lines) {
@@ -9063,6 +9060,8 @@ ${timeContext}
         // 【核心修复】：在任何处理之前，暴力移除 DeepSeek R1 的思维链
         if (aiResponse) {
             aiResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+            // 核心修复：同步移除自定义的 thought 标签及其内部所有内容，防止其进入后续的区块解析流程
+            aiResponse = aiResponse.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
         }
 
         // =================================================================
@@ -14235,11 +14234,8 @@ Okay, that's all the context and rules. Now, generate your full response.
                         }
                     }
                     
-                    // 核心修复：在处理流式回复的完整文本时，也进行源头清理
-                    let cleanedFullResponse = fullResponseText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-                    cleanedFullResponse = cleanedFullResponse.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
-                    
-                    aiResponse = cleanedFullResponse;
+                    // 【核心修复2】将流式结果赋值给全局变量，交由函数底部的公共逻辑统一处理
+                    aiResponse = fullResponseText; 
 
                     // 【已删除重复的处理逻辑，防止出现双重回复】
 
@@ -14277,6 +14273,8 @@ Okay, that's all the context and rules. Now, generate your full response.
 
                     if (aiResponse) {
                         aiResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                        // 核心修复：在常规回复中同步拦截并移除 thought 标签，确保内心独白在任何模式下都不会泄露给用户
+                        aiResponse = aiResponse.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
                     }
                     
 
@@ -14996,10 +14994,11 @@ You were receiving a video call from {{user}}, but they hung up before you could
 
         async function processAIResponseLine(line, targetChatId = null, forcedSender = null) {
             // 【核心修复】：移除 DeepSeek R1 等模型的思维链 (Thinking Process)
-            // 这必须在所有其他处理之前进行，防止思维链内容被错误显示
             line = line.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+            // 核心修复：兜底清理，如果 thought 标签作为独立区块传入，则将其内容彻底抹除，确保不会生成空气泡或残留文字
+            line = line.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
 
-            // 【核心新增】：移除自定义的心理活动标签，确保 AI 的内心独白不会出现在聊天气泡中
+            // --- 核心修复：在处理前，将占位符恢复为真正的换行符 ---
             line = line.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
 
             // --- 核心修复：在处理前，将占位符恢复为真正的换行符 ---
@@ -16203,27 +16202,38 @@ You were receiving a video call from {{user}}, but they hung up before you could
 
                     // 核心修复：定义一个通用的头像解析器，确保单聊、NPC、群聊主角头像能全局同步
                     const resolveAvatar = (name) => {
-                        // 1. 优先级：检查是否为 NPC 且有头像
+                        // 1. 核心修复：如果是 {{user}}，优先查找当前聊天绑定的用户人设头像
+                        if (name === '{{user}}') {
+                            const groupInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                            const selectedPersonaName = groupInfo.userPersonaName;
+                            if (selectedPersonaName && selectedPersonaName !== '无') {
+                                const selectedPersona = userPersonas.find(p => p.name === selectedPersonaName);
+                                if (selectedPersona && selectedPersona.avatar) return selectedPersona.avatar;
+                            }
+                            return myAvatar;
+                        }
+
+                        // 2. 优先级：检查是否为 NPC 且有头像
                         const npcData = loadFromLocalStorage('app-npc-settings', {}).personas?.[name];
                         if (npcData && npcData.avatar) return npcData.avatar;
 
-                        // 2. 优先级：检查是否为单聊角色且有头像
+                        // 3. 优先级：检查是否为单聊角色且有头像
                         const privChat = chatList.find(c => c.name === name && c.type === '私聊');
                         if (privChat) {
                             const privAvatar = loadFromLocalStorage(`chat_avatar_${privChat.id}`, null);
                             if (privAvatar) return privAvatar;
                         }
 
-                        // 3. 优先级：如果是群聊主角
+                        // 4. 优先级：如果是群聊主角
                         const groupInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
                         const groupProtagonist = (groupInfo.groupPersonas || []).find(p => p.name === name);
                         if (groupProtagonist && groupProtagonist.avatar) return groupProtagonist.avatar;
 
-                        // 4. 优先级：检查是否为用户人设
+                        // 5. 优先级：检查是否为用户人设
                         const uPersona = userPersonas.find(p => p.name === name);
                         if (uPersona && uPersona.avatar) return uPersona.avatar;
 
-                        // 5. 兜底：默认头像
+                        // 6. 兜底：默认头像
                         return generateDefaultAvatar(name);
                     };
 
@@ -16298,8 +16308,18 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     // 1. 确定要显示的名称
                     let displayName = "";
                     if (msg.side === 'sent') {
-                        // 优先级：变身名 > 聊天设置的人设名 > 全局 {{user}}
-                        displayName = msg.sender || (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无' ? chatInfo.userPersonaName : '{{user}}');
+                        // 核心修复：如果用户没有变身，且没有选择人设，则显示 {{user}}
+                        // 但如果选择了人设，必须强制替换显示为人设名
+                        const currentChatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                        const selectedPersonaName = currentChatInfo.userPersonaName;
+                        
+                        if (msg.sender) {
+                            displayName = msg.sender;
+                        } else if (selectedPersonaName && selectedPersonaName !== '无') {
+                            displayName = selectedPersonaName;
+                        } else {
+                            displayName = '{{user}}';
+                        }
                     } else {
                         displayName = msg.sender || chatState.chatName;
                     }
@@ -16728,8 +16748,18 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     // 1. 确定要显示的名称
                     let displayName = "";
                     if (msg.side === 'sent') {
-                        // 优先级：变身名 > 聊天设置的人设名 > 全局 {{user}}
-                        displayName = msg.sender || (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无' ? chatInfo.userPersonaName : '{{user}}');
+                        // 核心修复：如果用户没有变身，且没有选择人设，则显示 {{user}}
+                        // 但如果选择了人设，必须强制替换显示为人设名
+                        const currentChatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                        const selectedPersonaName = currentChatInfo.userPersonaName;
+                        
+                        if (msg.sender) {
+                            displayName = msg.sender;
+                        } else if (selectedPersonaName && selectedPersonaName !== '无') {
+                            displayName = selectedPersonaName;
+                        } else {
+                            displayName = '{{user}}';
+                        }
                     } else {
                         displayName = msg.sender || chatState.chatName;
                     }
@@ -18403,28 +18433,35 @@ function renderGroupMemberList(chatId) {
                 
                 // 核心修复：在成员列表渲染时，也使用统一的多级查找逻辑
                 const resolveMemberAvatar = (targetName) => {
-                    // 1. NPC 头像
+                    // 1. 核心修复：如果是 {{user}}，优先查找当前聊天绑定的用户人设头像
+                    if (targetName === '{{user}}') {
+                        const selectedPersonaName = chatInfo.userPersonaName;
+                        if (selectedPersonaName && selectedPersonaName !== '无') {
+                            const selectedPersona = userPersonas.find(p => p.name === selectedPersonaName);
+                            if (selectedPersona && selectedPersona.avatar) return selectedPersona.avatar;
+                        }
+                        return myAvatar;
+                    }
+
+                    // 2. NPC 头像
                     const npcData = loadFromLocalStorage('app-npc-settings', {}).personas?.[targetName];
                     if (npcData && npcData.avatar) return npcData.avatar;
 
-                    // 2. 单聊角色头像
+                    // 3. 单聊角色头像
                     const privChat = chatList.find(c => c.name === targetName && c.type === '私聊');
                     if (privChat) {
                         const privAvatar = loadFromLocalStorage(`chat_avatar_${privChat.id}`, null);
                         if (privAvatar) return privAvatar;
                     }
 
-                    // 3. 群聊主角头像
+                    // 4. 群聊主角头像
                     const protagonists = chatInfo.groupPersonas || [];
                     const foundProtagonist = protagonists.find(p => p.name === targetName);
                     if (foundProtagonist && foundProtagonist.avatar) return foundProtagonist.avatar;
 
-                    // 4. 用户人设头像
+                    // 5. 用户人设头像 (针对直接以人设名加入群聊的情况)
                     const uPersona = userPersonas.find(p => p.name === targetName);
                     if (uPersona && uPersona.avatar) return uPersona.avatar;
-
-                    // 5. 特殊处理：如果是 {{user}} 且没被人设覆盖
-                    if (targetName === '{{user}}') return myAvatar;
 
                     return generateDefaultAvatar(targetName);
                 };
