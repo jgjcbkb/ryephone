@@ -16189,54 +16189,75 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     const avatarDiv = document.createElement('div');
                     avatarDiv.className = 'message-avatar';
 
+                    // 核心修复：定义一个通用的头像解析器，确保单聊、NPC、群聊主角头像能全局同步
+                    const resolveAvatar = (name) => {
+                        // 1. 优先级：检查是否为 NPC 且有头像
+                        const npcData = loadFromLocalStorage('app-npc-settings', {}).personas?.[name];
+                        if (npcData && npcData.avatar) return npcData.avatar;
+
+                        // 2. 优先级：检查是否为单聊角色且有头像
+                        const privChat = chatList.find(c => c.name === name && c.type === '私聊');
+                        if (privChat) {
+                            const privAvatar = loadFromLocalStorage(`chat_avatar_${privChat.id}`, null);
+                            if (privAvatar) return privAvatar;
+                        }
+
+                        // 3. 优先级：如果是群聊主角
+                        const groupInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                        const groupProtagonist = (groupInfo.groupPersonas || []).find(p => p.name === name);
+                        if (groupProtagonist && groupProtagonist.avatar) return groupProtagonist.avatar;
+
+                        // 4. 优先级：检查是否为用户人设
+                        const uPersona = userPersonas.find(p => p.name === name);
+                        if (uPersona && uPersona.avatar) return uPersona.avatar;
+
+                        // 5. 兜底：默认头像
+                        return generateDefaultAvatar(name);
+                    };
+
                     let avatarUrlKey = contactInfo.avatarUrl;
+
                     if (msg.side === 'sent') {
-                        const chatSpecificUserAvatar = loadFromLocalStorage(`chat_user_avatar_${chatState.chatId}`, null);
-                        if (chatSpecificUserAvatar) {
-                            avatarUrlKey = chatSpecificUserAvatar;
-                        } else {
-                            const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                            const selectedPersonaName = chatInfo.userPersonaName;
-                            if (selectedPersonaName && selectedPersonaName !== '无') {
-                                const selectedPersona = userPersonas.find(p => p.name === selectedPersonaName);
-                                if (selectedPersona && selectedPersona.avatar) {
-                                    avatarUrlKey = selectedPersona.avatar;
+                        // 核心修复：智能头像查找逻辑
+                        
+                        // 情况A: 用户正在“变身”扮演某个角色 (isActing = true)
+                        if (msg.isActing && msg.sender) {
+                            // 直接使用通用的 resolveAvatar 函数去查找该角色的头像
+                            // 这会自动覆盖 NPC、单聊角色、群聊主角等所有情况
+                            avatarUrlKey = resolveAvatar(msg.sender);
+                        } 
+                        // 情况B: 用户以“本尊”身份发言 (isActing = false 或 undefined)
+                        else {
+                            // 1. 优先使用当前聊天窗口单独设置的“我的头像”
+                            const chatSpecificUserAvatar = loadFromLocalStorage(`chat_user_avatar_${chatState.chatId}`, null);
+                            
+                            if (chatSpecificUserAvatar) {
+                                avatarUrlKey = chatSpecificUserAvatar;
+                            } else {
+                                // 2. 其次检查当前聊天是否绑定了特定的“用户人设”
+                                const selectedPersonaName = chatInfo.userPersonaName;
+                                if (selectedPersonaName && selectedPersonaName !== '无') {
+                                    const selectedPersona = userPersonas.find(p => p.name === selectedPersonaName);
+                                    // 如果该人设设置了头像，就用人设头像
+                                    if (selectedPersona && selectedPersona.avatar) {
+                                        avatarUrlKey = selectedPersona.avatar;
+                                    } else {
+                                        // 如果人设没头像，回退到全局头像
+                                        avatarUrlKey = myAvatar;
+                                    }
                                 } else {
+                                    // 3. 最后回退到全局设置的“我的头像”
                                     avatarUrlKey = myAvatar;
                                 }
-                            } else {
-                                avatarUrlKey = myAvatar;
                             }
                         }
                     } else {
-                        // 【核心修复：群聊成员头像多级查找】
+                        // 接收方头像逻辑
                         if (contactInfo.isGroup && msg.sender) {
-                            // 1. 优先级：尝试从该角色的单聊记录中获取头像
-                            const characterChat = chatList.find(c => c.name === msg.sender && c.type === '私聊');
-                            if (characterChat) {
-                                const savedAvatar = loadFromLocalStorage(`chat_avatar_${characterChat.id}`, null);
-                                if (savedAvatar) avatarUrlKey = savedAvatar;
-                            }
-                            
-                            // 2. 优先级：如果是群聊主角，获取其群内专用头像
-                            if (avatarUrlKey === contactInfo.avatarUrl) {
-                                const groupInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                                const groupPersona = (groupInfo.groupPersonas || []).find(p => p.name === msg.sender);
-                                if (groupPersona && groupPersona.avatar) avatarUrlKey = groupPersona.avatar;
-                            }
-
-                            // 3. 优先级：尝试从NPC管理中获取头像
-                            if (avatarUrlKey === contactInfo.avatarUrl) {
-                                const npcSettingsData = loadFromLocalStorage('app-npc-settings', {});
-                                if (npcSettingsData.personas && npcSettingsData.personas[msg.sender] && npcSettingsData.personas[msg.sender].avatar) {
-                                    avatarUrlKey = npcSettingsData.personas[msg.sender].avatar;
-                                }
-                            }
-                            
-                            // 4. 兜底：使用该角色的默认生成的AI头像
-                            if (avatarUrlKey === contactInfo.avatarUrl) {
-                                avatarUrlKey = generateDefaultAvatar(msg.sender);
-                            }
+                            avatarUrlKey = resolveAvatar(msg.sender);
+                        } else {
+                            // 单聊接收方，直接用当前聊天的头像设置
+                            avatarUrlKey = loadFromLocalStorage(`chat_avatar_${chatState.chatId}`, null) || contactInfo.avatarUrl;
                         }
                     }
                     setImageSrc(avatarDiv, avatarUrlKey);
@@ -16618,34 +16639,56 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     const avatarDiv = document.createElement('div');
                     avatarDiv.className = 'message-avatar';
 
-                    // !!!!!!!!!! 从这里开始是最终的、包含三级优先级的头像判断逻辑 !!!!!!!!!!
-                    let avatarUrlKey = contactInfo.avatarUrl; // 默认是对方的头像
+                    // 核心修复：使用与 createMessageElement 完全一致的通用解析逻辑
+                    const resolveAvatar = (name) => {
+                        const npcData = loadFromLocalStorage('app-npc-settings', {}).personas?.[name];
+                        if (npcData && npcData.avatar) return npcData.avatar;
+
+                        const privChat = chatList.find(c => c.name === name && c.type === '私聊');
+                        if (privChat) {
+                            const privAvatar = loadFromLocalStorage(`chat_avatar_${privChat.id}`, null);
+                            if (privAvatar) return privAvatar;
+                        }
+
+                        const groupInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                        const groupProtagonist = (groupInfo.groupPersonas || []).find(p => p.name === name);
+                        if (groupProtagonist && groupProtagonist.avatar) return groupProtagonist.avatar;
+
+                        const uPersona = userPersonas.find(p => p.name === name);
+                        if (uPersona && uPersona.avatar) return uPersona.avatar;
+
+                        return generateDefaultAvatar(name);
+                    };
+
+                    let avatarUrlKey = contactInfo.avatarUrl;
+
                     if (msg.side === 'sent') {
-                        // 如果是用户发送的消息，进行三级判断
-                        const chatSpecificUserAvatar = loadFromLocalStorage(`chat_user_avatar_${chatState.chatId}`, null);
-                        
-                        // 优先级 1: 聊天特定头像
-                        if (chatSpecificUserAvatar) {
-                            avatarUrlKey = chatSpecificUserAvatar;
+                        // 核心修复：与 createMessageElement 保持完全一致的逻辑
+                        if (msg.isActing && msg.sender) {
+                            // 变身状态：查找扮演角色的头像
+                            avatarUrlKey = resolveAvatar(msg.sender);
                         } else {
-                            // 优先级 2: 所选人设头像
-                            const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                            const selectedPersonaName = chatInfo.userPersonaName;
-                            if (selectedPersonaName && selectedPersonaName !== '无') {
-                                const selectedPersona = userPersonas.find(p => p.name === selectedPersonaName);
-                                if (selectedPersona && selectedPersona.avatar) {
-                                    avatarUrlKey = selectedPersona.avatar;
+                            // 本尊状态
+                            const chatSpecificUserAvatar = loadFromLocalStorage(`chat_user_avatar_${chatState.chatId}`, null);
+                            if (chatSpecificUserAvatar) {
+                                avatarUrlKey = chatSpecificUserAvatar;
+                            } else {
+                                const selectedPersonaName = chatInfo.userPersonaName;
+                                if (selectedPersonaName && selectedPersonaName !== '无') {
+                                    const selectedPersona = userPersonas.find(p => p.name === selectedPersonaName);
+                                    avatarUrlKey = (selectedPersona && selectedPersona.avatar) ? selectedPersona.avatar : myAvatar;
                                 } else {
-                                    // 优先级 3: 全局用户头像 (作为保底)
                                     avatarUrlKey = myAvatar;
                                 }
-                            } else {
-                                // 优先级 3: 全局用户头像 (作为保底)
-                                avatarUrlKey = myAvatar;
                             }
                         }
+                    } else {
+                        if (contactInfo.isGroup && msg.sender) {
+                            avatarUrlKey = resolveAvatar(msg.sender);
+                        } else {
+                            avatarUrlKey = loadFromLocalStorage(`chat_avatar_${chatState.chatId}`, null) || contactInfo.avatarUrl;
+                        }
                     }
-                    // !!!!!!!!!! 最终的头像判断逻辑到这里结束 !!!!!!!!!!
 
                     setImageSrc(avatarDiv, avatarUrlKey);
                     contentRow.appendChild(avatarDiv);
@@ -18345,39 +18388,36 @@ function renderGroupMemberList(chatId) {
                 avatarDiv.className = 'member-avatar';
 
                 let avatarUrl = null;
-                const groupPersonas = chatInfo.groupPersonas || [];
-                const groupPersona = groupPersonas.find(p => p.name === name);
+                
+                // 核心修复：在成员列表渲染时，也使用统一的多级查找逻辑
+                const resolveMemberAvatar = (targetName) => {
+                    // 1. NPC 头像
+                    const npcData = loadFromLocalStorage('app-npc-settings', {}).personas?.[targetName];
+                    if (npcData && npcData.avatar) return npcData.avatar;
 
-                if (name === '{{user}}') {
-                    const userPersonaName = chatInfo.userPersonaName;
-                    const selectedPersona = userPersonaName ? userPersonas.find(p => p.name === userPersonaName) : null;
-                    avatarUrl = (selectedPersona && selectedPersona.avatar) ? selectedPersona.avatar : (myAvatar || generateDefaultAvatar(name));
-                } else {
-                    // 【核心修复：统一成员列表头像查找逻辑】
-                    // 1. 优先级：单聊设置的头像
-                    const characterChat = chatList.find(c => c.name === name && c.type === '私聊');
-                    if (characterChat) {
-                        avatarUrl = loadFromLocalStorage(`chat_avatar_${characterChat.id}`, null);
-                    }
-                    
-                    // 2. 优先级：群聊主角专用头像
-                    if (!avatarUrl && groupPersona && groupPersona.avatar) {
-                        avatarUrl = groupPersona.avatar;
+                    // 2. 单聊角色头像
+                    const privChat = chatList.find(c => c.name === targetName && c.type === '私聊');
+                    if (privChat) {
+                        const privAvatar = loadFromLocalStorage(`chat_avatar_${privChat.id}`, null);
+                        if (privAvatar) return privAvatar;
                     }
 
-                    // 3. 优先级：NPC管理中的头像
-                    if (!avatarUrl) {
-                        const npcSettingsData = loadFromLocalStorage('app-npc-settings', {});
-                        if (npcSettingsData.personas && npcSettingsData.personas[name] && npcSettingsData.personas[name].avatar) {
-                            avatarUrl = npcSettingsData.personas[name].avatar;
-                        }
-                    }
+                    // 3. 群聊主角头像
+                    const protagonists = chatInfo.groupPersonas || [];
+                    const foundProtagonist = protagonists.find(p => p.name === targetName);
+                    if (foundProtagonist && foundProtagonist.avatar) return foundProtagonist.avatar;
 
-                    // 4. 兜底：默认AI头像
-                    if (!avatarUrl) {
-                        avatarUrl = generateDefaultAvatar(name);
-                    }
-                }
+                    // 4. 用户人设头像
+                    const uPersona = userPersonas.find(p => p.name === targetName);
+                    if (uPersona && uPersona.avatar) return uPersona.avatar;
+
+                    // 5. 特殊处理：如果是 {{user}} 且没被人设覆盖
+                    if (targetName === '{{user}}') return myAvatar;
+
+                    return generateDefaultAvatar(targetName);
+                };
+
+                avatarUrl = resolveMemberAvatar(name);
                 
                 setImageSrc(avatarDiv, avatarUrl);
 
@@ -25731,7 +25771,8 @@ fileInput.style.display = 'none';
                 return;
             }
 
-            npcList.forEach(name => {
+            // 核心修复 1：在 forEach 中引入 index 索引，确保生成的 ID 即使是中文名也绝对唯一且有效
+            npcList.forEach((name, index) => {
                 const item = document.createElement('div');
                 item.className = 'list-item';
                 
@@ -25743,8 +25784,13 @@ fileInput.style.display = 'none';
                 const isActive = npcSettings.activeStates && npcSettings.activeStates[name] === true;
                 const isSelected = lastSelectedNpcs.has(name);
 
+                // 核心修复 2：获取人设数据，并提取头像 URL（兼容新旧数据格式）
+                const personaData = (npcSettings.personas && npcSettings.personas[name]) || {};
+                const avatarUrl = (typeof personaData === 'object' && personaData !== null) ? personaData.avatar : null;
+                const avatarContainerId = `npc-avatar-render-item-${index}`;
+
                 item.innerHTML = `
-                    <div class="list-avatar">${name.charAt(0).toUpperCase()}</div>
+                    <div class="list-avatar" id="${avatarContainerId}">${avatarUrl ? '' : name.charAt(0).toUpperCase()}</div>
                     <label class="list-name" for="npc-select-${name.replace(/\s/g, '')}">${name}</label>
                     <div class="npc-details">
                         <span>关联: ${association}</span>
@@ -25760,6 +25806,12 @@ fileInput.style.display = 'none';
                     </div>
                 `;
                 listContainer.appendChild(item);
+
+                // 核心修复 3：如果该 NPC 拥有头像，则调用全局 setImageSrc 函数异步加载图片
+                if (avatarUrl) {
+                    const avatarEl = item.querySelector(`#${avatarContainerId}`);
+                    setImageSrc(avatarEl, avatarUrl);
+                }
             });
         }
 
@@ -25826,42 +25878,37 @@ fileInput.style.display = 'none';
         async function showNpcEditorModal(npcName) {
             const isEditing = npcList.includes(npcName);
             
-            // --- 核心修改：兼容旧版（字符串）和新版（对象）数据的提取 ---
             const rawData = (npcSettings.personas && npcSettings.personas[npcName]);
             let persona = '';
             let avatar = '';
 
             if (typeof rawData === 'string') {
-                // 如果是旧数据（纯字符串），直接作为人设，头像为空
                 persona = rawData;
                 avatar = '';
             } else if (typeof rawData === 'object' && rawData !== null) {
-                // 如果是新数据（对象），分别读取
                 persona = rawData.description || '';
                 avatar = rawData.avatar || '';
             }
-            // --- 修改结束 ---
-            // --- 修改结束 ---
 
             const association = (npcSettings.associations && npcSettings.associations[npcName]) || [];
             const dynamicSetting = (npcSettings.dynamics && npcSettings.dynamics[npcName]) || { probability: 40, interval: 60 };
 
-            // --- 核心修改：在HTML中加入头像UI ---
+            // 核心修复 1：移除按钮的 modal-button 类名，改用 btn-primary/btn-secondary
+            // 这样点击它们时，showCustomModal 的全局监听器就不会认为你要关闭弹窗了
             const avatarHtml = `
                 <div class="form-group">
                     <label>NPC头像</label>
                     <div class="avatar-management-row">
                         <div class="avatar-preview" id="npc-avatar-preview"></div>
                         <div class="form-buttons-spaced" style="flex-grow: 1;">
-                            <button id="npc-avatar-link-btn" class="modal-button secondary">链接</button>
-                            <button id="npc-avatar-gallery-btn" class="modal-button secondary">本地</button>
+                            <button id="npc-avatar-link-btn" class="btn-primary btn-secondary">链接</button>
+                            <button id="npc-avatar-gallery-btn" class="btn-primary btn-secondary">本地</button>
                         </div>
                     </div>
                     <input type="hidden" id="npc-avatar-url">
                 </div>
                 <hr style="border: none; border-top: 1px solid #eee;">
             `;
-            // --- 修改结束 ---
 
             const modalHtml = `
                 <div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 65vh; overflow-y: auto; padding-right: 10px;">
@@ -25903,7 +25950,6 @@ fileInput.style.display = 'none';
                     { text: '保存', value: 'save', class: 'primary' }
                 ],
                 onRender: (modalDOM) => {
-                    // --- 核心修改：为头像UI绑定事件和加载数据 ---
                     const avatarPreview = modalDOM.querySelector('#npc-avatar-preview');
                     const avatarUrlInput = modalDOM.querySelector('#npc-avatar-url');
 
@@ -25912,7 +25958,9 @@ fileInput.style.display = 'none';
                         setImageSrc(avatarPreview, avatar);
                     }
 
-                    modalDOM.querySelector('#npc-avatar-link-btn').addEventListener('click', async () => {
+                    // 核心修复 2：增加 e.stopPropagation() 彻底拦截冒泡，防止事件上传到 overlay
+                    modalDOM.querySelector('#npc-avatar-link-btn').addEventListener('click', async (e) => {
+                        e.stopPropagation(); 
                         const url = await conversationManager.showContentInputModal({ title: '输入头像链接', placeholder: '请输入图片URL...' });
                         if (url && url.trim()) {
                             avatarUrlInput.value = url.trim();
@@ -25920,12 +25968,13 @@ fileInput.style.display = 'none';
                         }
                     });
 
-                    modalDOM.querySelector('#npc-avatar-gallery-btn').addEventListener('click', () => {
+                    modalDOM.querySelector('#npc-avatar-gallery-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
                         const fileInput = document.createElement('input');
                         fileInput.type = 'file';
                         fileInput.accept = 'image/*';
-                        fileInput.onchange = async (e) => {
-                            const file = e.target.files[0];
+                        fileInput.onchange = async (event) => {
+                            const file = event.target.files[0];
                             if (!file) return;
                             const dbKey = `npc-avatar-${Date.now()}`;
                             const indexedDbRef = `indexeddb:${dbKey}`;
@@ -25939,7 +25988,6 @@ fileInput.style.display = 'none';
                         };
                         fileInput.click();
                     });
-                    // --- 修改结束 ---
 
                     const assocListEl = modalDOM.querySelector('#npc-editor-association-list');
                     const allCharacters = getAllUniqueCharacters();
@@ -26036,12 +26084,10 @@ fileInput.style.display = 'none';
                 }
                 
                 if (!npcSettings.personas) npcSettings.personas = {};
-                // --- 核心修改：保存为人设对象 ---
                 npcSettings.personas[newName] = {
                     description: newPersona,
                     avatar: newAvatar
                 };
-                // --- 修改结束 ---
 
                 if (!npcSettings.associations) npcSettings.associations = {};
                 npcSettings.associations[newName] = newAssociation;
