@@ -10959,7 +10959,12 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                         const content = `${dateStr} ${timeStr}\n\n${finalData}`;
                         const storageKey = `app-mood-cards_${targetChatId}`;
                         const moods = loadFromLocalStorage(storageKey, []);
-                        moods.unshift({ content: content, timestamp: Date.now() });
+                        // 核心修复：为 AI 生成的卡片也添加唯一的 ID，确保收藏判定时不会互相干扰
+                        moods.unshift({ 
+                            id: `mood_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                            content: content, 
+                            timestamp: Date.now() 
+                        });
                         saveToLocalStorage(storageKey, moods);
                         console.log(`[Background Update] Mood Card updated by "${finalSenderName}".`);
                         break;
@@ -30161,7 +30166,10 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             if (cards.length > 0) {
                 const currentMood = moods[currentCardIndex];
                 const favs = loadFromLocalStorage('app_mood_favorites', []);
-                const isFavorited = favs.some(f => f.id === currentMood.id);
+                
+                // 核心修复：增加对 id 是否存在的判断。只有当 ID 存在且匹配时，才认为已收藏。
+                // 这样可以解决没有 ID 的旧卡片全部显示“取消收藏”的 Bug。
+                const isFavorited = currentMood.id && favs.some(f => f.id === currentMood.id);
 
                 const newFavBtn = document.createElement('button');
                 newFavBtn.id = 'fav-current-mood-btn';
@@ -30180,6 +30188,12 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
 
                 newEditBtn.addEventListener('click', handleEditMood);
                 newFavBtn.addEventListener('click', () => {
+                    // 如果卡片没有 ID，为了能正常收藏，我们临时给它补一个
+                    if (!currentMood.id) {
+                        currentMood.id = `mood_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+                        saveMoods(); // 保存补上的 ID
+                    }
+
                     let currentFavs = loadFromLocalStorage('app_mood_favorites', []);
                     if (isFavorited) {
                         currentFavs = currentFavs.filter(f => f.id !== currentMood.id);
