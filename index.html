@@ -184,16 +184,134 @@
     .btn-secondary { background-color: #6c757d; }
     #api-fetch-status { font-size: 0.9rem; margin-top: -10px; margin-bottom: 10px; min-height: 1.2em; }
     .status-success { color: #28a745; } .status-error { color: #dc3545; } .status-loading { color: #6c757d; }
-    .worldbook-item, .user-persona-item { background: #f8f8f8; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid var(--primary-color); }
-    .worldbook-item-header, .user-persona-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .worldbook-item-name, .user-persona-item-name { font-weight: bold; font-size: 1.1em; }
-    .worldbook-item-meta { display: flex; align-items: center; gap: 10px; font-size: 0.8em; color: #666; }
-    .worldbook-item-meta .status { width: 10px; height: 10px; border-radius: 50%; }
-    .worldbook-item-meta .status.enabled { background-color: #28a745; }
-    .worldbook-item-meta .status.disabled { background-color: #ccc; }
-    .worldbook-item-keywords { font-size: 0.9em; color: #555; margin-bottom: 8px; word-break: break-all; }
-    .worldbook-item-content, .user-persona-item-content { margin-bottom: 10px; word-break: break-all; white-space: pre-wrap; }
-    .worldbook-item-actions button, .user-persona-item-actions button { margin-left: 5px; }
+        /* 【核心修改】精致卡片化样式 */
+    .worldbook-item, .user-persona-item { 
+        background: #ffffff; 
+        padding: 16px; 
+        border-radius: 14px; 
+        margin-bottom: 12px; 
+        border: 1px solid #e5e5ea; 
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .worldbook-item:active, .user-persona-item:active {
+        transform: scale(0.99);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .worldbook-item-header, .user-persona-item-header { 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: flex-start; 
+        margin-bottom: 10px; 
+    }
+    .worldbook-item-name, .user-persona-item-name { 
+        font-weight: 700; 
+        font-size: 16px; 
+        color: #1c1c1e;
+        line-height: 1.3;
+    }
+    .worldbook-item-meta { 
+        display: flex; 
+        align-items: center; 
+        gap: 6px; 
+    }
+    /* 状态小药丸 */
+    .status-pill {
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .status-pill.enabled { background: #e8f5e9; color: #28a745; }
+    .status-pill.disabled { background: #f2f2f7; color: #8e8e93; }
+
+    /* 关键词标签样式 */
+    .item-tags-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 10px;
+    }
+    .item-tag {
+        font-size: 11px;
+        background: #f2f2f7;
+        color: #5d6d94;
+        padding: 3px 8px;
+        border-radius: 6px;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .worldbook-item-content, .user-persona-item-content { 
+        font-size: 14px;
+        color: #3a3a3c;
+        line-height: 1.5;
+        margin-bottom: 12px; 
+        word-break: break-word; 
+        white-space: pre-wrap; 
+        background: #f9f9fb;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #f0f0f3;
+    }
+    
+    .worldbook-item-actions, .user-persona-item-actions { 
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        border-top: 1px solid #f2f2f7;
+        padding-top: 10px;
+    }
+    .worldbook-item-actions button, .user-persona-item-actions button { 
+        background: none;
+        border: none;
+        color: #007aff;
+        font-size: 14px;
+        font-weight: 500;
+        padding: 4px 8px;
+        cursor: pointer;
+    }
+    .worldbook-item-actions button:last-child, .user-persona-item-actions button:last-child {
+        color: #ff3b30;
+    }
+
+    /* 【核心新增】正则卡片专属高级样式 */
+    .regex-code-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #21252b;
+        padding: 8px 12px;
+        border-radius: 8px 8px 0 0;
+        border-bottom: 1px solid #181a1f;
+    }
+    .regex-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .regex-dot.red { background: #ff5f56; }
+    .regex-dot.yellow { background: #ffbd2e; }
+    .regex-dot.green { background: #27c93f; }
+    
+    .regex-label-text {
+        margin-left: auto;
+        font-size: 9px;
+        color: #5c6370;
+        font-family: monospace;
+        letter-spacing: 1px;
+    }
+
+    .regex-pattern-pill {
+        display: inline-flex;
+        align-items: center;
+        background: #fdf2f2;
+        border: 1px solid #fee2e2;
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 12px;
+        color: #dc2626;
+    }
     .api-profile-item { border: 2px solid var(--light-gray); padding: 15px; border-radius: 8px; display: flex; }
     .api-profile-item.active { border-color: #4cd964; }
     
@@ -5599,7 +5717,20 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                 <div id="page-worldbook" class="page">
                     <div class="app-header"><button class="back-btn" data-target="home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button><h1>世界书</h1></div>
                     <div class="content-wrapper">
+                        <!-- 【核心修改】美化版批量操作工具栏 (增加移动分类按钮) -->
+                        <div id="worldbook-batch-actions" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #ffffff; border-radius: 12px; margin-bottom: 15px; border: 1px solid #e5e5ea; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                            <label style="display: flex; align-items: center; gap: 10px; font-size: 15px; cursor: pointer; color: #333;">
+                                <input type="checkbox" id="wb-select-all" style="width: 20px; height: 20px; cursor: pointer;"> 
+                                <span style="font-weight: 600;">全选条目</span>
+                            </label>
+                            <div style="display: flex; gap: 8px;">
+                                <button id="wb-batch-move-btn" class="modal-button secondary" style="padding: 8px 16px; font-size: 14px; margin: 0; width: auto; height: auto; border-radius: 8px; font-weight: 600; border: 1px solid #ddd;">移动分类</button>
+                                <button id="wb-batch-delete-btn" class="modal-button danger" style="padding: 8px 16px; font-size: 14px; margin: 0; width: auto; height: auto; border-radius: 8px; font-weight: 600; letter-spacing: 0.5px;">删除选中</button>
+                            </div>
+                        </div>
+                        
                         <div id="worldbook-list"></div>
+                        <div class="form-group"><label for="worldbook-category">分类 (Category)</label><input type="text" id="worldbook-category" placeholder="例如：人物、地理、酒馆导入"></div>
                         <div class="form-group"><label for="worldbook-name">名称 (Name)</label><input type="text" id="worldbook-name" placeholder="唯一的标识名称"></div>
                         <div class="form-group"><label for="worldbook-keywords">关键词 (Keywords)</label><input type="text" id="worldbook-keywords" placeholder="用逗号或空格分隔"></div>
                         <div class="form-group"><label for="worldbook-content">值 (Value)</label><textarea id="worldbook-content"></textarea></div>
@@ -6965,6 +7096,13 @@ if ('serviceWorker' in navigator) {
     
     let chatList = [], worldBookEntries = [], apiProfiles = [], activeProfileIndex = null, myAvatar = null, customBubbles = [], stickers = [], appearanceSettings = {};
     let userPersonas = []; 
+    
+    // 【核心新增】生成或读取专属 RyeID (用于酒馆功能解锁)
+    let ryeID = localStorage.getItem('app_rye_id');
+    if (!ryeID) {
+        ryeID = 'RYE-' + Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+        localStorage.setItem('app_rye_id', ryeID);
+    }
     let npcList = [], npcSettings = {}; 
     let proactiveApiCallTimestamps = []; 
     // 【核心新增】加载自定义模型列表
@@ -9561,6 +9699,214 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
         return true;
     }
 
+    async function importSillyTavernCard() {
+        // 【核心新增】强制权限检查
+        const isUnlocked = localStorage.getItem('app_st_feature_unlocked') === 'true';
+        if (!isUnlocked) {
+            await conversationManager.customAlert('该功能尚未解锁。请前往“API 设置”完成开发者认证。', '功能受限');
+            return;
+        }
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.style.display = 'none';
+        fileInput.accept = 'image/png,application/json,.json,.png';
+        document.body.appendChild(fileInput);
+
+        fileInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                document.body.removeChild(fileInput);
+                return;
+            }
+
+            try {
+                let charData = null;
+                if (file.type === 'application/json' || file.name.endsWith('.json')) {
+                    const text = await file.text();
+                    charData = JSON.parse(text);
+                } else {
+                    charData = await extractDataFromPng(file);
+                }
+
+                if (charData) {
+                    const data = charData.data ? charData.data : charData;
+                    const name = (data.name || "未命名角色").trim();
+                    const chatId = generateUniqueChatId('私聊');
+                    
+                    // --- 1. 处理核心人设 ---
+                    let fullPersona = "";
+                    if (data.description) fullPersona += `[Description]\n${data.description}\n\n`;
+                    if (data.personality) fullPersona += `[Personality]\n${data.personality}\n\n`;
+                    if (data.scenario) fullPersona += `[Scenario]\n${data.scenario}\n\n`;
+                    if (data.mes_example) fullPersona += `[Examples of Dialogue]\n${data.mes_example}\n\n`;
+
+                    // --- 2. 处理世界书 (Lorebook) 并自动挂载 (修复无关键词条目丢失问题) ---
+                    let importedWbNames = [];
+                    if (data.character_book && data.character_book.entries && Array.isArray(data.character_book.entries)) {
+                        data.character_book.entries.forEach((entry, index) => {
+                            // 只要有内容就允许导入
+                            if (entry.content && entry.content.trim()) {
+                                // 检查是否有关键词
+                                const hasKeys = entry.keys && Array.isArray(entry.keys) && entry.keys.length > 0;
+                                
+                                // 【核心修改】生成唯一名称：优先使用 comment 字段，其次是 name，最后是关键词或索引
+                                const entryTitle = entry.comment || entry.name || (hasKeys ? entry.keys[0] : `Entry_${index}`);
+                                const wbName = `${name}_${entryTitle}`;
+
+                                // 检查全局库中是否已存在
+                                if (!worldBookEntries.some(wb => wb.name === wbName)) {
+                                    worldBookEntries.push({
+                                        name: wbName,
+                                        // 【核心新增】导入时自动将分类设为角色名
+                                        category: name,
+                                        // 如果有关键词则合并为字符串，否则为空
+                                        keywords: hasKeys ? entry.keys.join(', ') : '',
+                                        content: entry.content,
+                                        enabled: true,
+                                        // 核心逻辑：有关键词用 keyword 模式，没关键词用 always 模式
+                                        triggerMode: hasKeys ? 'keyword' : 'always',
+                                        useInMoments: false
+                                    });
+                                }
+                                // 将此条目加入该角色的自动挂载名单
+                                importedWbNames.push(wbName);
+                            }
+                        });
+                        saveWorldBook();
+                        renderWorldBook();
+                    }
+
+                    // --- 3. 处理多开场白 (存入分支) ---
+                    let alternateBranches = [];
+                    if (data.alternate_greetings && Array.isArray(data.alternate_greetings)) {
+                        data.alternate_greetings.forEach((greet, i) => {
+                            if (!greet.trim()) return;
+                            alternateBranches.push({
+                                id: `branch_greet_${i}_${Date.now()}`,
+                                name: `开场白变体 ${i + 1}`,
+                                timestamp: Date.now() - (i * 1000), // 稍微错开时间
+                                preview: greet.substring(0, 30) + '...',
+                                messages: [{
+                                    id: `msg-greet-${i}`,
+                                    type: 'text',
+                                    text: greet,
+                                    side: 'received',
+                                    timestamp: Date.now()
+                                }]
+                            });
+                        });
+                    }
+
+                    // --- 4. 创建聊天窗口与基本信息 ---
+                    const newChat = { 
+                        id: chatId, 
+                        name: name, 
+                        type: '私聊', 
+                        lastMessage: data.first_mes || '角色卡导入成功', 
+                        timestamp: '刚刚' 
+                    };
+                    chatList.unshift(newChat);
+                    saveChatList();
+
+                    const chatInfo = {
+                        aiPersona: fullPersona.trim(),
+                        remark: name,
+                        enabledRegexes: [],
+                        userPersonaName: "无"
+                    };
+                    saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+                    
+                    // 自动挂载世界书
+                    if (importedWbNames.length > 0) {
+                        saveToLocalStorage(`chat_mounted_wb_${chatId}`, importedWbNames);
+                    }
+
+                    // 保存分支记录
+                    if (alternateBranches.length > 0) {
+                        saveToLocalStorage(`chat_branches_${chatId}`, alternateBranches);
+                    }
+
+                    // --- 5. 头像与主线消息 ---
+                    if (file.type.includes('image')) {
+                        const dbKey = `avatar-st-${Date.now()}`;
+                        await imageStore.setItem(dbKey, file);
+                        saveToLocalStorage(`chat_avatar_${chatId}`, `indexeddb:${dbKey}`);
+                    }
+
+                    if (data.first_mes) {
+                        const firstMsg = {
+                            id: `msg-main-${Date.now()}`,
+                            type: 'text',
+                            text: data.first_mes,
+                            side: 'received',
+                            timestamp: Date.now()
+                        };
+                        saveToLocalStorage(`conversation_${chatId}`, [firstMsg]);
+                    }
+
+                    renderChatList();
+                    alert(`导入成功！\n角色: ${name}\n导入世界书: ${importedWbNames.length} 条 (已自动关联)\n替代开场白: ${alternateBranches.length} 条 (已存入“回溯历史”菜单)`);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("导入失败，请检查文件格式。");
+            } finally {
+                document.body.removeChild(fileInput);
+            }
+        };
+        fileInput.click();
+    }
+
+    async function extractDataFromPng(file) {
+        const buffer = await file.arrayBuffer();
+        const view = new DataView(buffer);
+        
+        // 验证 PNG 签名
+        if (view.getUint32(0) !== 0x89504E47 || view.getUint32(4) !== 0x0D0A1A0A) {
+            throw new Error("不是有效的 PNG 图片文件");
+        }
+
+        let offset = 8;
+        while (offset < buffer.byteLength) {
+            const length = view.getUint32(offset);
+            const type = Array.from(new Uint8Array(buffer, offset + 4, 4))
+                              .map(b => String.fromCharCode(b)).join('');
+            
+            // SillyTavern 数据通常存放在 tEXt 块中，关键词为 'chara'
+            if (type === 'tEXt') {
+                const chunkData = new Uint8Array(buffer, offset + 8, length);
+                const text = new TextDecoder().decode(chunkData);
+                
+                if (text.startsWith('chara\0')) {
+                    const base64Content = text.substring(6);
+                    // 核心修复：使用 decodeURIComponent(escape(atob(...))) 处理中文乱码
+                    const jsonStr = decodeURIComponent(escape(atob(base64Content)));
+                    return JSON.parse(jsonStr);
+                }
+            } 
+            // 兼容某些使用 iTXt 块的现代卡片
+            else if (type === 'iTXt') {
+                const chunkData = new Uint8Array(buffer, offset + 8, length);
+                const text = new TextDecoder().decode(chunkData);
+                if (text.includes('chara\0')) {
+                    const parts = text.split('\0');
+                    // 查找包含 base64 的部分（通常在最后）
+                    for (let i = parts.length - 1; i >= 0; i--) {
+                        try {
+                            const decoded = decodeURIComponent(escape(atob(parts[i])));
+                            if (decoded.includes('"name"') || decoded.includes('"first_mes"')) {
+                                return JSON.parse(decoded);
+                            }
+                        } catch(e) {}
+                    }
+                }
+            }
+            offset += length + 12;
+        }
+        throw new Error("图片中未检测到酒馆角色数据");
+    }
+
     document.querySelectorAll('.back-btn').forEach(btn => btn.addEventListener('click', (e) => {
         const targetPage = e.currentTarget.dataset.target;
         
@@ -9646,14 +9992,26 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
     }
     
     document.getElementById('add-chat-btn-text').addEventListener('click', async () => {
+        // 【核心修改】检查本地存储中是否存在解锁标记
+        const isStUnlocked = localStorage.getItem('app_st_feature_unlocked') === 'true';
+        
+        const menuButtons = [
+            { text: '创建群聊', value: 'group', class: 'primary' },
+            { text: '添加角色', value: 'friend', class: 'primary' }
+        ];
+
+        // 只有解锁后才显示导入选项
+        if (isStUnlocked) {
+            menuButtons.push({ text: '导入酒馆角色卡', value: 'import_st', class: 'secondary' });
+        }
+
+        menuButtons.push({ text: '取消', value: 'cancel', class: 'secondary' });
+
         const result = await conversationManager.showCustomModal({
             title: '新对话',
-            buttons: [
-                { text: '创建群聊', value: 'group', class: 'primary' },
-                { text: '添加角色', value: 'friend', class: 'primary' },
-                { text: '取消', value: 'cancel', class: 'secondary' }
-            ]
+            buttons: menuButtons
         });
+
         if (!result || result.value === 'cancel' || result.value === 'close') return;
 
         if(result.value === 'group') {
@@ -9661,6 +10019,8 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
         } else if (result.value === 'friend') {
             const nameResult = await conversationManager.showContentInputModal({title: '添加角色', placeholder: '请输入角色名称'});
             if (nameResult) addNewChat(nameResult, '私聊');
+        } else if (result.value === 'import_st') {
+            importSillyTavernCard();
         }
     });
 
@@ -10096,46 +10456,124 @@ You MUST use the custom \`<dm>\` tag format.
         }
     function renderWorldBook() {
         worldbookList.innerHTML = '';
+        
+        // 1. 按分类对条目进行分组
+        const groups = {};
         worldBookEntries.forEach((entry, index) => {
-            // 【核心修正：对所有用户输入的内容进行转义】
-            const escapedName = escapeHtml(entry.name);
-            const escapedKeywords = escapeHtml(entry.keywords || '');
-            const escapedContent = escapeHtml(entry.content);
+            const cat = entry.category || '未分类';
+            if (!groups[cat]) groups[cat] = [];
+            groups[cat].push({ ...entry, originalIndex: index });
+        });
 
-            const item = document.createElement('div');
-            item.className = 'worldbook-item';
-            const triggerText = entry.triggerMode === 'always' ? '始终触发' : '关键词';
-            item.innerHTML = `
-                <div class="worldbook-item-header">
-                    <strong class="worldbook-item-name">${escapedName}</strong>
-                    <div class="worldbook-item-meta">
-                        <span class="status ${entry.enabled ? 'enabled' : 'disabled'}" title="${entry.enabled ? '已启用' : '已禁用'}"></span>
-                        <span class="trigger-mode">${triggerText}</span>
-                    </div>
-                </div>
-                <div class="worldbook-item-keywords"><strong>关键词:</strong> ${escapedKeywords}</div>
-                <div class="worldbook-item-content">${escapedContent}</div>
-                <div class="worldbook-item-actions">
-                    <button onclick="window.app.editWorldBookEntry(${index})">编辑</button>
-                    <button onclick="window.app.deleteWorldBookEntry(${index})">删除</button>
-                </div>`;
-            worldbookList.appendChild(item);
+        // 2. 遍历每个分类并渲染
+        Object.keys(groups).sort().forEach(categoryName => {
+            const items = groups[categoryName];
+            
+            // 创建分类外层包裹
+            const categoryWrapper = document.createElement('div');
+            categoryWrapper.style.marginBottom = '15px';
+            
+            // 创建分类标题按钮 (Header)
+            const categoryHeader = document.createElement('div');
+            categoryHeader.className = 'wb-category-header';
+            // 增加样式：浅灰背景、圆角、内边距、两端对齐
+            categoryHeader.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 15px;
+                background-color: #f0f2f5;
+                border-radius: 10px;
+                cursor: pointer;
+                user-select: none;
+                transition: background-color 0.2s;
+            `;
+            
+            categoryHeader.innerHTML = `
+                <span style="font-weight: bold; color: #333; font-size: 15px;">
+                    ${categoryName} <span style="font-weight: normal; color: #888; font-size: 13px; margin-left: 5px;">(${items.length})</span>
+                </span>
+                <span class="wb-category-arrow" style="color: #bbb; transition: transform 0.3s;">▶</span>
+            `;
+
+            // 创建条目容器 (Content Container) - 默认隐藏
+            const itemsContainer = document.createElement('div');
+            itemsContainer.className = 'wb-category-content';
+            itemsContainer.style.display = 'none'; // 默认折叠
+            itemsContainer.style.paddingTop = '10px'; // 与标题拉开距离
+
+            // 监听点击切换
+            categoryHeader.onclick = () => {
+                const isHidden = itemsContainer.style.display === 'none';
+                itemsContainer.style.display = isHidden ? 'block' : 'none';
+                categoryHeader.querySelector('.wb-category-arrow').style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+                categoryHeader.style.backgroundColor = isHidden ? '#e5e7eb' : '#f0f2f5';
+            };
+
+            // 渲染该分类下的所有条目
+            items.forEach(entry => {
+                const index = entry.originalIndex;
+                const escapedName = escapeHtml(entry.name);
+                const escapedKeywords = escapeHtml(entry.keywords || '');
+                const escapedContent = escapeHtml(entry.content);
+
+                const item = document.createElement('div');
+                item.className = 'worldbook-item';
+                item.style.marginBottom = '10px'; // 条目之间增加间距
+                const triggerText = entry.triggerMode === 'always' ? '始终触发' : '关键词';
+                
+                item.innerHTML = `
+                    <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <input type="checkbox" class="wb-item-checkbox" data-index="${index}" style="width: 18px; height: 18px; margin-top: 18px; flex-shrink: 0; cursor: pointer;">
+                        <div style="flex-grow: 1; min-width: 0;">
+                            <div class="worldbook-item-header">
+                                <div class="worldbook-item-name">${escapedName}</div>
+                                <div class="worldbook-item-meta">
+                                    <span class="status-pill ${entry.enabled ? 'enabled' : 'disabled'}">${entry.enabled ? '已启用' : '已禁用'}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="item-tags-row">
+                                <span class="item-tag" style="background: #e5e7eb; color: #4b5563;">${triggerText}</span>
+                                ${escapedKeywords ? escapedKeywords.split(/[,，\s]+/).map(k => `<span class="item-tag"># ${k}</span>`).join('') : ''}
+                            </div>
+
+                            <div class="worldbook-item-content">${escapedContent}</div>
+                            
+                            <div class="worldbook-item-actions">
+                                <button onclick="window.app.editWorldBookEntry(${index})">编辑</button>
+                                <button onclick="window.app.deleteWorldBookEntry(${index})">删除</button>
+                            </div>
+                        </div>
+                    </div>`;
+                itemsContainer.appendChild(item);
+            });
+
+            categoryWrapper.appendChild(categoryHeader);
+            categoryWrapper.appendChild(itemsContainer);
+            worldbookList.appendChild(categoryWrapper);
         });
     }
     worldbookAddBtn.addEventListener('click', () => {
         const name = worldbookNameInput.value.trim();
+        // 【核心新增】读取分类输入框的值
+        const category = document.getElementById('worldbook-category').value.trim() || '未分类';
         const keywords = worldbookKeywordsInput.value.trim();
         const content = worldbookContentInput.value.trim();
         const enabled = worldbookEnabledInput.checked;
-        const useInMoments = document.getElementById('worldbook-use-in-moments').checked; // <-- 新增
+        const useInMoments = document.getElementById('worldbook-use-in-moments').checked;
         const triggerMode = document.querySelector('input[name="worldbook-trigger"]:checked').value;
         if (!name || !content) { alert('名称和内容不能为空！'); return; }
         const editIndex = worldbookEditIndexInput.value;
         if (worldBookEntries.some((entry, index) => entry.name === name && index.toString() !== editIndex)) { alert('世界书名称已存在，请使用唯一的名称。'); return; }
-        const newEntry = { name, keywords, content, enabled, triggerMode, useInMoments }; // <-- 新增 useInMoments
+        // 【核心修改】将 category 加入对象
+        const newEntry = { name, category, keywords, content, enabled, triggerMode, useInMoments };
         if (editIndex !== '') { worldBookEntries[editIndex] = newEntry; } else { worldBookEntries.push(newEntry); }
         saveWorldBook(); renderWorldBook();
-        worldbookNameInput.value = ''; worldbookKeywordsInput.value = ''; worldbookContentInput.value = '';
+        worldbookNameInput.value = ''; 
+        // 【核心新增】重置分类输入框
+        document.getElementById('worldbook-category').value = '';
+        worldbookKeywordsInput.value = ''; worldbookContentInput.value = '';
         worldbookEnabledInput.checked = true; document.getElementById('worldbook-use-in-moments').checked = false;
         // --- 核心修改：默认选中“始终触发” ---
         document.querySelector('input[name="worldbook-trigger"][value="always"]').checked = true; 
@@ -10144,9 +10582,11 @@ You MUST use the custom \`<dm>\` tag format.
     window.app = window.app || {};
     window.app.editWorldBookEntry = (index) => {
         const entry = worldBookEntries[index];
+        // 【核心新增】回填分类字段
+        document.getElementById('worldbook-category').value = entry.category || '未分类';
         worldbookNameInput.value = entry.name; worldbookKeywordsInput.value = entry.keywords; worldbookContentInput.value = entry.content;
         worldbookEnabledInput.checked = entry.enabled; 
-        document.getElementById('worldbook-use-in-moments').checked = entry.useInMoments || false; // <-- 新增
+        document.getElementById('worldbook-use-in-moments').checked = entry.useInMoments || false;
         document.querySelector(`input[name="worldbook-trigger"][value="${entry.triggerMode}"]`).checked = true;
         worldbookEditIndexInput.value = index; worldbookAddBtn.textContent = '更新条目';
     };
@@ -20927,16 +21367,17 @@ const userPersonaManager = (function() {
         userPersonas.forEach((persona, index) => {
             const item = document.createElement('div');
             item.className = 'user-persona-item';
-            // 核心修改：使用 grid 布局来并排显示头像和内容
+            
+            // 【核心修改】精致化人设卡片布局
             item.innerHTML = `
-                <div style="display: grid; grid-template-columns: 50px 1fr; gap: 15px; align-items: flex-start;">
-                    <div class="avatar-preview persona-list-avatar" id="persona-avatar-list-${index}" style="width: 50px; height: 50px; border-radius: 8px;"></div>
-                    <div style="min-width: 0;">
+                <div style="display: flex; gap: 15px; align-items: flex-start;">
+                    <div class="avatar-preview persona-list-avatar" id="persona-avatar-list-${index}" style="width: 54px; height: 54px; border-radius: 12px; flex-shrink: 0; border: 1px solid #eee;"></div>
+                    <div style="flex-grow: 1; min-width: 0;">
                         <div class="user-persona-item-header">
-                            <strong class="user-persona-item-name">${persona.name}</strong>
+                            <div class="user-persona-item-name">${escapeHtml(persona.name)}</div>
                         </div>
-                        <div class="user-persona-item-content">${persona.description}</div>
-                        <div class="user-persona-item-actions" style="justify-content: flex-end;">
+                        <div class="user-persona-item-content" style="max-height: 120px; overflow-y: auto;">${escapeHtml(persona.description)}</div>
+                        <div class="user-persona-item-actions">
                             <button onclick="window.app.editUserPersona(${index})">编辑</button>
                             <button onclick="window.app.deleteUserPersona(${index})">删除</button>
                         </div>
@@ -24973,6 +25414,9 @@ function saveSettings() {
                 `;
                 container.appendChild(formGroup);
             });
+
+            // 【核心修复】确保每次打开外观设置页面时，都重新渲染正则规则列表
+            renderRegexList();
         }
         
         async function showCssManagerModal() {
@@ -25297,16 +25741,39 @@ function saveSettings() {
             const rules = appearanceSettings.regexReplacements || [];
             if (rules.length > 0) {
                 listEl.innerHTML = rules.map((rule, index) => `
-                    <div class="worldbook-item">
-                        <div class="worldbook-item-header">
-                            <strong class="worldbook-item-name">${escapeHtml(rule.name)}</strong>
-                            <span class="status ${rule.enabled ? 'enabled' : 'disabled'}"></span>
+                    <div class="worldbook-item" style="padding: 0; overflow: hidden; border-color: #d1d1d6;">
+                        <!-- 顶部标题区 -->
+                        <div style="padding: 16px 16px 12px; display: flex; justify-content: space-between; align-items: center;">
+                            <div class="worldbook-item-name" style="font-size: 15px;">${escapeHtml(rule.name)}</div>
+                            <span class="status-pill ${rule.enabled ? 'enabled' : 'disabled'}" style="transform: scale(0.9);">${rule.enabled ? 'ON' : 'OFF'}</span>
                         </div>
-                        <div class="worldbook-item-keywords"><strong>Pattern:</strong> <code>${escapeHtml(rule.pattern)}</code></div>
-                        <div class="worldbook-item-keywords"><strong>Template:</strong> <code>${escapeHtml(rule.template)}</code></div>
-                        <div class="worldbook-item-actions">
-                            <button onclick="window.app.editRegexRule(${index})">编辑</button>
-                            <button onclick="window.app.deleteRegexRule(${index})">删除</button>
+                        
+                        <!-- 匹配模式区 -->
+                        <div style="padding: 0 16px 12px;">
+                            <div class="regex-pattern-pill">
+                                <span style="opacity: 0.4; margin-right: 4px;">/</span>
+                                <span>${escapeHtml(rule.pattern)}</span>
+                                <span style="opacity: 0.4; margin-left: 4px;">/${escapeHtml(rule.flags || 'g')}</span>
+                            </div>
+                        </div>
+
+                        <!-- 模拟代码编辑器 -->
+                        <div style="margin: 0 16px 16px;">
+                            <div class="regex-code-header">
+                                <div class="regex-dot red"></div>
+                                <div class="regex-dot yellow"></div>
+                                <div class="regex-dot green"></div>
+                                <div class="regex-label-text">REPLACE_TEMPLATE</div>
+                            </div>
+                            <div class="worldbook-item-content" style="margin-bottom: 0; border-radius: 0 0 8px 8px; font-family: 'SF Mono', monospace; font-size: 12px; background: #282c34; color: #61afef; border: none; padding: 12px; max-height: 150px; overflow-y: auto;">
+                                ${escapeHtml(rule.template)}
+                            </div>
+                        </div>
+                        
+                        <!-- 底部按钮 -->
+                        <div class="worldbook-item-actions" style="padding: 8px 16px; background: #fafafa;">
+                            <button onclick="window.app.editRegexRule(${index})">编辑设置</button>
+                            <button onclick="window.app.deleteRegexRule(${index})">移除规则</button>
                         </div>
                     </div>
                 `).join('');
@@ -25621,6 +26088,78 @@ function saveSettings() {
             // 【【【 插入结束 】】】
 
             document.querySelector('.home-icon-btn[data-page="appearance"]').addEventListener('click', renderPage);
+
+            // 【核心新增】酒馆功能解锁彩蛋
+            let apiTitleClickCount = 0;
+            let lastClickTime = 0;
+            const apiSettingsHeader = document.querySelector('#page-settings .app-header h1');
+            
+            if (apiSettingsHeader) {
+                apiSettingsHeader.style.cursor = 'pointer'; // 增加手型提示
+                apiSettingsHeader.addEventListener('click', async () => {
+                    const now = Date.now();
+                    // 如果两次点击间隔超过 2 秒，重置计数
+                    if (now - lastClickTime > 2000) apiTitleClickCount = 0;
+                    
+                    lastClickTime = now;
+                    apiTitleClickCount++;
+
+                    if (apiTitleClickCount === 7) {
+                        apiTitleClickCount = 0; 
+                        
+                        const unlockHtml = `
+                            <div style="text-align: left; font-size: 14px; line-height: 1.6;">
+                                <p>要开启酒馆导入功能，请完成以下步骤：</p>
+                                <ol>
+                                    <li>打开你的 <b>SillyTavern</b>。</li>
+                                    <li>新建角色，名称设为：<b style="color:#28a745;">RyeUnlock</b></li>
+                                    <li>在人设描述中输入以下专属指纹：<br>
+                                        <code style="background:#eee; padding:2px 5px; border-radius:4px; display:block; margin:5px 0; text-align:center; font-size:16px;">${ryeID}</code>
+                                    </li>
+                                    <li>将该角色导出为 <b>PNG</b> 格式。</li>
+                                    <li>点击下方按钮上传该 PNG 进行验证。</li>
+                                </ol>
+                                <button id="st-verify-upload-btn" class="modal-button primary" style="width:100%; margin-top:10px;">上传验证卡片</button>
+                                <input type="file" id="st-verify-input" accept="image/png" style="display:none;">
+                            </div>
+                        `;
+
+                        await conversationManager.showCustomModal({
+                            title: 'SillyTavern 所有权认证',
+                            html: unlockHtml,
+                            showCloseButton: true,
+                            onRender: (modalDOM, closeModal) => {
+                                const btn = modalDOM.querySelector('#st-verify-upload-btn');
+                                const input = modalDOM.querySelector('#st-verify-input');
+                                
+                                btn.onclick = () => input.click();
+                                
+                                input.onchange = async (e) => {
+                                    const file = e.target.files[0];
+                                    if (!file) return;
+                                    
+                                    try {
+                                        const charData = await extractDataFromPng(file);
+                                        const data = charData.data ? charData.data : charData;
+                                        const name = (data.name || "").trim();
+                                        const desc = (data.description || "");
+
+                                        if (name === 'RyeUnlock' && desc.includes(ryeID)) {
+                                            localStorage.setItem('app_st_feature_unlocked', 'true');
+                                            closeModal();
+                                            await conversationManager.customAlert('验证成功！酒馆导入功能已永久解锁。', '认证通过');
+                                        } else {
+                                            await conversationManager.customAlert('验证失败：卡片内容不匹配。请检查角色名和指纹是否正确。', '认证失败');
+                                        }
+                                    } catch (err) {
+                                        await conversationManager.customAlert('解析失败：请确保上传的是从酒馆导出的标准 PNG 角色卡。', '错误');
+                                    }
+                                };
+                            }
+                        });
+                    }
+                });
+            }
 
             // START: 新增正则规则的导出/导入事件监听
             document.getElementById('export-regex-btn').addEventListener('click', () => {
@@ -28638,6 +29177,88 @@ async function handleRemoveMember() {
         conversationManager.injectCustomBubbleStyles();
         // loadChatList(); // 已经在前面加载过了
         // renderChatList(); // 已经在前面渲染过了
+        // 【核心修改】世界书全选逻辑 (支持折叠容器)
+        document.getElementById('wb-select-all').addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            // 使用更通用的选择器，确保隐藏在折叠面板里的框也能被勾选
+            const allCheckboxes = document.querySelectorAll('.wb-item-checkbox');
+            allCheckboxes.forEach(cb => {
+                cb.checked = isChecked;
+            });
+        });
+
+        // 【核心新增】世界书批量删除逻辑
+        document.getElementById('wb-batch-delete-btn').addEventListener('click', async () => {
+            const checkedBoxes = document.querySelectorAll('.wb-item-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('请先勾选要删除的条目。');
+                return;
+            }
+
+            const confirmed = await conversationManager.customConfirm(
+                `确定要永久删除选中的 ${checkedBoxes.length} 条世界书吗？`,
+                '批量删除确认',
+                '确认删除'
+            );
+
+            if (confirmed) {
+                // 1. 获取所有选中的索引，并从大到小排序（防止删除时索引错位）
+                const indicesToDelete = Array.from(checkedBoxes)
+                    .map(cb => parseInt(cb.dataset.index, 10))
+                    .sort((a, b) => b - a);
+
+                // 2. 执行删除
+                indicesToDelete.forEach(index => {
+                    worldBookEntries.splice(index, 1);
+                });
+
+                // 3. 保存并刷新
+                saveWorldBook();
+                renderWorldBook();
+                document.getElementById('wb-select-all').checked = false;
+                alert('删除成功！');
+            }
+        });
+
+        // 【核心新增】世界书批量移动分类逻辑
+        document.getElementById('wb-batch-move-btn').addEventListener('click', async () => {
+            const checkedBoxes = document.querySelectorAll('.wb-item-checkbox:checked');
+            if (checkedBoxes.length === 0) {
+                alert('请先勾选要移动的条目。');
+                return;
+            }
+
+            // 获取现有分类列表，用于提示（可选）
+            const existingCats = [...new Set(worldBookEntries.map(e => e.category || '未分类'))];
+            const tipText = existingCats.length > 0 ? `当前已有分类：${existingCats.join(', ')}` : '请输入新分类名称';
+
+            const targetCategory = await conversationManager.showContentInputModal({
+                title: '批量移动分类',
+                placeholder: '输入目标分类名称',
+                value: ''
+            });
+
+            if (targetCategory !== null) {
+                const newCategoryName = targetCategory.trim() || '未分类';
+                
+                // 遍历选中的框，根据 data-index 修改原始数据
+                checkedBoxes.forEach(cb => {
+                    const index = parseInt(cb.dataset.index, 10);
+                    if (worldBookEntries[index]) {
+                        worldBookEntries[index].category = newCategoryName;
+                    }
+                });
+
+                // 保存并刷新
+                saveWorldBook();
+                renderWorldBook();
+                
+                // 重置全选框
+                document.getElementById('wb-select-all').checked = false;
+                alert(`成功将 ${checkedBoxes.length} 条条目移动到 "${newCategoryName}"。`);
+            }
+        });
+
         loadWorldBook(); renderWorldBook();
         loadApiSettings(); renderApiProfiles();
         userPersonaManager.init();
