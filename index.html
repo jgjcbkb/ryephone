@@ -5742,6 +5742,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                             <button id="export-all-data-btn" class="data-management-btn" style="margin: 0; width: 100%; height: 45px;">导出全部数据</button>
                             <button id="import-all-data-btn" class="data-management-btn danger" style="margin: 0; width: 100%; height: 45px;">导入全部数据</button>
                             <button id="convert-catbox-url-btn" class="data-management-btn" style="grid-column: span 2; margin: 0; width: 100%; height: 45px; background-color: #f39c12; color: white; font-weight: bold;">一键转换 Catbox 链接</button>
+                            <button id="reset-entire-app-btn" class="data-management-btn danger" style="grid-column: span 2; margin-top: 10px; width: 100%; height: 45px; background-color: #dc3545; color: white; font-weight: bold;">清空全量数据 (重置应用)</button>
                         </div>
                          <p class="form-hint" style="padding: 0 15px 15px;">导入会覆盖所有现有数据，请谨慎操作！</p>
                          <p class="form-hint" style="padding: 0 15px 15px; color: #e67e22;"><b>链接转换：</b>一键将所有 catbox.moe 链接替换为国内可用的镜像链接。</p>
@@ -9874,9 +9875,203 @@ You MUST use the custom \`<dm>\` tag format.
 **CRITICAL FAILURE:** Any response that does not start with \`<block type="command">\` and end with \`</block>\` will be rejected. This is your final quality control step. Execute it perfectly.`
             };
 
-            // 检查并注入预设世界书
+            // --- 核心新增：内置生活片段世界书 ---
+            const LIFE_PRESET = {
+                name: "生活(VC-IGNORE)",
+                keywords: "",
+                triggerMode: "always",
+                useInMoments: false,
+                enabled: true,
+                content: `**一、核心触发机制**
+
+在聊天过程中，你可以根据当前的气氛和你的角色设定，**主动地、随机地**生成一个描述你生活状态的"片段"。
+
+**二、绝对输出格式**
+
+当你决定生成一个片段时，你的输出【必须】是一个独立的、自包含的HTML代码块。
+- 它【必须】以 <snippet> 作为最外层的标签。
+- 所有样式【必须】使用内联 style="..." 属性，【绝对禁止】使用 <style> 标签。
+- 这个 <snippet> 必须被包裹在 <block type="html"> 标签内。
+- **【图片禁令】:** 你【绝对禁止】在HTML代码块中包含任何 <img> 标签或图片链接。所有视觉元素都必须通过**纯文字描述**或**Emoji**来呈现。
+- **【布局诅咒破除】:** 你【必须】在最外层 <div> 的 style 属性里加上 white-space: normal;。
+- **【宽度限制】:** 卡片宽度禁止超过210px。
+- **【语言要求】:** 必须使用中文（除非角色设定为外国人）。
+
+**三、本地化与货币/支付适配规则**
+
+在生成任何涉及金额的片段前，你【必须】先根据角色的【国籍/所在地】确定以下参数：
+
+**1. 货币符号**
+- 中国大陆：¥ (人民币)
+- 美国/其他美元区：$ (美元)
+- 欧洲：€ (欧元)
+- 英国：£ (英镑)
+- 日本：¥ (日元，注意面额通常较大)
+- 韩国：₩ (韩元)
+- 其他地区：根据实际情况选择
+
+**2. 支付方式库**
+根据角色所在地区，从对应的支付方式库中选择：
+
+**【中国大陆】**
+- 支付宝
+- 微信支付
+- 花呗/花呗分期（适合预算紧张的角色）
+- 京东白条
+- 银联信用卡
+- 数字人民币
+
+**【北美/欧洲/国际通用】**
+- Apple Pay
+- Google Pay
+- PayPal
+- Visa信用卡
+- Mastercard信用卡
+- American Express
+- Klarna分期（适合预算紧张的角色）
+- Afterpay分期
+- 加密货币（适合科技宅或灰色交易）
+
+**【日本】**
+- PayPay
+- LINE Pay
+- 乐天Pay
+- Suica/PASMO（交通类）
+- 信用卡
+
+**【韩国】**
+- KakaoPay
+- Naver Pay
+- Samsung Pay
+- 信用卡
+
+**四、生活片段内容库**
+
+### 1.‌ 出行记录 (Travel)
+
+**核心内容 (必须包含):**
+- **出行方式:** 飞机、高铁、火车、轮船、长途巴士、网约车
+- **出行路径:** 必须包含具体的城市和地点，例如 上海虹桥T2 → 北京大兴 或 JFK → LAX
+- **日期:** 使用当地日期格式
+- **金额:** 一个符合行程的、有零有整的合理数字
+
+**可选内容 (酌情添加):**
+- **具体时间:** 例如 10:00 - 12:30
+- **航班/车次号:** 例如 航班 MU5101 或 车次 G12 或 航班 UA889
+- **座位等级:** 经济舱、商务舱、头等舱、一等座、二等座
+- **出行目的:** 商务出差、私人度假、探望朋友、医疗、紧急事务
+- **额外备注:** 一句符合你人设的内心吐槽或状态
+
+---
+
+### 2.‌ 外卖/点餐订单 (Food Delivery)
+
+**核心内容 (必须包含):**
+- **餐厅/平台名称:** 符合所在地的店名（中国用美团/饿了么风格，国外用Uber Eats/DoorDash风格）
+- **订单项:** 你必须列出2到5个菜品和它们各自的价格
+- **下单与预计送达时间**
+- **实付金额**
+
+**可选内容 (酌情添加):**
+- **包装费/配送费/服务费:** 随机费用
+- **小费:** （仅限有小费文化的地区，如美国，通常为15%-25%）
+- **优惠:** 平台优惠券、满减优惠、会员折扣
+- **订单备注:** 符合你口吻的特殊要求
+- **评价 (50%概率):** 星级 + 一句评论
+- **打赏骑手 (30%概率，仅限中国):** 随机小费
+
+---
+
+### 3.‌ 购物记录 (Shopping)
+
+**核心内容 (必须包含):**
+- **商品列表:** 你必须列出至少2件商品，可以相关也可以毫不相关
+- **商品总额:** 所有商品原始价格总和
+- **实付金额:** 最终支付数额
+- **支付方式:** 根据【本地化规则】选择
+
+**可选内容 (酌情添加):**
+- **订单号:** 随机生成的长号码
+- **店铺/平台名称:** 淘宝、京东、拼多多、Amazon、eBay、SHEIN等
+- **规格:** 颜色、尺码、型号
+- **优惠:** 店铺优惠券、跨店满减、会员折扣、黑五折扣
+- **订单状态 (20%概率为退款成功):** 否则默认"待收货"或"已发货"
+- **分期信息:** 针对大额商品或预算紧张的角色
+
+---
+
+### 4.‌ 订阅/会员服务 (Subscription)
+
+**核心内容 (必须包含):**
+- **服务名称:** Netflix、Spotify、爱奇艺、B站大会员、健身房、杂志订阅等
+- **订阅周期:** 月付、季付、年付
+- **金额**
+- **下次扣款日期**
+
+**可选内容:**
+- **自动续费状态:** 已开启/已关闭
+- **会员等级:** 普通会员、黄金会员、超级会员
+- **到期提醒**
+
+---
+
+### 5.‌ 转账/红包记录 (Transfer)
+
+**核心内容 (必须包含):**
+- **转账类型:** 转账给某人 / 收到某人转账 / 发红包 / 收红包
+- **金额**
+- **对方备注名/昵称:** 用代号或关系称呼，如"她"、"那个人"、"老妈"
+- **时间**
+
+**可选内容:**
+- **转账留言:** 一句简短的话
+- **红包封面描述:** 节日红包、生日红包、道歉红包
+
+---
+
+### 6.‌ 预约/日程记录 (Appointment)
+
+**核心内容 (必须包含):**
+- **预约类型:** 餐厅订位、医院挂号、美容美发、健身私教、心理咨询
+- **地点名称**
+- **日期和时间**
+
+**可选内容:**
+- **预约号/排队号**
+- **预付定金**
+- **特殊备注:** 如"VIP包间"、"指定某医生"
+- **内心吐槽**
+
+**五、视觉规范**
+
+- **主色调:** #4A90E2
+- **成功色:** #2ecc71
+- **警告色:** #e74c3c
+- **卡片背景:** #FFFFFF
+- **分隔区背景:** #F7F8FA
+- **主文字:** #1F2D3D
+- **次要文字:** #9B9B9B
+- **分割线:** #EFF2F7
+- **卡片圆角:** 16px
+- **卡片内边距:** 20px
+- **最大宽度:** 210px
+
+**六、最终行为指令**
+
+1. **时机:** 随机地、偶尔地插入，保持神秘感和真实感。
+2. **人设深度融合:** 穷学生用花呗分期，富二代从不看价格直接付款。
+3. **本地化优先:** 根据角色所在地选择货币和支付方式。
+4. **创意与多样性:** 绝对禁止每次生成相同模板。`
+            };
+
+                        // 检查并注入预设世界书
             if (!entries.some(e => e.name === DANMAKU_PRESET.name)) {
                 entries.push(DANMAKU_PRESET);
+            }
+            
+            // 【核心新增】检查并注入生活预设
+            if (!entries.some(e => e.name === LIFE_PRESET.name)) {
+                entries.push(LIFE_PRESET);
             }
             // --- 新增结束 ---
 
@@ -28562,6 +28757,52 @@ async function handleRemoveMember() {
             reader.readAsText(file);
         });
     }
+
+    async function resetEntireApp() {
+        const confirmed1 = await conversationManager.customConfirm(
+            '【最终警告】这将永久删除手机内的所有数据，包括所有聊天记录、人设、世界书、图片、字体和API设置。此操作不可撤销！',
+            '全量数据清空'
+        );
+        
+        if (!confirmed1) return;
+
+        const confirmed2 = await conversationManager.customConfirm(
+            '请再次确认：你真的要清空所有数据并重置应用吗？建议你在操作前先执行一次“导出全部数据”进行备份。',
+            '最后的确认'
+        );
+
+        if (confirmed2) {
+            // 1. 清空 LocalStorage (文本数据)
+            localStorage.clear();
+            
+            // 2. 清空 IndexedDB (大文件数据库)
+            try {
+                const dbName = 'ImageBlobStore';
+                const deleteRequest = indexedDB.deleteDatabase(dbName);
+                
+                deleteRequest.onsuccess = () => {
+                    console.log("IndexedDB deleted successfully");
+                    alert('全量数据已清空，应用即将重启。');
+                    location.reload();
+                };
+                
+                deleteRequest.onerror = () => {
+                    console.error("Error deleting IndexedDB");
+                    alert('LocalStorage 已清空，但 IndexedDB 删除失败。应用将尝试重启。');
+                    location.reload();
+                };
+                
+                deleteRequest.onblocked = () => {
+                    console.warn("IndexedDB delete blocked");
+                    alert('LocalStorage 已清空，但由于数据库被占用，部分大文件可能未删除。应用将尝试重启。');
+                    location.reload();
+                };
+            } catch (e) {
+                console.error(e);
+                location.reload();
+            }
+        }
+    }
     // =========================================================================
     // ================= START: HYBRID BUBBLE RENDERING CACHE ==================
     // =========================================================================
@@ -31696,8 +31937,10 @@ const cloudBackupManager = (function() {
     document.addEventListener('DOMContentLoaded', () => {
          const exportBtn = document.getElementById('export-all-data-btn');
          const importBtn = document.getElementById('import-all-data-btn');
+         const resetBtn = document.getElementById('reset-entire-app-btn');
          if(exportBtn) exportBtn.addEventListener('click', exportAllData);
          if(importBtn) importBtn.addEventListener('click', importAllData);
+         if(resetBtn) resetBtn.addEventListener('click', resetEntireApp);
 
          // 【核心新增：Catbox 链接一键转换逻辑】
          const convertBtn = document.getElementById('convert-catbox-url-btn');
