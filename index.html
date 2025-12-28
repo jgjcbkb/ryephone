@@ -16244,18 +16244,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         const uPersona = userPersonas.find(p => p.name === name);
                         if (uPersona && uPersona.avatar) return uPersona.avatar;
 
-                        // 5. 特殊处理：如果是 {{user}}，尝试获取当前聊天绑定的用户人设头像
-                        if (name === '{{user}}') {
-                            const currentChatId = chatState.chatId;
-                            const info = loadFromLocalStorage(`chat_info_${currentChatId}`, {});
-                            if (info.userPersonaName && info.userPersonaName !== '无') {
-                                const p = userPersonas.find(persona => persona.name === info.userPersonaName);
-                                if (p && p.avatar) return p.avatar;
-                            }
-                            return myAvatar;
-                        }
-
-                        // 6. 兜底：默认头像
+                        // 5. 兜底：默认头像
                         return generateDefaultAvatar(name);
                     };
 
@@ -16698,20 +16687,11 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         const groupProtagonist = (groupInfo.groupPersonas || []).find(p => p.name === name);
                         if (groupProtagonist && groupProtagonist.avatar) return groupProtagonist.avatar;
 
-                        const uPersona = userPersonas.find(p => p.name === targetName);
-                    if (uPersona && uPersona.avatar) return uPersona.avatar;
+                        const uPersona = userPersonas.find(p => p.name === name);
+                        if (uPersona && uPersona.avatar) return uPersona.avatar;
 
-                    // 5. 特殊处理：如果是 {{user}}，尝试获取当前群聊绑定的用户人设头像
-                    if (targetName === '{{user}}') {
-                        if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
-                            const p = userPersonas.find(persona => persona.name === chatInfo.userPersonaName);
-                            if (p && p.avatar) return p.avatar;
-                        }
-                        return myAvatar;
-                    }
-
-                    return generateDefaultAvatar(targetName);
-                };
+                        return generateDefaultAvatar(name);
+                    };
 
                     let avatarUrlKey = contactInfo.avatarUrl;
 
