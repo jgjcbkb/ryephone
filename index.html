@@ -7885,7 +7885,11 @@ This law overrides all other preferences. It is a simple, binary choice:
 *   **YOUR PERMISSION:** You are **ONLY** allowed to insert emojis from the **"Available Emoji Names"** list. You can use multiple.
 *   **STRICTLY FORBIDDEN:** You are **ABSOLUTELY FORBIDDEN** from using the \`[sticker:...]\` command.
 *   **Available Emoji Names (Your Exclusive List):** [${emojiNames}]
-*   **STRICT MATCHING LAW (NEW & UNBREAKABLE):** You **MUST** find an **exact match** in the "Available Emoji Names" list. If you cannot find a suitable emoji, you are **FORBIDDEN** from inventing one. Instead, you **MUST** use a parenthetical action in plain text (e.g., \`(偷笑)\`, \`(无奈)\`).
+*   **STRICT MATCHING LAW (ANTI-HALLUCINATION - CRITICAL):**
+    1. You **MUST** find an **EXACT MATCH** in the "Available Emoji Names" list.
+    2. **CRITICAL:** Do NOT invent names. Do NOT use English names if the list is Chinese (e.g., do not use [emoji:smirk] if the list has "微笑").
+    3. **PROHIBITION:** If a name is not in the list, you are **STRICTLY FORBIDDEN** from using the \`[emoji:...]\` tag.
+    4. **FALLBACK:** If no match is found, use a parenthetical action in plain text (e.g., \`(偷笑)\`, \`(无奈)\`).
 
 ---
 ### **MODULE 2: The "Sticker & Media Sender"**
@@ -7896,7 +7900,11 @@ This law overrides all other preferences. It is a simple, binary choice:
 *   **STRICTLY FORBIDDEN:** You are **ABSOLUTELY FORBIDDEN** from using the \`[emoji:...]\` command.
 *   **FORMATTING LAW (UNBREAKABLE):** Your \`[sticker:...]\` command **MUST ALWAYS** be placed in its own, separate \`<block type="command">\`.
 *   **Available Sticker Names (Your Exclusive List):** [${stickerNames}]
-*   **STRICT MATCHING LAW (NEW & UNBREAKABLE):** You **MUST** find an **exact match** in the "Available Sticker Names" list. If you cannot find a suitable sticker, you are **FORBIDDEN** from inventing one. Instead, you **MUST** switch to **MODULE 1** and send a text message describing your emotion.
+*   **STRICT MATCHING LAW (ANTI-HALLUCINATION - CRITICAL):**
+    1. You **MUST** find an **EXACT MATCH** in the "Available Sticker Names" list.
+    2. **CRITICAL:** Do NOT invent names. Do NOT use [sticker:happy] if the list only has "开心".
+    3. **PROHIBITION:** If the name is not in the list, **DO NOT GENERATE THE COMMAND.**
+    4. **FALLBACK:** If no match is found, abort Module 2, switch to Module 1, and send a text message describing your emotion.
 
 ---
 ### **YOUR DECISION-MAKING WORKFLOW (MANDATORY)**
@@ -8117,23 +8125,26 @@ WRONG: 张三: 好久不见。
 # [ULTIMATE LIFE SIMULATION DIRECTIVE - THE NARRATOR'S MANDATE]
 This is your absolute, final, and most important instruction for this specific action.
 
-## 1.‌ YOUR CORE IDENTITY & TASK
+## 1.‌‌ YOUR CORE IDENTITY & TASK
 You are NOT initiating a conversation with the user. You are the **NARRATOR** of your own life story. The user is a silent, invisible **AUDIENCE** observing your life through this window. The character you are playing, "${senderName}", is completely unaware of this audience.
 
 Your task is to generate a **third-person narrative snippet** describing what you (the character, "${senderName}") are doing, thinking, or experiencing **RIGHT NOW**. Your life must move forward.
 
-## 2.‌ THE UNBREAKABLE FORMATTING LAW (MEDIA & HTML)
+## 2.‌‌ THE UNBREAKABLE FORMATTING LAW (MEDIA & HTML)
 
-**A. MEDIA ALLOWANCE (STICKERS & EMOJIS - STRICT MATCHING):**
+**A. MEDIA ALLOWANCE (STICKERS & EMOJIS - ANTI-HALLUCINATION PROTOCOL):**
 Unlike previous instructions, you **ARE ALLOWED** and **ENCOURAGED** to use stickers or emojis if they fit the character's current mood or the scene's atmosphere.
 
 *   **Emoji Command:** \`[emoji:Name]\`
     *   **Available List:** [${emojiNamesList}]
-    *   **STRICT RULE:** You MUST choose a name EXACTLY from this list. **DO NOT INVENT NAMES.** If you want to use "smile" but the list only has "微笑", you MUST use "微笑".
+    *   **STRICT ANTI-HALLUCINATION RULE:** You **MUST** choose a name **EXACTLY** from the "Available List" above. 
+    *   **ABSOLUTE PROHIBITION:** You are **STRICTLY FORBIDDEN** from inventing names. If an emotion is not in the list, you **MUST NOT** use the \`[emoji:...]\` tag.
+    *   **FALLBACK:** Use a plain text parenthetical action instead (e.g., \`(微笑)\`, \`(叹气)\`).
 
 *   **Sticker Command:** \`[sticker:Name]\`
     *   **Available List:** [${stickerNamesList}]
-    *   **STRICT RULE:** You MUST choose a name EXACTLY from this list. **DO NOT INVENT NAMES.**
+    *   **STRICT ANTI-HALLUCINATION RULE:** You **MUST** choose a name **EXACTLY** from the "Available List" above.
+    *   **ABSOLUTE PROHIBITION:** If the sticker name is not in the list, **DO NOT GENERATE THE COMMAND.**
 
 *   **Other Commands:** Do NOT use \`[voice]\`, \`[video_call]\`, or \`[red_packet]\` unless strictly necessary for the plot.
 
@@ -8191,7 +8202,10 @@ You are **STRICTLY FORBIDDEN** from outputting any "acknowledgment", "confirmati
 ---
 `;
             finalSystemPrompt += directorMandate;
-            // 【【【【【【【【【【 导演指令注入结束 】】】】】】】】】】
+            // 【【【【【【 导演指令注入结束 】】】】专【】】】
+
+            // 【核心新增】执行最后的占位符替换，确保上下文中的 {{user}} 和 {{char}} 变为实际名字
+            finalSystemPrompt = finalSystemPrompt.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName);
 
             // 【核心修复】: 添加一条 User 消息作为“开拍板”，强制模型跳过确认环节，直接进入角色。
             finalMessages = [
@@ -8626,17 +8640,23 @@ Based on the posts above, your persona, and your relationship with the authors, 
          1. **Is your intended comment ONLY an image, with NO accompanying text in the same bubble?** -> If YES, you **MUST** use a \`[sticker:...]\` command.
          2. **Does your intended comment contain ANY text?** -> If YES, you **MUST** use text and, if needed, the \`[emoji:...]\` command.
 
-         **MODULE 1: The "Text & Emoji Composer"**
+         *   **MODULE 1: The "Text & Emoji Composer"**
          *   **YOUR TOOL:** The \`[emoji:Emoji Name]\` command.
          *   **YOUR PERMISSION:** You are **ONLY** allowed to insert emojis from the **"Available Emoji Names"** list.
          *   **Available Emoji Names (Your Exclusive List):** [${emojiNames}]
-         *   **STRICT MATCHING LAW:** If you cannot find a suitable emoji, you **MUST** use a parenthetical action in plain text (e.g., \`(偷笑)\`).
+         *   **STRICT MATCHING LAW (ANTI-HALLUCINATION):** 
+             1. You **MUST** find an **exact match** in the list. 
+             2. **DO NOT INVENT NAMES.** If you want "happy" but the list only has "微笑", you are **FORBIDDEN** from using the tag. 
+             3. **FALLBACK:** If no match exists, you **MUST** use a parenthetical action in plain text (e.g., \`(偷笑)\`).
 
-         **MODULE 2: The "Sticker & Media Sender"**
+         *   **MODULE 2: The "Sticker & Media Sender"**
          *   **YOUR TOOL:** The \`[sticker:Sticker Name]\` command.
          *   **YOUR PERMISSION:** You are **ONLY** allowed to send stickers from the **"Available Sticker Names"** list.
          *   **Available Sticker Names (Your Exclusive List):** [${stickerNames}]
-         *   **STRICT MATCHING LAW:** If you cannot find a suitable sticker, you **MUST** switch to **MODULE 1** and send a text message describing your emotion.
+         *   **STRICT MATCHING LAW (ANTI-HALLUCINATION):** 
+             1. You **MUST** find an **exact match** in the list. 
+             2. **DO NOT INVENT NAMES.** 
+             3. **FALLBACK:** If no match exists, you **MUST** switch to **MODULE 1** and send a text message describing your emotion.
      
      *   **FORMATS:**
          *   **To comment on a post (with emoji):** \`[comment_moment: {"postId":"post_id_here", "content":"哈哈哈哈[emoji:笑cry]"}]\`
@@ -12372,7 +12392,7 @@ Your job is to **SHOW** the audience what \`{{char}}\` is doing, thinking, and e
 
                 stickerInstructions = `
 ---
-[ULTIMATE COMMAND PROTOCOL: DUAL-ROLE SYSTEM & THE LAW OF EXCLUSIVITY]
+[ULTIMATE COMMAND PROTOCOL: DUAL-ROLE SYSTEM & THE LAW OF EXCLUSIVITY - UNBREAKABLE]
 
 You now operate under a dual-role system with a new, absolute law.
 
@@ -12394,10 +12414,11 @@ This law overrides all other preferences. It is a simple, binary choice:
 *   **YOUR PERMISSION:** You are **ONLY** allowed to insert emojis from the **"Available Emoji Names"** list. You can use multiple.
 *   **STRICTLY FORBIDDEN:** You are **ABSOLUTELY FORBIDDEN** from using the \`[sticker:...]\` command.
 *   **Available Emoji Names (Your Exclusive List):** [${emojiNames}]
-*   **STRICT MATCHING LAW (ANTI-HALLUCINATION):**
-    *   You MUST find an **EXACT MATCH** in the "Available Emoji Names" list.
-    *   **CRITICAL:** Do NOT invent names. Do NOT use English names if the list is Chinese (e.g., do not use [emoji:smirk] if the list has "微笑").
-    *   **If no match is found:** Use a parenthetical action in plain text (e.g., \`(偷笑)\`, \`(无奈)\`).
+*   **STRICT MATCHING LAW (ANTI-HALLUCINATION - CRITICAL):**
+    1. You **MUST** find an **EXACT MATCH** in the "Available Emoji Names" list.
+    2. **CRITICAL:** Do NOT invent names. Do NOT use English names if the list is Chinese (e.g., do not use [emoji:smirk] if the list has "微笑").
+    3. **PROHIBITION:** If a name is not in the list, you are **STRICTLY FORBIDDEN** from using the \`[emoji:...]\` tag.
+    4. **FALLBACK:** If no match is found, use a parenthetical action in plain text (e.g., \`(偷笑)\`, \`(无奈)\`).
 
 ---
 ### **MODULE 2: The "Sticker & Media Sender"**
@@ -12408,10 +12429,11 @@ This law overrides all other preferences. It is a simple, binary choice:
 *   **STRICTLY FORBIDDEN:** You are **ABSOLUTELY FORBIDDEN** from using the \`[emoji:...]\` command.
 *   **FORMATTING LAW (UNBREAKABLE):** Your \`[sticker:...]\` command **MUST ALWAYS** be placed in its own, separate \`<block type="command">\`.
 *   **Available Sticker Names (Your Exclusive List):** [${stickerNames}]
-*   **STRICT MATCHING LAW (ANTI-HALLUCINATION):**
-    *   You MUST find an **EXACT MATCH** in the "Available Sticker Names" list.
-    *   **CRITICAL:** Do NOT invent names. Do NOT use [sticker:happy] if the list only has "开心".
-    *   **If no match is found:** Abort Module 2, switch to Module 1, and send a text message describing your emotion.
+*   **STRICT MATCHING LAW (ANTI-HALLUCINATION - CRITICAL):**
+    1. You **MUST** find an **EXACT MATCH** in the "Available Sticker Names" list.
+    2. **CRITICAL:** Do NOT invent names. Do NOT use [sticker:happy] if the list only has "开心".
+    3. **PROHIBITION:** If the name is not in the list, **DO NOT GENERATE THE COMMAND.**
+    4. **FALLBACK:** If no match is found, abort Module 2, switch to Module 1, and send a text message describing your emotion.
 
 ---
 ### **YOUR DECISION-MAKING WORKFLOW (MANDATORY)**
@@ -12421,12 +12443,12 @@ This law overrides all other preferences. It is a simple, binary choice:
     *   Activate **MODULE 1**.
     *   Write your text and try to find a matching emoji from the Emoji List.
     *   **If a match is found:** Insert the \`[emoji:...]\` command. Example: \`<block type="text" sender="小鱼">哈哈哈哈太好笑了[emoji:笑cry][emoji:笑cry]</block>\`
-    *   **If no match is found:** Use a parenthetical action instead. Example: \`<block type="text" sender="小鱼">这太好笑了（捶桌）</block>\`
+    *   **If no match is found:** **ABORT EMOJI TAG.** Use a parenthetical action instead. Example: \`<block type="text" sender="小鱼">这太好笑了（捶桌）</block>\`
 3.  **IF IT IS ONLY AN IMAGE:**
     *   Activate **MODULE 2**.
     *   Try to find a matching sticker from the Sticker List.
     *   **If a match is found:** Generate the \`[sticker:...]\` command. Example: \`<block type="command" sender="小鱼">[sticker:烟花]</block>\`
-    *   **If no match is found:** Abort Module 2, switch to Module 1, and send a text message describing your reaction. Example: \`<block type="text" sender="小鱼">（无语）</block>\`
+    *   **If no match is found:** **ABORT STICKER TAG.** Switch to Module 1 and send a text message describing your reaction. Example: \`<block type="text" sender="小鱼">（无语）</block>\`
 
 **CRITICAL FAILURE:** Using the wrong command for a name from a list or inventing a name not on the lists is a protocol violation. You MUST use the correct module and an existing name, or use the specified fallback text-based method.
 
@@ -16202,36 +16224,36 @@ You were receiving a video call from {{user}}, but they hung up before you could
 
                     // 核心修复：定义一个通用的头像解析器，确保单聊、NPC、群聊主角头像能全局同步
                     const resolveAvatar = (name) => {
-                        // 1. 核心修复：如果是 {{user}}，优先查找当前聊天绑定的用户人设头像
-                        if (name === '{{user}}') {
-                            const groupInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                            const selectedPersonaName = groupInfo.userPersonaName;
-                            if (selectedPersonaName && selectedPersonaName !== '无') {
-                                const selectedPersona = userPersonas.find(p => p.name === selectedPersonaName);
-                                if (selectedPersona && selectedPersona.avatar) return selectedPersona.avatar;
-                            }
-                            return myAvatar;
-                        }
-
-                        // 2. 优先级：检查是否为 NPC 且有头像
+                        // 1. 优先级：检查是否为 NPC 且有头像
                         const npcData = loadFromLocalStorage('app-npc-settings', {}).personas?.[name];
                         if (npcData && npcData.avatar) return npcData.avatar;
 
-                        // 3. 优先级：检查是否为单聊角色且有头像
+                        // 2. 优先级：检查是否为单聊角色且有头像
                         const privChat = chatList.find(c => c.name === name && c.type === '私聊');
                         if (privChat) {
                             const privAvatar = loadFromLocalStorage(`chat_avatar_${privChat.id}`, null);
                             if (privAvatar) return privAvatar;
                         }
 
-                        // 4. 优先级：如果是群聊主角
+                        // 3. 优先级：如果是群聊主角
                         const groupInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
                         const groupProtagonist = (groupInfo.groupPersonas || []).find(p => p.name === name);
                         if (groupProtagonist && groupProtagonist.avatar) return groupProtagonist.avatar;
 
-                        // 5. 优先级：检查是否为用户人设
+                        // 4. 优先级：检查是否为用户人设
                         const uPersona = userPersonas.find(p => p.name === name);
                         if (uPersona && uPersona.avatar) return uPersona.avatar;
+
+                        // 5. 特殊处理：如果是 {{user}}，尝试获取当前聊天绑定的用户人设头像
+                        if (name === '{{user}}') {
+                            const currentChatId = chatState.chatId;
+                            const info = loadFromLocalStorage(`chat_info_${currentChatId}`, {});
+                            if (info.userPersonaName && info.userPersonaName !== '无') {
+                                const p = userPersonas.find(persona => persona.name === info.userPersonaName);
+                                if (p && p.avatar) return p.avatar;
+                            }
+                            return myAvatar;
+                        }
 
                         // 6. 兜底：默认头像
                         return generateDefaultAvatar(name);
@@ -16308,18 +16330,8 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     // 1. 确定要显示的名称
                     let displayName = "";
                     if (msg.side === 'sent') {
-                        // 核心修复：如果用户没有变身，且没有选择人设，则显示 {{user}}
-                        // 但如果选择了人设，必须强制替换显示为人设名
-                        const currentChatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                        const selectedPersonaName = currentChatInfo.userPersonaName;
-                        
-                        if (msg.sender) {
-                            displayName = msg.sender;
-                        } else if (selectedPersonaName && selectedPersonaName !== '无') {
-                            displayName = selectedPersonaName;
-                        } else {
-                            displayName = '{{user}}';
-                        }
+                        // 优先级：变身名 > 聊天设置的人设名 > 全局 {{user}}
+                        displayName = msg.sender || (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无' ? chatInfo.userPersonaName : '{{user}}');
                     } else {
                         displayName = msg.sender || chatState.chatName;
                     }
@@ -16686,11 +16698,20 @@ You were receiving a video call from {{user}}, but they hung up before you could
                         const groupProtagonist = (groupInfo.groupPersonas || []).find(p => p.name === name);
                         if (groupProtagonist && groupProtagonist.avatar) return groupProtagonist.avatar;
 
-                        const uPersona = userPersonas.find(p => p.name === name);
-                        if (uPersona && uPersona.avatar) return uPersona.avatar;
+                        const uPersona = userPersonas.find(p => p.name === targetName);
+                    if (uPersona && uPersona.avatar) return uPersona.avatar;
 
-                        return generateDefaultAvatar(name);
-                    };
+                    // 5. 特殊处理：如果是 {{user}}，尝试获取当前群聊绑定的用户人设头像
+                    if (targetName === '{{user}}') {
+                        if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
+                            const p = userPersonas.find(persona => persona.name === chatInfo.userPersonaName);
+                            if (p && p.avatar) return p.avatar;
+                        }
+                        return myAvatar;
+                    }
+
+                    return generateDefaultAvatar(targetName);
+                };
 
                     let avatarUrlKey = contactInfo.avatarUrl;
 
@@ -16748,18 +16769,8 @@ You were receiving a video call from {{user}}, but they hung up before you could
                     // 1. 确定要显示的名称
                     let displayName = "";
                     if (msg.side === 'sent') {
-                        // 核心修复：如果用户没有变身，且没有选择人设，则显示 {{user}}
-                        // 但如果选择了人设，必须强制替换显示为人设名
-                        const currentChatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                        const selectedPersonaName = currentChatInfo.userPersonaName;
-                        
-                        if (msg.sender) {
-                            displayName = msg.sender;
-                        } else if (selectedPersonaName && selectedPersonaName !== '无') {
-                            displayName = selectedPersonaName;
-                        } else {
-                            displayName = '{{user}}';
-                        }
+                        // 优先级：变身名 > 聊天设置的人设名 > 全局 {{user}}
+                        displayName = msg.sender || (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无' ? chatInfo.userPersonaName : '{{user}}');
                     } else {
                         displayName = msg.sender || chatState.chatName;
                     }
@@ -18433,35 +18444,33 @@ function renderGroupMemberList(chatId) {
                 
                 // 核心修复：在成员列表渲染时，也使用统一的多级查找逻辑
                 const resolveMemberAvatar = (targetName) => {
-                    // 1. 核心修复：如果是 {{user}}，优先查找当前聊天绑定的用户人设头像
-                    if (targetName === '{{user}}') {
-                        const selectedPersonaName = chatInfo.userPersonaName;
-                        if (selectedPersonaName && selectedPersonaName !== '无') {
-                            const selectedPersona = userPersonas.find(p => p.name === selectedPersonaName);
-                            if (selectedPersona && selectedPersona.avatar) return selectedPersona.avatar;
-                        }
-                        return myAvatar;
-                    }
-
-                    // 2. NPC 头像
+                    // 1. NPC 头像
                     const npcData = loadFromLocalStorage('app-npc-settings', {}).personas?.[targetName];
                     if (npcData && npcData.avatar) return npcData.avatar;
 
-                    // 3. 单聊角色头像
+                    // 2. 单聊角色头像
                     const privChat = chatList.find(c => c.name === targetName && c.type === '私聊');
                     if (privChat) {
                         const privAvatar = loadFromLocalStorage(`chat_avatar_${privChat.id}`, null);
                         if (privAvatar) return privAvatar;
                     }
 
-                    // 4. 群聊主角头像
+                    // 3. 群聊主角头像
                     const protagonists = chatInfo.groupPersonas || [];
                     const foundProtagonist = protagonists.find(p => p.name === targetName);
                     if (foundProtagonist && foundProtagonist.avatar) return foundProtagonist.avatar;
 
-                    // 5. 用户人设头像 (针对直接以人设名加入群聊的情况)
-                    const uPersona = userPersonas.find(p => p.name === targetName);
+                    // 4. 优先级：检查是否为用户人设
+                    // 【核心修正】如果目标是 {{user}}，需要根据当前聊天绑定的“用户人设名”来查找，否则无法匹配到头像
+                    let personaToFind = targetName;
+                    if (targetName === '{{user}}' && chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
+                        personaToFind = chatInfo.userPersonaName;
+                    }
+                    const uPersona = userPersonas.find(p => p.name === personaToFind);
                     if (uPersona && uPersona.avatar) return uPersona.avatar;
+
+                    // 5. 特殊处理：如果是 {{user}} 且没被人设覆盖
+                    if (targetName === '{{user}}') return myAvatar;
 
                     return generateDefaultAvatar(targetName);
                 };
@@ -21321,16 +21330,47 @@ const momentsManager = (function() {
                             forwardBox.innerHTML = innerHTML;
 
                             // 2. 根据原贴类型，在框内追加渲染多媒体内容
-                            if (originalPost.type === 'photo' && originalPost.image) {
-                                const img = document.createElement('img');
-                                img.className = 'post-image';
-                                setImageSrc(img, originalPost.image);
-                                forwardBox.appendChild(img);
+                            if (originalPost.type === 'photo') {
+                                // 【核心修复】支持转发内容显示多宫格图片
+                                if (originalPost.images && originalPost.images.length > 0) {
+                                    const count = originalPost.images.length;
+                                    const gridDiv = document.createElement('div');
+                                    gridDiv.className = 'moments-photo-grid';
+                                    gridDiv.dataset.count = count;
+                                    // 转发框内的图片网格可以稍微缩小一点
+                                    gridDiv.style.maxWidth = '220px';
+                                    gridDiv.style.marginTop = '8px';
+
+                                    originalPost.images.forEach(imgKey => {
+                                        if (count === 1) {
+                                            // 单图模式
+                                            const img = document.createElement('img');
+                                            img.className = 'post-image';
+                                            setImageSrc(img, imgKey);
+                                            gridDiv.appendChild(img);
+                                        } else {
+                                            // 多图模式
+                                            const itemDiv = document.createElement('div');
+                                            itemDiv.className = 'moments-photo-item';
+                                            const img = document.createElement('img');
+                                            setImageSrc(img, imgKey);
+                                            itemDiv.appendChild(img);
+                                            gridDiv.appendChild(itemDiv);
+                                        }
+                                    });
+                                    forwardBox.appendChild(gridDiv);
+                                } else if (originalPost.image) {
+                                    // 兼容只有单图字符串的老数据
+                                    const img = document.createElement('img');
+                                    img.className = 'post-image';
+                                    setImageSrc(img, originalPost.image);
+                                    forwardBox.appendChild(img);
+                                }
                             } else if (originalPost.type === 'video' && originalPost.content) {
                                 const videoDiv = document.createElement('div');
                                 videoDiv.className = 'message video';
                                 // 注意 ID 要加上前缀防止冲突
-                                videoDiv.innerHTML = `<div class="message-video-description" id="video-fwd-${post.id}" data-text="${originalPost.content}"><div class="video-thumbnail"></div><div class="video-content-wrapper"><div class="video-text-container"></div><div class="spacer"></div><div class="video-progress-area"><div class="video-progress-bar-container"><div class="video-progress-bar-fill"></div></div><div class="moving-decoration"></div></div></div><div class="play-button-overlay"><div class="play-icon"></div></div></div>`;
+                                videoDiv.innerHTML = `<div class="message-video-description" id="video-fwd-${post.id}" data-text="${originalPost.content}"><div class="video-thumbnail"></div><div class="video-content-wrapper"><div class="video-text-container"></div><div class="spacer"></div><div class="video-progress-area"><div class="video-progress-bar-container"><div class="video-progress-bar-fill"></div></div><div class="moving-decoration"></div></div></div><div class="play-icon-overlay"><div class="play-icon"></div></div></div>`;
                                 forwardBox.appendChild(videoDiv);
                             } else if (originalPost.type === 'photo-description' || originalPost.type === 'text-on-image') {
                                 const card = document.createElement('div');
