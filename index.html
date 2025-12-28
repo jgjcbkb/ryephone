@@ -312,6 +312,23 @@
         font-size: 12px;
         color: #dc2626;
     }
+
+    /* 【核心新增】编辑器专用深色文本框 */
+    .regex-input-code-area {
+        font-family: 'SF Mono', 'Fira Code', monospace !important;
+        background: #282c34 !important;
+        color: #61afef !important;
+        border: 1px solid #181a1f !important;
+        border-radius: 0 0 12px 12px !important;
+        padding: 15px !important;
+        line-height: 1.5 !important;
+        min-height: 120px !important;
+        resize: vertical;
+    }
+    .regex-input-code-area::placeholder {
+        color: #5c6370 !important;
+        opacity: 0.6;
+    }
     .api-profile-item { border: 2px solid var(--light-gray); padding: 15px; border-radius: 8px; display: flex; }
     .api-profile-item.active { border-color: #4cd964; }
     
@@ -6493,34 +6510,68 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                         <div class="form-section">
                             <h3>正则替换规则</h3>
                             <div id="regex-list"></div>
-                             <h4 style="text-align: center; color: var(--primary-text); font-size: 1.1em; margin-top: 20px;" id="regex-form-title">添加新规则</h4>
-                            <div class="form-group"><label for="regex-name">规则名称</label><input type="text" id="regex-name" placeholder="唯一的标识名称，如：Markdown加粗"></div>
-                            <div class="form-group"><label for="regex-pattern">正则表达式 (Pattern)</label><input type="text" id="regex-pattern" placeholder="例如：\*\*([^*]+)\*\*"></div>
-                            <div class="form-group"><label for="regex-flags">标志 (Flags)</label><input type="text" id="regex-flags" placeholder="例如：g" value="g"></div>
-                            <div class="form-group">
-                            <label for="regex-template">替换模板 (Template)</label>
-                            <textarea id="regex-template" placeholder="例如：<b>$1</b>"></textarea>
-                            <p class="form-hint">
-                                <b>性能警告:</b> 请谨慎使用 <code>backdrop-filter: blur()</code> 和带有 <code>rgba()</code> 透明度的 <code>background</code>。在长列表中大量使用会导致严重的滚动卡顿。
-                                <br><br>
-                                <b style="color: #dc3545;">布局警告 (必读):</b> 如果你的模板HTML代码里有很多换行和空格，它在聊天气泡里会产生<b>巨大空白</b>！这是因为聊天气泡有“保留换行符”的诅咒。
-                                <br>
-                                <b>解决方法：</b>在你模板最外层的 <code>&lt;div&gt;</code> 的 <code>style</code> 属性里，加上 <code>white-space: normal;</code> 来破除诅咒。
-                                <br>
-                                <b>示例:</b> <code>style="white-space: normal; background: red;"</code>
-                            </p>
-                        </div>
-                            <div class="form-group-toggle">
-                            <label for="regex-enabled" class="toggle-label">启用此规则</label>
-                            <label class="switch">
-                                <input type="checkbox" id="regex-enabled" checked>
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                            <div class="form-buttons-spaced">
-                                <button id="regex-add-btn" class="btn-primary">添加规则</button>
-                                <button id="regex-cancel-btn" class="btn-primary btn-secondary" style="display: none;">取消编辑</button>
+                             <!-- 【核心重构】正则规则编辑器区域 -->
+                        <div class="form-section" style="border: 1px dashed #d1d1d6; background: #fafafa; padding: 0; overflow: hidden;">
+                            <div style="background: #f0f0f2; padding: 12px 16px; border-bottom: 1px solid #e5e5ea;">
+                                <h4 style="margin: 0; color: #333; font-size: 15px;" id="regex-form-title">✨ 创建新正则规则</h4>
                             </div>
+
+                            <div style="padding: 16px;">
+                                <!-- 第一行：名称与标志并排 -->
+                                <div style="display: flex; gap: 12px; margin-bottom: 15px;">
+                                    <div style="flex: 3;">
+                                        <label style="display: block; font-size: 13px; color: #666; margin-bottom: 6px;">规则名称</label>
+                                        <input type="text" id="regex-name" placeholder="名称 (如: 字体加粗)" style="background: white;">
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <label style="display: block; font-size: 13px; color: #666; margin-bottom: 6px;">标志</label>
+                                        <input type="text" id="regex-flags" value="g" placeholder="g" style="background: white; text-align: center; font-family: monospace;">
+                                    </div>
+                                </div>
+
+                                <!-- 第二行：匹配模式 -->
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: block; font-size: 13px; color: #666; margin-bottom: 6px;">匹配模式 (Regex Pattern)</label>
+                                    <input type="text" id="regex-pattern" placeholder="例如: \*\*([^*]+)\*\*" style="background: white; font-family: monospace; color: #dc2626;">
+                                </div>
+
+                                <!-- 第三行：替换模板 (模拟编辑器) -->
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: block; font-size: 13px; color: #666; margin-bottom: 6px;">替换模板 (HTML Template)</label>
+                                    <div class="regex-code-header" style="background: #21252b; border-radius: 12px 12px 0 0;">
+                                        <div class="regex-dot red"></div>
+                                        <div class="regex-dot yellow"></div>
+                                        <div class="regex-dot green"></div>
+                                        <div class="regex-label-text">HTML_EDITOR</div>
+                                    </div>
+                                    <textarea id="regex-template" class="regex-input-code-area" placeholder="在此输入 HTML 代码，例如: <b style='white-space:normal;'>$1</b>"></textarea>
+                                    
+                                    <div style="background: #fffbe6; border: 1px solid #ffe58f; border-radius: 8px; padding: 12px; margin-top: 10px;">
+                                        <p style="margin: 0; font-size: 12px; color: #856404; line-height: 1.6;">
+                                            <b>排版技巧：</b>请务必在模板最外层标签加上 <code>white-space: normal;</code> 属性，否则生成的卡片会出现大面积空白。
+                                            <br><br>
+                                            <b style="color: #dc3545;">性能警告：</b>请谨慎使用 <code>backdrop-filter: blur()</code> 和带有 <code>rgba()</code> 透明度的 <code>background</code>。在长列表中大量使用会导致严重的滚动卡顿。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- 第四行：开关与按钮 (修正版) -->
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+                                    <div style="display: flex; align-items: center; gap: 12px;">
+                                        <span style="font-size: 14px; color: #333; font-weight: 500;">启用此规则</span>
+                                        <label class="switch">
+                                            <input type="checkbox" id="regex-enabled" checked>
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    
+                                    <div style="display: flex; gap: 10px;">
+                                        <button id="regex-cancel-btn" class="modal-button secondary" style="display: none; padding: 8px 15px; margin: 0; width: auto; height: 38px; line-height: 1;">取消</button>
+                                        <button id="regex-add-btn" class="modal-button primary" style="padding: 8px 20px; margin: 0; width: auto; height: 38px; line-height: 1;">添加规则</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                             <input type="hidden" id="regex-edit-index">
                             
                             <!-- START: 新增导出/导入按钮 -->
