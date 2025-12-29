@@ -45,6 +45,28 @@
         --accent-green: #60d881; 
         --red-packet-color: #fa5151; /* 红色 */
     }
+
+    /* 新增：点击复制按钮样式 */
+    .copy-btn {
+        background-color: #f0f0f0;
+        color: #555;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        line-height: 1;
+    }
+    .copy-btn:hover {
+        background-color: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+    }
+    .copy-btn:active {
+        transform: scale(0.95);
+    }
     
     html, body { 
         margin: 0; padding: 0; background-color: #f0f2f5; 
@@ -5759,7 +5781,13 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                         <div class="form-group"><label for="worldbook-category">分类 (Category)</label><input type="text" id="worldbook-category" placeholder="例如：人物、地理、酒馆导入"></div>
                         <div class="form-group"><label for="worldbook-name">名称 (Name)</label><input type="text" id="worldbook-name" placeholder="唯一的标识名称"></div>
                         <div class="form-group"><label for="worldbook-keywords">关键词 (Keywords)</label><input type="text" id="worldbook-keywords" placeholder="用逗号或空格分隔"></div>
-                        <div class="form-group"><label for="worldbook-content">值 (Value)</label><textarea id="worldbook-content"></textarea></div>
+                        <div class="form-group">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <label for="worldbook-content" style="margin-bottom: 0;">值 (Value)</label>
+        <button class="copy-btn" onclick="copyToClipboard('worldbook-content')">复制内容</button>
+    </div>
+    <textarea id="worldbook-content"></textarea>
+</div>
                         <div class="form-group">
                             <div class="form-control-group">
                                 <label class="inline-label"><input type="checkbox" id="worldbook-enabled" checked>启用此词条</label>
@@ -5813,7 +5841,13 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     <div id="custom-model-tags" style="display: none; flex-wrap: wrap; gap: 8px; margin-top: 8px;"></div>
 </div>
 
-<div class="form-group"><label for="system-prompt">系统提示</label><textarea id="system-prompt"></textarea></div>
+<div class="form-group">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <label for="system-prompt" style="margin-bottom: 0;">系统提示</label>
+        <button class="copy-btn" onclick="copyToClipboard('system-prompt')">复制内容</button>
+    </div>
+    <textarea id="system-prompt"></textarea>
+</div>
                         
                         <div class="form-group">
                             <label for="api-temperature">API 温度 (Temperature)</label>
@@ -6222,9 +6256,11 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                         <div class="form-section">
                             <!-- 这是您原来就有的前情提要输入框 -->
 <div class="form-group">
-    <label for="chat-preamble">前情提要 (Preamble)</label>
-    <textarea id="chat-preamble" placeholder="为本次对话设定特定的开场背景或情景..."></textarea>
-    <!-- 下面的 <p> 标签也是您原来就有的 -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <label for="chat-preamble" style="margin-bottom: 0;">前情提要 (Preamble)</label>
+        <button class="copy-btn" onclick="copyToClipboard('chat-preamble')">复制内容</button>
+    </div>
+    <textarea id="chat-preamble" placeholder="为本次对话设定特定的开场背景 or 情景..."></textarea>
     <p class="form-hint">这段内容会作为最高优先级，附加在主系统提示之前，用于设定单次对话的特定场景或背景。</p>
 </div>
 
@@ -6237,10 +6273,14 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                             
                             <!-- ******** 新增的聊天总结模块从这里开始 ******** -->
                             <div class="form-section" id="chat-summary-section">
-                                <h3>聊天总结</h3>
-                                <div class="form-group">
-                                    <textarea id="chat-summary-content" readonly placeholder="还没有生成总结..." style="min-height: 120px; background-color: #f0f0f0;"></textarea>
-                                </div>
+    <h3>聊天总结</h3>
+    <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label for="chat-summary-content" style="margin-bottom: 0; font-size: 14px; color: #666;">自动生成的剧情梗概</label>
+            <button class="copy-btn" onclick="copyToClipboard('chat-summary-content')">复制总结</button>
+        </div>
+        <textarea id="chat-summary-content" readonly placeholder="还没有生成总结..." style="min-height: 120px; background-color: #f0f0f0;"></textarea>
+    </div>
                                 <div class="form-group" style="flex-direction: row; gap: 10px; padding-bottom: 15px;">
                                     <button id="generate-summary-btn" class="modal-button primary" style="margin: 0;">生成/更新总结</button>
                                     <button id="save-summary-btn" class="modal-button primary" style="margin: 0; display: none;">保存</button>
@@ -6254,20 +6294,26 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 <select id="chat-user-persona-select"></select>
                             </div>
                             <div class="form-group">
-                                <label for="my-persona">补充人设 (Supplementary Persona)</label>
-                                <textarea id="my-persona" placeholder="输入在此对话中的临时或补充设定..."></textarea>
-                                <p class="form-hint">此处内容会附加在所选主人设之后。</p>
-                            </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <label for="my-persona" style="margin-bottom: 0;">补充人设 (Supplementary Persona)</label>
+        <button class="copy-btn" onclick="copyToClipboard('my-persona')">复制人设</button>
+    </div>
+    <textarea id="my-persona" placeholder="输入在此对话中的临时或补充设定..."></textarea>
+    <p class="form-hint">此处内容会附加在所选主人设之后。</p>
+</div>
                         </div>
                         <!-- END: 全局通用人设与背景设置 -->
 
                         <!-- START: 单聊专属AI人设 -->
                         <div id="chat-info-single" class="form-section">
-                            <div class="form-group">
-                                <label for="ai-persona">对方人设 ({{char}} Persona)</label>
-                                <textarea id="ai-persona" placeholder="输入对方的角色设定..."></textarea>
-                            </div>
-                        </div>
+    <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label for="ai-persona" style="margin-bottom: 0;">对方人设 ({{char}} Persona)</label>
+            <button class="copy-btn" onclick="copyToClipboard('ai-persona')">复制人设</button>
+        </div>
+        <textarea id="ai-persona" placeholder="输入对方的角色设定..."></textarea>
+    </div>
+</div>
                         <!-- END: 单聊专属AI人设 -->
                         
                         <div id="chat-info-group" class="form-section hidden">
@@ -6282,8 +6328,11 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                             
                             <!-- 【【【核心新增代码从这里开始】】】 -->
                             <div class="form-group" style="padding: 15px;">
-                                <label for="group-ensemble-persona">群演人设 (Ensemble Persona)</label>
-                                <textarea id="group-ensemble-persona" placeholder="在此处一次性定义多个角色的性格，例如：\n张三：性格火爆，有话直说。\n李四：沉默寡言，善于观察。"></textarea>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <label for="group-ensemble-persona" style="margin-bottom: 0;">群演人设 (Ensemble Persona)</label>
+        <button class="copy-btn" onclick="copyToClipboard('group-ensemble-persona')">复制人设</button>
+    </div>
+    <textarea id="group-ensemble-persona" placeholder="在此处一次性定义多个角色的性格，例如：\n张三：性格火爆，有话直说。\n李四：沉默寡言，善于观察。"></textarea>
                                 <p class="form-hint">此处填写的人设将与“群聊主角”的人设合并，供AI扮演。备注中列出的名字，如果在这里定义了，AI就会使用这里的性格。</p>
                             </div>
                             <!-- 【【【核心新增代码到这里结束】】】 -->
@@ -6508,9 +6557,11 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 </div>
                             </div>
                             <div class="form-group">
-<!-- ... -->
-                                <label for="global-custom-css-editor">CSS 代码编辑器</label>
-                                <textarea id="global-custom-css-editor" placeholder="在此处编辑或输入新的CSS代码..."></textarea>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <label for="global-custom-css-editor" style="margin-bottom: 0;">CSS 代码编辑器</label>
+        <button class="copy-btn" onclick="copyToClipboard('global-custom-css-editor')">复制 CSS</button>
+    </div>
+    <textarea id="global-custom-css-editor" placeholder="在此处编辑或输入新的CSS代码..."></textarea>
                                 <p class="form-hint">从上方选择一个片段以编辑，或直接输入新代码后点击“保存”。</p>
                             </div>
                        </div>
@@ -6546,14 +6597,17 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 
                                 <!-- 第三行：替换模板 (模拟编辑器) -->
                                 <div style="margin-bottom: 15px;">
-                                    <label style="display: block; font-size: 13px; color: #666; margin-bottom: 6px;">替换模板 (HTML Template)</label>
-                                    <div class="regex-code-header" style="background: #21252b; border-radius: 12px 12px 0 0;">
-                                        <div class="regex-dot red"></div>
-                                        <div class="regex-dot yellow"></div>
-                                        <div class="regex-dot green"></div>
-                                        <div class="regex-label-text">HTML_EDITOR</div>
-                                    </div>
-                                    <textarea id="regex-template" class="regex-input-code-area" placeholder="在此输入 HTML 代码，例如: <b style='white-space:normal;'>$1</b>"></textarea>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <label style="display: block; font-size: 13px; color: #666; margin-bottom: 0;">替换模板 (HTML Template)</label>
+        <button class="copy-btn" onclick="copyToClipboard('regex-template')">复制代码</button>
+    </div>
+    <div class="regex-code-header" style="background: #21252b; border-radius: 12px 12px 0 0;">
+        <div class="regex-dot red"></div>
+        <div class="regex-dot yellow"></div>
+        <div class="regex-dot green"></div>
+        <div class="regex-label-text">HTML_EDITOR</div>
+    </div>
+    <textarea id="regex-template" class="regex-input-code-area" placeholder="在此输入 HTML 代码，例如: <b style='white-space:normal;'>$1</b>"></textarea>
                                     
                                     <div style="background: #fffbe6; border: 1px solid #ffe58f; border-radius: 8px; padding: 12px; margin-top: 10px;">
                                         <p style="margin: 0; font-size: 12px; color: #856404; line-height: 1.6;">
@@ -6959,7 +7013,13 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 <input type="hidden" id="user-persona-avatar-url">
                             </div>
                             <!-- !!!!!!!!!! 新增的头像设置区域到这里结束 !!!!!!!!!! -->
-                            <div class="form-group"><label for="user-persona-description">人设描述 (Persona)</label><textarea id="user-persona-description" placeholder="详细描述这个身份的性格、背景、说话方式等..."></textarea></div>
+                            <div class="form-group">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <label for="user-persona-description" style="margin-bottom: 0;">人设描述 (Persona)</label>
+        <button class="copy-btn" onclick="copyToClipboard('user-persona-description')">复制人设</button>
+    </div>
+    <textarea id="user-persona-description" placeholder="详细描述这个身份的性格、背景、说话方式等..."></textarea>
+</div>
                             <div class="form-buttons-spaced">
                                 <button id="user-persona-add-btn" class="btn-primary">添加人设</button>
                                 <button id="user-persona-cancel-btn" class="btn-primary btn-secondary" style="display: none;">取消编辑</button>
@@ -7057,11 +7117,46 @@ if ('serviceWorker' in navigator) {
 
 (function() {
     'use strict';
-    // ... 原有的代码 ...
-    
+
     // =================================================================================
     // Global Helper Functions
     // =================================================================================
+
+    // 新增：通用复制到剪贴板函数
+    window.copyToClipboard = function(elementId) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+
+        const textToCopy = element.value || element.innerText || "";
+        if (!textToCopy.trim()) {
+            alert("内容为空，无法复制。");
+            return;
+        }
+
+        const textArea = document.createElement("textarea");
+        textArea.value = textToCopy;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        textArea.style.top = "0";
+        document.body.appendChild(textArea);
+        
+        textArea.focus();
+        textArea.select();
+        textArea.setSelectionRange(0, 99999);
+        
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                alert('已成功复制到剪贴板！');
+            } else {
+                alert('复制失败，请重试');
+            }
+        } catch (err) {
+            alert('浏览器不支持自动复制');
+        }
+        
+        document.body.removeChild(textArea);
+    };
     
     function sanitizeFilename(name) {
         if (typeof name !== 'string') return 'download';
@@ -21566,8 +21661,17 @@ async function showGroupPersonaEditor(persona = {}, isEditing = false) {
             // --- 2. 修改form数组，并将头像HTML作为纯html注入 ---
             html: avatarHtml,
             form: [
-                { id: 'group-persona-name', label: '角色名', value: persona.name || '' },
-                { id: 'group-persona-desc', label: '人设描述', type: 'textarea', value: persona.description || '' }
+                { 
+                    id: 'group-persona-name', 
+                    label: '<div style="display:flex; justify-content:space-between; align-items:center; width:100%;"><span>角色名</span><button class="copy-btn" onclick="copyToClipboard(\'group-persona-name\')">复制</button></div>', 
+                    value: persona.name || '' 
+                },
+                { 
+                    id: 'group-persona-desc', 
+                    label: '<div style="display:flex; justify-content:space-between; align-items:center; width:100%;"><span>人设描述</span><button class="copy-btn" onclick="copyToClipboard(\'group-persona-desc\')">复制</button></div>', 
+                    type: 'textarea', 
+                    value: persona.description || '' 
+                }
             ],
             buttons: [{ text: '保存', value: 'save', class: 'primary' }],
             // --- 3. 新增 onRender 回调来处理事件和数据加载 ---
@@ -27068,12 +27172,18 @@ fileInput.style.display = 'none';
             const modalHtml = `
                 <div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 65vh; overflow-y: auto; padding-right: 10px;">
                     <div class="form-group" style="margin:0;">
-                        <label for="npc-editor-name">名称</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <label for="npc-editor-name" style="margin-bottom: 0;">名称</label>
+                            <button class="copy-btn" onclick="copyToClipboard('npc-editor-name')">复制名称</button>
+                        </div>
                         <input type="text" id="npc-editor-name" class="modal-input" placeholder="NPC的唯一名称" value="${npcName || ''}">
                     </div>
                     ${avatarHtml}
                     <div class="form-group" style="margin:0;">
-                        <label for="npc-editor-persona">人设</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <label for="npc-editor-persona" style="margin-bottom: 0;">人设</label>
+                            <button class="copy-btn" onclick="copyToClipboard('npc-editor-persona')">复制人设</button>
+                        </div>
                         <textarea id="npc-editor-persona" class="modal-textarea" placeholder="描述NPC的性格、背景、行为模式等...">${persona}</textarea>
                     </div>
                     <hr style="border: none; border-top: 1px solid #eee;">
