@@ -26529,8 +26529,16 @@ function saveSettings() {
                                 input.onchange = async (e) => {
                                     const file = e.target.files[0];
                                     if (!file) return;
+
+                                    // 【核心修复】强制文件类型检查：只允许图片，拒绝 JSON
+                                    if (!file.type.startsWith('image/')) {
+                                        await conversationManager.customAlert('验证失败：为了安全起见，仅支持上传 PNG 格式的角色卡图片，禁止直接上传 JSON 文件。', '格式错误');
+                                        input.value = ''; // 清空选择
+                                        return;
+                                    }
                                     
                                     try {
+                                        // 强制调用 PNG 提取函数，如果不是 PNG，此函数内部会报错
                                         const charData = await extractDataFromPng(file);
                                         const data = charData.data ? charData.data : charData;
                                         const name = (data.name || "").trim();
@@ -26545,6 +26553,8 @@ function saveSettings() {
                                         }
                                     } catch (err) {
                                         await conversationManager.customAlert('解析失败：请确保上传的是从酒馆导出的标准 PNG 角色卡。', '错误');
+                                    } finally {
+                                        input.value = ''; // 无论成功失败都清空，方便下次重新选择
                                     }
                                 };
                             }
