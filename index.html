@@ -1710,7 +1710,8 @@ input:checked + .slider:before {
     --font-color-light: #ffffff; 
     --timer-button-bg: rgba(45, 212, 191, 0.85); 
     --timer-button-shadow: rgba(45, 212, 191, 0.4); 
-    --dialogue-bg: rgba(0, 0, 0, 0.45); 
+    /* 【核心修改】将背景透明度从 0.45 加深到 0.65，确保白色文字更醒目 */
+    --dialogue-bg: rgba(0, 0, 0, 0.65); 
 }
 #page-video-call * { font-family: 'Poppins', sans-serif; box-sizing: border-box; }
 #page-video-call .video-call-app-container { 
@@ -1760,9 +1761,17 @@ input:checked + .slider:before {
     background-color: rgba(255,255,255,0.4);
     border-radius: 3px;
 }
-#page-video-call #dialogue-text { color: var(--font-color-light); font-size: 1.1em; line-height: 1.5; text-shadow: 1px 1px 3px rgba(0,0,0,0.5); text-align: center; }
+/* 【核心修复】修正 ID 为 dialogue-text-vc，并设置高对比度白色与强阴影 */
+#page-video-call #dialogue-text-vc { 
+    color: #ffffff !important; 
+    font-size: 1.15em; 
+    font-weight: 500;
+    line-height: 1.6; 
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5); 
+    text-align: center; 
+}
 /* --- After --- */
-#page-video-call .dialogue-nav { 
+#page-video-call .dialogue-nav {
     display: none !important; /* <-- 核心修改：用 !important 强制隐藏这个旧的导航栏 */
 }
 #page-video-call .nav-button { background: transparent; border: none; color: white; cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background-color 0.2s, opacity 0.2s; }
@@ -7879,9 +7888,13 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                 const sourceMessages = loadFromLocalStorage(`conversation_${targetChatId}`, []);
                 const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
 
-                const lastCallSummary = [...sourceMessages].reverse().find(m => m.type === 'call_summary');
+                                const lastCallSummary = [...sourceMessages].reverse().find(m => m.type === 'call_summary');
                 if (lastCallSummary && lastCallSummary.callData && lastCallSummary.callData.conversation) {
-                    const callHistoryText = lastCallSummary.callData.conversation.map(c => `${c.sender}: ${c.text}`).join('\n');
+                    // 【核心修复】在生成剧本时，实时判断并替换 {{user}} 为当前人设名
+                    const callHistoryText = lastCallSummary.callData.conversation.map(c => {
+                        const displayName = c.sender === '{{user}}' ? userNameForPrompt : c.sender;
+                        return `${displayName}: ${c.text}`;
+                    }).join('\n');
                     finalSystemPrompt += `\n\n[Recent Video Call Transcript]\n${callHistoryText}\n[End of Transcript]`;
                 }
 
@@ -14605,15 +14618,27 @@ if (momentsContext) {
 }
 // =================================================================
 
-                // <<< START: 新增代码块 >>> (这是原本就有的代码，接在下面)
-                const lastCallSummary = [...chatState.messages].reverse().find(m => m.type === 'call_summary');
-                if (lastCallSummary && lastCallSummary.callData && lastCallSummary.callData.conversation) {
-                    const callHistoryText = lastCallSummary.callData.conversation.map(c => `${c.sender}: ${c.text}`).join('\n');
-                    const callContext = `[Recent Video Call Transcript]\n${callHistoryText}\n[End of Transcript]`;
-                    // 将通话记录作为一条 system 消息添加到 payload 的末尾
-                    apiPayloadMessages.push({ role: 'system', content: callContext });
+                // 1. 从完整历史记录中筛选出所有的通话总结
+                const allCallSummaries = loadFromLocalStorage(`conversation_${chatId}`, []).filter(m => m.type === 'call_summary' && m.callData && m.callData.conversation);
+                
+                if (allCallSummaries.length > 0) {
+                    let allCallsContext = `\n\n[HISTORY: FULL TRANSCRIPTS OF ALL PAST VIDEO CALLS]\n(The following are detailed logs of video calls that happened in the past. Treat them as part of your shared memory.)\n`;
+                    
+                    allCallSummaries.forEach((summaryMsg, index) => {
+                        const dateStr = new Date(summaryMsg.timestamp).toLocaleString();
+                        allCallsContext += `\n--- Call Record #${index + 1} (${dateStr}) ---\n`;
+                        summaryMsg.callData.conversation.forEach(dialogue => {
+                            // 【核心修复】替换剧本中的发送者名字
+                            const displayName = dialogue.sender === '{{user}}' ? userNameForPrompt : dialogue.sender;
+                            allCallsContext += `${displayName}: ${dialogue.text}\n`;
+                        });
+                    });
+                    allCallsContext += `[END OF CALL TRANSCRIPTS]\n`;
+
+                    // 将所有通话记录合并为一条 system 消息添加到 payload 的末尾
+                    apiPayloadMessages.push({ role: 'system', content: allCallsContext });
                 }
-                // <<< END: 新增代码块 >>>
+                // <<< END: 修正代码块 >>>
 
                 // --- 【核心修正】确保“最高圣旨”只在线上模式（包括群聊和单聊）下附加 ---
 
@@ -15352,16 +15377,19 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
             // 在永久的“账本”中，找到同样的分界点
             const fullHistoryIndex = fullMessageHistory.findIndex(m => m.id === lastMessageBeforeAI.id);
             if (fullHistoryIndex > -1) {
-                // 从这个分界点之后，删除所有内容
-                fullMessageHistory.splice(fullHistoryIndex + 1);
+                    // 从这个分界点之后，删除所有内容
+                    fullMessageHistory.splice(fullHistoryIndex + 1);
+                }
             }
+            
+            // 【核心新增】重新生成前，重置状态、备注和后缀
+            resetCurrentChatState();
+
+            // 重新渲染屏幕，保存永久记录，然后触发AI
+            reRenderMessages();
+            saveConversation();
+            triggerAIContinuation(true);
         }
-        
-        // 重新渲染屏幕，保存永久记录，然后触发AI
-        reRenderMessages();
-        saveConversation();
-        triggerAIContinuation(true);
-    }
 
 // ===== 到这里结束复制 =====
         // ===== 从这里开始，完整复制下面所有的代码 =====
@@ -15417,20 +15445,23 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
         }
 
         // --- 核心修复：同时操作两个“账本” ---
-        // 1. 找出所有需要被删除的消息的 ID
-        const idsToDelete = chatState.messages.slice(spliceIndex).map(m => m.id);
-        
-        // 2. 在临时的“账本”中删除
-        chatState.messages.splice(spliceIndex);
-        
-        // 3. 在永久的“账本”中，根据 ID 过滤掉所有要删除的消息
-        fullMessageHistory = fullMessageHistory.filter(m => !idsToDelete.includes(m.id));
-        // --- 修复结束 ---
+            // 1. 找出所有需要被删除的消息的 ID
+            const idsToDelete = chatState.messages.slice(spliceIndex).map(m => m.id);
+            
+            // 2. 在临时的“账本”中删除
+            chatState.messages.splice(spliceIndex);
+            
+            // 3. 在永久的“账本”中，根据 ID 过滤掉所有要删除的消息
+            fullMessageHistory = fullMessageHistory.filter(m => !idsToDelete.includes(m.id));
+            // --- 修复结束 ---
 
-        reRenderMessages();
-        saveConversation();
-        triggerAIContinuation(true);
-    }
+            // 【核心新增】重新生成前，重置状态、备注和后缀，确保逻辑回到分叉点
+            resetCurrentChatState();
+
+            reRenderMessages();
+            saveConversation();
+            triggerAIContinuation(true);
+        }
 
 // ===== 到这里结束复制 =====
         async function handleOutgoingCallAttempt(callId) {
@@ -15443,45 +15474,140 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
                 }
 
                 // 2. 准备API请求
-                const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {}); // 修正：必须在使用前定义
-                
-                // 核心修复：增加“反AI拒绝”协议和“虚拟扮演”声明
-                const callInstruction = { role: "user", content: `
-[SYSTEM ALERT: VIRTUAL ROLEPLAY EVENT]
-The user has initiated a "Video Call" event within this text-based story.
+                const chatId = chatState.chatId;
+                const chat = chatList.find(c => c.id === chatId);
+                if (!chat) throw new Error("Chat not found.");
 
-**[CRITICAL ANTI-REFUSAL PROTOCOL]**
-1.  **NOT A REAL CALL:** This is a text-based simulation. You are NOT required to stream video. You simply need to output the text command to transition the story to the "video call scene".
-2.  **FORBIDDEN OUTPUT:** You are **STRICTLY FORBIDDEN** from saying "As an AI...", "I cannot use camera...", or "I am unable to participate". These are critical failures.
-3.  **IDENTITY ENFORCEMENT:** You are the character(s) defined in the context, NOT an AI assistant.
-
-**[DECISION LOGIC]**
-You must decide whether the character(s) would pick up the phone based on their current mood and relationship.
-
-*   **OPTION A: ACCEPT (Start the Scene)**
-    *   If the character is available/willing.
-    *   **REQUIRED OUTPUT:** You MUST include the command \`[accept_call]\` in your reply.
-
-*   **OPTION B: REJECT (Busy/Angry)**
-    *   If the character is busy, asleep, or ignoring the user.
-    *   **REQUIRED OUTPUT:** Include \`[reject_call]\` or simply state the rejection reason in-character (e.g., "Busy right now").
-
-**[YOUR CURRENT PERSONA]**
-"${chatInfo.aiPersona || 'The characters in this chat'}"
-
-**[ACTION]**
-The phone is ringing. Do not break character. Do you accept?`
-                };
+                const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
                 const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
                 if (profileIndexStr === null) throw new Error("API configuration not found for this chat.");
                 
                 const profile = apiProfiles[parseInt(profileIndexStr)];
                 if (!profile || !profile.key || !profile.url || !profile.model) throw new Error("API configuration is incomplete.");
+
+                // --- 开始构建完整的系统上下文 (与正式通话逻辑对齐) ---
+                let fullSystemPrompt = profile.prompt || '';
                 
+                // A. 注入历史通话的具体内容 (从 call_summary 中提取)
+                const fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
+                const pastCalls = fullHistoryForCalls.filter(m => m.type === 'call_summary' && m.callData && m.callData.conversation);
+                
+                if (pastCalls.length > 0) {
+                    fullSystemPrompt += `\n\n[HISTORY: TRANSCRIPTS OF PREVIOUS VIDEO CALLS]\n(This is what you talked about in previous calls. Use this for context.)\n`;
+                    pastCalls.forEach((callMsg, idx) => {
+                        const dateStr = new Date(callMsg.timestamp).toLocaleString();
+                        fullSystemPrompt += `\n--- Call Record #${idx + 1} (${dateStr}) ---\n`;
+                        callMsg.callData.conversation.forEach(dialogue => {
+                            // 【核心修复】替换剧本中的发送者名字
+                            const displayName = dialogue.sender === '{{user}}' ? userNameForPrompt : dialogue.sender;
+                            fullSystemPrompt += `${displayName}: ${dialogue.text}\n`;
+                        });
+                    });
+                    fullSystemPrompt += `[END OF PREVIOUS CALLS]\n`;
+                }
+
+                // B. 注入基础环境信息
+                const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+                if (chatInfo.preamble) {
+                    fullSystemPrompt += `\n[Preamble - Highest Priority Context]\n${chatInfo.preamble}\n`;
+                }
+                if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
+                    const persona = userPersonas.find(p => p.name === chatInfo.userPersonaName);
+                    if (persona && persona.description) {
+                        fullSystemPrompt += `\n[User Persona for "${userNameForPrompt}"]\n${persona.description}\n`;
+                    }
+                }
+                if (chatInfo.myPersona) {
+                    fullSystemPrompt += `\n[Supplementary User Persona]\n${chatInfo.myPersona}\n`;
+                }
+
+                // C. 注入世界书
+                const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${chatId}`, []);
+                worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
+                    if (entry.name.includes('(VC-IGNORE)')) return;
+                    fullSystemPrompt += `\n[Background Information: ${entry.name}]\n${entry.content}\n`;
+                });
+
+                // D. 注入关联 NPC
+                const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${chatId}`, []);
+                if (associatedNpcNames.length > 0) {
+                    fullSystemPrompt += '\n[Associated NPCs]\n';
+                    const npcSettingsData = loadFromLocalStorage('app-npc-settings', {});
+                    associatedNpcNames.forEach(name => {
+                        // 【核心修复】判断数据类型，如果是对象则提取 description
+                        const rawData = (npcSettingsData.personas && npcSettingsData.personas[name]);
+                        let persona = 'No specific persona defined.';
+                        
+                        if (typeof rawData === 'object' && rawData !== null) {
+                            persona = rawData.description || '';
+                        } else if (typeof rawData === 'string') {
+                            persona = rawData;
+                        }
+
+                        fullSystemPrompt += `- **${name}**: ${persona}\n`;
+                    });
+                }
+
+                // E. 注入群聊人设或单聊人设
+                if (chat.type === '群聊') {
+                    const formalMembers = loadFromLocalStorage(`chat_members_${chatId}`, []);
+                    const groupPersonasData = chatInfo.groupPersonas || [];
+                    const protagonistNames = groupPersonasData.map(p => p.name);
+                    const allPotentialAiEntities = [...new Set([...formalMembers, ...protagonistNames])];
+                    const allAiActors = allPotentialAiEntities.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+                    let groupPersonasPrompt = `\n[YOUR ROLES: GROUP CHAT]\nYou are playing ALL of the following AI characters in this group. You must decide as a group or as individuals if the call is answered.\n`;
+                    const ensemblePersona = chatInfo.ensemblePersona || 'No general ensemble persona has been defined.';
+                    groupPersonasPrompt += `\n[Ensemble & Supporting Cast Persona]\n${ensemblePersona}\n`;
+                    allAiActors.forEach(actorName => {
+                        let persona = '';
+                        const isNpc = npcList.includes(actorName);
+                        const protagonistPersona = groupPersonasData.find(p => p.name === actorName);
+                        if (protagonistPersona) {
+                            persona = protagonistPersona.description || '(No persona defined)';
+                        } else if (isNpc) { 
+                            // 【核心修复】判断数据类型，兼容对象和字符串
+                            const rawNpcData = (npcSettings.personas && npcSettings.personas[actorName]);
+                            if (typeof rawNpcData === 'object' && rawNpcData !== null) {
+                                persona = rawNpcData.description || '(No persona defined)';
+                            } else {
+                                persona = rawNpcData || '(No persona defined)';
+                            }
+                        }
+                        else { const memberChat = chatList.find(c => c.name === actorName && c.type === '私聊'); if (memberChat) { const info = loadFromLocalStorage(`chat_info_${memberChat.id}`, {}); persona = info.aiPersona || '(No persona defined)'; } }
+                        groupPersonasPrompt += `- **${actorName}**: ${persona}\n`;
+                    });
+                    fullSystemPrompt += groupPersonasPrompt;
+                } else {
+                    fullSystemPrompt += `\n[YOUR ROLE: PRIVATE CALL]\nYOUR PERSONA IS: "${chatInfo.aiPersona || 'A helpful assistant.'}"`;
+                }
+
+                // F. 注入决策指令 (这是之前的核心指令)
+                fullSystemPrompt += `
+\n[SYSTEM ALERT: VIRTUAL ROLEPLAY EVENT]
+The user has initiated a "Video Call" event. 
+
+**[CRITICAL ANTI-REFUSAL PROTOCOL]**
+1. NOT A REAL CALL: This is a text-based simulation. You simply need to output text.
+2. FORBIDDEN OUTPUT: Never say "As an AI..." or "I cannot use camera".
+3. IDENTITY ENFORCEMENT: You are the character(s), not an AI.
+
+**[DECISION LOGIC]**
+You must decide whether the character(s) would pick up the phone based on their current mood, relationship, and the context provided above.
+
+* OPTION A: ACCEPT -> Output MUST include \`[accept_call]\`.
+* OPTION B: REJECT -> Output MUST include \`[reject_call]\` and a reason.
+
+**[ACTION]**
+The phone is ringing. Do not break character. Do you accept?`;
+
+                // 3. 构建最终消息数组
+                const systemMessage = { role: "system", content: fullSystemPrompt };
+                const finalMessages = [systemMessage];
+
                 const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
-                const recentMessages = memoryLength > 0 ? chatState.messages.slice(-memoryLength) : chatState.messages;
-                const apiPayloadMessages = await prepareApiPayload(recentMessages);
-                const finalMessages = [...apiPayloadMessages, callInstruction];
+                const recentChatHistory = memoryLength > 0 ? loadFromLocalStorage(`conversation_${chatId}`, []).slice(-memoryLength) : loadFromLocalStorage(`conversation_${chatId}`, []);
+                const apiPayloadHistory = await conversationManager.prepareApiPayload(recentChatHistory);
+                finalMessages.push(...apiPayloadHistory);
             
             // =================================================================
             // ================= START: GEMINI COMPATIBILITY BLOCK ================
@@ -15594,74 +15720,181 @@ You were receiving a video call from {{user}}, but they hung up before you could
         }
 
 
-        async function handleCallRejectionByUser(callerChatId) { // <<< 核心修改1：接收一个参数 callerChatId
+        async function handleCallRejectionByUser(callerChatId) {
             try {
-                // 向消息历史中注入一个系统观察，告知AI发生了什么
-                const rejectionContext = { role: "user", content: "[System observation: {{user}} rejected your video call.]" };
-                
-                // 复用triggerAIContinuation的逻辑来获取AI的反应
-                const chatInfo = loadFromLocalStorage(`chat_info_${callerChatId}`, {}); // <<< 核心修改2：使用传入的 callerChatId
+                const chatInfo = loadFromLocalStorage(`chat_info_${callerChatId}`, {});
+                const chat = chatList.find(c => c.id === callerChatId);
+                if (!chat) return;
+
                 const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
-                if (profileIndexStr === null) throw new Error("API configuration not found for this chat.");
+                if (profileIndexStr === null) throw new Error("API configuration not found.");
                 
                 const profile = apiProfiles[parseInt(profileIndexStr)];
-                 if (!profile || !profile.key || !profile.url || !profile.model) throw new Error("API configuration is incomplete.");
+                if (!profile || !profile.key || !profile.url || !profile.model) throw new Error("API configuration is incomplete.");
 
+                // --- 1. 构建完整的系统上下文 (灵魂注入) ---
+                let fullSystemPrompt = profile.prompt || '';
+                
+                // 注入终极心理引擎
+                fullSystemPrompt = ULTIMATE_PSYCHOLOGICAL_ENGINE + fullSystemPrompt;
+
+                const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+
+                // 前情提要
+                if (chatInfo.preamble) {
+                    fullSystemPrompt = `[Preamble - Highest Priority Context]\n${chatInfo.preamble}\n\n` + fullSystemPrompt;
+                }
+
+                // 用户人设
+                if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
+                    const persona = userPersonas.find(p => p.name === chatInfo.userPersonaName);
+                    if (persona && persona.description) {
+                        fullSystemPrompt += `\n\n[User Persona for "${userNameForPrompt}"]\n${persona.description}`;
+                    }
+                }
+                if (chatInfo.myPersona) {
+                    fullSystemPrompt += `\n\n[Supplementary User Persona]\n${chatInfo.myPersona}`;
+                }
+
+                // 角色人设 (区分单聊/群聊)
+                if (chat.type === '群聊') {
+                    const formalMembers = loadFromLocalStorage(`chat_members_${callerChatId}`, []);
+                    const groupPersonasData = chatInfo.groupPersonas || [];
+                    const protagonistNames = groupPersonasData.map(p => p.name);
+                    const allPotentialAiEntities = [...new Set([...formalMembers, ...protagonistNames])];
+                    const allAiActors = allPotentialAiEntities.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+                    
+                    let groupPersonasPrompt = `\n\n[Group Chat Context]\nThis is a group chat named "${chat.name}". You play all AI members.\n`;
+                    const ensemblePersona = chatInfo.ensemblePersona || 'No general ensemble persona defined.';
+                    groupPersonasPrompt += `\n[Ensemble Persona]\n${ensemblePersona}\n`;
+
+                    allAiActors.forEach(actorName => {
+                        let persona = '';
+                        const isNpc = npcList.includes(actorName);
+                        const protagonistPersona = groupPersonasData.find(p => p.name === actorName);
+                        if (protagonistPersona) {
+                            persona = protagonistPersona.description || '';
+                        } else if (isNpc) {
+                            const rawNpcData = (npcSettings.personas && npcSettings.personas[actorName]);
+                            if (typeof rawNpcData === 'object' && rawNpcData !== null) {
+                                persona = rawNpcData.description || '';
+                            } else {
+                                persona = rawNpcData || '';
+                            }
+                        } else {
+                            const memberChat = chatList.find(c => c.name === actorName && c.type === '私聊');
+                            if (memberChat) {
+                                const info = loadFromLocalStorage(`chat_info_${memberChat.id}`, {});
+                                persona = info.aiPersona || '';
+                            }
+                        }
+                        groupPersonasPrompt += `- **${actorName}**: ${persona}\n`;
+                    });
+                    fullSystemPrompt += groupPersonasPrompt;
+                } else {
+                    fullSystemPrompt += `\n\n[Your Character Persona]\n${chatInfo.aiPersona || ''}`;
+                }
+
+                // 关联 NPC
+                const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${callerChatId}`, []);
+                if (associatedNpcNames.length > 0) {
+                    fullSystemPrompt += '\n\n[Associated NPCs]\n';
+                    associatedNpcNames.forEach(name => {
+                        const rawData = (npcSettings.personas && npcSettings.personas[name]);
+                        let persona = 'No specific persona defined.';
+                        if (typeof rawData === 'object' && rawData !== null) {
+                            persona = rawData.description || '';
+                        } else if (typeof rawData === 'string') {
+                            persona = rawData;
+                        }
+                        fullSystemPrompt += `- **${name}**: ${persona}\n`;
+                    });
+                }
+
+                // 时间上下文
+                timeManager.updateSettingsForChat(callerChatId);
+                fullSystemPrompt += timeManager.getAITimeContext();
+
+                // 【核心新增：注入输出格式铁律】
+                const formatLaw = `
+# [ULTIMATE OUTPUT FORMAT LAW - UNBREAKABLE]
+Your entire output MUST be a sequence of one or more XML-like <block> elements. 
+
+**THE UNIVERSAL BLOCK STRUCTURE:**
+<block type="..." sender="...">...</block>
+
+**MANDATORY RULES:**
+1. type="text": For character dialogue or narration.
+2. type="command": For system commands like [sticker:Name] or [set_status:Text].
+3. sender: (In Group Chat) MUST be the name of the character.
+
+**[STRICT COMMAND PROTOCOL]**
+- To send a sticker: <block type="command" sender="Name">[sticker:StickerName]</block>
+- To update status: <block type="command" sender="Name">[set_status:NewStatus]</block>
+- DO NOT use brackets like "[Name]:" or "[System Message]". Use the <block> tags above.
+
+**[DIRECTOR'S ROLE]**
+You are the Director. If multiple characters react to the rejection, generate a SEPARATE <block> for each character's words and actions.
+`;
+                fullSystemPrompt += formatLaw;
+
+                // 执行全局占位符替换
+                fullSystemPrompt = fullSystemPrompt
+                    .replace(/{{user}}/g, userNameForPrompt)
+                    .replace(/{{char}}/g, chat.name);
+
+                // --- 2. 准备消息数组 ---
+                const systemMessage = { role: "system", content: fullSystemPrompt };
+                const finalMessages = [systemMessage];
+
+                // 加载历史记录
                 const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
-                // <<< 核心修改3：从正确的聊天记录源加载历史消息，而不是当前打开的
                 const sourceMessages = loadFromLocalStorage(`conversation_${callerChatId}`, []);
                 const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
-                const apiPayloadMessages = await prepareApiPayload(recentMessages);
-                
-                const finalMessages = [...apiPayloadMessages, rejectionContext];
+                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, callerChatId);
+                finalMessages.push(...apiPayloadMessages);
 
+                // 注入拒接观察
+                finalMessages.push({ role: "user", content: `[System observation: ${userNameForPrompt} rejected your video call. Respond to this event in character.]` });
+
+                // --- 3. 发送请求 ---
                 const chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
                 const response = await fetch(chatUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
+                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) })
                 });
 
-                if (!response.ok) {
-                    const errorBody = await response.text();
-                    throw new Error(`API Error ${response.status}: ${response.statusText}\nResponse: ${errorBody}`);
-                }
+                if (!response.ok) throw new Error(`API Error ${response.status}`);
                 
                 const data = await response.json();
                 const aiReaction = data.choices[0]?.message?.content;
 
                 if (aiReaction && aiReaction.trim()) {
-                    await processAIResponseLine(aiReaction.trim(), callerChatId); // <<< 核心修改4：将AI的回复发到正确的聊天窗口
+                    // 【核心修复】使用正则提取并逐个处理所有 <block>，确保多角色回复不卡死
+                    const blockRegex = /<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>/g;
+                    let match;
+                    let foundBlocks = false;
+
+                    while ((match = blockRegex.exec(aiReaction)) !== null) {
+                        foundBlocks = true;
+                        const type = match[1];
+                        const sender = match[2];
+                        const content = match[3].trim();
+                        
+                        // 重新组合成标准格式交给 processAIResponseLine 处理
+                        const formattedBlock = `<block type="${type}"${sender ? ` sender="${sender}"` : ''}>${content}</block>`;
+                        await processAIResponseLine(formattedBlock, callerChatId, sender);
+                    }
+
+                    // 如果 AI 还是没听话（没发 block），则走保底解析
+                    if (!foundBlocks) {
+                        await processAIResponseLine(aiReaction.trim(), callerChatId);
+                    }
                 }
 
             } catch(error) {
                 console.error("Failed to get AI reaction to call rejection:", error);
-                await customAlert(`获取AI对拒接通话的反应时出错:\n\n${error.message}`, '错误');
-            }
-        }
-        async function notifyAIofMemberRemoval(removedMembers) {
-            if (!removedMembers || removedMembers.length === 0) return;
-            try {
-                const observationText = `[System observation: You (${'{{user}}'}) have removed the following members from the group: ${removedMembers.join(', ')}. They can no longer speak, but can send a request to rejoin.]`;
-                const context = { role: "system", content: observationText };
-                
-                // 复用API调用逻辑
-                const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
-                if (profileIndexStr === null) return;
-                const profile = apiProfiles[parseInt(profileIndexStr)];
-                if (!profile) return;
-                
-                const finalMessages = [context]; // 只发送观察信息
-
-                await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
-                });
-                // 只是通知，不需要处理回复
-            } catch (error) {
-                console.error("Failed to notify AI of member removal:", error);
             }
         }
         async function notifyAIofFriendRequestDecision(wasAccepted, reason = null) {
@@ -15691,7 +15924,7 @@ You were receiving a video call from {{user}}, but they hung up before you could
                 await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages, stream: false, temperature: (profile.temperature ?? 0.7) })
+                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) })
                 });
                 // 我们不需要处理回复，只是通知AI
 
@@ -18706,10 +18939,10 @@ const showContextMenu = (event, messageId) => {
                 regenerateFromMessage(messageId);
                 break;
 
-            // 【核心新增】执行从此清除逻辑
+            // 【核心修改】执行从此清除逻辑 (同步清理状态、备注与后缀)
             case 'clear_after':
                 const confirmClear = await conversationManager.customConfirm(
-                    '确定要从这条消息开始，清除之后的所有对话吗？\n此操作不可撤销。',
+                    '确定要从这条消息开始，清除之后的所有对话吗？\n此操作不可撤销，且将重置角色状态与备注。',
                     '清除确认',
                     '确定清除'
                 );
@@ -18722,10 +18955,14 @@ const showContextMenu = (event, messageId) => {
                         chatState.messages.splice(targetIdx);
                         // 3. 更新完整历史数组
                         fullMessageHistory = fullMessageHistory.filter(m => !idsToRemove.includes(m.id));
+                        
+                        // 【核心新增】重置当前聊天的角色状态、备注和拍一拍后缀
+                        resetCurrentChatState();
+
                         // 4. 保存并重绘
                         saveConversation();
                         reRenderMessages();
-                        showNotification('已清理后续对话');
+                        showNotification('已清理后续对话并重置状态');
                     }
                 }
                 break;
@@ -30351,9 +30588,33 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const profile = apiProfiles[parseInt(profileIndexStr)];
                 if (!profile) throw new Error("API profile not found.");
 
-                // --- 1. 构建 Prompt ---
-                let fullSystemPrompt = "You MUST respond in Simplified Chinese (简体中文).\n\n";
-                fullSystemPrompt += `[SCENE: VIDEO CALL - DIRECTOR'S NOTES]\nYou are in a live video call. Your world is limited to what you can SEE and HEAR. Your response must be engaging and in-character. To hang up, you MUST end your response with the command \`[hang_up_call]\`.\n`;
+                // --- 1. 构建 Prompt (终极修正版：包含基础设定 + 历史通话详情) ---
+                
+                // A. 注入 API 设置中的基础 System Prompt
+                let fullSystemPrompt = profile.prompt || '';
+
+                // B. 注入所有历史通话的具体内容 (从 call_summary 中提取)
+                const fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
+                const pastCalls = fullHistoryForCalls.filter(m => m.type === 'call_summary' && m.callData && m.callData.conversation);
+                
+                if (pastCalls.length > 0) {
+                    fullSystemPrompt += `\n\n[HISTORY: TRANSCRIPTS OF PREVIOUS VIDEO CALLS]\n(This is what you talked about in previous calls. Use this for context.)\n`;
+                    pastCalls.forEach((callMsg, idx) => {
+                        const dateStr = new Date(callMsg.timestamp).toLocaleString();
+                        fullSystemPrompt += `\n--- Call Record #${idx + 1} (${dateStr}) ---\n`;
+                        // 遍历该次通话的每一句对话
+                        callMsg.callData.conversation.forEach(dialogue => {
+                            // 【核心修复】替换剧本中的发送者名字
+                            const displayName = dialogue.sender === '{{user}}' ? userNameForPrompt : dialogue.sender;
+                            fullSystemPrompt += `${displayName}: ${dialogue.text}\n`;
+                        });
+                    });
+                    fullSystemPrompt += `[END OF PREVIOUS CALLS]\n`;
+                }
+
+                // C. 注入当前通话场景指令
+                fullSystemPrompt += `\n\n[SCENE: VIDEO CALL - DIRECTOR'S NOTES]\nYou are in a live video call. Your world is limited to what you can SEE and HEAR. Your response must be engaging and in-character. To hang up, you MUST end your response with the command \`[hang_up_call]\`.\n`;
+                fullSystemPrompt += "You MUST respond in Simplified Chinese (简体中文).\n";
 
                 const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
                 if (chatInfo.preamble) {
@@ -30380,7 +30641,16 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                     fullSystemPrompt += '\n[Associated NPCs]\n';
                     const npcSettingsData = loadFromLocalStorage('app-npc-settings', {});
                     associatedNpcNames.forEach(name => {
-                        const persona = (npcSettingsData.personas && npcSettingsData.personas[name]) || 'No specific persona defined.';
+                        // 【核心修复】判断 NPC 数据类型
+                        const rawData = (npcSettingsData.personas && npcSettingsData.personas[name]);
+                        let persona = 'No specific persona defined.';
+                        
+                        if (typeof rawData === 'object' && rawData !== null) {
+                            persona = rawData.description || '';
+                        } else if (typeof rawData === 'string') {
+                            persona = rawData;
+                        }
+
                         fullSystemPrompt += `- **${name}**: ${persona}\n`;
                     });
                 }
@@ -30413,12 +30683,18 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                     fullSystemPrompt += `\n[YOUR ROLE: PRIVATE CALL]\nYOUR PERSONA IS: "${chatInfo.aiPersona || 'A helpful assistant.'}"\nYour response MUST come from this persona.`;
                 }
 
+                // 【核心修复】执行全局占位符替换
+                fullSystemPrompt = fullSystemPrompt
+                    .replace(/{{user}}/g, userNameForPrompt)
+                    .replace(/{{char}}/g, chatInfo.remark || chat.name);
+
                 const systemMessage = { role: "system", content: fullSystemPrompt };
                 const finalMessages = [systemMessage];
 
                 const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
                 const recentChatHistory = memoryLength > 0 ? loadFromLocalStorage(`conversation_${chatId}`, []).slice(-memoryLength) : loadFromLocalStorage(`conversation_${chatId}`, []);
-                const apiPayloadHistory = await conversationManager.prepareApiPayload(recentChatHistory);
+                // 【核心修复】传入 chatId 确保后台运行正常
+                const apiPayloadHistory = await conversationManager.prepareApiPayload(recentChatHistory, chatId);
                 finalMessages.push(...apiPayloadHistory);
 
                 callState.conversation.forEach(msg => {
@@ -30633,9 +30909,32 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const profile = apiProfiles[parseInt(profileIndexStr)];
                 if (!profile) return;
 
-                // --- 1. 构建一个包含所有所需信息的完整 System Prompt ---
-                let fullSystemPrompt = "You MUST respond in Simplified Chinese (简体中文).\n\n";
-                fullSystemPrompt += `[SCENE: VIDEO CALL - THE FIRST MOMENT]\n${contextPrompt}\n`;
+                // --- 1. 构建一个包含所有所需信息的完整 System Prompt (终极修正版) ---
+                
+                // A. 注入 API 设置中的基础 System Prompt
+                let fullSystemPrompt = profile.prompt || '';
+
+                // B. 注入所有历史通话的具体内容 (从 call_summary 中提取)
+                const fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
+                const pastCalls = fullHistoryForCalls.filter(m => m.type === 'call_summary' && m.callData && m.callData.conversation);
+                
+                if (pastCalls.length > 0) {
+                    fullSystemPrompt += `\n\n[HISTORY: TRANSCRIPTS OF PREVIOUS VIDEO CALLS]\n(This is what you talked about in previous calls. Use this for context.)\n`;
+                    pastCalls.forEach((callMsg, idx) => {
+                        const dateStr = new Date(callMsg.timestamp).toLocaleString();
+                        fullSystemPrompt += `\n--- Call Record #${idx + 1} (${dateStr}) ---\n`;
+                        callMsg.callData.conversation.forEach(dialogue => {
+                            // 【核心修复】替换剧本中的发送者名字
+                            const displayName = dialogue.sender === '{{user}}' ? userNameForPrompt : dialogue.sender;
+                            fullSystemPrompt += `${displayName}: ${dialogue.text}\n`;
+                        });
+                    });
+                    fullSystemPrompt += `[END OF PREVIOUS CALLS]\n`;
+                }
+
+                // C. 注入当前开场指令
+                fullSystemPrompt += `\n\n[SCENE: VIDEO CALL - THE FIRST MOMENT]\n${contextPrompt}\n`;
+                fullSystemPrompt += "You MUST respond in Simplified Chinese (简体中文).\n";
 
                 const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
                 if (chatInfo.preamble) {
@@ -30671,7 +30970,16 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                     fullSystemPrompt += '\n[Associated NPCs]\n';
                     const npcSettingsData = loadFromLocalStorage('app-npc-settings', {});
                     associatedNpcNames.forEach(name => {
-                        const persona = (npcSettingsData.personas && npcSettingsData.personas[name]) || 'No specific persona defined.';
+                        // 【核心修复】判断 NPC 数据类型，防止 [object Object]
+                        const rawData = (npcSettingsData.personas && npcSettingsData.personas[name]);
+                        let persona = 'No specific persona defined.';
+                        
+                        if (typeof rawData === 'object' && rawData !== null) {
+                            persona = rawData.description || '';
+                        } else if (typeof rawData === 'string') {
+                            persona = rawData;
+                        }
+
                         fullSystemPrompt += `- **${name}**: ${persona}\n`;
                     });
                 }
@@ -30703,7 +31011,15 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                             persona = protagonistPersona.description || '(No persona defined)';
                         }
                         // --- 修改结束 ---
-                        else if (isNpc) { persona = (npcSettings.personas && npcSettings.personas[actorName]) || '(No persona defined)'; }
+                        else if (isNpc) { 
+                            // 【核心修复】判断 NPC 数据类型
+                            const rawData = (npcSettings.personas && npcSettings.personas[actorName]);
+                            if (typeof rawData === 'object' && rawData !== null) {
+                                persona = rawData.description || '(No persona defined)';
+                            } else {
+                                persona = rawData || '(No persona defined)';
+                            }
+                        }
                         else { const memberChat = chatList.find(c => c.name === actorName && c.type === '私聊'); if (memberChat) { const info = loadFromLocalStorage(`chat_info_${memberChat.id}`, {}); persona = info.aiPersona || '(No persona defined)'; } }
                         groupPersonasPrompt += `- **${actorName}**: ${persona}\n`;
                     });
@@ -30714,13 +31030,20 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 }
 
                 // --- 5. 构建API请求 ---
+                
+                // 【核心修复】执行全局占位符替换
+                fullSystemPrompt = fullSystemPrompt
+                    .replace(/{{user}}/g, userNameForPrompt)
+                    .replace(/{{char}}/g, chatInfo.remark || chat.name);
+
                 const systemMessage = { role: "system", content: fullSystemPrompt };
                 const finalMessages = [systemMessage];
 
                 // <<< 核心修改2：注入主聊天记录的上下文 >>>
             const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
             const recentChatHistory = memoryLength > 0 ? loadFromLocalStorage(`conversation_${chatId}`, []).slice(-memoryLength) : loadFromLocalStorage(`conversation_${chatId}`, []);
-            const apiPayloadHistory = await conversationManager.prepareApiPayload(recentChatHistory);
+            // 【核心修复】传入 chatId 确保后台运行正常
+            const apiPayloadHistory = await conversationManager.prepareApiPayload(recentChatHistory, chatId);
             finalMessages.push(...apiPayloadHistory);
 
             // =================================================================
