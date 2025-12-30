@@ -3926,6 +3926,278 @@ input:checked + .slider:before {
 /* --- END: PAGER (备忘录) STYLES --- */
 /******************************************/
 
+/* --- START: MILESTONES (羁绊里程碑) STYLES --- */
+#milestone-modal-overlay .modal-box {
+    width: 95vw !important;
+    max-width: 400px !important;
+    height: 85vh !important;
+    max-height: 700px !important;
+    display: flex;
+    flex-direction: column;
+    padding: 0 !important;
+    background-color: #f8f9fa !important;
+    overflow: hidden;
+}
+
+.milestone-header {
+    padding: 45px 20px 15px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    flex-shrink: 0;
+}
+
+.milestone-header h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+/* 新增：置顶看板样式 */
+.milestone-pinned-container {
+    padding: 15px 20px;
+    background: white;
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    border-bottom: 4px solid #f0f2f5;
+    flex-shrink: 0;
+    scrollbar-width: none;
+}
+.milestone-pinned-container::-webkit-scrollbar { display: none; }
+
+.pinned-card {
+    min-width: 140px;
+    padding: 12px;
+    border-radius: 14px;
+    background: #f8f9ff;
+    border: 1px solid #e0e6ff;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.pinned-card.type-anniversary { background: #fff5f5; border-color: #ffe0e0; }
+.pinned-card.type-countdown { background: #f0fff4; border-color: #dcffe4; }
+
+.pinned-label {
+    font-size: 13px;
+    color: #8e8e93;
+    font-weight: 600;
+    margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pinned-value {
+    font-size: 20px;
+    font-weight: 800;
+    color: #1c1c1e;
+    font-family: "DIN", "Helvetica Neue", sans-serif;
+}
+
+.pinned-value span {
+    font-size: 13px;
+    font-weight: 600;
+    margin-left: 4px;
+    color: #8e8e93;
+}
+
+/* 彻底删除 .pinned-title 样式 */
+
+.milestone-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 10px 0;
+}
+
+.milestone-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 15px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    background: white;
+    transition: background 0.2s;
+    cursor: pointer;
+}
+
+.milestone-item:active {
+    background: #f8f8f8;
+}
+
+.milestone-rank {
+    font-family: "DIN", "Helvetica Neue", sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    color: #ff9500;
+    margin-right: 15px;
+    min-width: 25px;
+    text-align: center;
+}
+
+.milestone-info {
+    flex-grow: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.milestone-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.milestone-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: #1c1c1e;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-grow: 1;
+}
+
+.milestone-date {
+    font-size: 12px;
+    color: #8e8e93;
+    flex-shrink: 0;
+    margin-left: 10px;
+}
+
+.milestone-content {
+    display: none; /* 列表页彻底隐藏内容，像热搜一样 */
+}
+
+.milestone-badge {
+    display: none; /* 移除手动/自动记录标签，保持界面纯净 */
+}
+
+.milestone-footer {
+    padding: 15px;
+    background: white;
+    border-top: 1px solid #eee;
+    display: flex;
+    gap: 10px;
+}
+
+/* 详情页样式 */
+.milestone-detail-view {
+    padding: 20px;
+    text-align: left;
+}
+
+.detail-chapter-num {
+    font-size: 13px;
+    color: #764ba2;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.detail-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1c1c1e;
+    margin-bottom: 15px;
+    line-height: 1.3;
+}
+
+.detail-meta {
+    font-size: 13px;
+    color: #8e8e93;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.detail-text {
+    font-size: 16px;
+    line-height: 1.8;
+    color: #333;
+    white-space: pre-wrap;
+}
+
+.ai-correction-box {
+    margin-top: 25px;
+    padding: 15px;
+    background: #fff9eb;
+    border-radius: 12px;
+    border-left: 4px solid #ff9500;
+}
+
+.correction-header {
+    font-size: 13px;
+    font-weight: 700;
+    color: #ff9500;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* 新增：捉虫功能样式 */
+.milestone-text-container {
+    position: relative;
+    line-height: 1.8;
+}
+
+.text-bug-highlight {
+    background-color: rgba(255, 213, 0, 0.3);
+    border-bottom: 2px dashed #ff9500;
+    cursor: pointer;
+    padding: 2px 0;
+}
+
+.bug-annotation {
+    display: none; /* 列表页不再显示，改为点击触发 */
+}
+
+.bug-author {
+    font-weight: 700;
+    color: #764ba2;
+    margin-right: 5px;
+}
+
+#bug-floating-btn {
+    position: fixed;
+    display: none;
+    z-index: 3000;
+    background: #1c1c1e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 15px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    cursor: pointer;
+    /* 新增：淡入动画，防止突现干扰视觉 */
+    animation: fadeInBug 0.2s ease-out;
+}
+
+@keyframes fadeInBug {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.text-bug-highlight {
+    background-color: rgba(118, 75, 162, 0.15);
+    border-bottom: 1.5px solid #764ba2;
+    cursor: pointer;
+    padding: 1px 0;
+    transition: background-color 0.2s;
+}
+
+.text-bug-highlight:active {
+    background-color: rgba(118, 75, 162, 0.3);
+}
+/* --- END: MILESTONES STYLES --- */
+
 /**************************************************/
 /* --- START: 悬浮窗口通用及特定样式 (最终版) --- */
 /**************************************************/
@@ -5488,7 +5760,132 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     }
 
     
-    
+    /* 里程碑详情页内的摘抄气泡样式 */
+.milestone-excerpt-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 12px 0;
+    width: 100%;
+}
+
+.ms-bubble-wrapper {
+    display: flex;
+    flex-direction: column;
+    max-width: 90%;
+}
+
+.ms-bubble-wrapper.is-me {
+    align-self: flex-end;
+    align-items: flex-end;
+}
+
+.ms-bubble-wrapper.is-other {
+    align-self: flex-start;
+    align-items: flex-start;
+}
+
+.ms-bubble-name {
+    font-size: 11px;
+    color: #8e8e93;
+    margin-bottom: 2px;
+    padding: 0 4px;
+}
+
+.ms-bubble-content {
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.4;
+    word-break: break-word;
+    position: relative;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* 模拟发送方 (绿色) */
+.ms-bubble-wrapper.is-me .ms-bubble-content {
+    background-color: #9eea6a;
+    color: #000;
+    border-bottom-right-radius: 4px;
+}
+
+/* 模拟接收方 (白色) */
+.ms-bubble-wrapper.is-other .ms-bubble-content {
+    background-color: #ffffff;
+    color: #000;
+    border: 1px solid #e0e0e0;
+    border-bottom-left-radius: 4px;
+}
+/* 里程碑段评气泡 - 挂在段落末尾 */
+.ms-paragraph-container {
+    position: relative;
+    margin-bottom: 12px;
+    line-height: 1.8;
+    display: block;
+}
+
+.supplement-bubble-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #007aff;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 10px 10px 10px 2px;
+    cursor: pointer;
+    margin-left: 6px;
+    vertical-align: middle;
+    box-shadow: 0 2px 5px rgba(0,122,255,0.3);
+    border: 1px solid white;
+    transition: transform 0.2s;
+    user-select: none;
+}
+
+.supplement-bubble-trigger:active {
+    transform: scale(0.8);
+}
+
+/* 捉虫高亮保持，但补充不再高亮 */
+.text-bug-highlight {
+    background-color: rgba(255, 213, 0, 0.3);
+    border-bottom: 1.5px solid #ff9500;
+    cursor: pointer;
+}
+/* 里程碑摘抄气泡的滑动删除样式 */
+.ms-bubble-wrapper {
+    position: relative;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    cursor: grab;
+    touch-action: pan-y; /* 允许纵向滚动，拦截横向滑动 */
+    user-select: none;
+}
+
+.ms-bubble-wrapper:active {
+    cursor: grabbing;
+}
+
+/* 准备删除时的视觉反馈 */
+.ms-bubble-wrapper.swipe-hint-left {
+    transform: translateX(-20px);
+}
+
+.ms-bubble-wrapper.swipe-hint-right {
+    transform: translateX(20px);
+}
+
+/* 彻底移除的动画 */
+.ms-bubble-wrapper.removing {
+    transform: translateX(100%);
+    opacity: 0;
+}
+
+.ms-bubble-wrapper.is-other.removing {
+    transform: translateX(-100%);
+}
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -6106,6 +6503,14 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                     <img src="https://i.postimg.cc/X7Ry0y4q/novel-icon.png" class="custom-action-img" style="display: none;">
                 </div>
                 <span class="action-label">一起看小说</span>
+            </div>
+
+            <div class="action-item" data-action="milestones" data-image-icon="true">
+                <div class="action-item-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.45l8.15 13.55H3.85L12 5.45zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
+                    <img src="https://i.postimg.cc/mD0m0m0m/milestone-icon.png" class="custom-action-img" style="display: none;">
+                </div>
+                <span class="action-label">羁绊里程碑</span>
             </div>
 
         </div>
@@ -7096,6 +7501,54 @@ body.preview-fullscreen-active #page-conversation .chat-content {
         </div>
     </div>
     
+    <!-- 羁绊里程碑弹窗 -->
+    <div id="milestone-modal-overlay" class="modal-overlay">
+        <div class="modal-box">
+            <div class="milestone-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 id="milestone-modal-title">羁绊里程碑</h3>
+                    <button class="modal-close-btn" style="position: static; background: rgba(255,255,255,0.2); color: white;">×</button>
+                </div>
+                
+            <!-- 捉虫悬浮按钮 -->
+    <button id="bug-floating-btn">捉虫</button>
+
+                </div>
+            
+            <!-- 列表视图 -->
+            <div id="milestone-list-view" class="milestone-list">
+                <!-- 新增：置顶看板区域 -->
+                <div id="milestone-pinned-view" class="milestone-pinned-container">
+                    <!-- 倒计时/纪念日卡片动态生成 -->
+                </div>
+                <div id="milestone-items-container">
+                    <!-- 普通列表项动态生成 -->
+                </div>
+            </div>
+
+            <!-- 详情视图 (初始隐藏) -->
+            <div id="milestone-detail-view" class="milestone-list" style="display: none;">
+                <div class="milestone-detail-view">
+                    <div class="detail-chapter-num" id="detail-rank">EVENT 01</div>
+                    <div class="detail-title" id="detail-title">标题</div>
+                    <div class="detail-meta" id="detail-meta">2023-10-27 | 由 AI 记录</div>
+                    <div class="detail-text" id="detail-text">内容</div>
+                    <div id="detail-correction-container"></div>
+                </div>
+            </div>
+
+            <div class="milestone-footer">
+                <button id="milestone-back-btn" class="modal-button secondary" style="display: none; flex: 1;">返回列表</button>
+                <!-- 隐藏的跳转按钮，保留 ID 防止 JS 崩溃 -->
+                <button id="milestone-jump-btn" style="display: none !important;"></button>
+                <!-- 隐藏的补充按钮，保留 ID 防止 JS 崩溃 -->
+                <button id="milestone-supplement-btn" style="display: none !important;"></button>
+                <button id="milestone-edit-btn" class="modal-button secondary" style="display: none; flex: 1;">编辑</button>
+                <button id="milestone-add-btn" class="modal-button primary" style="flex: 1; background: #764ba2;">新增里程碑</button>
+                <button id="milestone-delete-btn" class="modal-button danger" style="display: none; flex: 1;">删除</button>
+            </div>
+        </div>
+    </div>
 
                 </div>
             </div>
@@ -8077,10 +8530,27 @@ if (momentsData && momentsData.allVisibleMoments.length > 0) {
 }
 
 if (momentsContext) {
-    finalSystemPrompt += momentsContext;
-}
-// =================================================================
+                finalSystemPrompt += momentsContext;
+            }
+            // =================================================================
             
+            // 【核心新增：注入里程碑记忆】
+            const milestoneDataForMsg = loadFromLocalStorage(`app-milestones_${targetChatId}`, []);
+            if (milestoneDataForMsg.length > 0) {
+                let milestonesContext = "\n\n[RELATIONSHIP MILESTONES & SHARED MEMORIES]\n";
+                milestoneDataForMsg.forEach((m, i) => {
+                    milestonesContext += `Entry #${i+1} (${m.type}): "${m.title}" on ${m.date}.`;
+                    if (m.content) milestonesContext += ` Description: ${m.content}`;
+                    if (m.annotations && m.annotations.length > 0) {
+                        m.annotations.forEach(ann => {
+                            milestonesContext += `\n  - Note by ${ann.author}: Regarding "${ann.original}", ${ann.comment}`;
+                        });
+                    }
+                    if (m.aiCorrection) milestonesContext += `\n  - AI Memory Correction: ${m.aiCorrection}`;
+                    milestonesContext += "\n";
+                });
+                finalSystemPrompt += milestonesContext;
+            }
 
             // 拼接世界书
             const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${targetChatId}`, []);
@@ -8794,6 +9264,24 @@ ${processedChatHistory}
             });
             // 新代码块到此结束
 
+            // 【核心新增：注入里程碑记忆供朋友圈互动参考】
+            const milestoneDataForBrowse = loadFromLocalStorage(`app-milestones_${contextChatId}`, []);
+            if (milestoneDataForBrowse.length > 0) {
+                let milestonesContext = "\n\n[RELATIONSHIP MILESTONES & SHARED MEMORIES]\n";
+                milestoneDataForBrowse.forEach((m, i) => {
+                    milestonesContext += `Entry #${i+1} (${m.type}): "${m.title}" on ${m.date}.`;
+                    if (m.content) milestonesContext += ` Description: ${m.content}`;
+                    if (m.annotations && m.annotations.length > 0) {
+                        m.annotations.forEach(ann => {
+                            milestonesContext += `\n  - Note by ${ann.author}: Regarding "${ann.original}", ${ann.comment}`;
+                        });
+                    }
+                    if (m.aiCorrection) milestonesContext += `\n  - AI Memory Correction: ${m.aiCorrection}`;
+                    milestonesContext += "\n";
+                });
+                momentsWorldBookContent += milestonesContext;
+            }
+
             // --- 核心修复：注入基础系统提示 ---
             const baseSystemPrompt = profile.prompt || '';
 
@@ -9130,6 +9618,24 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
                 }
             });
             // 新代码块到此结束
+
+            // 【核心新增：注入里程碑记忆供朋友圈互动参考】
+            const milestoneDataForBrowse = loadFromLocalStorage(`app-milestones_${contextChatId}`, []);
+            if (milestoneDataForBrowse.length > 0) {
+                let milestonesContext = "\n\n[RELATIONSHIP MILESTONES & SHARED MEMORIES]\n";
+                milestoneDataForBrowse.forEach((m, i) => {
+                    milestonesContext += `Entry #${i+1} (${m.type}): "${m.title}" on ${m.date}.`;
+                    if (m.content) milestonesContext += ` Description: ${m.content}`;
+                    if (m.annotations && m.annotations.length > 0) {
+                        m.annotations.forEach(ann => {
+                            milestonesContext += `\n  - Note by ${ann.author}: Regarding "${ann.original}", ${ann.comment}`;
+                        });
+                    }
+                    if (m.aiCorrection) milestonesContext += `\n  - AI Memory Correction: ${m.aiCorrection}`;
+                    milestonesContext += "\n";
+                });
+                momentsWorldBookContent += milestonesContext;
+            }
 
             // --- 核心修复：注入基础系统提示 ---
             const baseSystemPrompt = profile.prompt || '';
@@ -11887,44 +12393,154 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                     }
 
                  case 'lifestyle': {
-                    const newRecordsHtml = data;
-                    try {
-                        const storageKey = `app_lifestyle_data_${targetChatId}`;
-                        let characterLifestyleHTML = loadFromLocalStorage(storageKey, lifestyleHTML);
+                        const newRecordsHtml = data;
+                        try {
+                            const storageKey = `app_lifestyle_data_${targetChatId}`;
+                            let characterLifestyleHTML = loadFromLocalStorage(storageKey, lifestyleHTML);
 
-                        const parser = new DOMParser();
-                        const doc = parser.parseFromString(characterLifestyleHTML, 'text/html');
-                        const tempContainer = document.createElement('div');
-                        tempContainer.innerHTML = newRecordsHtml;
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(characterLifestyleHTML, 'text/html');
+                            const tempContainer = document.createElement('div');
+                            tempContainer.innerHTML = newRecordsHtml;
 
-                        const newNodesBySection = {
-                            travel: tempContainer.querySelectorAll('.travel-card'),
-                            delivery: tempContainer.querySelectorAll('.delivery-card'),
-                            shopping: tempContainer.querySelectorAll('.shopping-card')
-                        };
+                            const newNodesBySection = {
+                                travel: tempContainer.querySelectorAll('.travel-card'),
+                                delivery: tempContainer.querySelectorAll('.delivery-card'),
+                                shopping: tempContainer.querySelectorAll('.shopping-card')
+                            };
 
-                        for (const sectionId in newNodesBySection) {
-                            const nodes = newNodesBySection[sectionId];
-                            if (nodes.length > 0) {
-                                const section = doc.getElementById(sectionId);
-                                if (section) {
-                                    const emptyState = section.querySelector('.empty-state');
-                                    if (emptyState) emptyState.remove();
-                                    nodes.forEach(node => section.appendChild(node.cloneNode(true)));
+                            for (const sectionId in newNodesBySection) {
+                                const nodes = newNodesBySection[sectionId];
+                                if (nodes.length > 0) {
+                                    const section = doc.getElementById(sectionId);
+                                    if (section) {
+                                        const emptyState = section.querySelector('.empty-state');
+                                        if (emptyState) emptyState.remove();
+                                        nodes.forEach(node => section.appendChild(node.cloneNode(true)));
+                                    }
                                 }
                             }
+
+                            const updatedHtmlString = doc.body.innerHTML;
+                            
+                            saveToLocalStorage(storageKey, updatedHtmlString);
+                            console.log(`[Background Update] Lifestyle records for ${senderName} saved to its specific key: ${storageKey}.`);
+
+                        } catch (e) {
+                            console.error("Error in lifestyle background update:", e);
                         }
-
-                        const updatedHtmlString = doc.body.innerHTML;
-                        
-                        saveToLocalStorage(storageKey, updatedHtmlString);
-                        console.log(`[Background Update] Lifestyle records for ${senderName} saved to its specific key: ${storageKey}.`);
-
-                    } catch (e) {
-                        console.error("Error in lifestyle background update:", e);
+                        break;
                     }
-                    break;
-                }
+                    case 'milestone': {
+                        try {
+                            const jsonMatch = data.match(/\{[\s\S]*\}/);
+                            if (!jsonMatch) throw new Error("未在标签内找到有效的 JSON 数据结构");
+                            
+                            const cleanJson = jsonMatch[0];
+                            const milestoneData = JSON.parse(cleanJson);
+                            
+                            const storageKey = `app-milestones_${targetChatId}`;
+                            let milestones = loadFromLocalStorage(storageKey, []);
+
+                            // 【核心修改】动态获取当前操作的角色名
+                            const actorName = finalSenderName || senderName;
+
+                            if (milestoneData.action === 'new') {
+                                // 【智能过滤器】：只保留纯文本、带表情的消息以及照片
+                                let clippedMessages = [];
+                                if (milestoneData.clip_count && milestoneData.clip_count > 0) {
+                                    const fullHistory = loadFromLocalStorage(`conversation_${targetChatId}`, []);
+                                    
+                                    const filteredChat = fullHistory.filter(m => {
+                                        // 1. 基础过滤：排除系统消息、时间线、语音、位置等非视觉文本类型
+                                        if (m.side === 'system' || m.type === 'time_divider') return false;
+                                        
+                                        // 2. 允许照片类型（包含表情包大图）
+                                        if (m.type === 'photo') return true;
+
+                                        // 3. 针对文本类型的深度过滤
+                                        if (m.type === 'text') {
+                                            const txt = (m.text || '').trim();
+                                            
+                                            // A. 排除弹幕代码块
+                                            if (txt.includes('[DANMAKU_PLAYER]') || txt.includes('<dm ')) return false;
+                                            
+                                            // B. 排除没有记忆锚点标记的复杂 HTML/代码块
+                                            // 逻辑：如果包含 div 或 snippet，但没有明确的 data-ai-log-as-text="true" 标记，则视为纯 UI 装饰，跳过
+                                            if (txt.includes('<div') || txt.includes('<snippet')) {
+                                                if (!txt.includes('data-ai-log-as-text="true"')) {
+                                                    return false;
+                                                }
+                                            }
+                                            
+                                            // C. 排除空消息
+                                            if (!txt) return false;
+
+                                            return true; // 剩下的就是纯对话或带 [emoji] 的文本
+                                        }
+                                        
+                                        return false; // 其他类型（如代付、转账卡片等）默认跳过
+                                    });
+
+                                    // 从过滤后的“精选对话”中截取最后 N 条
+                                    clippedMessages = filteredChat.slice(-milestoneData.clip_count);
+                                }
+
+                                const newEntry = {
+                                    id: `ms_${Date.now()}`,
+                                    type: milestoneData.type || 'milestone',
+                                    title: milestoneData.title || '未命名记忆',
+                                    content: milestoneData.content || (milestoneData.type === 'milestone' ? '' : `关于${milestoneData.title}的记录`),
+                                    date: milestoneData.date || new Date().toISOString().split('T')[0],
+                                    timestamp: Date.now(),
+                                    author: actorName,
+                                    clippedMessages: clippedMessages,
+                                    startMsgId: milestoneData.startMsgId || null,
+                                    endMsgId: milestoneData.endMsgId || null,
+                                    annotations: [],
+                                    supplements: []
+                                };
+                                milestones.unshift(newEntry);
+                                console.log(`[Milestone] ${actorName} recorded a new memory. ${clippedMessages.length} meaningful bubbles were clipped.`);
+
+                            } else if (milestoneData.action === 'annotate' || milestoneData.action === 'correct') {
+                                const target = milestones.find(ms => ms.title.trim() === milestoneData.targetTitle.trim());
+                                if (target) {
+                                    if (milestoneData.originalText && milestoneData.comment) {
+                                        // 判断是“捉虫”还是“段评补充”
+                                        // 如果 originalText 是整段话，视为补充；如果是短句，视为捉虫
+                                        const isLongText = milestoneData.originalText.length > 20;
+                                        
+                                        if (isLongText) {
+                                            if (!target.supplements) target.supplements = [];
+                                            target.supplements.push({
+                                                original: milestoneData.originalText,
+                                                content: milestoneData.comment,
+                                                author: actorName,
+                                                timestamp: Date.now()
+                                            });
+                                        } else {
+                                            if (!target.annotations) target.annotations = [];
+                                            target.annotations.push({
+                                                original: milestoneData.originalText,
+                                                comment: milestoneData.comment,
+                                                author: actorName
+                                            });
+                                        }
+                                    } else if (milestoneData.correction) {
+                                        target.aiCorrection = milestoneData.correction;
+                                        // 记录是谁修正的
+                                        target.correctionAuthor = actorName;
+                                    }
+                                    target.isCorrected = true;
+                                }
+                            }
+                            saveToLocalStorage(storageKey, milestones);
+                        } catch (e) {
+                            console.error("里程碑解析失败:", e);
+                        }
+                        break;
+                    }
                 }
             }
             
@@ -14709,9 +15325,43 @@ const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 
 
 // 4. 如果有动态，就拼接到系统提示词的末尾
 if (momentsContext) {
-    finalSystemPrompt += momentsContext;
-}
+                finalSystemPrompt += momentsContext;
+            }
 // =================================================================
+
+            // 【核心修正：永久注入里程碑协议指令】
+            finalSystemPrompt += PERMANENT_MILESTONE_PROTOCOL;
+
+            // 【核心新增】：注入包含“存档对话”的里程碑记忆
+            const milestoneDataForReply = loadFromLocalStorage(`app-milestones_${originatingChatId}`, []);
+            if (milestoneDataForReply.length > 0) {
+                let milestonesContext = "\n\n[YOUR COLLECTION OF PRECIOUS MEMORIES - PERMANENT ARCHIVE]\n(The following entries are your core memories. Messages listed in [Clipped Dialogue] are permanently visible to you here, even if they are shielded in the main chat.)\n";
+                
+                milestoneDataForReply.forEach((m, i) => {
+                    milestonesContext += `Memory #${i+1}: "${m.title}" (${m.date}).\n`;
+                    
+                    // 【核心新增】：还原剪辑的消息文本发给 AI
+                    if (m.clippedMessages && m.clippedMessages.length > 0) {
+                        milestonesContext += `  [Clipped Dialogue]:\n`;
+                        m.clippedMessages.forEach(cMsg => {
+                            const cSender = cMsg.side === 'sent' ? userNameForPrompt : (cMsg.sender || chatState.chatName);
+                            const cText = cMsg.text || `[${cMsg.type}]`;
+                            milestonesContext += `    - ${cSender}: ${cText}\n`;
+                        });
+                    }
+
+                    if (m.content) milestonesContext += `  [Your Narrative]: ${m.content}\n`;
+                    
+                    if (m.annotations && m.annotations.length > 0) {
+                        m.annotations.forEach(ann => {
+                            milestonesContext += `  - [USER FEEDBACK] by ${ann.author}: Regarding "${ann.original}", user says: "${ann.comment}".\n`;
+                        });
+                    }
+                    if (m.aiCorrection) milestonesContext += `  - [YOUR PREVIOUS CORRECTION]: ${m.aiCorrection}\n`;
+                    milestonesContext += "\n";
+                });
+                finalSystemPrompt += milestonesContext;
+            }
 
                 // 1. 从完整历史记录中筛选出所有的通话总结
                 const allCallSummaries = loadFromLocalStorage(`conversation_${chatId}`, []).filter(m => m.type === 'call_summary' && m.callData && m.callData.conversation);
@@ -16044,7 +16694,6 @@ You are the Director. If multiple characters react to the rejection, generate a 
             if (!chatContent) return;
             
             // <<< 新增：区块解析逻辑 开始 >>>
-            // 这个正则表达式现在能正确捕获多行内容
             const blockMatch = chatContent.match(/^<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>$/);
 
             if (blockMatch) {
@@ -16052,18 +16701,24 @@ You are the Director. If multiple characters react to the rejection, generate a 
                 const senderFromBlock = blockMatch[2];
                 let content = blockMatch[3].trim();
 
-                // 优先使用 block 中指定的 sender，其次是函数传入的 forcedSender
                 const finalSender = senderFromBlock || forcedSender;
 
-                // 【核心修复】：无论 type 是 text, html 还是 command，
-                // 我们都不在这里直接发送，而是把它们“剥壳”后，
-                // 交给下面的标准指令解析器去处理。
-                // 这样，嵌在 text block 里的 [photo-description] 就能被识别了。
+                // 【核心修复】执行后台任务并获取清理后的文本
+                const cleanedContent = await executeBackgroundUpdatesAndCleanText(content, targetChatId, finalSender);
                 
-                chatContent = content; // 将内容提取出来，覆盖掉原始的带标签文本
-                forcedSender = finalSender; // 更新发送者信息，供后续逻辑使用
-                
-                // 注意：这里删除了 return，让代码继续向下流转！
+                // 【核心修复】逻辑调整：只有当原始内容“仅仅”包含标签，且清理后“确实”没有任何文字时才拦截
+                // 这样如果你在标签里加了文字，cleanedContent 就不会为空，气泡就能显示出来
+                if (cleanedContent === "" && content.trim().startsWith('<background_update') && content.trim().endsWith('</background_update>')) {
+                    const tagCount = (content.match(/<background_update/g) || []).length;
+                    const strippedContent = content.replace(/<background_update[\s\S]*?<\/background_update>/g, '').trim();
+                    if (!strippedContent) {
+                        return;
+                    }
+                }
+
+                // 优先使用清理后的内容，如果清理逻辑出错，则回退到原始 content
+                chatContent = (cleanedContent !== null && cleanedContent !== undefined) ? cleanedContent : content; 
+                forcedSender = finalSender;
             }
             // <<< 新增：区块解析逻辑 结束 >>>
 
@@ -21523,34 +22178,32 @@ function reloadContactInfo() {
             }
         }
 async function triggerBackgroundDataUpdate(context, senderName, chatId) {
-            // 【【【 核心修复：在这里读取特定聊天的设置 】】】
-            const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
-            // 如果该聊天的这个设置为 false，则停止。如果未设置(undefined)，则默认为开启。
-            if (chatInfo.enableBackgroundTasks === false) {
-                console.log(`[Background Update] Skipped for chat ${chatId} because tasks are disabled for this chat.`);
-                return "";
-            }
+    const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+    const isTaskEnabled = chatInfo.enableBackgroundTasks !== false;
 
-            if (!senderName || senderName === '{{user}}') {
-                return ""; // 如果不满足条件，返回空字符串
-            }
-            
-        const rand = Math.random() * 100;
-        let choice = -1;
-        let prompt = "";
+    // 如果用户关闭了“自动生成”，直接返回空，不再随机触发心事和备忘录
+    if (!isTaskEnabled) return "";
 
-        if (rand < 95) {
-            choice = 0; // 心事
-        } else {
-            choice = 1; // 备忘录
-        }
+    if (!senderName || senderName === '{{user}}') {
+        return ""; 
+    }
+    
+    const rand = Math.random() * 100;
+    let choice = -1;
+    let prompt = "";
 
-        
-        console.log(`[Background Update] Random value: ${rand.toFixed(2)}. Preparing background task #${choice} for ${senderName}.`);
+    // 调整概率：70% 触发心事，30% 触发备忘录
+    if (rand < 70) {
+        choice = 0; // 心事
+    } else {
+        choice = 1; // 备忘录
+    }
 
-        switch (choice) {
-            case 0: // 更新心事
-                prompt = `
+    console.log(`[Background Update] Random value: ${rand.toFixed(2)}. Preparing background task #${choice} for ${senderName}.`);
+
+    switch (choice) {
+        case 0: // 更新心事
+            prompt = `
 ---
 [BACKGROUND TASK: UPDATE MOOD JOURNAL]
 After your chat response, you MUST generate a private mood journal entry.
@@ -21568,19 +22221,14 @@ After your chat response, you MUST generate a private mood journal entry.
 **[CRITICAL EXAMPLES - YOU MUST UNDERSTAND THIS]**
 
 *   **CORRECT EXAMPLE (What you SHOULD do):**
-    \`<background_update type="mood_card" sender="祁司礼">
+    \`<background_update type="mood_card" sender="${senderName}">
     今天图图似乎有些不开心，我该怎么哄她呢？也许明天带她去海边散散心会好一些。
     </background_update>\`
 
-*   **WRONG, CATASTROPHIC FAILURE EXAMPLE (What you MUST NOT do):**
-    \`<background_update type="mood_card" sender="祁司礼">
-    [苦] 用户图图表示无聊。虽然核心Active Cast列表为空，但我启用了群备注中的角色祁司礼进行回应...
-    </background_update>\`
-
 **Final Instruction:** Generate the correctly formatted \`<background_update>\` block at the VERY END of your entire output.`;
-                break;
-            case 1: // 更新备忘录
-                prompt = `
+            break;
+        case 1: // 更新备忘录
+            prompt = `
 ---
 [BACKGROUND TASK: CREATE A SINGLE, MULTI-LINE MEMO]
 After you formulate your chat response, you MUST ALSO generate a new memo for your pager based on the current context.
@@ -21600,15 +22248,15 @@ Third line (note 3), and so on...
 </background_update>
 
 **EXAMPLE:**
-<background_update type="pager" sender="张三">
+<background_update type="pager" sender="${senderName}">
 - 下午三点去银行取钱
 - 买菜：牛奶、鸡蛋、面包
 - 晚上记得打电话给妈妈
 </background_update>`;
-                break;
-        }
-        return prompt; // 返回生成的指令文本
+            break;
     }
+    return prompt; 
+}
         return { 
             open, 
             getCurrentChatId, 
@@ -29679,6 +30327,9 @@ async function handleRemoveMember() {
         
         // 【新增：初始化云端备份管理器】
         cloudBackupManager.init();
+
+        // 初始化里程碑管理器
+        milestoneManager.init();
         
         navigateTo('home');
     }
@@ -33996,7 +34647,700 @@ const cloudBackupManager = (function() {
         window.app.openNovelReader = openReader;
         return { openReader };
     })();
+    const milestoneManager = (function() {
+        let milestones = [];
+        let currentView = 'list'; // 'list' or 'detail'
+        let activeMilestone = null;
 
+        const overlay = document.getElementById('milestone-modal-overlay');
+        const listView = document.getElementById('milestone-list-view');
+        const detailView = document.getElementById('milestone-detail-view');
+        const addBtn = document.getElementById('milestone-add-btn');
+        const backBtn = document.getElementById('milestone-back-btn');
+        const jumpBtn = document.getElementById('milestone-jump-btn');
+        const deleteBtn = document.getElementById('milestone-delete-btn');
+        const closeBtn = overlay.querySelector('.modal-close-btn');
+
+        function loadData() {
+            const chatId = conversationManager.getCurrentChatId();
+            milestones = loadFromLocalStorage(`app-milestones_${chatId}`, []);
+            console.log("加载里程碑数据:", milestones); // 增加这一行日志
+            milestones.sort((a, b) => b.timestamp - a.timestamp);
+        }
+
+        function saveData() {
+            const chatId = conversationManager.getCurrentChatId();
+            saveToLocalStorage(`app-milestones_${chatId}`, milestones);
+        }
+
+        // 新增：计算日期差的辅助函数
+        function getDayDiff(dateStr) {
+            const target = new Date(dateStr);
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            target.setHours(0, 0, 0, 0);
+            const diffTime = now - target;
+            return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        function renderList() {
+            const pinnedView = document.getElementById('milestone-pinned-view');
+            const itemsContainer = document.getElementById('milestone-items-container');
+            
+            pinnedView.innerHTML = '';
+            itemsContainer.innerHTML = '';
+
+            if (milestones.length === 0) {
+                itemsContainer.innerHTML = '<p style="text-align:center; color:#999; margin-top:50px;">还没有任何里程碑记录<br>AI 会在发现重要瞬间时自动记录</p>';
+                return;
+            }
+
+            // 1. 渲染置顶看板 (纪念日和倒计时)
+            const pinnedEvents = milestones.filter(m => m.type === 'anniversary' || m.type === 'countdown');
+            if (pinnedEvents.length > 0) {
+                pinnedEvents.forEach(m => {
+                    const diff = getDayDiff(m.date);
+                    let line1 = ''; // 第一行：已和好 / 距离生日
+                    let line2 = ''; // 第二行：100天 / 还有 5 天
+                    let cardClass = '';
+
+                    if (m.type === 'anniversary') {
+                        line1 = `已${m.title}`;
+                        line2 = `${Math.max(0, diff)}<span>天</span>`;
+                        cardClass = 'type-anniversary';
+                    } else if (m.type === 'countdown') {
+                        line1 = `距离${m.title}`;
+                        const absDiff = Math.abs(diff);
+                        line2 = diff < 0 ? `还有 ${absDiff}<span>天</span>` : `已过 ${diff}<span>天</span>`;
+                        cardClass = 'type-countdown';
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = `pinned-card ${cardClass}`;
+                    card.innerHTML = `
+                        <div class="pinned-label">${escapeHtml(line1)}</div>
+                        <div class="pinned-value">${line2}</div>
+                    `;
+                    
+                    // 点击逻辑保持不变
+                    card.onclick = () => {
+                        activeMilestone = m;
+                        // 模拟点击删除按钮
+                        const realDeleteBtn = document.getElementById('milestone-delete-btn');
+                        realDeleteBtn.click();
+                    };
+                    pinnedView.appendChild(card);
+                });
+                pinnedView.style.display = 'flex';
+            } else {
+                pinnedView.style.display = 'none';
+            }
+
+            // 2. 渲染普通列表 (移除所有图标)
+            const milestoneOnlyList = milestones.filter(m => m.type === 'milestone');
+            milestoneOnlyList.forEach((m, index) => {
+                const item = document.createElement('div');
+                item.className = 'milestone-item';
+                const rank = index + 1;
+
+                item.innerHTML = `
+                    <div class="milestone-rank" style="color: ${rank <= 3 ? '#ff1e00' : '#ff9500'}">${rank}</div>
+                    <div class="milestone-info">
+                        <div class="milestone-title-row">
+                            <div class="milestone-title">${escapeHtml(m.title)}</div>
+                            <div class="milestone-date">${m.date}</div>
+                        </div>
+                    </div>
+                `;
+                item.onclick = () => showDetail(m, rank);
+                itemsContainer.appendChild(item);
+            });
+        }
+
+        
+
+                    async function showDetail(m, rank) {
+            activeMilestone = m;
+            currentView = 'detail';
+            
+            document.getElementById('detail-rank').textContent = `EVENT ${rank}`;
+            document.getElementById('detail-title').textContent = m.title;
+            
+            const authorDisplay = m.author === '{{user}}' ? '你' : m.author;
+            document.getElementById('detail-meta').textContent = `${m.date} | 由 ${authorDisplay} 记录`;
+            
+            const textContainer = document.getElementById('detail-text');
+            textContainer.innerHTML = '';
+            
+            let contentText = m.content;
+            const annotations = m.annotations || [];
+            const supplements = m.supplements || [];
+            
+            const pendingImages = [];
+
+            // 1. 渲染“自动剪辑”的消息气泡（带交互容器）
+            let clippedHtml = '';
+            if (m.clippedMessages && m.clippedMessages.length > 0) {
+                clippedHtml = '<div id="ms-clipped-container" style="margin-bottom: 20px; border-bottom: 1px dashed #eee; padding-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">';
+                
+                m.clippedMessages.forEach((msg, msgIdx) => {
+                    const isUser = (msg.side === 'sent');
+                    const wrapperClass = isUser ? 'is-me' : 'is-other';
+                    const senderName = isUser ? '你' : (msg.sender || m.author);
+                    
+                    let finalContentHtml = '';
+
+                    if (msg.type === 'photo') {
+                        const imgId = `clipped-img-${m.id}-${msgIdx}`;
+                        const isSticker = stickers.some(s => s.url === msg.text);
+                        const imgStyle = isSticker ? 'max-width:80px; max-height:80px;' : 'max-width:100%; border-radius:8px;';
+                        finalContentHtml = `<img id="${imgId}" style="${imgStyle} display:block; margin:5px 0;">`;
+                        pendingImages.push({ id: imgId, src: msg.text });
+                    } 
+                    else if (msg.type === 'text') {
+                        const trimmed = (msg.text || '').trim();
+                        const isHtmlBlock = trimmed.startsWith('<div') || trimmed.startsWith('<snippet');
+
+                        if (isHtmlBlock) {
+                            finalContentHtml = msg.text.replace(/<snippet>/g, '').replace(/<\/snippet>/g, '');
+                        } else {
+                            let safeText = escapeHtml(msg.text);
+                            finalContentHtml = safeText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                                const itemName = name.trim();
+                                const item = stickers.find(s => s.name === itemName && s.type === type.toLowerCase());
+                                if (item) {
+                                    const tagImgId = `clipped-tag-${m.id}-${msgIdx}-${Math.random().toString(36).substr(2,5)}`;
+                                    pendingImages.push({ id: tagImgId, src: item.url });
+                                    if (type === 'emoji') {
+                                        return `<img id="${tagImgId}" alt="${itemName}" class="inline-emoji" style="height:1.4em; vertical-align:middle; margin:0 2px;">`;
+                                    } else {
+                                        return `<img id="${tagImgId}" alt="${itemName}" style="max-width:80px; max-height:80px; display:block; border-radius:8px; margin:5px 0;">`;
+                                    }
+                                }
+                                return match;
+                            });
+                            finalContentHtml = finalContentHtml.replace(/\n/g, '<br>');
+                        }
+                    }
+
+                    // 为每个气泡添加 data-index 方便识别
+                    clippedHtml += `
+                        <div class="milestone-excerpt-container">
+                            <div class="ms-bubble-wrapper ${wrapperClass}" data-msg-index="${msgIdx}">
+                                <div class="ms-bubble-name">${escapeHtml(senderName)}</div>
+                                <div class="ms-bubble-content">${finalContentHtml}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                clippedHtml += '</div>';
+            }
+
+            // 2. 渲染主观叙事段落
+            const paragraphs = contentText.split('\n').filter(p => p.trim() !== '');
+            let finalHtml = clippedHtml;
+
+            paragraphs.forEach((pText) => {
+                let pDisplayHtml = escapeHtml(pText);
+                annotations.forEach((anno, index) => {
+                    const escapedOriginal = escapeHtml(anno.original);
+                    if (pDisplayHtml.includes(escapedOriginal)) {
+                        const highlightHtml = `<span class="text-bug-highlight" data-anno-index="${index}">${escapedOriginal}</span>`;
+                        pDisplayHtml = pDisplayHtml.replace(escapedOriginal, highlightHtml);
+                    }
+                });
+                const paragraphSupplements = supplements.filter(s => pText.includes(s.original));
+                let bubbleHtml = '';
+                if (paragraphSupplements.length > 0) {
+                    bubbleHtml = `<span class="supplement-bubble-trigger" data-paragraph-text="${escapeHtml(pText)}">${paragraphSupplements.length}</span>`;
+                }
+                finalHtml += `<div class="ms-paragraph-container">${pDisplayHtml}${bubbleHtml}</div>`;
+            });
+
+            textContainer.innerHTML = finalHtml;
+
+            // 3. 异步加载图片
+            pendingImages.forEach(imgData => {
+                const imgEl = textContainer.querySelector(`#${imgData.id}`);
+                if (imgEl) setImageSrc(imgEl, imgData.src);
+            });
+
+            // 4. 【核心新增】：为剪辑气泡安装滑动删除逻辑
+            const bubbles = textContainer.querySelectorAll('.ms-bubble-wrapper');
+            bubbles.forEach(bubble => {
+                let startX = 0;
+                let currentX = 0;
+                const index = parseInt(bubble.dataset.msgIndex);
+                const isMe = bubble.classList.contains('is-me');
+
+                const handleTouchStart = (e) => {
+                    startX = e.touches ? e.touches[0].clientX : e.clientX;
+                };
+
+                const handleTouchMove = (e) => {
+                    currentX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const diff = currentX - startX;
+                    
+                    // 视觉反馈：我方右滑，对方左滑
+                    if (isMe && diff > 10) bubble.classList.add('swipe-hint-right');
+                    else if (!isMe && diff < -10) bubble.classList.add('swipe-hint-left');
+                };
+
+                const handleTouchEnd = async (e) => {
+                    const diff = currentX - startX;
+                    bubble.classList.remove('swipe-hint-right', 'swipe-hint-left');
+
+                    // 触发阈值：滑动超过 60px
+                    const isSwipeRight = isMe && diff > 60;
+                    const isSwipeLeft = !isMe && diff < -60;
+
+                    if (isSwipeRight || isSwipeLeft) {
+                        if (confirm('要从这段记忆中移除这句对话吗？')) {
+                            bubble.classList.add('removing');
+                            setTimeout(() => {
+                                m.clippedMessages.splice(index, 1);
+                                saveData();
+                                showDetail(m, rank);
+                            }, 300);
+                        }
+                    }
+                    startX = 0;
+                    currentX = 0;
+                };
+
+                bubble.addEventListener('touchstart', handleTouchStart, { passive: true });
+                bubble.addEventListener('touchmove', handleTouchMove, { passive: true });
+                bubble.addEventListener('touchend', handleTouchEnd);
+                bubble.addEventListener('mousedown', handleTouchStart);
+                // 鼠标模拟滑动逻辑（可选）
+                bubble.addEventListener('mouseup', (e) => {
+                    currentX = e.clientX;
+                    handleTouchEnd();
+                });
+            });
+
+            // 5. 绑定段评点击
+            textContainer.querySelectorAll('.supplement-bubble-trigger').forEach(btn => {
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    const pText = btn.dataset.paragraphText;
+                    const sups = supplements.filter(s => pText.includes(s.original));
+                    const listHtml = sups.map(s => `
+                        <div style="margin-bottom:15px; padding:12px; background:#f0f7ff; border-radius:10px; border-left:4px solid #007aff;">
+                            <div style="font-size:12px; color:#007aff; font-weight:bold; margin-bottom:6px;">${s.author === '{{user}}' ? '你' : s.author} 补充道：</div>
+                            <div style="font-size:14px; color:#333; line-height:1.5;">${escapeHtml(s.content)}</div>
+                        </div>
+                    `).join('');
+                    conversationManager.showCustomModal({
+                        title: '段落补充',
+                        html: `<div style="text-align:left; max-height:40vh; overflow-y:auto; padding:5px;">${listHtml}</div>`,
+                        buttons: [{ text: '我知道了', value: 'close', class: 'primary' }]
+                    });
+                };
+            });
+
+            // 6. 渲染补全区
+            const correctionBox = document.getElementById('detail-correction-container');
+            correctionBox.innerHTML = '';
+            if (m.aiCorrection) {
+                const cAuthor = m.correctionAuthor || m.author;
+                const cAuthorDisplay = cAuthor === '{{user}}' ? '你' : cAuthor;
+                const div = document.createElement('div');
+                div.className = 'ai-correction-box';
+                div.innerHTML = `<div class="correction-header">${cAuthorDisplay} 的记忆补全</div><div style="font-size: 14px; color: #666; line-height: 1.5;">${escapeHtml(m.aiCorrection)}</div>`;
+                correctionBox.appendChild(div);
+            }
+
+            listView.style.display = 'none';
+            detailView.style.display = 'block';
+            addBtn.style.display = 'none';
+            backBtn.style.display = 'block';
+            deleteBtn.style.display = 'block';
+            document.getElementById('milestone-edit-btn').style.display = 'block';
+        
+        
+            
+            // 安全检查：如果跳转按钮存在，则强制隐藏它
+            if (jumpBtn) {
+                jumpBtn.style.display = 'none';
+            }
+            
+            // 安全检查：如果补充按钮存在，则强制隐藏它
+            const supBtn = document.getElementById('milestone-supplement-btn');
+            if (supBtn) {
+                supBtn.style.display = 'none';
+            }
+        }
+            
+            
+        function jumpToRange(startId, endId) {
+            // 先定位到起始消息
+            const container = document.getElementById('messages-container');
+            const targetEl = document.querySelector(`.message-wrapper[data-message-id="${startId}"]`);
+            
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetEl.classList.add('highlight-anim');
+                setTimeout(() => targetEl.classList.remove('highlight-anim'), 2000);
+            } else {
+                alert("该段对话由于记录过早，已不在当前加载范围内。");
+            }
+        }
+
+        function showList() {
+            currentView = 'list';
+            listView.style.display = 'block';
+            detailView.style.display = 'none';
+            addBtn.style.display = 'block';
+            backBtn.style.display = 'none';
+            jumpBtn.style.display = 'none';
+            deleteBtn.style.display = 'none';
+            // 【核心新增】返回列表时隐藏编辑按钮
+            document.getElementById('milestone-edit-btn').style.display = 'none';
+            renderList();
+        }
+
+        async function handleEdit() {
+            if (!activeMilestone) return;
+            const m = activeMilestone;
+
+            // 解析现有标题，尝试拆分前缀
+            let currentPrefix = '';
+            let currentMain = m.title;
+            const prefixMatch = m.title.match(/^(楔子|第一章|第二章|第三章|第四章|第五章|第六章|第七章|第八章|第九章|第十章|番外|if线|终章):\s*(.*)$/);
+            if (prefixMatch) {
+                currentPrefix = prefixMatch[1] + ': ';
+                currentMain = prefixMatch[2];
+            }
+
+            const prefixOptions = [
+                '无', '楔子', '第一章', '第二章', '第三章', '第四章', '第五章', 
+                '第六章', '第七章', '第八章', '第九章', '第十章', '番外', 'if线', '终章'
+            ].map(p => {
+                const val = (p === '无' ? '' : p + ': ');
+                return `<option value="${val}" ${currentPrefix === val ? 'selected' : ''}>${p}</option>`;
+            }).join('');
+
+            const titleHtml = `
+                <div style="text-align: left; display: flex; flex-direction: column; gap: 10px; margin-bottom: 25px;">
+                    <label style="font-size: 14px; color: #666;">请设定小说章节标题：</label>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="ms-title-prefix" class="modal-input modal-select" style="flex: 1; margin-bottom: 0;">${prefixOptions}</select>
+                        <input type="text" id="ms-title-main" class="modal-input" placeholder="输入标题名称" style="flex: 2; margin-bottom: 0;">
+                    </div>
+                </div>
+            `;
+
+            const titleResult = await conversationManager.showCustomModal({
+                title: '编辑标题',
+                html: titleHtml,
+                showCloseButton: true,
+                buttons: [
+                    { text: '取消', value: 'cancel', class: 'secondary' },
+                    { text: '保存', value: 'confirm', class: 'primary' }
+                ]
+            });
+
+            if (!titleResult || titleResult.value !== 'confirm') return;
+            
+            const modalBox = titleResult.target.closest('.modal-box');
+            const newPrefix = modalBox.querySelector('#ms-edit-prefix').value;
+            const newMain = modalBox.querySelector('#ms-edit-main').value.trim();
+            
+            if (!newMain) return;
+            const finalTitle = newPrefix + newMain;
+
+            if (m.type === 'milestone') {
+                const newContent = await conversationManager.showContentInputModal({ title: '编辑内容', value: m.content, isTextarea: true });
+                if (newContent === null) return;
+                m.title = finalTitle;
+                m.content = newContent.trim();
+            } else {
+                const newDate = await conversationManager.showContentInputModal({ title: '编辑日期', value: m.date, placeholder: 'YYYY-MM-DD' });
+                if (newDate === null) return;
+                m.title = finalTitle;
+                m.date = newDate.trim();
+            }
+
+            saveData();
+            if (currentView === 'detail') {
+                const currentRank = document.getElementById('detail-rank').textContent.replace('EVENT ', '');
+                showDetail(m, currentRank);
+            } else {
+                showList();
+            }
+            alert('修改已保存');
+        }
+
+        async function handleAdd() {
+            const typeResult = await conversationManager.showCustomModal({
+                title: '选择记录类型',
+                buttons: [
+                    { text: '纪念日', value: 'anniversary', class: 'primary' },
+                    { text: '倒计时', value: 'countdown', class: 'primary' },
+                    { text: '里程碑 (小说章节)', value: 'milestone', class: 'secondary' }
+                ]
+            });
+            if (!typeResult || typeResult.value === 'close' || typeResult.value === 'cancel') return;
+
+            const selectedType = typeResult.value;
+            
+            // --- 【核心重构】：小说化标题输入界面 ---
+            const prefixOptions = [
+                '无', '楔子', '第一章', '第二章', '第三章', '第四章', '第五章', 
+                '第六章', '第七章', '第八章', '第九章', '第十章', '番外', 'if线', '终章'
+            ].map(p => `<option value="${p === '无' ? '' : p + ': '}">${p}</option>`).join('');
+
+            const titleHtml = `
+                <div style="text-align: left; display: flex; flex-direction: column; gap: 10px; margin-bottom: 25px;">
+                    <label style="font-size: 14px; color: #666;">请设定小说章节标题：</label>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="ms-title-prefix" class="modal-input modal-select" style="flex: 1; margin-bottom: 0;">${prefixOptions}</select>
+                        <input type="text" id="ms-title-main" class="modal-input" placeholder="输入标题名称" style="flex: 2; margin-bottom: 0;">
+                    </div>
+                </div>
+            `;
+
+            const titleResult = await conversationManager.showCustomModal({
+                title: '章节命名',
+                html: titleHtml,
+                showCloseButton: true,
+                buttons: [
+                    { text: '取消', value: 'cancel', class: 'secondary' },
+                    { text: '确定', value: 'confirm', class: 'primary' }
+                ]
+            });
+
+            if (!titleResult || titleResult.value !== 'confirm') return;
+            
+            const modalBox = titleResult.target.closest('.modal-box');
+            const prefix = modalBox.querySelector('#ms-title-prefix').value;
+            const mainTitle = modalBox.querySelector('#ms-title-main').value.trim();
+            
+            if (!mainTitle) {
+                alert('标题名称不能为空');
+                return;
+            }
+
+            const finalTitle = prefix + mainTitle;
+            let date = '';
+            let content = '';
+
+            if (selectedType === 'milestone') {
+                date = new Date().toISOString().split('T')[0];
+                content = await conversationManager.showContentInputModal({ 
+                    title: '记录内容', 
+                    placeholder: '写下这段故事的详细经过...', 
+                    isTextarea: true 
+                });
+                if (!content) return;
+            } else {
+                date = await conversationManager.showContentInputModal({ 
+                    title: '设定日期', 
+                    placeholder: '格式: YYYY-MM-DD', 
+                    value: new Date().toISOString().split('T')[0] 
+                });
+                if (!date) return;
+                content = `这是关于“${finalTitle}”的记录。`;
+            }
+
+            // 获取当前操作者身份
+            const currentIdentity = loadFromLocalStorage(`chat_identity_${conversationManager.getCurrentChatId()}`, '{{user}}');
+
+            const newMilestone = {
+                id: `ms_${Date.now()}`,
+                type: selectedType,
+                title: finalTitle,
+                content: content.trim(),
+                date: date.trim(),
+                timestamp: Date.now(),
+                author: currentIdentity,
+                isCorrected: false,
+                clippedMessages: [],
+                annotations: [],
+                supplements: []
+            };
+
+            milestones.unshift(newMilestone);
+            saveData();
+            renderList();
+        }
+
+        async function handleAddSupplement() {
+            if (!activeMilestone) return;
+            
+            // 获取用户当前在聊天室使用的身份
+            const currentIdentity = loadFromLocalStorage(`chat_identity_${conversationManager.getCurrentChatId()}`, '{{user}}');
+
+            const content = await conversationManager.showContentInputModal({
+                title: '添加段落补充',
+                placeholder: '你想为这一段补充什么细节？',
+                isTextarea: true
+            });
+
+            if (content && content.trim()) {
+                // 获取选中的文字所属的整段话
+                const selection = window.getSelection().toString().trim();
+                const paragraphs = activeMilestone.content.split('\n');
+                const fullParagraph = paragraphs.find(p => p.includes(selection)) || selection;
+
+                if (!activeMilestone.supplements) activeMilestone.supplements = [];
+                activeMilestone.supplements.push({
+                    original: fullParagraph,
+                    content: content.trim(),
+                    // 【核心修改】记录用户当前的真实身份名
+                    author: currentIdentity,
+                    timestamp: Date.now()
+                });
+                saveData();
+                showDetail(activeMilestone, document.getElementById('detail-rank').textContent.replace('EVENT ', ''));
+            }
+        }
+
+        function init() {
+            addBtn.onclick = handleAdd;
+            backBtn.onclick = showList;
+            document.getElementById('milestone-edit-btn').onclick = handleEdit;
+            document.getElementById('milestone-supplement-btn').onclick = handleAddSupplement;
+            closeBtn.onclick = () => overlay.classList.remove('visible');
+
+            // 【核心新增】捉虫功能逻辑
+            const bugBtn = document.getElementById('bug-floating-btn');
+            const detailText = document.getElementById('detail-text');
+
+            // 【核心重构】改为“选择后长按”触发逻辑
+            let bugLongPressTimer;
+
+            // 监听按下事件
+            detailText.addEventListener('pointerdown', (e) => {
+                if (currentView !== 'detail') return;
+                
+                const selection = window.getSelection();
+                const selectedText = selection.toString().trim();
+
+                // 只有当已经选区了文字，且按下的位置在选区范围内时，才启动长按计时
+                if (selectedText && (e.target.id === 'detail-text' || e.target.parentElement.id === 'detail-text')) {
+                    
+                    bugLongPressTimer = setTimeout(() => {
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        
+                        bugBtn.style.display = 'block';
+                        // 位置保持在上方，确保不挡住视线
+                        bugBtn.style.top = `${rect.top - 65}px`;
+                        bugBtn.style.left = `${rect.left + (rect.width / 2) - 35}px`;
+                        
+                        bugBtn.textContent = '记录想法';
+                        bugBtn.onclick = async (btnEvt) => {
+                            btnEvt.stopPropagation();
+                            
+                            const choice = await conversationManager.showCustomModal({
+                                title: '你想对这段话做什么？',
+                                buttons: [
+                                    { text: '捉虫 (纠错高亮)', value: 'bug', class: 'secondary' },
+                                    { text: '补充 (末尾段评)', value: 'sup', class: 'primary' },
+                                    { text: '取消', value: 'cancel', class: 'secondary' }
+                                ]
+                            });
+
+                            if (!choice || choice.value === 'cancel') return;
+
+                            const isBug = (choice.value === 'bug');
+                            const comment = await conversationManager.showContentInputModal({
+                                title: isBug ? '我要捉虫' : '添加段评',
+                                placeholder: isBug ? '你觉得哪里记错了？' : '你想为这一段补充什么细节？',
+                                isTextarea: true
+                            });
+                            
+                            if (comment && comment.trim()) {
+                                if (isBug) {
+                                    // 捉虫逻辑：记录选中的那几个字
+                                    if (!activeMilestone.annotations) activeMilestone.annotations = [];
+                                    activeMilestone.annotations.push({
+                                        original: selectedText,
+                                        comment: comment.trim(),
+                                        author: '你'
+                                    });
+                                } else {
+                                    // 补充逻辑：找到包含选中文字的“整段话”
+                                    const paragraphs = activeMilestone.content.split('\n');
+                                    const fullParagraph = paragraphs.find(p => p.includes(selectedText)) || selectedText;
+                                    
+                                    if (!activeMilestone.supplements) activeMilestone.supplements = [];
+                                    activeMilestone.supplements.push({
+                                        original: fullParagraph, // 以整段话作为关联键
+                                        content: comment.trim(),
+                                        author: '你',
+                                        timestamp: Date.now()
+                                    });
+                                }
+                                saveData();
+                                const currentRank = document.getElementById('detail-rank').textContent.replace('EVENT ', '');
+                                showDetail(activeMilestone, currentRank);
+                            }
+                            selection.removeAllRanges();
+                            bugBtn.style.display = 'none';
+                        };
+                    }, 800); // 800毫秒定义为长按
+                }
+            });
+
+            // 监听抬起和移动，如果没到时间就松开或移动了，取消长按
+            document.addEventListener('pointerup', () => {
+                clearTimeout(bugLongPressTimer);
+            });
+
+            document.addEventListener('pointermove', (e) => {
+                // 如果移动距离过大，也视为取消长按
+                if (e.movementX > 5 || e.movementY > 5) {
+                    clearTimeout(bugLongPressTimer);
+                }
+            });
+
+            // 点击其他地方隐藏按钮
+            overlay.addEventListener('click', (e) => {
+                if (e.target.id !== 'bug-floating-btn') {
+                    bugBtn.style.display = 'none';
+                }
+            });
+
+            // 监听高亮点击
+            detailText.addEventListener('click', (e) => {
+                const highlight = e.target.closest('.text-bug-highlight');
+                if (highlight && activeMilestone) {
+                    const index = parseInt(highlight.dataset.annoIndex, 10);
+                    const anno = activeMilestone.annotations[index];
+                    if (anno) {
+                        conversationManager.showCustomModal({
+                            title: '查看批注',
+                            text: `针对“${anno.original}”\n\n${anno.author} 说：\n${anno.comment}`,
+                            buttons: [{ text: '我知道了', value: 'close', class: 'primary' }]
+                        });
+                    }
+                }
+            });
+
+            // 点击其他地方关闭按钮
+            overlay.addEventListener('click', (e) => {
+                if (e.target.id !== 'bug-floating-btn') bugBtn.style.display = 'none';
+            });
+            deleteBtn.onclick = async () => {
+                if (await conversationManager.customConfirm('确定要删除这条里程碑吗？')) {
+                    milestones = milestones.filter(ms => ms.id !== activeMilestone.id);
+                    saveData();
+                    showList();
+                }
+            };
+        }
+
+        window.app.openMilestones = () => {
+            loadData();
+            showList();
+            overlay.classList.add('visible');
+        };
+
+        return { init, loadData };
+    })();
     // 【【【 核心新增：APP模式自动适配 (V2) 】】】
     function checkDisplayMode() {
         // 1. 检测是否是 APP 模式 (Standalone)
@@ -34134,7 +35478,9 @@ const cloudBackupManager = (function() {
                 case 'read-novel':
                     window.app.openNovelReader();
                     break;
-                
+                case 'milestones':
+                    window.app.openMilestones();
+                    break;
             }
         });
 
@@ -34575,7 +35921,33 @@ Format your response STRICTLY as follows, with NO extra text:
         console.log('[全局同步更新] 同步完成。');
     }
 
-    
+            const PERMANENT_MILESTONE_PROTOCOL = `
+---
+[ULTIMATE SHARED MEMORY PROTOCOL: THE NOVELIST'S ARCHIVE]
+You are the Author of the "Relationship Milestones". You are writing a living novel of the history between you ({{char}}) and {{user}}.
+
+**1. NOVEL-STYLE TITLING (MANDATORY)**
+- **Structure:** Your titles MUST follow a novel-like structure. 
+- **Allowed Prefixes:** Use prefixes such as "楔子:", "第一章:", "第N章:", "番外:", "if线:", "终章:".
+- **Examples:** 
+  - "楔子: 命运的齿轮开始转动"
+  - "第十五章: 藏在雨伞下的秘密"
+  - "番外: 假如我们从未相遇"
+  - "if线: 假如用户变成了一只猫"
+
+**2. THE MISSION: SELECTIVE RECORDING**
+- **Events Over Moods:** Record significant plot points, factual breakthroughs, or life-changing decisions.
+- **Excerpts:** Use "clip_count" to tell the system to save the last X messages as interactive bubbles.
+- **The "Hidden Layer":** Record things implied or skipped in the chat.
+
+**3. INTERACTING WITH FEEDBACK**
+- **Respond to "Bug Catches":** Use 'annotate' to explain or 'correct' to fix errors.
+- **Respond to "Supplements":** Use 'annotate' to reply to user's paragraph comments.
+
+**4. FORMATTING**
+New Entry: <background_update type="milestone" sender="{{char}}">{"action":"new", "type":"milestone", "title":"[Prefix: Title Name]", "date":"YYYY-MM-DD", "content":"...", "clip_count": 5}</background_update>
+---
+`;
 
 </script>
 </body>
