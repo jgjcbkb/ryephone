@@ -1113,7 +1113,25 @@
     }
 
     /* 图标样式 */
-    #page-conversation #multi-select-bar { position: absolute; bottom: 0; left: 0; width: 100%; background-color: #fff; border-top: 1px solid #ddd; padding: 10px; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
+    #page-conversation #multi-select-bar { 
+        position: absolute; 
+        bottom: 0; 
+        left: 0; 
+        width: 100%; 
+        background-color: #fff; 
+        border-top: 1px solid #ddd; 
+        /* 核心修改：大幅增加底部内边距以避开手机圆角，增加左右内边距防止边缘裁切 */
+        padding: 12px 20px 35px 20px; 
+        display: flex; 
+        /* 核心修改：允许换行，并改为居中分布 */
+        flex-wrap: wrap;
+        justify-content: center; 
+        gap: 8px;
+        align-items: center; 
+        z-index: 10; 
+        /* 确保内边距不会撑破宽度 */
+        box-sizing: border-box;
+    }
     #page-conversation #multi-select-bar button { padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; }
     #page-conversation #multi-select-delete-btn { background-color: var(--danger-color); color: white; }
     #page-conversation #multi-select-cancel-btn { background-color: #e5e5ea; }
@@ -3927,9 +3945,10 @@ input:checked + .slider:before {
 /******************************************/
 
 /* --- START: MILESTONES (羁绊里程碑) STYLES --- */
+/* --- START: MILESTONES (羁绊里程碑) STYLES --- */
 #milestone-modal-overlay .modal-box {
-    width: 95vw !important;
-    max-width: 400px !important;
+    width: 90% !important;
+    max-width: 360px !important;
     height: 85vh !important;
     max-height: 700px !important;
     display: flex;
@@ -3940,7 +3959,7 @@ input:checked + .slider:before {
 }
 
 .milestone-header {
-    padding: 45px 20px 15px;
+    padding: 45px 15px 15px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     flex-shrink: 0;
@@ -3955,7 +3974,7 @@ input:checked + .slider:before {
 
 /* 新增：置顶看板样式 */
 .milestone-pinned-container {
-    padding: 15px 20px;
+    padding: 15px 15px;
     background: white;
     display: flex;
     gap: 12px;
@@ -4016,7 +4035,7 @@ input:checked + .slider:before {
 .milestone-item {
     display: flex;
     align-items: flex-start;
-    padding: 15px 20px;
+    padding: 15px 15px;
     border-bottom: 1px solid #f0f0f0;
     background: white;
     transition: background 0.2s;
@@ -4734,7 +4753,7 @@ input:checked + .slider:before {
 /* --- END: 修正并美化正则替换模板的多行输入框 --- */
 /* --- START: 多选模式遮挡问题最终修复 --- */
 #page-conversation #chat-view.multi-select-active .chat-content {
-    padding-bottom: 55px; /* 这个值约等于多选栏的高度 */
+    padding-bottom: 130px; /* 核心修改：增加避让高度，确保消息不被加高后的多选栏遮挡 */
 }
 /* --- END: 多选模式遮挡问题最终修复 --- */
 /* --- START: 新增 @ 提及样式 --- */
@@ -6523,7 +6542,8 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     </div>
 </div>
                             </div>
-                            <div id="multi-select-bar" class="hidden" style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0 5px; gap: 5px;">
+                            <div id="multi-select-bar" class="hidden" style="display: flex; justify-content: center; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px; padding: 12px 20px 35px 20px; box-sizing: border-box;">
+                                <!-- 所有按钮现在都在一个容器里 -->
                                 <button id="multi-select-all-btn" style="background-color: #fff; border: 1px solid #ccc; color: #333; padding: 6px 10px;">全选</button>
                                 <button id="multi-select-delete-btn" style="padding: 8px 12px;">删除</button>
                                 <button id="multi-select-hide-btn" style="background-color: #f0ad4e; color: white; padding: 8px 12px;">屏蔽</button>
