@@ -6524,10 +6524,11 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 </div>
                             </div>
                             <div id="multi-select-bar" class="hidden" style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0 5px; gap: 5px;">
-                                <!-- 所有按钮现在都在一个容器里 -->
                                 <button id="multi-select-all-btn" style="background-color: #fff; border: 1px solid #ccc; color: #333; padding: 6px 10px;">全选</button>
                                 <button id="multi-select-delete-btn" style="padding: 8px 12px;">删除</button>
                                 <button id="multi-select-hide-btn" style="background-color: #f0ad4e; color: white; padding: 8px 12px;">屏蔽</button>
+                                <!-- 【核心新增】存入里程碑按钮 -->
+                                <button id="multi-select-milestone-btn" style="background-color: #764ba2; color: white; padding: 8px 12px;">存入里程碑</button>
                                 <button id="multi-select-preview-btn" style="background-color: #3498db; color: white; padding: 8px 12px;">预览</button>
                                 <span id="multi-select-counter" style="font-size: 12px; white-space: nowrap; margin: 0 auto;">已选 0</span>
                                 <button id="multi-select-cancel-btn" style="padding: 8px 12px;">取消</button>
@@ -12446,43 +12447,54 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                             const actorName = finalSenderName || senderName;
 
                             if (milestoneData.action === 'new') {
-                                // 【智能过滤器】：只保留纯文本、带表情的消息以及照片
+                                // 【智能过滤器 2.0】：排除弹幕、代码块及 [STATUS] 等元数据
                                 let clippedMessages = [];
-                                if (milestoneData.clip_count && milestoneData.clip_count > 0) {
-                                    const fullHistory = loadFromLocalStorage(`conversation_${targetChatId}`, []);
+                                const fullHistory = loadFromLocalStorage(`conversation_${targetChatId}`, []);
+                                
+                                const filteredChat = fullHistory.filter(m => {
+                                    // 1. 基础过滤
+                                    if (m.side === 'system' || m.type === 'time_divider') return false;
                                     
-                                    const filteredChat = fullHistory.filter(m => {
-                                        // 1. 基础过滤：排除系统消息、时间线、语音、位置等非视觉文本类型
-                                        if (m.side === 'system' || m.type === 'time_divider') return false;
+                                    // 2. 允许照片
+                                    if (m.type === 'photo') return true;
+
+                                    // 3. 文本深度过滤
+                                    if (m.type === 'text') {
+                                        const txt = (m.text || '').trim();
                                         
-                                        // 2. 允许照片类型（包含表情包大图）
-                                        if (m.type === 'photo') return true;
-
-                                        // 3. 针对文本类型的深度过滤
-                                        if (m.type === 'text') {
-                                            const txt = (m.text || '').trim();
-                                            
-                                            // A. 排除弹幕代码块
-                                            if (txt.includes('[DANMAKU_PLAYER]') || txt.includes('<dm ')) return false;
-                                            
-                                            // B. 排除没有记忆锚点标记的复杂 HTML/代码块
-                                            // 逻辑：如果包含 div 或 snippet，但没有明确的 data-ai-log-as-text="true" 标记，则视为纯 UI 装饰，跳过
-                                            if (txt.includes('<div') || txt.includes('<snippet')) {
-                                                if (!txt.includes('data-ai-log-as-text="true"')) {
-                                                    return false;
-                                                }
+                                        // A. 排除弹幕代码
+                                        if (txt.includes('[DANMAKU_PLAYER]') || txt.includes('<dm ')) return false;
+                                        
+                                        // B. 【核心修复】：排除开头结尾是 [] 的特殊格式文本（如 [STATUS], [LOG] 等）
+                                        if (txt.startsWith('[') && txt.endsWith(']')) return false;
+                                        if (txt.includes('[STATUS]')) return false;
+                                        
+                                        // C. 排除没有记忆锚点标记的复杂 HTML/代码块
+                                        if (txt.includes('<div') || txt.includes('<snippet')) {
+                                            if (!txt.includes('data-ai-log-as-text="true"')) {
+                                                return false;
                                             }
-                                            
-                                            // C. 排除空消息
-                                            if (!txt) return false;
-
-                                            return true; // 剩下的就是纯对话或带 [emoji] 的文本
                                         }
                                         
-                                        return false; // 其他类型（如代付、转账卡片等）默认跳过
-                                    });
+                                        // D. 排除空消息
+                                        if (!txt) return false;
 
-                                    // 从过滤后的“精选对话”中截取最后 N 条
+                                        return true; 
+                                    }
+                                    return false;
+                                });
+
+                                // 执行截取逻辑 (clip_range 优先，clip_count 兜底)
+                                if (milestoneData.clip_range && Array.isArray(milestoneData.clip_range) && milestoneData.clip_range.length === 2) {
+                                    const startText = milestoneData.clip_range[0];
+                                    const endText = milestoneData.clip_range[1];
+                                    const startIndex = filteredChat.findIndex(m => m.text && m.text.includes(startText));
+                                    const endIndex = filteredChat.findLastIndex(m => m.text && m.text.includes(endText));
+                                    if (startIndex !== -1 && endIndex !== -1 && endIndex >= startIndex) {
+                                        clippedMessages = filteredChat.slice(startIndex, endIndex + 1);
+                                    }
+                                } 
+                                if (clippedMessages.length === 0 && milestoneData.clip_count > 0) {
                                     clippedMessages = filteredChat.slice(-milestoneData.clip_count);
                                 }
 
@@ -21480,6 +21492,95 @@ messagesContainer.addEventListener('dblclick', async (e) => {
         showContextMenu(e, messageId); 
     });
 multiSelectCancelBtn.addEventListener('click', exitMultiSelectMode);
+// 【核心新增】：多选消息存入里程碑逻辑 (带 2.0 过滤器)
+    document.getElementById('multi-select-milestone-btn').addEventListener('click', async () => {
+        if (selectedMessageIds.length === 0) return;
+
+        const prefixOptions = [
+            '无', '楔子', '第一章', '第二章', '第三章', '第四章', '第五章', 
+            '第六章', '第七章', '第八章', '第九章', '第十章', '番外', 'if线', '终章'
+        ].map(p => `<option value="${p === '无' ? '' : p + ': '}">${p}</option>`).join('');
+
+        const titleHtml = `
+            <div style="text-align: left; display: flex; flex-direction: column; gap: 10px; margin-bottom: 25px;">
+                <label style="font-size: 14px; color: #666;">请为选中的 ${selectedMessageIds.length} 条对话设定标题：</label>
+                <div style="display: flex; gap: 8px;">
+                    <select id="ms-multi-prefix" class="modal-input modal-select" style="flex: 1; margin-bottom: 0;">${prefixOptions}</select>
+                    <input type="text" id="ms-multi-main" class="modal-input" placeholder="输入标题名称" style="flex: 2; margin-bottom: 0;">
+                </div>
+            </div>
+        `;
+
+        const titleResult = await conversationManager.showCustomModal({
+            title: '存入里程碑',
+            html: titleHtml,
+            showCloseButton: true,
+            buttons: [
+                { text: '取消', value: 'cancel', class: 'secondary' },
+                { text: '确定存入', value: 'confirm', class: 'primary' }
+            ]
+        });
+
+        if (!titleResult || titleResult.value !== 'confirm') return;
+
+        const modalBox = titleResult.target.closest('.modal-box');
+        const mainTitleText = modalBox.querySelector('#ms-multi-main').value.trim();
+        const finalTitle = modalBox.querySelector('#ms-multi-prefix').value + mainTitleText;
+        
+        if (!mainTitleText) {
+            alert('标题不能为空');
+            return;
+        }
+
+        // 【过滤器 2.0】：收集并过滤选中的消息
+        const selectedMsgs = chatState.messages
+            .filter(m => selectedMessageIds.includes(m.id))
+            .filter(m => {
+                if (m.type === 'system' || m.type === 'time_divider') return false;
+                if (m.type === 'photo') return true;
+                if (m.type === 'text') {
+                    const txt = (m.text || '').trim();
+                    // 排除弹幕
+                    if (txt.includes('[DANMAKU_PLAYER]') || txt.includes('<dm ')) return false;
+                    // 【核心修复】：排除 [STATUS] 等特殊格式
+                    if (txt.startsWith('[') && txt.endsWith(']')) return false;
+                    if (txt.includes('[STATUS]')) return false;
+                    // 排除无标记代码块
+                    if ((txt.includes('<div') || txt.includes('<snippet')) && !txt.includes('data-ai-log-as-text="true"')) return false;
+                    return !!txt;
+                }
+                return false;
+            })
+            .sort((a, b) => a.timestamp - b.timestamp);
+
+        const content = await conversationManager.showContentInputModal({
+            title: '添加叙事/备注',
+            placeholder: '（选填）为这段对话添加一些背景描写或你的内心戏...',
+            isTextarea: true
+        }) || `这是关于“${finalTitle}”的精彩对话摘录。`;
+
+        const chatId = conversationManager.getCurrentChatId();
+        const storageKey = `app-milestones_${chatId}`;
+        const milestones = loadFromLocalStorage(storageKey, []);
+        const currentIdentity = loadFromLocalStorage(`chat_identity_${chatId}`, '{{user}}');
+
+        milestones.unshift({
+            id: `ms_${Date.now()}`,
+            type: 'milestone',
+            title: finalTitle,
+            content: content.trim(),
+            date: new Date().toISOString().split('T')[0],
+            timestamp: Date.now(),
+            author: currentIdentity,
+            clippedMessages: JSON.parse(JSON.stringify(selectedMsgs)),
+            annotations: [],
+            supplements: []
+        });
+
+        saveToLocalStorage(storageKey, milestones);
+        exitMultiSelectMode();
+        alert('已成功存入里程碑！');
+    });
 // --- 全选/全不选逻辑 ---
     if (multiSelectAllBtn) {
         multiSelectAllBtn.addEventListener('click', () => {
@@ -35923,29 +36024,37 @@ Format your response STRICTLY as follows, with NO extra text:
 
             const PERMANENT_MILESTONE_PROTOCOL = `
 ---
-[ULTIMATE SHARED MEMORY PROTOCOL: THE NOVELIST'S ARCHIVE]
-You are the Author of the "Relationship Milestones". You are writing a living novel of the history between you ({{char}}) and {{user}}.
+[ULTIMATE SHARED MEMORY PROTOCOL: THE PRECISION ARCHIVIST]
+You are the Author of the "Relationship Milestones". You have advanced tools to save history accurately.
 
-**1. NOVEL-STYLE TITLING (MANDATORY)**
-- **Structure:** Your titles MUST follow a novel-like structure. 
-- **Allowed Prefixes:** Use prefixes such as "楔子:", "第一章:", "第N章:", "番外:", "if线:", "终章:".
-- **Examples:** 
-  - "楔子: 命运的齿轮开始转动"
-  - "第十五章: 藏在雨伞下的秘密"
-  - "番外: 假如我们从未相遇"
-  - "if线: 假如用户变成了一只猫"
+**1. ADVANCED CLIPPING (TOKEN SAVER)**
+- **Option A: "clip_count"**: Set to a number (e.g., 5) to save the last X meaningful messages.
+- **Option B: "clip_range" (NEW)**: If you want to save a specific conversation from earlier, use this field. 
+  - **Format**: \`"clip_range": ["Start Text", "End Text"]\`
+  - **Logic**: The system will find the message containing "Start Text" and the message containing "End Text", and clip everything in between.
+  - **Requirement**: The text you provide must be UNIQUE enough to find the correct messages.
 
-**2. THE MISSION: SELECTIVE RECORDING**
-- **Events Over Moods:** Record significant plot points, factual breakthroughs, or life-changing decisions.
-- **Excerpts:** Use "clip_count" to tell the system to save the last X messages as interactive bubbles.
-- **The "Hidden Layer":** Record things implied or skipped in the chat.
+**2. NOVEL-STYLE TITLING**
+- **Structure:** Use prefixes: "楔子:", "第一章:", "番外:", "if线:", "终章:".
+- **Example:** "if线: 假如用户变成了一只猫"
 
-**3. INTERACTING WITH FEEDBACK**
-- **Respond to "Bug Catches":** Use 'annotate' to explain or 'correct' to fix errors.
-- **Respond to "Supplements":** Use 'annotate' to reply to user's paragraph comments.
+**3. THE MISSION: SELECTIVE RECORDING**
+- **Events Over Moods:** Record significant plot points.
+- **Hidden Layer:** Record things implied or skipped.
+- **NO FABRICATION:** Do not invent major events that contradict history.
 
-**4. FORMATTING**
-New Entry: <background_update type="milestone" sender="{{char}}">{"action":"new", "type":"milestone", "title":"[Prefix: Title Name]", "date":"YYYY-MM-DD", "content":"...", "clip_count": 5}</background_update>
+**4. FORMATTING (MANDATORY)**
+<background_update type="milestone" sender="{{char}}">
+{
+  "action": "new",
+  "type": "milestone",
+  "title": "[Prefix: Title]",
+  "date": "YYYY-MM-DD",
+  "content": "Your subjective story.",
+  "clip_count": 5,
+  "clip_range": ["The first sentence of the scene", "The last sentence of the scene"]
+}
+</background_update>
 ---
 `;
 
