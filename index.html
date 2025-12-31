@@ -109,21 +109,22 @@
         -webkit-transform: translate3d(0, 0, 0);
     }
     .status-bar { 
-        position: absolute; top: 8px; left: 0; width: 100%; height: 28px;
+        position: absolute; top: 8px; left: 0; width: 100%; height: 30px; /* 高度增加到30px，与刘海一致 */
         z-index: 101; pointer-events: none; padding: 0 25px; box-sizing: border-box;
         display: flex; justify-content: space-between; align-items: center;
     }
     .notch { 
-        position: relative; 
-        width: 120px; /* 放大两倍 */
-        height: 30px; /* 放大两倍 */
+        position: absolute; /* 核心修改：改为绝对定位，脱离 flex 限制 */
+        left: 50%; /* 移动到屏幕水平中心 */
+        transform: translateX(-50%); /* 向左偏移自身一半的宽度，达成完美居中 */
+        width: 120px; 
+        height: 30px; 
         background: #000; 
-        border-radius: 18px; /* 增加圆角以保持药丸形状 */
+        border-radius: 18px; 
         z-index: 1000; 
         display: flex;
         align-items: center;
         justify-content: center;
-        /* 增加一点点阴影，让它在深绿背景上更有立体感 */
         box-shadow: 0 4px 12px rgba(0,0,0,0.3); 
     }
     /* 彻底隐藏摄像头和麦克风样式 */
