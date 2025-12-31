@@ -6072,11 +6072,11 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 }
 .music-main-row { 
     position: relative; 
-    height: 115px; 
+    height: 105px; 
     perspective: 1000px; 
     display: flex;
     align-items: center;
-    padding-top: 12px; /* 新增：通过内边距将唱片和文字整体向下推 */
+    padding-top: 5px; 
 }
 .music-flip-container { 
     position: relative; 
@@ -6107,13 +6107,13 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     top: 0; 
 }
 .music-record-wrapper { 
-    width: 110px; /* 缩小唱片外框 */
-    height: 110px; 
+    width: 100px; 
+    height: 100px; 
     position: relative; 
     flex-shrink: 0; 
     background-color: transparent; 
     overflow: hidden;
-    transition: transform 0.5s ease; /* 切换时的平滑过渡 */
+    transition: transform 0.5s ease; 
 }
 
 /* 定义旋转动画 */
@@ -6158,7 +6158,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
-    margin-top: 8px; /* 稍微减小间距，确保整体在 180px 的卡片内不拥挤 */
+    margin-top: 2px; 
 }
 .music-btn { background: none; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
 .music-btn svg { width: 22px; height: 22px; fill: var(--text-main); transition: fill 0.2s; } /* 稍微缩小图标并统一为白色 */
