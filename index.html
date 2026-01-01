@@ -29426,6 +29426,41 @@ function saveSettings() {
                 alert('外观设置已保存！');
             });
 
+            // --- 核心修复：添加正则规则按钮的点击监听器 ---
+            document.getElementById('regex-add-btn').addEventListener('click', () => {
+                const name = document.getElementById('regex-name').value.trim();
+                const pattern = document.getElementById('regex-pattern').value.trim();
+                const flags = document.getElementById('regex-flags').value.trim();
+                const template = document.getElementById('regex-template').value;
+                const enabled = document.getElementById('regex-enabled').checked;
+                const editIndex = document.getElementById('regex-edit-index').value;
+
+                if (!name || !pattern) {
+                    alert('名称和匹配模式不能为空！');
+                    return;
+                }
+
+                const newRule = { name, pattern, flags, template, enabled };
+
+                if (editIndex !== '') {
+                    // 更新现有规则
+                    appearanceSettings.regexReplacements[editIndex] = newRule;
+                } else {
+                    // 添加新规则
+                    if (!appearanceSettings.regexReplacements) appearanceSettings.regexReplacements = [];
+                    appearanceSettings.regexReplacements.push(newRule);
+                }
+
+                saveSettings();
+                renderRegexList(); // 刷新列表显示
+                resetRegexForm();  // 重置输入框
+                alert('正则规则已成功保存！');
+            });
+
+            // 绑定取消按钮
+            document.getElementById('regex-cancel-btn').addEventListener('click', resetRegexForm);
+            // --- 修复结束 ---
+
             // 【【【核心修改：为所有新按钮绑定事件】】】
             document.getElementById('global-chat-bg-upload-btn').addEventListener('click', () => {
                 const inputEl = document.getElementById('global-chat-bg-url');
