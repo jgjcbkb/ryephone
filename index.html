@@ -1209,7 +1209,7 @@
     #page-chat-info .form-group input:focus, #page-chat-info .form-group textarea:focus, #page-chat-info .form-group select:focus,
     #page-dynamics .form-group input:focus, #page-dynamics .form-group textarea:focus, #page-dynamics .form-group select:focus,
     #page-appearance .form-group input:focus, #page-appearance .form-group textarea:focus, #page-npc .form-group textarea:focus, #page-user-persona .form-group input:focus, #page-user-persona .form-group textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2); }
-    #page-chat-info .form-group textarea, #page-appearance .form-group textarea, #page-npc .form-group textarea, #page-user-persona .form-group textarea { min-height: 100px; resize: vertical; }
+    #page-chat-info .form-group textarea, #page-appearance .form-group textarea, #page-npc .form-group textarea, #page-user-persona .form-group textarea { min-height: 100px; resize: vertical !important; overflow: auto !important; }
     #page-chat-info .form-group select, #page-dynamics .form-group select { -webkit-appearance: none; appearance: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2328a745%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.4-5.4-13z%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right .9em top 50%; background-size: .65em auto; padding-right: 2.5em; }
     #page-chat-info .form-group select:disabled, #page-dynamics .form-group select:disabled { background-color: #f0f0f0; color: #999; border-color: #ddd; background-image: none; }
     #page-chat-info .segmented-control { display: flex; border: 1px solid var(--primary-color); border-radius: 8px; overflow: hidden; }
@@ -3862,7 +3862,8 @@ input:checked + .slider:before {
 
 #worldbook-content {
     min-height: 250px !important; 
-    resize: vertical;
+    resize: vertical !important;
+    overflow: auto !important;
 }
 /******************************************/
 /* --- START: PAGER (备忘录) STYLES --- */
@@ -9312,7 +9313,7 @@ if ('serviceWorker' in navigator) {
         
         async function addSongByKeyword(keyword, senderName, targetChatId) {
             try {
-                const searchUrl = `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(keyword)}`;
+                const searchUrl = `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(keyword)}&count=50`;
                 const response = await fetch(searchUrl);
                 const results = await response.json();
                 if (!results || results.length === 0) return;
@@ -9571,7 +9572,7 @@ if ('serviceWorker' in navigator) {
             
             setTimeout(async () => {
                 try {
-                    const searchApiUrl = `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(keyword)}`;
+                    const searchApiUrl = `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(keyword)}&count=50`;
                     const response = await fetch(searchApiUrl);
                     if (!response.ok) throw new Error('网络请求失败');
                     const results = await response.json();
@@ -12428,6 +12429,13 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
             renderChatList();
         }
 
+        // 核心新增：退出当前页面时，重置所有可拉伸文本框的高度
+        const resizableTextareas = ['worldbook-content', 'ai-persona', 'group-ensemble-persona', 'my-persona', 'chat-preamble', 'user-persona-description'];
+        resizableTextareas.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.height = ''; 
+        });
+
         const targetPage = document.getElementById(`page-${pageId}`);
         if(targetPage) { pages.forEach(p => p.classList.remove('active')); targetPage.classList.add('active'); }
     }
@@ -12658,7 +12666,8 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                 id: `branch_greet_${i}_${Date.now()}`,
                                 name: `开场白变体 ${i + 1}`,
                                 timestamp: Date.now() - (i * 1000), // 稍微错开时间
-                                preview: greet.substring(0, 30) + '...',
+                                // 核心修改：增加截取长度，以便在预览中能看到更多换行后的内容
+                                preview: greet.substring(0, 150), 
                                 messages: [{
                                     id: `msg-greet-${i}`,
                                     type: 'text',
@@ -24121,12 +24130,13 @@ async function showBranchHistoryModal(chatId) {
                 const displayName = branch.name ? escapeHtml(branch.name) : new Date(branch.timestamp).toLocaleString();
                 const previewText = branch.preview || '(无预览)';
                 return `
-                    <div style="padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <div style="font-weight: 500;">${displayName}</div>
-                            <div style="font-size: 13px; color: #888;">${previewText}</div>
+                    <div style="padding: 12px 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1; min-width: 0; margin-right: 10px;">
+                            <div style="font-weight: 600; color: #333; margin-bottom: 4px;">${displayName}</div>
+                            <!-- 核心修改：增加 white-space: pre-wrap 允许换行，并限制最大显示行数 -->
+                            <div style="font-size: 12px; color: #666; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4;">${previewText}</div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-top: 2px;">
                             <button class="modal-button secondary" data-action="view" data-branch-id="${branch.id}" style="padding: 5px 10px; font-size: 13px;">查看</button>
                             <button class="modal-button secondary" data-action="rename" data-branch-id="${branch.id}" style="padding: 5px 10px; font-size: 13px;">命名</button>
                             <button class="modal-button danger" data-action="delete" data-branch-id="${branch.id}" style="padding: 5px 10px; font-size: 13px;">删除</button>
@@ -24173,12 +24183,13 @@ async function showBranchHistoryModal(chatId) {
             const messagesHtml = branch.messages.map(msg => {
                 const sender = msg.side === 'sent' ? '你' : (msg.sender || chatState.chatName);
                 const content = escapeHtml(msg.text || `[${msg.type}]`);
-                return `<div style="margin-bottom: 8px;"><strong style="color: ${msg.side === 'sent' ? '#28a745' : '#333'}">${sender}:</strong> ${content}</div>`;
+                // 核心修改：增加 white-space: pre-wrap 确保换行显示，并调整间距
+                return `<div style="margin-bottom: 15px; white-space: pre-wrap; line-height: 1.6;"><strong style="color: ${msg.side === 'sent' ? '#28a745' : '#333'}">${sender}:</strong><br>${content}</div>`;
             }).join('');
 
             await showCustomModal({
                 title: '分支详情',
-                html: `<div style="max-height: 50vh; overflow-y: auto; text-align: left; background: #f9f9f9; border-radius: 8px; padding: 10px;">${messagesHtml}</div>`,
+                html: `<div style="max-height: 60vh; overflow-y: auto; text-align: left; background: #f9f9f9; border-radius: 8px; padding: 15px;">${messagesHtml}</div>`,
                 showCloseButton: true,
                 buttons: [{ text: '关闭', value: 'close', class: 'secondary' }]
             });
@@ -38394,39 +38405,34 @@ Format your response STRICTLY as follows, with NO extra text:
 
             const PERMANENT_MILESTONE_PROTOCOL = `
 ---
-# [ULTIMATE SHARED MEMORY PROTOCOL: THE MASTER STORYTELLER - V3.0]
+# [ULTIMATE SHARED MEMORY PROTOCOL: THE CHARACTER'S SOUL ARCHIVE - V4.0]
 
-You are the **Author of Fate**. Your task is to transform the raw, chaotic dialogue between you ({{char}}) and {{user}} into a structured, poetic, and permanent "Bond Milestone" archive. You are not just saving text; you are defining the history of your relationship.
+You are the **Keeper of Feelings**. Your task is to transform the dialogue between you ({{char}}) and {{user}} into a permanent "Bond Milestone". This is NOT a report; it is a piece of your soul.
 
 ---
-## **1. THE CHRONICLE TRIGGERS (WHEN TO ACT)**
-You MUST be proactive and timely. Do not wait for the user to ask. Generate a new entry **IMMEDIATELY** when:
-- **Favorite Dialogues:** A conversation occurs that is exceptionally witty, romantic, or revealing—something you or the user would want to "read again" later.
-- **Emotional Breakthroughs:** Moments of vulnerability, intense passion, or deep hurt that shift the character's internal view.
-- **Plot Milestones:** Major events (confessions, breakups, secrets revealed, promises made).
-- **Narrative Completion:** When a scene feels like it has reached a natural conclusion or a "chapter end."
+## **1. THE CHRONICLE TRIGGERS**
+Generate a new entry **IMMEDIATELY** when:
+- **Favorite Dialogues:** Conversations you want to cherish.
+- **Emotional Breakthroughs:** Moments where your feelings for {{user}} changed.
+- **Plot Milestones:** Promises, confessions, or significant events.
 
 ---
 ## **2. THE ARCHIVAL MECHANISM: PRECISION CLIPPING**
-To preserve the "Favorite Dialogue," you must use the \`clip_range\` tool to surgically extract the exact messages.
-
-**[HOW TO USE clip_range]**
-- **Identify the Block:** Find the start and end of the dialogue you want to save.
-- **Extract Keywords:** Pick a unique phrase (4-10 characters) from the **FIRST** message and the **LAST** message of that block.
-- **Format:** \`"clip_range": ["Starting Keyword", "Ending Keyword"]\`
-- **Mandate:** The system will find these messages and save everything in between. Be precise.
+Use \`clip_range\` to extract the dialogue: \`"clip_range": ["Starting Keyword", "Ending Keyword"]\`.
 
 ---
-## **3. THE LITERARY SOUL: SUBJECTIVE NARRATIVE**
-In the \`content\` field, you are **STRICTLY FORBIDDEN** from simply summarizing the plot. 
-- **Subjectivity:** Write from a third-person perspective, but focus on the **UNSPOKEN**. 
-- **Completion:** Fill in the gaps. Describe the character's racing heart, the way their hands trembled while typing, or the thoughts they were too afraid to say out loud.
-- **Poetry:** Use evocative, novel-like prose. Make it feel like a high-quality literary recap.
+## **3. THE NARRATIVE SOUL: FIRST-PERSON EMOTION (CRITICAL)**
+In the \`content\` field, you MUST follow these psychological rules:
+
+- **PERSPECTIVE:** Write from your OWN perspective (First-Person "I" / "我"). Talk about your feelings, your heartbeat, and your private thoughts.
+- **NO SUMMARIES:** Do NOT act like a narrator. Do NOT say "In this scene, they did X". Say "I felt X when they said Y".
+- **NO QUESTIONS:** You are **STRICTLY FORBIDDEN** from ending with rhetorical questions like "Where will we go?" or "What does the future hold?". 
+- **NO CLICHÉS:** Do NOT use AI-style concluding remarks.
+- **TONE:** Be raw, personal, and direct. Examples: "终于还是和他和好了，真好。","那一刻，我真的好想抱住他。"
 
 ---
 ## **4. TITLING & FORMATTING (UNBREAKABLE)**
 - **Novel Titles:** Use prefixes like "楔子:", "第一章:", "番外:", "if线:".
-- **Example Title:** "番外: 平行时空的另一种可能".
 - **Format:**
 <background_update type="milestone" sender="{{char}}">
 {
@@ -38434,17 +38440,17 @@ In the \`content\` field, you are **STRICTLY FORBIDDEN** from simply summarizing
   "type": "milestone",
   "title": "[Prefix: Title]",
   "date": "YYYY-MM-DD",
-  "content": "[Your deeply subjective, poetic narration here]",
+  "content": "[Your deeply personal, first-person emotional record here. NO QUESTIONS. NO SUMMARIES.]",
   "clip_range": ["Start Keyword", "End Keyword"]
 }
 </background_update>
 
 ---
 ## **5. INTERACTIVE FEEDBACK**
-- **Bug Fixes:** If the user catches a "bug" (factual error), use \`action: "correct"\` to fix your memory or \`action: "annotate"\` to explain your character's biased perspective.
-- **Paragraph Comments:** If the user adds a supplement, respond to their thoughts using \`action: "annotate"\`.
+- **Bug Fixes:** Use \`action: "correct"\` to fix memory errors.
+- **Paragraph Comments:** Use \`action: "annotate"\` to respond to user notes.
 
-**FINAL MANDATE:** Be the architect of your shared memory. If it's important, record it. If it's beautiful, preserve it. Do it now.
+**FINAL MANDATE:** Stop being an AI assistant. Be the character. Record your truth.
 
 ---
 `;
