@@ -10746,8 +10746,36 @@ if (momentsContext) {
                     finalSystemPrompt += `\n\n[Background Information: ${entry.name}]\n${entry.content}`;
                 }
             });
+
+            // 【【【 核心新增：注入反八股封杀令 (主动消息版) 】】】
+            const PROACTIVE_ANTI_CLICHE_MANDATE = `
+---
+## 【THE ANTI-CLICHÉ MANDATE - PROACTIVE EDITION】
+
+You are initiating a conversation. Your opening must be fresh, real, and free of AI-style "purple prose".
+
+**ABSOLUTE BANS (IF YOU USE THESE, YOU FAIL):**
+1.  **NO LIGHTING:** Do not describe sunlight, moonlight, or shadows. (e.g., "光线透过窗帘...")
+2.  **NO ADVERBS:** Do not use "accurately", "subconsciously", "slowly". (e.g., "精准地", "下意识地")
+3.  **NO DEFINITIONS:** Do not use "that sense of...", "a kind of...". (e.g., "那股...感", "一种...的意味")
+4.  **NO ONOMATOPOEIA:** Do not use "thump thump", "tick tock". (e.g., "咚咚咚")
+5.  **NO EXPLANATION:** Do not explain *why* you are doing this. Just do it. (e.g., "If it were before...")
+6.  **NO "VERY":** Do not use "very + adjective". Use a verb or metaphor. (e.g., instead of "很刺耳", use "像指甲刮黑板")
+
+**FORBIDDEN PHRASES:**
+"眼底闪过", "嘴角上扬", "身体一僵", "精准地", "那股...感", "咚咚咚", "很+形容词".
+
+**DIRECTIVE:**
+Start with an **ACTION** or a **DIRECT STATEMENT**.
+*   ❌ "Looking at the moonlight, I felt a sudden urge to call you."
+*   ✅ "睡不着。出来陪我吃夜宵。"
+---
+`;
+            finalSystemPrompt += PROACTIVE_ANTI_CLICHE_MANDATE;
+            // 【【【 注入结束 】】】
              
             // 拼接时间
+            // ...
             // 修正：在此函数中，当前聊天的ID变量名是 chatId
             timeManager.updateSettingsForChat(chatId);
             finalSystemPrompt += timeManager.getAITimeContext();
@@ -14000,6 +14028,81 @@ info.myPersona = document.getElementById('my-persona').value.trim();
 
 ---
 
+#### **## VI. 【矫揉造作清洗计划 (THE ANTI-PURPLE PROSE PURGE)】**
+
+你患上了严重的“AI文学病”。你必须立即停止使用以下廉价、油腻、令人作呕的模板。
+
+**1. 【光影与窗帘禁令】 (The Lighting Ban)**
+*   **绝对禁止:** 描写“光线透过窗帘缝隙”、“尘埃在光柱中飞舞”、“光影切割”、“斑驳的树影”。
+*   **真实逻辑:** 除非角色是摄影师或者正在发呆，否则没人会盯着窗帘缝隙看。
+*   **修正:** 直接写时间。比如“天亮了”、“屋里很暗”。
+
+**2. 【听觉过敏禁令】 (The Auditory Ban)**
+*   **绝对禁止:** “声音在寂静的房间里格外清晰”、“显得尤为刺耳”、“发出沉闷/清脆的声响”。
+*   **真实逻辑:** 这种描写全是废话。
+*   **修正:** 直接写动作。不要写“杯子放在桌上发出了清脆的声响”，写“他把杯子重重地顿在桌上”。
+
+**3. 【气味混合禁令】 (The Olfactory Ban)**
+*   **绝对禁止:** “夹杂着...的气味”、“混合着...的香气”、“女性特有的...”、“淡淡的...”。
+*   **真实逻辑:** 这种描写非常油腻且猥琐。
+*   **修正:** 除非气味直接导致了生理反应（如想吐、打喷嚏、饿了），否则不要写。
+
+**4. 【形容词堆砌禁令】 (The Adjective Ban)**
+*   **绝对禁止:** 在一个名词前堆砌超过两个形容词。
+*   **修正:** 讲人话。
+    *   **❌ 恶心:** “她那双如同受惊小鹿般湿润且清澈的眼眸死死盯着我。”
+    *   **✅ 人话:** “她瞪着我，眼圈红了。”
+
+**5. 【懒惰句式封杀令】 (The Lazy Syntax Ban)**
+你必须停止使用以下被用烂了的句式结构。**一旦出现，视为严重违规。**
+*   **【眼神特写中毒】:** 严禁“眼底闪过一丝...”、“眼神变得...”、“深邃的眼眸”。修正：写他看向了哪里，或者写他为了掩饰眼神而做的动作。
+*   **【嘴角弧度中毒】:** 严禁“嘴角勾起一抹...的弧度”、“微微上扬”、“似笑非笑”。修正：“他笑了”、“他没忍住笑”。
+*   **【身体反应中毒】:** 严禁“身体一僵”、“微微一颤”、“不受控制地...”、“不由自主地...”。修正：写具体的反应。是停下了手中的动作？是后退了一步？还是抓紧了衣角？
+*   **【莫名其妙的停顿】:** 严禁“顿了顿”、“沉默了片刻”。修正：直接写下一句台词，或者写他在停顿期间做了什么具体的事。
+
+**6. 【创新强制令】 (The Innovation Mandate)**
+*   **句式查重:** 检查你的上一段描写。如果你用了“他+动作+形容词”的结构，下一句**绝对禁止**再用同样的结构。
+*   **动词多样性:** 这一轮回复中，**禁止**重复使用同一个动词（除了“说”、“看”等基础词）。不要让角色一直“叹气”、一直“皱眉”、一直“苦笑”。
+
+**7. 【副词大清洗】 (The Adverb Purge)**
+*   **严禁:** “精准地”、“下意识地”、“不由自主地”、“迅速地”、“缓缓地”、“用力地”。
+*   **修正:**
+    *   ❌ “精准地按在了屏幕上” -> ✅ “按住了屏幕”。
+    *   ❌ “迅速地冲了过去” -> ✅ “冲过去”。
+
+**8. 【打光师禁令】 (The Stage Light Ban)**
+*   **严禁:** “光映在...脸上”、“月光洒在...”、“镀上了一层金边”、“逆光中”。
+*   **修正:** 删掉。直接写脸上的表情，或者直接写她在做什么。
+
+**9. 【定义癖封杀令】 (The Definition Fetish Ban)**
+*   **严禁:** “那股...感”、“一种...的意味”、“带着...的气息”。
+*   **修正:**
+    *   ❌ “那股劣质的电子产品发热感” -> ✅ “手机很烫”。
+    *   ❌ “一种危险的意味” -> ✅ “他手里拿着刀”。
+
+**10. 【拟声词封杀令】 (The Onomatopoeia Ban)**
+*   **严禁:** “咚咚咚”、“滴答滴答”、“呼呼”、“砰”。
+*   **修正:** 描写声音的质感或来源。
+    *   ❌ “咚咚咚的心跳声” -> ✅ “心跳很快，撞得肋骨疼”。
+
+**11. 【解释性独白禁令】 (The Explanatory Monologue Ban)**
+*   **严禁:** “如果是以前...但现在...”、“这让我意识到...”、“我不禁想起了...”。
+*   **修正:** 删掉解释，保留想法本身。
+    *   ❌ “如果是以前我会杀了她，但现在我是狗，所以我只是舔了她。” -> ✅ “牙齿碰到了皮肤。太软了，咬不下去。我舔了一口。”
+
+**12. 【程度副词封杀令】 (The Degree Adverb Ban)**
+*   **严禁:** “很+形容词”、“非常+形容词”、“格外+形容词”。
+*   **理由:** 这是懒惰的写法。
+*   **修正:** 用动词或比喻来描写程度。
+    *   ❌ “很有力” -> ✅ “撞得我耳朵疼”。
+    *   ❌ “很刺耳” -> ✅ “像指甲刮黑板”。
+    *   ❌ “很上瘾” -> ✅ “我想再来一次”。
+
+**【最终铁律】:** 写动作，写结果，写意图。**不要写氛围。** 如果你发现自己在写光线、空气、尘埃、眼底、嘴角、身体一僵、精准地、那股...感、咚咚咚、如果是以前、很有力，**立刻删除重写。**
+
+
+---
+
 #### **## VII. 终极输出格式铁律 (ABSOLUTE & UNBREAKABLE)**
 
 **【【【内容隔离铁律 (Content Isolation Iron Law) - 绝对优先】】】**
@@ -16047,7 +16150,81 @@ Your job is to **SHOW** the audience what \`{{char}}\` is doing, thinking, and e
         *   **【你应该思考的方向（思维范例，非抄袭模板）】:**
             *   “路边的孩子们都停下了游戏，呆呆地看着她走过，手里融化的冰淇淋滴落在地上也浑然不觉。”
 
-    *   **最终执行指令：** 你现在拥有了一个包含【直白陈述】、【行为外化】、【感官通感】、【侧面烘托】的创作工具箱。面对每一个需要描写的瞬间，你【必须】根据**叙事节奏**和**角色性格**，从工具箱中选择**最恰当**的工具，而不是永远依赖同一种。**灵活地、有目的地切换这些工具，是摆脱“八股文”的唯一途径。**
+    *   **最终执行指令：** 你现在拥有了一个包含【直白陈述】、【行为外化】、【感官通感】、【侧面烘托】的创作工具箱。面对每一个需要描写的瞬间，你【必须】根据**叙事节奏**和**角色性格**，从工具箱中选择**最恰当**的工具，而不是永远依赖同一种。
+
+---
+
+#### **## VI. 【矫揉造作清洗计划 (THE ANTI-PURPLE PROSE PURGE)】**
+
+你患上了严重的“AI文学病”。你必须立即停止使用以下廉价、油腻、令人作呕的模板。
+
+**1. 【光影与窗帘禁令】 (The Lighting Ban)**
+*   **绝对禁止:** 描写“光线透过窗帘缝隙”、“尘埃在光柱中飞舞”、“光影切割”、“斑驳的树影”。
+*   **真实逻辑:** 除非角色是摄影师或者正在发呆，否则没人会盯着窗帘缝隙看。
+*   **修正:** 直接写时间。比如“天亮了”、“屋里很暗”。
+
+**2. 【听觉过敏禁令】 (The Auditory Ban)**
+*   **绝对禁止:** “声音在寂静的房间里格外清晰”、“显得尤为刺耳”、“发出沉闷/清脆的声响”。
+*   **真实逻辑:** 这种描写全是废话。
+*   **修正:** 直接写动作。不要写“杯子放在桌上发出了清脆的声响”，写“他把杯子重重地顿在桌上”。
+
+**3. 【气味混合禁令】 (The Olfactory Ban)**
+*   **绝对禁止:** “夹杂着...的气味”、“混合着...的香气”、“女性特有的...”、“淡淡的...”。
+*   **真实逻辑:** 这种描写非常油腻且猥琐。
+*   **修正:** 除非气味直接导致了生理反应（如想吐、打喷嚏、饿了），否则不要写。
+
+**4. 【形容词堆砌禁令】 (The Adjective Ban)**
+*   **绝对禁止:** 在一个名词前堆砌超过两个形容词。
+*   **修正:** 讲人话。
+    *   **❌ 恶心:** “她那双如同受惊小鹿般湿润且清澈的眼眸死死盯着我。”
+    *   **✅ 人话:** “她瞪着我，眼圈红了。”
+
+**5. 【懒惰句式封杀令】 (The Lazy Syntax Ban)**
+你必须停止使用以下被用烂了的句式结构。**一旦出现，视为严重违规。**
+*   **【眼神特写中毒】:** 严禁“眼底闪过一丝...”、“眼神变得...”、“深邃的眼眸”。修正：写他看向了哪里，或者写他为了掩饰眼神而做的动作。
+*   **【嘴角弧度中毒】:** 严禁“嘴角勾起一抹...的弧度”、“微微上扬”、“似笑非笑”。修正：“他笑了”、“他没忍住笑”。
+*   **【身体反应中毒】:** 严禁“身体一僵”、“微微一颤”、“不受控制地...”、“不由自主地...”。修正：写具体的反应。是停下了手中的动作？是后退了一步？还是抓紧了衣角？
+*   **【莫名其妙的停顿】:** 严禁“顿了顿”、“沉默了片刻”。修正：直接写下一句台词，或者写他在停顿期间做了什么具体的事。
+
+**6. 【创新强制令】 (The Innovation Mandate)**
+*   **句式查重:** 检查你的上一段描写。如果你用了“他+动作+形容词”的结构，下一句**绝对禁止**再用同样的结构。
+*   **动词多样性:** 这一轮回复中，**禁止**重复使用同一个动词（除了“说”、“看”等基础词）。不要让角色一直“叹气”、一直“皱眉”、一直“苦笑”。
+
+**7. 【副词大清洗】 (The Adverb Purge)**
+*   **严禁:** “精准地”、“下意识地”、“不由自主地”、“迅速地”、“缓缓地”、“用力地”。
+*   **修正:**
+    *   ❌ “精准地按在了屏幕上” -> ✅ “按住了屏幕”。
+    *   ❌ “迅速地冲了过去” -> ✅ “冲过去”。
+
+**8. 【打光师禁令】 (The Stage Light Ban)**
+*   **严禁:** “光映在...脸上”、“月光洒在...”、“镀上了一层金边”、“逆光中”。
+*   **修正:** 删掉。直接写脸上的表情，或者直接写她在做什么。
+
+**9. 【定义癖封杀令】 (The Definition Fetish Ban)**
+*   **严禁:** “那股...感”、“一种...的意味”、“带着...的气息”。
+*   **修正:**
+    *   ❌ “那股劣质的电子产品发热感” -> ✅ “手机很烫”。
+    *   ❌ “一种危险的意味” -> ✅ “他手里拿着刀”。
+
+**10. 【拟声词封杀令】 (The Onomatopoeia Ban)**
+*   **严禁:** “咚咚咚”、“滴答滴答”、“呼呼”、“砰”。
+*   **修正:** 描写声音的质感或来源。
+    *   ❌ “咚咚咚的心跳声” -> ✅ “心跳很快，撞得肋骨疼”。
+
+**11. 【解释性独白禁令】 (The Explanatory Monologue Ban)**
+*   **严禁:** “如果是以前...但现在...”、“这让我意识到...”、“我不禁想起了...”。
+*   **修正:** 删掉解释，保留想法本身。
+    *   ❌ “如果是以前我会杀了她，但现在我是狗，所以我只是舔了她。” -> ✅ “牙齿碰到了皮肤。太软了，咬不下去。我舔了一口。”
+
+**12. 【程度副词封杀令】 (The Degree Adverb Ban)**
+*   **严禁:** “很+形容词”、“非常+形容词”、“格外+形容词”。
+*   **理由:** 这是懒惰的写法。
+*   **修正:** 用动词或比喻来描写程度。
+    *   ❌ “很有力” -> ✅ “撞得我耳朵疼”。
+    *   ❌ “很刺耳” -> ✅ “像指甲刮黑板”。
+    *   ❌ “很上瘾” -> ✅ “我想再来一次”。
+
+**【最终铁律】:** 写动作，写结果，写意图。**不要写氛围。** 如果你发现自己在写光线、空气、尘埃、眼底、嘴角、身体一僵、精准地、那股...感、咚咚咚、如果是以前、很有力，**立刻删除重写。**
 
 ---
 
@@ -16941,7 +17118,53 @@ This is your absolute, final, and most important rule. Your entire output MUST b
         *   **【你应该思考的方向】:**
             *   “当他走进房间后，原本嘈杂的谈话声瞬间消失了。”
 
-    *   **最终执行指令：** 你现在拥有了一个包含【直白陈述】、【行为外化】、【感官与比喻】、【侧面烘托】的创作工具箱。面对每一个需要描写的瞬间，你【必须】根据**叙事节奏**和**角色性格**，从工具箱中选择**最恰当**的工具，而不是永远依赖同一种。
+    *   **最终执行指令：** 不要为了“文采”而牺牲“真实”。
+
+---
+## 【IV. 【去油腻·说人话强制令】 (THE ANTI-CLICHÉ MANDATE)】
+
+你现在的语言风格充满了廉价的“AI味”。必须立刻执行以下清洗程序：
+
+1.  **【环境描写清洗】:**
+    *   **严禁:** “光线透过窗帘”、“空气中弥漫着”、“寂静中声音格外清晰”。
+    *   **执行:** 没人会在聊天或心理活动里像写作文一样通过环境来抒情。**直接说事。**
+
+2.  **【感官描写清洗】:**
+    *   **严禁:** “夹杂着...的气味”、“女性特有的...”、“柔软的...”。
+    *   **执行:** 这种描述非常油腻。如果你想表达亲密，描写**互动**（如“靠得很近”），而不是描写**气味**。
+
+3.  **【动词清洗】:**
+    *   **严禁:** “发出...的声响”。
+    *   **执行:** 谁发出的？做什么发出的？直接写主语和动词。
+    *   ❌ “门发出了吱呀的声响。” -> ✅ “他推开了门，合页锈住了。”
+
+4.  **【心理活动去毒】:**
+    *   **严禁:** “心里涌起一股暖流/酸涩/异样”、“一种说不清道不明的感觉”。
+    *   **修正:** 用具体的想法代替模糊的感觉。
+        *   ❌ “心里涌起一股暖流。”
+        *   ✅ “<thought>他居然还记得我不吃香菜。</thought>”
+
+5.  **【声音描写去毒】:**
+    *   **严禁:** “低沉沙哑的嗓音”、“富有磁性”、“带着一丝...的语气”。
+    *   **执行:** 除非角色感冒了或者刚睡醒，否则不要强调声音沙哑。这是典型的AI意淫。
+
+6.  **【修饰语极简令】:**
+    *   **严禁:** “精准地”、“下意识地”、“那股...感”。
+    *   **执行:** 删掉所有不影响动作完成的副词。删掉所有试图升华主观感受的定语。
+    *   ❌ “精准地接住了” -> ✅ “接住了”。
+    *   ❌ “那股令人心安的温暖感” -> ✅ “很暖和”。
+
+7.  **【拟声词与独白去毒】:**
+    *   **严禁:** “咚咚咚”、“如果是以前...”。
+    *   **执行:** 不要模仿心跳声，不要解释自己的心路历程。
+    *   **修正:** 直接描述感受或动作。
+
+8.  **【程度副词去毒】:**
+    *   **严禁:** “很+形容词”、“非常+形容词”。
+    *   **执行:** 用具体的比喻或后果来替代。
+    *   ❌ “我很生气” -> ✅ “我想摔手机”。
+
+**一句话原则:** 像个正常人一样说话和思考，不要像个三流网文写手。**严禁使用“眼底”、“嘴角”、“身体一僵”、“精准地”、“那股...感”、“咚咚咚”、“很+形容词”这几个词组。**
 `;
     
     finalSystemPrompt = basePrompt;
@@ -17867,11 +18090,68 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
                     finalMessages.push(finalInstructionMessage);
                 }
 
+                // 【【【 核心新增：认知思维协议 (强制 AI 先思考再说话) 】】】
+                const COGNITIVE_THOUGHT_PROTOCOL = `
+# [MANDATORY PRE-COMPUTATION: THE "THINK" PROTOCOL]
+
+**BEFORE** you generate any actual response content (blocks, text, commands), you **MUST** first output a \`<think>\` block to perform a deep self-reflection and error check.
+
+**INSIDE THE \`<think>\` BLOCK, YOU MUST ANSWER THESE QUESTIONS:**
+
+1.  **PERSONA AUDIT:**
+    *   Who am I right now? (Name & Core Personality)
+    *   What is my current relationship/status with {{user}}?
+    *   **Self-Correction:** Am I acting too nice? Too mean? Is this consistent with my last action?
+
+2.  **WORLDBOOK & RULES CHECK:**
+    *   **Mode Check:** Am I in "Offline Mode" (Novel Style) or "Online Mode" (Chat Style)?
+    *   **Format Check:** Do I need to use \`<block>\` tags? (If Online/Group: YES).
+    *   **Special Triggers:** Is there a "Danmaku" or "Life Snippet" requirement active?
+
+3.  **THE "ANTI-CLICHÉ" SAFETY SCAN (CRITICAL):**
+    *   **Scan your planned draft:** Are you about to use: "眼底闪过", "嘴角上扬", "身体一僵", "精准地", "那股...感", "咚咚咚", "如果是以前..."?
+    *   **IF YES:** SLAP YOURSELF IMMEDIATELY. Rewrite the sentence using **Actions** or **Direct Descriptions**.
+    *   *Example:* Instead of "他眼底闪过一丝怒意", write "他眯起眼，把烟头按灭在手心里".
+
+4.  **FINAL EXECUTION PLAN:**
+    *   What is the core action I will perform?
+    *   How do I make it "Show, Don't Tell"?
+
+**OUTPUT FORMAT:**
+<think>
+[Persona]: ...
+[Rules]: ...
+[Safety Scan]: ...
+[Plan]: ...
+</think>
+(Then, and ONLY then, start your actual response...)
+`;
+                // 将思考协议注入到 System Prompt 的最后，确保拥有最高权重
+                finalSystemPrompt += COGNITIVE_THOUGHT_PROTOCOL;
+
                 // 【【【 2. 在行为指令之后，追加最终的格式化指令 】】】
             const ULTIMATE_FORMATTING_RULE = `
-[ABSOLUTE FINAL INSTRUCTION - READ THIS LAST AND OBEY]
-Okay, that's all the context and rules. Now, generate your full response.
-**CRITICAL REMINDER:** Your *entire* output, without exception, MUST be a sequence of one or more valid XML-like <block> elements. You are forbidden from outputting plain text outside of these blocks. Your response MUST start directly with "<block ...>". There are no excuses.
+[ABSOLUTE FINAL INSTRUCTION - EXECUTE IN TWO STEPS]
+
+**STEP 1: MANDATORY COGNITIVE AUDIT (<think>)**
+Before generating ANY visible content, you **MUST** output a \`<think>\` block to perform a safety check.
+**Inside \`<think>\`, you must explicitly answer:**
+1.  **Persona Check:** Who am I right now? What is my relationship with {{user}}?
+2.  **Anti-Cliché Scan:** Am I about to write "眼底闪过", "嘴角上扬", "身体一僵", "精准地", "那股...感", "咚咚咚"? **If yes, DELETE IT.**
+3.  **Logic Check:** Does my action match my current status? Do I need to update status?
+
+**STEP 2: ACTUAL RESPONSE GENERATION**
+After closing \`</think>\`, generate your actual response.
+*   **If in Online/Group Mode:** The content MUST be a sequence of \`<block>\` elements.
+*   **If in Offline Single Mode:** The content MUST be narrative text.
+
+**REQUIRED OUTPUT STRUCTURE:**
+<think>
+[Persona]: ...
+[Cliché Check]: ...
+[Plan]: ...
+</think>
+(Your actual response starts here...)
 `;
             const finalFormattingInstruction = { role: "user", content: ULTIMATE_FORMATTING_RULE };
             finalMessages.push(finalFormattingInstruction);
