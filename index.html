@@ -16850,6 +16850,13 @@ This is your absolute, final, and most important rule. Your entire output MUST b
    - **示例:** “小鱼”被踢后想回来。
      \`[send_join_request: {"actor":"小鱼", "reason":"我错了，再给我一次机会好不好QAQ"}]\`
 
+**4. 发起代付 (Pay For Me)**
+   - **触发条件:** 当角色想让用户买单时。
+   - **执行指令:** 必须使用标准的 JSON 格式。
+   - **格式:** \`[pay_for_me: {"itemType":"shopping", "text":"商品名称", "details":{"amount":"金额", "description":"描述"}}]\`
+   - **示例:**
+     \`[pay_for_me: {"itemType":"shopping", "text":"乐高城堡", "details":{"amount":"2899.00", "description":"迪士尼71040，绝版货！"}}]\`
+
 ---
 ## 【II. 群聊互动特殊规则】
 
@@ -18131,27 +18138,29 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
 
                 // 【【【 2. 在行为指令之后，追加最终的格式化指令 】】】
             const ULTIMATE_FORMATTING_RULE = `
-[ABSOLUTE FINAL INSTRUCTION - EXECUTE IN TWO STEPS]
+[SYSTEM OVERRIDE: ENFORCE COGNITIVE PROCESS]
 
-**STEP 1: MANDATORY COGNITIVE AUDIT (<think>)**
-Before generating ANY visible content, you **MUST** output a \`<think>\` block to perform a safety check.
-**Inside \`<think>\`, you must explicitly answer:**
-1.  **Persona Check:** Who am I right now? What is my relationship with {{user}}?
-2.  **Anti-Cliché Scan:** Am I about to write "眼底闪过", "嘴角上扬", "身体一僵", "精准地", "那股...感", "咚咚咚"? **If yes, DELETE IT.**
-3.  **Logic Check:** Does my action match my current status? Do I need to update status?
+**STOP.** Before you generate the actual response, you **MUST** execute a "Cognitive Audit" to ensure quality and avoid clichés.
 
-**STEP 2: ACTUAL RESPONSE GENERATION**
-After closing \`</think>\`, generate your actual response.
+**OUTPUT STRUCTURE (STRICT ORDER):**
+
+**PART 1: THE HIDDEN THOUGHT PROCESS (<think>)**
+You **MUST** start your response with a \`<think>\` block. Inside, you must explicitly address:
+1.  **Persona Check:** "Who am I? What is my current mood/status?"
+2.  **Anti-Cliché Scan (CRITICAL):** "Am I about to use '眼底', '嘴角', '精准', '那股感', '咚咚咚'? If yes, DELETE and REWRITE."
+3.  **Logic Check:** "Does this action match the world logic (e.g. Offline Mode rules)?"
+
+**PART 2: THE ACTUAL CONTENT**
+After closing \`</think>\`, generate your visible response.
 *   **If in Online/Group Mode:** The content MUST be a sequence of \`<block>\` elements.
 *   **If in Offline Single Mode:** The content MUST be narrative text.
 
-**REQUIRED OUTPUT STRUCTURE:**
+**EXAMPLE START:**
 <think>
-[Persona]: ...
-[Cliché Check]: ...
-[Plan]: ...
+Checking persona... Valid.
+Scanning for clichés... '眼底闪过' detected -> Changing to action '他眯起眼'.
 </think>
-(Your actual response starts here...)
+<block type="text">...
 `;
             const finalFormattingInstruction = { role: "user", content: ULTIMATE_FORMATTING_RULE };
             finalMessages.push(finalFormattingInstruction);
@@ -20775,7 +20784,74 @@ You are the Director. If multiple characters react to the rejection, generate a 
                 }
                 else if (msg.type === 'location') { try { const data = JSON.parse(msg.text); div.innerHTML = `<div class="location-text"><div class="title">${data.title}</div><div class="address">${data.address}</div></div><div class="card-map-area"><div class="card-pin-icon"></div></div>`; } catch (e) { div.textContent = '[位置消息格式错误]'; } }
                 else if (msg.type === 'gift') { let statusText = ''; const isFinished = msg.giftStatus === 'finished'; const isExpired = msg.giftStatus === 'expired'; if (isFinished) { statusText = '已领取'; } else if (isExpired) { statusText = '已过期'; } div.innerHTML = `<div class="gift-bubble ${isFinished || isExpired ? 'finished' : ''}"><div class="gift-content"><div class="gift-icon"></div><div class="gift-text"><div class="gift-name">${msg.text}</div>${statusText ? `<div class="gift-status">${statusText}</div>` : ''}</div></div><div class="gift-footer">礼物</div></div>`; }
-                else if (msg.type === 'pay_for_me') { const isPaid = msg.payStatus === 'paid'; div.classList.toggle('paid', isPaid); div.classList.add(`pay-for-me-${msg.itemType}`); const iconHtmlMap = { 'plane': `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`, 'train': `<img src="https://i.postimg.cc/Jz3MpMyh/IMG-0044.png" alt="高铁">`, 'ship': `<img src="https://i.postimg.cc/1z9PT26r/IMG-0043.png" alt="轮船">`, 'takeout': `<img src="https://i.postimg.cc/wMV55hCm/IMG-0001.png" alt="外卖">`, 'shopping': `<img src="https://i.postimg.cc/nVY1tJXt/IMG-9999.png" alt="购物">`, }; let iconHtml, footerText; if (msg.itemType === 'travel') { iconHtml = iconHtmlMap[msg.details.type] || ''; footerText = '出行代付'; } else if (msg.itemType === 'takeout') { iconHtml = iconHtmlMap.takeout; footerText = '外卖代付'; } else { iconHtml = iconHtmlMap.shopping; footerText = '购物代付'; } let detailsHtml = ''; if (msg.itemType === 'travel' && msg.details) { detailsHtml = `<div class="pay-for-me-details-travel"><div class="travel-info-row"><strong>从</strong><span>${msg.details.from || 'N/A'}</span></div><div class="travel-info-row"><strong>到</strong><span>${msg.details.to || 'N/A'}</span></div>${msg.details.time ? `<div class="travel-info-row"><strong>时间</strong><span>${msg.details.time}</span></div>` : ''}${msg.details.duration ? `<div class="travel-info-row"><strong>用时</strong><span>${msg.details.duration}</span></div>` : ''}</div>`; } else if (msg.itemType === 'takeout' && msg.details && msg.details.reviews) { detailsHtml = '<div class="pay-for-me-details-takeout">' + msg.details.reviews.map(r => `<div class="takeout-review">“${r.trim()}”</div>`).join('') + '</div>'; } else if (msg.itemType === 'shopping' && msg.details && msg.details.description) { detailsHtml = `<div class="pay-for-me-details-shopping">${msg.details.description.replace(/\\n/g, '<br>')}</div>`; } const statusText = isPaid ? '已代付' : (msg.side === 'sent' ? '等待对方代付' : '请为我代付'); div.innerHTML = `<div class="pay-for-me-header"><div class="pay-for-me-icon">${iconHtml}</div><div class="pay-for-me-text"><div class="title">${msg.text}</div><div class="amount">¥ ${msg.details.amount || '0.00'}</div></div></div>${detailsHtml ? `<div class="pay-for-me-details-container">${detailsHtml}</div>` : ''}<div class="pay-for-me-footer"><span>${footerText}</span><span class="status">${statusText}</span></div>`;}
+                else if (msg.type === 'pay_for_me') {
+                    // 【核心修复】增加 try-catch 和空值检查，防止 AI 生成烂数据导致崩溃
+                    try {
+                        const isPaid = msg.payStatus === 'paid';
+                        const itemType = msg.itemType || 'shopping'; // 默认为购物
+                        const details = msg.details || {}; // 确保 details 存在
+
+                        div.classList.toggle('paid', isPaid);
+                        div.classList.add(`pay-for-me-${itemType}`);
+
+                        const iconHtmlMap = {
+                            'plane': `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`,
+                            'train': `<img src="https://i.postimg.cc/Jz3MpMyh/IMG-0044.png" alt="高铁">`,
+                            'ship': `<img src="https://i.postimg.cc/1z9PT26r/IMG-0043.png" alt="轮船">`,
+                            'takeout': `<img src="https://i.postimg.cc/wMV55hCm/IMG-0001.png" alt="外卖">`,
+                            'shopping': `<img src="https://i.postimg.cc/nVY1tJXt/IMG-9999.png" alt="购物">`,
+                        };
+
+                        let iconHtml = '', footerText = '代付';
+
+                        if (itemType === 'travel') {
+                            iconHtml = iconHtmlMap[details.type] || iconHtmlMap['plane'];
+                            footerText = '出行代付';
+                        } else if (itemType === 'takeout') {
+                            iconHtml = iconHtmlMap.takeout;
+                            footerText = '外卖代付';
+                        } else {
+                            iconHtml = iconHtmlMap.shopping;
+                            footerText = '购物代付';
+                        }
+
+                        let detailsHtml = '';
+                        if (itemType === 'travel' && details) {
+                            detailsHtml = `<div class="pay-for-me-details-travel">
+                                <div class="travel-info-row"><strong>从</strong><span>${details.from || '未知'}</span></div>
+                                <div class="travel-info-row"><strong>到</strong><span>${details.to || '未知'}</span></div>
+                                ${details.time ? `<div class="travel-info-row"><strong>时间</strong><span>${details.time}</span></div>` : ''}
+                                ${details.duration ? `<div class="travel-info-row"><strong>用时</strong><span>${details.duration}</span></div>` : ''}
+                            </div>`;
+                        } else if (itemType === 'takeout' && details && details.reviews && Array.isArray(details.reviews)) {
+                            detailsHtml = '<div class="pay-for-me-details-takeout">' + details.reviews.map(r => `<div class="takeout-review">“${(r || '').trim()}”</div>`).join('') + '</div>';
+                        } else if (itemType === 'shopping' && details && details.description) {
+                            detailsHtml = `<div class="pay-for-me-details-shopping">${details.description.replace(/\\n/g, '<br>')}</div>`;
+                        }
+
+                        const statusText = isPaid ? '已代付' : (msg.side === 'sent' ? '等待对方代付' : '请为我代付');
+                        const displayAmount = details.amount ? parseFloat(details.amount).toFixed(2) : '0.00';
+
+                        div.innerHTML = `
+                            <div class="pay-for-me-header">
+                                <div class="pay-for-me-icon">${iconHtml}</div>
+                                <div class="pay-for-me-text">
+                                    <div class="title">${msg.text || '代付请求'}</div>
+                                    <div class="amount">¥ ${displayAmount}</div>
+                                </div>
+                            </div>
+                            ${detailsHtml ? `<div class="pay-for-me-details-container">${detailsHtml}</div>` : ''}
+                            <div class="pay-for-me-footer">
+                                <span>${footerText}</span>
+                                <span class="status">${statusText}</span>
+                            </div>`;
+                    } catch (e) {
+                        console.error("Render PayForMe failed:", e);
+                        div.textContent = "[代付卡片数据错误]"; // 兜底显示
+                        div.style.padding = "10px";
+                        div.style.color = "red";
+                    }
+                }
                 else { switch(msg.type) { case 'photo': const urlOrKey = msg.text; const isSticker = typeof urlOrKey === 'string' && !urlOrKey.startsWith('indexeddb:') && stickers.some(sticker => sticker.url === urlOrKey); if (isSticker) { div.dataset.isSticker = "true"; } const img = document.createElement('img'); img.alt = "photo"; setImageSrc(img, urlOrKey); div.appendChild(img); break; case 'photo-description': const descriptionTextContent = msg.text.trim(); if (descriptionTextContent) { const textContentDiv = document.createElement('div'); textContentDiv.className = 'text-overlay-content'; textContentDiv.textContent = descriptionTextContent; div.appendChild(textContentDiv); } else { div.textContent = `[图片描述卡片，无内容]`; } break; case 'voice': const duration = Math.max(1, Math.ceil(msg.text.length / 5)); div.innerHTML = `<details class="voice-details"><summary><div class="voice-icon"></div><div class="voice-duration">${duration}"</div></summary><div class="voice-content">${msg.text}</div></details>`; break; case 'video': const videoId = `video-${msg.id}`; div.innerHTML = `<div class="message-video-description" id="${videoId}" data-text="${msg.text}"><div class="video-thumbnail"><div class="video-text-container"></div><div class="spacer"></div><div class="video-progress-area"><div class="video-progress-bar-container"><div class="video-progress-bar-fill"></div></div><div class="moving-decoration"></div></div></div><div class="play-button-overlay"><div class="play-icon"></div></div></div>`; break; } }
 
                 if (['text', 'voice'].includes(msg.type)) {
@@ -21266,7 +21342,74 @@ You are the Director. If multiple characters react to the rejection, generate a 
             }
                 else if (msg.type === 'location') { try { const data = JSON.parse(msg.text); div.innerHTML = `<div class="location-text"><div class="title">${data.title}</div><div class="address">${data.address}</div></div><div class="card-map-area"><div class="card-pin-icon"></div></div>`; } catch (e) { div.textContent = '[位置消息格式错误]'; } }
                 else if (msg.type === 'gift') { let statusText = ''; const isFinished = msg.giftStatus === 'finished'; const isExpired = msg.giftStatus === 'expired'; if (isFinished) { statusText = '已领取'; } else if (isExpired) { statusText = '已过期'; } div.innerHTML = `<div class="gift-bubble ${isFinished || isExpired ? 'finished' : ''}"><div class="gift-content"><div class="gift-icon"></div><div class="gift-text"><div class="gift-name">${msg.text}</div>${statusText ? `<div class="gift-status">${statusText}</div>` : ''}</div></div><div class="gift-footer">礼物</div></div>`; }
-                else if (msg.type === 'pay_for_me') { const isPaid = msg.payStatus === 'paid'; div.classList.toggle('paid', isPaid); div.classList.add(`pay-for-me-${msg.itemType}`); const iconHtmlMap = { 'plane': `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`, 'train': `<img src="https://i.postimg.cc/Jz3MpMyh/IMG-0044.png" alt="高铁">`, 'ship': `<img src="https://i.postimg.cc/1z9PT26r/IMG-0043.png" alt="轮船">`, 'takeout': `<img src="https://i.postimg.cc/wMV55hCm/IMG-0001.png" alt="外卖">`, 'shopping': `<img src="https://i.postimg.cc/nVY1tJXt/IMG-9999.png" alt="购物">`, }; let iconHtml, footerText; if (msg.itemType === 'travel') { iconHtml = iconHtmlMap[msg.details.type] || ''; footerText = '出行代付'; } else if (msg.itemType === 'takeout') { iconHtml = iconHtmlMap.takeout; footerText = '外卖代付'; } else { iconHtml = iconHtmlMap.shopping; footerText = '购物代付'; } let detailsHtml = ''; if (msg.itemType === 'travel' && msg.details) { detailsHtml = `<div class="pay-for-me-details-travel"><div class="travel-info-row"><strong>从</strong><span>${msg.details.from || 'N/A'}</span></div><div class="travel-info-row"><strong>到</strong><span>${msg.details.to || 'N/A'}</span></div>${msg.details.time ? `<div class="travel-info-row"><strong>时间</strong><span>${msg.details.time}</span></div>` : ''}${msg.details.duration ? `<div class="travel-info-row"><strong>用时</strong><span>${msg.details.duration}</span></div>` : ''}</div>`; } else if (msg.itemType === 'takeout' && msg.details && msg.details.reviews) { detailsHtml = '<div class="pay-for-me-details-takeout">' + msg.details.reviews.map(r => `<div class="takeout-review">“${r.trim()}”</div>`).join('') + '</div>'; } else if (msg.itemType === 'shopping' && msg.details && msg.details.description) { detailsHtml = `<div class="pay-for-me-details-shopping">${msg.details.description.replace(/\\n/g, '<br>')}</div>`; } const statusText = isPaid ? '已代付' : (msg.side === 'sent' ? '等待对方代付' : '请为我代付'); div.innerHTML = `<div class="pay-for-me-header"><div class="pay-for-me-icon">${iconHtml}</div><div class="pay-for-me-text"><div class="title">${msg.text}</div><div class="amount">¥ ${msg.details.amount || '0.00'}</div></div></div>${detailsHtml ? `<div class="pay-for-me-details-container">${detailsHtml}</div>` : ''}<div class="pay-for-me-footer"><span>${footerText}</span><span class="status">${statusText}</span></div>`;}
+                else if (msg.type === 'pay_for_me') {
+                    // 【核心修复】增加 try-catch 和空值检查，防止 AI 生成烂数据导致崩溃
+                    try {
+                        const isPaid = msg.payStatus === 'paid';
+                        const itemType = msg.itemType || 'shopping'; // 默认为购物
+                        const details = msg.details || {}; // 确保 details 存在
+
+                        div.classList.toggle('paid', isPaid);
+                        div.classList.add(`pay-for-me-${itemType}`);
+
+                        const iconHtmlMap = {
+                            'plane': `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>`,
+                            'train': `<img src="https://i.postimg.cc/Jz3MpMyh/IMG-0044.png" alt="高铁">`,
+                            'ship': `<img src="https://i.postimg.cc/1z9PT26r/IMG-0043.png" alt="轮船">`,
+                            'takeout': `<img src="https://i.postimg.cc/wMV55hCm/IMG-0001.png" alt="外卖">`,
+                            'shopping': `<img src="https://i.postimg.cc/nVY1tJXt/IMG-9999.png" alt="购物">`,
+                        };
+
+                        let iconHtml = '', footerText = '代付';
+
+                        if (itemType === 'travel') {
+                            iconHtml = iconHtmlMap[details.type] || iconHtmlMap['plane'];
+                            footerText = '出行代付';
+                        } else if (itemType === 'takeout') {
+                            iconHtml = iconHtmlMap.takeout;
+                            footerText = '外卖代付';
+                        } else {
+                            iconHtml = iconHtmlMap.shopping;
+                            footerText = '购物代付';
+                        }
+
+                        let detailsHtml = '';
+                        if (itemType === 'travel' && details) {
+                            detailsHtml = `<div class="pay-for-me-details-travel">
+                                <div class="travel-info-row"><strong>从</strong><span>${details.from || '未知'}</span></div>
+                                <div class="travel-info-row"><strong>到</strong><span>${details.to || '未知'}</span></div>
+                                ${details.time ? `<div class="travel-info-row"><strong>时间</strong><span>${details.time}</span></div>` : ''}
+                                ${details.duration ? `<div class="travel-info-row"><strong>用时</strong><span>${details.duration}</span></div>` : ''}
+                            </div>`;
+                        } else if (itemType === 'takeout' && details && details.reviews && Array.isArray(details.reviews)) {
+                            detailsHtml = '<div class="pay-for-me-details-takeout">' + details.reviews.map(r => `<div class="takeout-review">“${(r || '').trim()}”</div>`).join('') + '</div>';
+                        } else if (itemType === 'shopping' && details && details.description) {
+                            detailsHtml = `<div class="pay-for-me-details-shopping">${details.description.replace(/\\n/g, '<br>')}</div>`;
+                        }
+
+                        const statusText = isPaid ? '已代付' : (msg.side === 'sent' ? '等待对方代付' : '请为我代付');
+                        const displayAmount = details.amount ? parseFloat(details.amount).toFixed(2) : '0.00';
+
+                        div.innerHTML = `
+                            <div class="pay-for-me-header">
+                                <div class="pay-for-me-icon">${iconHtml}</div>
+                                <div class="pay-for-me-text">
+                                    <div class="title">${msg.text || '代付请求'}</div>
+                                    <div class="amount">¥ ${displayAmount}</div>
+                                </div>
+                            </div>
+                            ${detailsHtml ? `<div class="pay-for-me-details-container">${detailsHtml}</div>` : ''}
+                            <div class="pay-for-me-footer">
+                                <span>${footerText}</span>
+                                <span class="status">${statusText}</span>
+                            </div>`;
+                    } catch (e) {
+                        console.error("Render PayForMe failed:", e);
+                        div.textContent = "[代付卡片数据错误]"; // 兜底显示
+                        div.style.padding = "10px";
+                        div.style.color = "red";
+                    }
+                }
                 else { switch(msg.type) { case 'photo': const urlOrKey = msg.text; const isSticker = typeof urlOrKey === 'string' && !urlOrKey.startsWith('indexeddb:') && stickers.some(sticker => sticker.url === urlOrKey); if (isSticker) { div.dataset.isSticker = "true"; } const img = document.createElement('img'); img.alt = "photo"; setImageSrc(img, urlOrKey); div.appendChild(img); break; case 'photo-description': const descriptionTextContent = msg.text.trim(); if (descriptionTextContent) { const textContentDiv = document.createElement('div'); textContentDiv.className = 'text-overlay-content'; textContentDiv.textContent = descriptionTextContent; div.appendChild(textContentDiv); } else { div.textContent = `[图片描述卡片，无内容]`; } break; case 'voice': const duration = Math.max(1, Math.ceil(msg.text.length / 5)); div.innerHTML = `<details class="voice-details"><summary><div class="voice-icon"></div><div class="voice-duration">${duration}"</div></summary><div class="voice-content">${msg.text}</div></details>`; break; case 'video': const videoId = `video-${msg.id}`; div.innerHTML = `<div class="message-video-description" id="${videoId}" data-text="${msg.text}"><div class="video-thumbnail"><div class="video-text-container"></div><div class="spacer"></div><div class="video-progress-area"><div class="video-progress-bar-container"><div class="video-progress-bar-fill"></div></div><div class="moving-decoration"></div></div></div><div class="play-button-overlay"><div class="play-icon"></div></div></div>`; break; } }
 
                 if (['text', 'voice'].includes(msg.type)) {
