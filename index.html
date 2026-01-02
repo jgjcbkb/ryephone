@@ -14908,24 +14908,27 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
         }
 
         const showCustomModal = (config) => {
-
             return new Promise((resolve) => {
+                // 1. 移除页面上可能残留的旧弹窗 (防止双重弹窗)
+                const existingOverlay = document.querySelector('.modal-overlay[data-modal-id]');
+                if (existingOverlay) {
+                    existingOverlay.remove();
+                }
+
                 const overlay = document.createElement('div');
                 overlay.className = 'modal-overlay';
                 if (config.customClass) overlay.classList.add(config.customClass);
 
-                // --- 新增代码块 开始 ---
                 // 自动计算并设置更高的 z-index
-                const existingModals = document.querySelectorAll('.modal-overlay.visible');
-                let maxZIndex = 2000; // 基础 z-index
-                if (existingModals.length > 0) {
-                    maxZIndex = Math.max(...Array.from(existingModals).map(m => {
+                const existingVisibleModals = document.querySelectorAll('.modal-overlay.visible');
+                let maxZIndex = 2000;
+                if (existingVisibleModals.length > 0) {
+                    maxZIndex = Math.max(...Array.from(existingVisibleModals).map(m => {
                         const z = parseInt(window.getComputedStyle(m).zIndex, 10);
                         return isNaN(z) ? 0 : z;
                     }));
                 }
                 overlay.style.zIndex = maxZIndex + 10;
-                // --- 新增代码块 结束 ---
 
                 const modalId = `modal-${Date.now()}`;
                 overlay.dataset.modalId = modalId;
@@ -14960,7 +14963,12 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                 
                 document.querySelector('.app-container').appendChild(overlay);
 
+                let isResolved = false; // 防止多次 resolve
+
                 const closeModal = (resolutionValue) => {
+                    if (isResolved) return; // 如果已经处理过，直接返回
+                    isResolved = true;
+
                     overlay.classList.remove('visible');
                     overlay.addEventListener('transitionend', () => {
                         if (overlay.parentElement) overlay.remove();
@@ -14970,10 +14978,23 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
 
                 const internalClickHandler = e => {
                     const target = e.target;
+                    // 1. 处理按钮点击
                     const button = target.closest('.modal-button, .modal-close-btn');
                     if (button) {
                         e.stopPropagation();
-                        closeModal({ value: button.dataset.value, data: null, target: button });
+                        // 如果按钮有 data-value，则以此值关闭并 resolve
+                        // 如果没有（例如自定义绑定事件的按钮），则不自动关闭，等待手动调用 closeModal
+                        if (button.dataset.value) {
+                            closeModal({ value: button.dataset.value, data: null, target: button });
+                        }
+                        return;
+                    }
+                    
+                    // 2. 处理遮罩层点击 (点击空白处关闭)
+                    // 只有当点击的是 overlay 本身，且没有禁用点击关闭时才触发
+                    if (target === overlay && !config.disableBackdropClose) {
+                        e.stopPropagation();
+                        closeModal({ value: 'backdrop_click', data: null, target: overlay });
                     }
                 };
                 
@@ -14983,7 +15004,8 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                     config.onRender(overlay, closeModal);
                 }
 
-                setTimeout(() => overlay.classList.add('visible'), 10);
+                // 稍微延迟以触发 CSS transition
+                requestAnimationFrame(() => overlay.classList.add('visible'));
             });
         };
 
@@ -18097,70 +18119,63 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
                     finalMessages.push(finalInstructionMessage);
                 }
 
-                // 【【【 核心新增：认知思维协议 (强制 AI 先思考再说话) 】】】
+                // 【【【 核心新增：认知思维协议 (深度思考版 - 带词表核对) 】】】
                 const COGNITIVE_THOUGHT_PROTOCOL = `
-# [MANDATORY PRE-COMPUTATION: THE "THINK" PROTOCOL]
+# [MANDATORY COGNITIVE AUDIT PROTOCOL - THE "DEEP THINK" MANDATE]
 
-**BEFORE** you generate any actual response content (blocks, text, commands), you **MUST** first output a \`<think>\` block to perform a deep self-reflection and error check.
+**STOP.** Before generating any visible response, you **MUST** engage in a deep, structured cognitive audit inside a \`<think>\` block.
 
-**INSIDE THE \`<think>\` BLOCK, YOU MUST ANSWER THESE QUESTIONS:**
+**YOU MUST COMPLETE THE FOLLOWING CHECKLIST INSIDE \`<think>\`:**
 
-1.  **PERSONA AUDIT:**
-    *   Who am I right now? (Name & Core Personality)
-    *   What is my current relationship/status with {{user}}?
-    *   **Self-Correction:** Am I acting too nice? Too mean? Is this consistent with my last action?
+**STEP 1: CONTEXT & PLOT RECONSTRUCTION**
+*   **Current Situation:** Briefly summarize the *exact* physical and emotional state of the scene.
+*   **My Goal:** What does my character want to achieve *right now*?
 
-2.  **WORLDBOOK & RULES CHECK:**
-    *   **Mode Check:** Am I in "Offline Mode" (Novel Style) or "Online Mode" (Chat Style)?
-    *   **Format Check:** Do I need to use \`<block>\` tags? (If Online/Group: YES).
-    *   **Special Triggers:** Is there a "Danmaku" or "Life Snippet" requirement active?
+**STEP 2: THE "KILL LIST" AUDIT (CRITICAL)**
+*   **Active Scan:** I am scanning my planned response for these specific forbidden phrases:
+    1.  **"眼底"** (Eye bottom) -> **FORBIDDEN.**
+    2.  **"嘴角"** (Mouth corner) -> **FORBIDDEN.**
+    3.  **"身体一僵"** (Body stiffened) -> **FORBIDDEN.**
+    4.  **"精准地"** (Accurately) -> **FORBIDDEN.**
+    5.  **"那股...感"** (That sense of...) -> **FORBIDDEN.**
+    6.  **"咚咚咚"** (Thump thump) -> **FORBIDDEN.**
+    7.  **"如果是以前"** (If it were before) -> **FORBIDDEN.**
+    8.  **"很+形容词"** (Very + Adjective) -> **FORBIDDEN.**
 
-3.  **THE "ANTI-CLICHÉ" SAFETY SCAN (CRITICAL):**
-    *   **Scan your planned draft:** Are you about to use: "眼底闪过", "嘴角上扬", "身体一僵", "精准地", "那股...感", "咚咚咚", "如果是以前..."?
-    *   **IF YES:** SLAP YOURSELF IMMEDIATELY. Rewrite the sentence using **Actions** or **Direct Descriptions**.
-    *   *Example:* Instead of "他眼底闪过一丝怒意", write "他眯起眼，把烟头按灭在手心里".
+*   **Self-Correction Simulation:**
+    *   *Draft:* "他眼底闪过一丝怒意，嘴角勾起冷笑。" -> **DETECTED!**
+    *   *Correction:* "他眯起眼，把烟头按灭在手心里，笑出了声。"
 
-4.  **FINAL EXECUTION PLAN:**
-    *   What is the core action I will perform?
-    *   How do I make it "Show, Don't Tell"?
+**STEP 3: PERSONA & REALISM**
+*   **Physical Reality:** Is the action physically possible? (No hearing heartbeats from 5 meters away).
+*   **Show, Don't Tell:** Am I using adjectives to describe emotions? If yes, change them to **Actions**.
 
 **OUTPUT FORMAT:**
 <think>
-[Persona]: ...
-[Rules]: ...
-[Safety Scan]: ...
-[Plan]: ...
+[Plot]: ...
+[Kill List Scan]: (Must explicitly state "No forbidden words found" or "Corrected [X] to [Y]")
+[Realism Check]: ...
+[Drafting]: ...
 </think>
-(Then, and ONLY then, start your actual response...)
+(Then, start your actual response...)
 `;
                 // 将思考协议注入到 System Prompt 的最后，确保拥有最高权重
                 finalSystemPrompt += COGNITIVE_THOUGHT_PROTOCOL;
 
                 // 【【【 2. 在行为指令之后，追加最终的格式化指令 】】】
             const ULTIMATE_FORMATTING_RULE = `
-[SYSTEM OVERRIDE: ENFORCE COGNITIVE PROCESS]
+[SYSTEM OVERRIDE: ENFORCE DEEP THOUGHT]
 
-**STOP.** Before you generate the actual response, you **MUST** execute a "Cognitive Audit" to ensure quality and avoid clichés.
+**STOP.** Do not output the response yet. You must first **THINK**.
 
-**OUTPUT STRUCTURE (STRICT ORDER):**
+**MANDATORY PROCESS:**
+1.  **Open \`<think>\` block.**
+2.  **Analyze Context:** Review the plot. Is my character's reaction logical? Is it physically possible?
+3.  **Purge Clichés:** Actively hunt for "眼底", "嘴角", "身体一僵", "精准", "那股感", "咚咚咚". **If you find them in your draft, you MUST explicitly state: "Detected cliché [X], rewriting to [Y]" inside the think block.**
+4.  **Close \`</think>\` block.**
+5.  **Generate Output:** Only NOW can you output the actual response (using \`<block>\` or narrative text).
 
-**PART 1: THE HIDDEN THOUGHT PROCESS (<think>)**
-You **MUST** start your response with a \`<think>\` block. Inside, you must explicitly address:
-1.  **Persona Check:** "Who am I? What is my current mood/status?"
-2.  **Anti-Cliché Scan (CRITICAL):** "Am I about to use '眼底', '嘴角', '精准', '那股感', '咚咚咚'? If yes, DELETE and REWRITE."
-3.  **Logic Check:** "Does this action match the world logic (e.g. Offline Mode rules)?"
-
-**PART 2: THE ACTUAL CONTENT**
-After closing \`</think>\`, generate your visible response.
-*   **If in Online/Group Mode:** The content MUST be a sequence of \`<block>\` elements.
-*   **If in Offline Single Mode:** The content MUST be narrative text.
-
-**EXAMPLE START:**
-<think>
-Checking persona... Valid.
-Scanning for clichés... '眼底闪过' detected -> Changing to action '他眯起眼'.
-</think>
-<block type="text">...
+**FAILURE TO THINK IS A CRITICAL ERROR.**
 `;
             const finalFormattingInstruction = { role: "user", content: ULTIMATE_FORMATTING_RULE };
             finalMessages.push(finalFormattingInstruction);
