@@ -6399,6 +6399,43 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.6; transform: scale(0.9); }
 }
+/* 【核心重构】消息表态高级样式 */
+    .message-reactions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 4px 0; /* 与气泡和时间戳保持间距 */
+        z-index: 10;
+        width: fit-content;
+    }
+    .reaction-pill {
+        background: #2c2c2e; /* 深色背景，如你提供的图 */
+        color: #ffffff;
+        border-radius: 18px;
+        padding: 3px 10px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        cursor: pointer;
+        transition: all 0.1s;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .reaction-pill:active { transform: scale(0.95); background: #3a3a3c; }
+    .reaction-pill img {
+        height: 16px;
+        width: 16px;
+        object-fit: contain;
+    }
+    .reaction-count {
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        font-weight: 500;
+        color: #efeff4;
+    }
+    /* 调整发送方和接收方的对齐 */
+    .sent .message-reactions { justify-content: flex-end; margin-left: auto; }
+    .received .message-reactions { justify-content: flex-start; margin-right: auto; }
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -11283,7 +11320,8 @@ ${stickerInstructions}
 - To send a LOCATION: \`[location: {"title":"Location Name", "address":"Detailed Address"}]\`
 - To initiate a VIDEO CALL: \`[video_call]\`
 - To RECALL your last message: \`[recall]\`
-
+- To REACT to a specific message with an emoji: \`[react_to: "The exact text of the message" : EmojiName]\`
+  * Note: When you see \`[Reactions: ...]\` at the end of a message in the history, it means someone has reacted to that message.
 **[SPECIAL RULE FOR PRIVATE MESSAGES ONLY]**
 - **Multi-Message Splitter:** When using \`[send_private_message: ...]\` OR when actively chatting in a private window, you can use \`|||\` to separate multiple messages.
 - **FORBIDDEN:** Do **NOT** use \`|||\` in Moments comments, group chats, or any other context. It will break the display.
@@ -16860,7 +16898,12 @@ A girl with long pink hair is standing under a cherry blossom tree. She is weari
                 mainText = mainText.replace(stripRegex, '').trim();
                 
                 // 【核心修改】恢复纯净文本，不再每条都加时间戳
-                if(mainText) { 
+                if(mainText) {
+                    // 【核心新增】让 AI 能“看见”这条消息上被贴了哪些表态表情
+                    if (msg.reactions && msg.reactions.length > 0) {
+                        const reactionSummary = ` [Reactions: ${msg.reactions.join(', ')}]`;
+                        mainText += reactionSummary;
+                    }
                     contentParts.unshift({ type: 'text', text: mainText }); 
                 }
 
@@ -17771,7 +17814,8 @@ ${stickerInstructions}
 - To send a LOCATION: \`[location: {"title":"Location Name", "address":"Detailed Address"}]\`
 - To initiate a VIDEO CALL: \`[video_call]\`
 - To RECALL your last message: \`[recall]\`
-
+- To REACT to a specific message with an emoji: \`[react_to: "The exact text of the message" : EmojiName]\`
+  * Note: When you see \`[Reactions: ...]\` at the end of a message in the history, it means someone has reacted to that message.
 **[SPECIAL RULE FOR PRIVATE MESSAGES ONLY]**
 - **Multi-Message Splitter:** When using \`[send_private_message: ...]\` OR when actively chatting in a private window, you can use \`|||\` to separate multiple messages.
 - **FORBIDDEN:** Do **NOT** use \`|||\` in Moments comments, group chats, or any other context. It will break the display.
@@ -20626,7 +20670,7 @@ You are the Director. If multiple characters react to the rejection, generate a 
             return; // 处理完毕，结束函数
         }
 
-            const commandsRegex = /\[\s*(music_add|music_play_title|music_next|music_prev|music_toggle|set_status|set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|reject_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|nudge|set_nudge_suffix|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?:\s*[:：]\s*((?:\[[^\]]*\]|[^\]]|[\r\n])*))?\s*\]/g;
+            const commandsRegex = /\[\s*(react_to|music_add|music_play_title|music_next|music_prev|music_toggle|set_status|set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|reject_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|nudge|set_nudge_suffix|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?:\s*[:：]\s*((?:\[[^\]]*\]|[^\]]|[\r\n])*))?\s*\]/g;
             
             // --- 【核心重构：高级引用逻辑】 ---
             // 核心修复：正则改为兼容带引号("")、带中文引号(“”)、或完全不带引号的三种格式
@@ -20667,6 +20711,29 @@ You are the Director. If multiple characters react to the rejection, generate a 
             let regularText = textContent.replace(commandsRegex, '').trim();
             for (const cmd of commandsToExecute) {
                 switch(cmd.command) {
+                    case 'react_to': {
+                        const parts = cmd.value.split(/[:：]/);
+                        if (parts.length >= 2) {
+                            const targetText = parts[0].trim().replace(/^["'“]|["'”]$/g, '');
+                            const emojiName = parts[1].trim();
+                            // 确定是哪个 AI 角色在表态
+                            const actorName = sender || forcedSender || chatState.chatName;
+                            
+                            const targetMsg = [...chatState.messages].reverse().find(m => m.text && m.text.trim() === targetText);
+                            if (targetMsg) {
+                                if (!targetMsg.reactions) targetMsg.reactions = [];
+                                // 检查该 AI 是否已经表过态
+                                const alreadyReacted = targetMsg.reactions.some(r => r.user === actorName && r.emoji === emojiName);
+                                if (!alreadyReacted) {
+                                    targetMsg.reactions.push({ user: actorName, emoji: emojiName });
+                                    reRenderMessages();
+                                    saveConversation();
+                                }
+                            }
+                        }
+                        break;
+                    }
+                    // ... 后面接原有的 case 'set_avatar' 等
                                     // ===== 从这里开始添加新代码 =====
                     case 'set_avatar': {
                         // 从后往前找到用户最近发送的一张图片
@@ -21109,6 +21176,8 @@ You are the Director. If multiple characters react to the rejection, generate a 
             // --- 【全新】实时增量更新逻辑 ---
             msgData.id = msgData.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
             if (!msgData.timestamp) msgData.timestamp = timeManager.getCurrentTimestamp();
+            // 【核心新增】初始化表态数据口袋，让消息能存下表情
+            if (!msgData.reactions) msgData.reactions = [];
             simulatedCurrentTime = msgData.timestamp;
 
             // 【新增：播放提示音 (修复版)】
@@ -22039,6 +22108,27 @@ You are the Director. If multiple characters react to the rejection, generate a 
                 } 
                 
                 mainContentWrapper.appendChild(div);
+
+                // 【核心新增】渲染表态表情
+                if (msg.reactions && msg.reactions.length > 0) {
+                    const reactionsDiv = document.createElement('div');
+                    reactionsDiv.className = 'message-reactions';
+                    
+                    // 统计每个表情出现的次数
+                    const counts = {};
+                    msg.reactions.forEach(r => counts[r] = (counts[r] || 0) + 1);
+                    
+                    for (const [emojiName, count] of Object.entries(counts)) {
+                        const item = stickers.find(s => s.name === emojiName && s.type === 'emoji');
+                        if (item) {
+                            const pill = document.createElement('div');
+                            pill.className = 'reaction-pill';
+                            pill.innerHTML = `<img src="${item.url}" style="height:16px; width:auto; margin-right:2px;"> ${count > 1 ? count : ''}`;
+                            reactionsDiv.appendChild(pill);
+                        }
+                    }
+                    mainContentWrapper.appendChild(reactionsDiv);
+                }
                 
                 // 1. 创建一个新的包裹容器 (Bubble Row)
                 const bubbleRow = document.createElement('div');
@@ -22050,6 +22140,46 @@ You are the Director. If multiple characters react to the rejection, generate a 
 
                 // 3. 将气泡主体放入 Row
                 bubbleRow.appendChild(mainContentWrapper);
+
+                // 【核心重构】渲染表态表情（放在气泡下，时间戳上）
+                if (msg.reactions && msg.reactions.length > 0) {
+                    const reactionsDiv = document.createElement('div');
+                    reactionsDiv.className = 'message-reactions';
+                    
+                    // 按表情分组统计
+                    const groups = {};
+                    msg.reactions.forEach(r => {
+                        if (!groups[r.emoji]) groups[r.emoji] = [];
+                        groups[r.emoji].push(r.user);
+                    });
+                    
+                    for (const [emojiName, users] of Object.entries(groups)) {
+                        const item = stickers.find(s => s.name === emojiName && s.type === 'emoji');
+                        if (item) {
+                            const pill = document.createElement('div');
+                            pill.className = 'reaction-pill';
+                            pill.dataset.emoji = emojiName;
+                            pill.dataset.msgId = msg.id;
+                            pill.innerHTML = `
+                                <img src="${item.url}" alt="${emojiName}">
+                                <span class="reaction-count">${users.length}</span>
+                            `;
+                            // 绑定点击查看人员列表事件
+                            pill.onclick = (e) => {
+                                e.stopPropagation();
+                                conversationManager.showCustomModal({
+                                    title: `${emojiName} 表态详情`,
+                                    html: `<div style="text-align:left; max-height:200px; overflow-y:auto;">
+                                        ${users.map(u => `<div style="padding:8px 0; border-bottom:1px solid #eee;">${u === '{{user}}' ? '你' : u}</div>`).join('')}
+                                    </div>`,
+                                    buttons: [{ text: '知道了', value: 'close', class: 'primary' }]
+                                });
+                            };
+                            reactionsDiv.appendChild(pill);
+                        }
+                    }
+                    bubbleRow.appendChild(reactionsDiv);
+                }
 
                 // 4. 插入时间戳 (如果开启)
                 if (appearanceSettings.showMessageTimestamps) {
@@ -22597,6 +22727,27 @@ You are the Director. If multiple characters react to the rejection, generate a 
                 } 
                 
                 mainContentWrapper.appendChild(div);
+
+                // 【核心新增】渲染表态表情
+                if (msg.reactions && msg.reactions.length > 0) {
+                    const reactionsDiv = document.createElement('div');
+                    reactionsDiv.className = 'message-reactions';
+                    
+                    // 统计每个表情出现的次数
+                    const counts = {};
+                    msg.reactions.forEach(r => counts[r] = (counts[r] || 0) + 1);
+                    
+                    for (const [emojiName, count] of Object.entries(counts)) {
+                        const item = stickers.find(s => s.name === emojiName && s.type === 'emoji');
+                        if (item) {
+                            const pill = document.createElement('div');
+                            pill.className = 'reaction-pill';
+                            pill.innerHTML = `<img src="${item.url}" style="height:16px; width:auto; margin-right:2px;"> ${count > 1 ? count : ''}`;
+                            reactionsDiv.appendChild(pill);
+                        }
+                    }
+                    mainContentWrapper.appendChild(reactionsDiv);
+                }
                 
                 // 1. 创建一个新的包裹容器 (Bubble Row)
                 const bubbleRow = document.createElement('div');
@@ -22608,6 +22759,46 @@ You are the Director. If multiple characters react to the rejection, generate a 
 
                 // 3. 将气泡主体放入 Row
                 bubbleRow.appendChild(mainContentWrapper);
+
+                // 【核心重构】渲染表态表情（放在气泡下，时间戳上）
+                if (msg.reactions && msg.reactions.length > 0) {
+                    const reactionsDiv = document.createElement('div');
+                    reactionsDiv.className = 'message-reactions';
+                    
+                    // 按表情分组统计
+                    const groups = {};
+                    msg.reactions.forEach(r => {
+                        if (!groups[r.emoji]) groups[r.emoji] = [];
+                        groups[r.emoji].push(r.user);
+                    });
+                    
+                    for (const [emojiName, users] of Object.entries(groups)) {
+                        const item = stickers.find(s => s.name === emojiName && s.type === 'emoji');
+                        if (item) {
+                            const pill = document.createElement('div');
+                            pill.className = 'reaction-pill';
+                            pill.dataset.emoji = emojiName;
+                            pill.dataset.msgId = msg.id;
+                            pill.innerHTML = `
+                                <img src="${item.url}" alt="${emojiName}">
+                                <span class="reaction-count">${users.length}</span>
+                            `;
+                            // 绑定点击查看人员列表事件
+                            pill.onclick = (e) => {
+                                e.stopPropagation();
+                                conversationManager.showCustomModal({
+                                    title: `${emojiName} 表态详情`,
+                                    html: `<div style="text-align:left; max-height:200px; overflow-y:auto;">
+                                        ${users.map(u => `<div style="padding:8px 0; border-bottom:1px solid #eee;">${u === '{{user}}' ? '你' : u}</div>`).join('')}
+                                    </div>`,
+                                    buttons: [{ text: '知道了', value: 'close', class: 'primary' }]
+                                });
+                            };
+                            reactionsDiv.appendChild(pill);
+                        }
+                    }
+                    bubbleRow.appendChild(reactionsDiv);
+                }
 
                 // 4. 插入时间戳 (如果开启)
                 if (appearanceSettings.showMessageTimestamps) {
@@ -23465,6 +23656,10 @@ const showContextMenu = (event, messageId) => {
     }
 
     menuItems.push({ label: '引用', action: 'quote' });
+    // 【核心新增】表态选项
+    menuItems.push({ label: '表态', action: 'react' });
+
+    // 【核心新增】复制选项
 
     // 【核心新增】复制选项
     menuItems.push({ label: '复制', action: 'copy' });
@@ -23518,6 +23713,25 @@ const showContextMenu = (event, messageId) => {
     const menuClickHandler = async (e) => {
         const action = e.target.dataset.action; hideContextMenu(); const msgToActOn = chatState.messages.find(m => m.id === messageId); if (!msgToActOn) return;
         switch(action) {
+            case 'react':
+                stickerManager.openPanel((name, type) => {
+                    if (type === 'emoji') {
+                        if (!msgToActOn.reactions) msgToActOn.reactions = [];
+                        // 获取当前正在使用的身份
+                        const currentIdentity = chatState.currentIdentity || '{{user}}';
+                        
+                        // 检查该用户是否已经对该表情表过态，防止重复
+                        const alreadyReacted = msgToActOn.reactions.some(r => r.user === currentIdentity && r.emoji === name);
+                        if (!alreadyReacted) {
+                            msgToActOn.reactions.push({ user: currentIdentity, emoji: name });
+                            reRenderMessages();
+                            saveConversation();
+                        }
+                    } else {
+                        alert('只能选择 Emoji 进行表态哦');
+                    }
+                });
+                break;
             // --- 核心新增：处理收藏/取消收藏动作 ---
             case 'favorite':
                 await favoriteMessage(messageId);
