@@ -22758,34 +22758,19 @@ banner.querySelector('#notification-banner-clickable-area').addEventListener('cl
                     // 【核心保留】使用唯一 Tag，确保锁屏通知一条一条叠起来，不覆盖
                     const uniqueTag = chatId + '_' + Date.now() + '_' + Math.random();
 
-                    if (isIOS) {
-                        // 🍎 iOS
-                        const iosNotify = new Notification(displayName, {
-                            body: systemNotificationText,
-                            tag: uniqueTag, 
-                            silent: true 
-                        });
-                        
-                        iosNotify.onclick = function() {
-                            window.focus();
-                            open(chatId);
-                            this.close();
-                        };
-                    } else {
-                        // 🤖 安卓
-                        if ("serviceWorker" in navigator) {
-                            navigator.serviceWorker.ready.then(function(registration) {
-                                registration.showNotification(displayName, {
-                                    body: systemNotificationText,
-                                    icon: avatarUrl,
-                                    badge: 'https://i.imgur.com/sE3924q.png',
-                                    tag: uniqueTag, 
-                                    renotify: true, 
-                                    requireInteraction: true, 
-                                    silent: false 
-                                });
+                    // 【终极修复】不分安卓苹果，统一走 Service Worker 注册路径触发通知
+                    if ("serviceWorker" in navigator) {
+                        navigator.serviceWorker.ready.then(function(registration) {
+                            registration.showNotification(displayName, {
+                                body: specificContent, // 使用处理后的内容
+                                icon: avatarUrl,
+                                badge: 'https://i.postimg.cc/MTSwWVtp/IMG-2146.png', // 换成你的图标
+                                tag: uniqueTag, 
+                                renotify: true, 
+                                requireInteraction: true, 
+                                silent: false // 设为 false，确保有声音/震动提醒
                             });
-                        }
+                        });
                     }
                 } catch (e) {
                     console.error("通知发送失败:", e);
