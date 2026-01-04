@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>兔区</title>
+    <style>
+        /* --- 基础和全局样式 --- */
+        :root {
+            --jj-pink-bg: #FFE7F7;
+            --jj-pink-header-bg: #FDEAF5;
+            --jj-pink-quote-bg: #FCE0EB;
+            --jj-orange-header: #FFCC99;
+            --jj-orange-light: #FFF5EC;
+            --jj-blue-header: #E8F3FF;
+            --jj-blue-link: #0000FF;
+            --jj-red-link-hover: #FF0000;
+            --jj-gray-border: #999999;
+            --jj-green-text: #99CC00;
+            --jj-meta-text: #999999;
+            --jj-main-text: #333333;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background-color: #f0f2f5;
+            font-family: 'SimSun', '宋体', serif;
+            overscroll-behavior-y: contain;
+        }
+
+        .phone-screen {
+            max-width: 450px;
+            min-height: 100vh;
+            margin: 0 auto;
+            background-color: #FFFFFF; /* 默认白色背景 */
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        #page-home .page-content, #page-list .page-content {
+             background-color: var(--jj-pink-bg);
+        }
+
+        .page { display: none; flex-direction: column; width: 100%; animation: fadeIn 0.3s ease-in-out; }
+        .page.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        a { color: var(--jj-blue-link); text-decoration: none; }
+        a:hover { color: var(--jj-red-link-hover); }
+
+        .page-header { 
+            background-color: var(--jj-pink-header-bg); 
+            /* 核心修改：增加顶部内边距避开黑麦手机刘海 */
+            padding: 15px 10px; 
+            padding-top: 45px; 
+            text-align: center; 
+            border-bottom: 1px solid #EEDDE8; 
+            flex-shrink: 0; 
+            /* 核心修改：固定顶栏，不随页面滚动 */
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+        }
+        .page-header h1 { margin: 0; font-size: 17px; font-weight: normal; color: var(--jj-main-text); }
+        .page-header .sub-id { font-size: 12px; color: var(--jj-meta-text); }
+        /* 核心修改：调整返回键位置，使其在增加内边距后依然垂直居中于文字行 */
+        .back-button { position: absolute; left: 15px; bottom: 12px; font-size: 24px; color: #888; cursor: pointer; text-decoration: none; }
+        /* 核心修改：调整菜单键位置 */
+        .header-menu { position: absolute; right: 15px; bottom: 12px; font-size: 24px; color: #888; cursor: pointer; }
+
+        .page-content { padding: 5px; flex-grow: 1; }
+        #page-post .page-content { padding: 0; } /* 帖子详情页内容区无内边距 */
+
+
+        /* --- 页面 1: 主页 --- */
+        #page-home .board-list-table { width: 100%; background-color: #FFFFFF; border: 1px solid var(--jj-gray-border); }
+        #page-home .category-header { background-color: var(--jj-orange-light); color: var(--jj-red-link-hover); font-weight: bold; padding: 5px 10px; font-size: 12px; }
+        #page-home .board-header-row { background-color: var(--jj-orange-header); text-align: center; font-weight: bold; line-height: 25px; }
+        #page-home .board-row { background-color: var(--jj-orange-light); border-top: 1px solid #FFFFFF; }
+        #page-home .board-name { width: 30%; text-align: center; font-weight: bold; vertical-align: middle; border-right: 1px solid #FFFFFF; padding: 15px 5px; }
+        #page-home .board-desc { padding: 15px 10px; vertical-align: middle; font-size: 12px; color: var(--jj-main-text); }
+
+        /* --- 页面 2: 帖子列表页 --- */
+        #page-list .list-header { display: flex; justify-content: flex-start; align-items: center; padding: 8px 10px; font-size: 12px; }
+        #page-list .topic-list-table { width: 100%; background-color: var(--jj-green-text); border: 1px solid var(--jj-green-text); }
+        #page-list .topic-list-table th { background-color: var(--jj-blue-header); padding: 8px 5px; font-size: 12px; font-weight: normal; }
+        #page-list .topic-list-table td { background-color: var(--jj-pink-bg); padding: 8px 5px; font-size: 12px; border-top: 1px solid #FFFFFF; }
+        #page-list .topic-title { word-break: break-all; }
+        #page-list .topic-author, #page-list .topic-time, #page-list .topic-replies { text-align: center; white-space: nowrap; }
+        #page-list .topic-author { width: 18%; }
+        #page-list .topic-time { width: 22%; }
+        #page-list .topic-replies { width: 10%; }
+        #page-list .no-topics-message { text-align: center; color: var(--jj-meta-text); padding: 40px 20px; }
+        
+        /* --- 页面 3: 帖子详情页 (全新样式) --- */
+        #page-post .post-title { font-size: 20px; font-weight: bold; padding: 15px; color: #8B5A65; line-height: 1.4; }
+        #page-post .reply-item { border-bottom: 1px solid #F0F0F0; padding: 15px; }
+        #page-post .reply-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        #page-post .author-info .author-line1 { font-size: 14px; color: var(--jj-main-text); }
+        #page-post .author-info .author-id { color: var(--jj-meta-text); margin-left: 5px; }
+        #page-post .author-info .author-line2 { font-size: 12px; color: var(--jj-meta-text); margin-top: 4px; }
+        #page-post .reply-actions-menu { color: #888; font-size: 20px; font-weight: bold; cursor: pointer; padding: 0 5px; }
+        #page-post .reply-content { line-height: 1.8; font-size: 16px; word-wrap: break-word; }
+
+        /* 操作菜单弹窗 */
+        .action-menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: flex-end; z-index: 1000; }
+        .action-menu { background: #fff; width: 100%; max-width: 450px; border-radius: 15px 15px 0 0; overflow: hidden; }
+        .action-item { padding: 15px; text-align: center; border-bottom: 1px solid #eee; cursor: pointer; font-size: 16px; color: #333; }
+        .action-item:active { background-color: #f5f5f5; }
+        .action-item.cancel { color: #888; border-bottom: none; background: #fafafa; }
+        .action-item.delete { color: #ff0000; }
+
+        /* --- 新增：右上角下拉菜单样式 --- */
+        .header-dropdown-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1050; display: none; }
+        .header-dropdown-menu { 
+            position: absolute; 
+            /* 核心修改：调整弹出位置，避开加高的顶栏 */
+            top: 85px; 
+            right: 10px; 
+            background: #fff; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2); 
+            width: 140px; 
+            display: none; 
+            flex-direction: column; 
+            overflow: hidden; 
+            z-index: 1051; 
+        }
+        .header-dropdown-menu.active { display: flex; }
+        .header-dropdown-item { padding: 12px 15px; font-size: 14px; color: #333; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        .header-dropdown-item:last-child { border-bottom: none; }
+        .header-dropdown-item:active { background-color: #f5f5f5; }
+        .header-dropdown-item svg { width: 16px; height: 16px; fill: #666; }
+
+        /* 自定义精致弹窗 (编辑/删除) */
+        .custom-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1100; }
+        .custom-modal { background: #fff; width: 85%; max-width: 320px; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: popIn 0.2s ease-out; }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-title { margin: 0 0 15px 0; font-size: 18px; font-weight: bold; text-align: center; color: #333; }
+        .modal-body { margin-bottom: 20px; font-size: 15px; color: #666; }
+        .modal-textarea { width: 100%; height: 120px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; font-size: 15px; resize: none; box-sizing: border-box; }
+        .modal-buttons { display: flex; justify-content: space-between; gap: 10px; }
+        .modal-btn { flex: 1; padding: 10px 0; border: none; border-radius: 20px; font-size: 15px; cursor: pointer; }
+        .btn-cancel { background-color: #f0f0f0; color: #666; }
+        .btn-confirm { background-color: var(--jj-blue-header); color: #333; font-weight: bold; }
+        .btn-delete { background-color: #ffecec; color: #ff0000; font-weight: bold; }
+
+        /* --- 投诉页面样式 --- */
+        #page-report .page-content { background-color: #fff; padding: 0; }
+        .report-notice { background-color: #fffbf8; color: #d98e73; padding: 12px 15px; font-size: 12px; line-height: 1.5; border-bottom: 1px solid #f0f0f0; }
+        .report-body { padding: 20px 15px; }
+        .report-target-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; color: #333; }
+        .report-target-title span { color: #999; font-weight: normal; margin-left: 5px; }
+        .report-preview { background-color: #f7f8fa; padding: 15px; border-radius: 6px; font-size: 14px; color: #666; line-height: 1.6; margin-bottom: 25px; }
+        .report-section-title { font-weight: bold; font-size: 15px; margin-bottom: 15px; color: #000; }
+        .report-tags { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 25px; }
+        .report-tag { background-color: #f9f9f9; border: 1px solid #f9f9f9; border-radius: 4px; padding: 12px 0; text-align: center; font-size: 13px; color: #333; cursor: pointer; transition: all 0.2s; }
+        .report-tag.active { background-color: #fff; border-color: #333; font-weight: bold; }
+        .report-textarea { width: 100%; height: 100px; padding: 10px; border: 1px solid #eee; border-radius: 6px; background-color: #fff; box-sizing: border-box; font-size: 14px; margin-bottom: 30px; font-family: inherit; resize: none; }
+        .report-submit-btn { width: 100%; background-color: #e0e0e0; color: #fff; border: none; padding: 14px; border-radius: 30px; font-size: 16px; font-weight: bold; cursor: not-allowed; text-align: center; }
+        .report-submit-btn.active { background-color: #d4d4d4; color: #333; cursor: pointer; } 
+        /* 这里的active颜色模拟图中未激活但可点的状态，或者直接给个深色 */
+        .report-submit-btn.ready { background-color: #333; color: #fff; cursor: pointer; }
+
+        #page-post .quote-content { font-size: 14px; color: var(--jj-main-text); background-color: var(--jj-pink-quote-bg); border: 1px solid #F6D8E6; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+        #page-post .quote-content .quote-meta { font-size: 12px; color: #a08c96; }
+        #page-post .post-images img { max-width: 100%; height: auto; display: block; margin-top: 10px; border-radius: 4px; }
+        
+        /* --- 页面 4: 发表新帖子页 & 回复帖子表单 --- */
+        .post-form-table { width: 100%; border: 4px solid #FFF9E1; border-collapse: collapse; margin-top: 10px; }
+        .post-form-table td { padding: 10px; border: 1px solid #FFF9E1; }
+        .form-label { width: 25%; font-weight: bold; text-align: right; background-color: #FFFFCC; vertical-align: top; font-size: 14px; }
+        .form-input { background-color: var(--jj-pink-bg); }
+        .post-form-table input[type="text"], .post-form-table textarea { width: 100%; padding: 8px; border: 1px solid var(--jj-gray-border); font-family: 'SimSun', '宋体', serif; font-size: 14px; box-sizing: border-box; }
+        .post-form-table textarea { min-height: 150px; resize: vertical; }
+        .image-link-input { margin-bottom: 5px; }
+        #add-pic-button, #reply-add-pic-button { font-size: 12px; padding: 4px 8px; margin-top: 5px; }
+        .form-hint { font-size: 12px; color: var(--jj-red-link-hover); margin-top: 5px; }
+        .form-buttons { text-align: center; }
+        .form-buttons button { border: 1px solid var(--jj-gray-border); padding: 8px 25px; margin: 0 10px; border-radius: 4px; cursor: pointer; }
+        .submit-btn { background-color: var(--jj-blue-header); border-color: #BBD6F2; font-weight: bold; }
+        #reply-quote-area { margin-bottom: 10px; }
+        #reply-quote-area .quote-content { font-size: 14px; }
+        /* 投诉内容相关样式 */
+        .reported-banner-active { background: #fff1f0; border: 1px solid #ffa39e; color: #cf1322; padding: 8px; border-radius: 4px; font-size: 13px; cursor: pointer; user-select: none; margin-bottom: 5px; }
+        .reported-banner-active:hover { background: #ffccc7; }
+        .reported-content-hidden { display: none; padding: 10px; border: 1px dashed #ffa39e; background: #fafafa; border-radius: 4px; margin-top: 5px; }
+        .reported-content-hidden.show { display: block; }
+        /* 新增：数字角标样式 */
+        .jj-badge { display: inline-block; background-color: #ff4d4f; color: white; font-size: 11px; font-weight: bold; padding: 0 6px; height: 18px; line-height: 18px; border-radius: 9px; margin-left: 8px; vertical-align: middle; min-width: 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); border: 1px solid #fff; }
+
+        /* 新增：催更选择弹窗样式 */
+        .tuqu-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 2000; }
+        .tuqu-modal { background: white; width: 85%; max-width: 320px; border-radius: 15px; padding: 20px; box-sizing: border-box; }
+        .tuqu-modal h3 { margin: 0 0 15px 0; font-size: 16px; text-align: center; color: #333; }
+        .tuqu-modal select, .tuqu-modal textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px; box-sizing: border-box; font-family: inherit; }
+        .tuqu-modal .btns { display: flex; gap: 10px; }
+        .tuqu-modal button { flex: 1; padding: 10px; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .tuqu-modal .btn-cancel { background: #eee; color: #666; }
+        .tuqu-modal .btn-confirm { background: #ff4d4f; color: white; }
+   
+        /* 新增：数字角标样式 */
+        .jj-badge { display: inline-block; background-color: #ff4d4f; color: white; font-size: 11px; font-weight: bold; padding: 0 6px; height: 18px; line-height: 18px; border-radius: 9px; margin-left: 8px; vertical-align: middle; min-width: 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); border: 1px solid #fff; }
+    
+        /* --- 适配黑麦手机的 Iframe 样式 --- */
+/* 这段代码让兔区在被嵌入时自动铺满，去掉多余的外壳 */
+html, body {
+    background-color: #f0f2f5; /* 保持背景色 */
+    overflow: hidden; /* 防止双重滚动条 */
+}
+
+.phone-screen {
+    max-width: 100% !important; /* 强制宽度铺满 */
+    width: 100% !important;
+    min-height: 100% !important;
+    height: 100vh !important;
+    box-shadow: none !important; /* 去掉阴影 */
+    margin: 0 !important;
+    border-radius: 0 !important; /* 去掉圆角，因为主APP已经有圆角了 */
+    overflow-y: auto; /* 让内容在内部滚动 */
+}
+
+/* 隐藏滚动条但保留滚动功能 (美观) */
+.phone-screen::-webkit-scrollbar {
+    display: none;
+}
+    </style>
+</head>
+<body>
+
+    <div class="phone-screen">
+
+        <!-- ========================================= -->
+        <!--    页面 1: 主页 (板块列表)                -->
+        <!-- ========================================= -->
+        <div id="page-home" class="page active">
+            <div class="page-header">
+                <div class="back-button" onclick="exitTuquToAppHome()">‹</div>
+                <h1>兔区</h1>
+                <button onclick="triggerRandomTuqu()" style="position:absolute; right:10px; bottom:12px; font-size:12px; padding:5px 10px; background:#ff4d4f; color:white; border:none; border-radius:15px; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">全站乱炖</button>
+            </div>
+            <div class="page-content">
+                <table class="board-list-table" cellpadding="5" cellspacing="1">
+                    <thead class="board-header-row"><tr><td>版块</td><td>版规</td></tr></thead>
+                    <tbody>
+                        <tr><td colspan="2" class="category-header">--+　无限创作宇宙 (The Infinite Creation)　+--</td></tr>
+                        <tr class="board-row"><td class="board-name"><a href="#" onclick="navigateTo('list', '同人衍生')">同人衍生</a></td><td class="board-desc">
+                            <b>【捡手机文学 · 聊天体 · 无限流AU · 拆逆无罪】</b><br>
+                            1. <b>捡手机文学/伪造现场</b>：强烈鼓励模拟“我捡到了XX角色的手机”。请直接贴出伪造的【聊天记录】、备忘录碎碎念、私密相册描述。越像真的越好。<br>
+                            2. <b>无限时空 (AU)</b>：打破原作！黑帮卧底、霍格沃兹、赛博朋克、古代宫廷、末日废土。角色名字不变，身份随你定。<br>
+                            3. <b>CP大乱炖 (拆逆不限)</b>：这里没有官配。拆散任何一对，组合任何一对。逆攻受、水仙（自攻自受）、拉郎配、买股文。<br>
+                            4. <b>梦女/乙女/原女</b>：这里是“我”的主场。尽情代入“我”与角色的恋爱、争吵、修罗场。玛丽苏无罪，OOC有理。<br>
+                            5. <b>特殊癖好</b>：ABO、哨向、Dom/Sub、生子、人外、触手。请在标题标注。
+                        </td></tr>
+                        
+                        <tr class="board-row"><td class="board-name"><a href="#" onclick="navigateTo('list', '情感百态')">情感百态</a></td><td class="board-desc">
+                            <b>【社交求助 · 关系维系 · 聊天记录分析】</b><br>
+                            1. <b>社交难题互助 (带图求助)</b>：“这就是断崖式分手吗？”、“相亲对象回这个表情是什么意思？”、“怎么礼貌地拒绝借钱？”。晒出对话，求大家做阅读理解。<br>
+                            2. <b>关系维系与修复</b>：探讨如何拯救冷淡的友谊、修复破裂亲情、或在长期关系中保持新鲜感。<br>
+                            3. <b>Crush与下头</b>：记录瞬间的心动（Crush）或因为一个细节瞬间冷静（下头）的时刻。<br>
+                            4. <b>发疯与直播</b>：允许无逻辑的咆哮宣泄，欢迎直播抓马现场（如“直播我去前任婚礼砸场子”）。
+                        </td></tr>
+                        
+                        <tr class="board-row"><td class="board-name"><a href="#" onclick="navigateTo('list', '灵异怪谈')">灵异怪谈</a></td><td class="board-desc">
+                            <b>【赛博算命 · 规则怪谈 · 沉浸式恐怖】</b><br>
+                            1. <b>第一人称实录</b>：“我捡到了一本带血的日记”或“这是我从死人身上扒下来的手机”。<br>
+                            2. <b>规则类怪谈</b>：“XX中学守则”、“XX小区业主须知”，带给读者细思极恐的体验。<br>
+                            3. <b>玄学探讨</b>：梦境解析、八字探讨、塔罗占卜。默认“信则有”，禁止用科学杠楼主。
+                        </td></tr>
+
+                        <tr><td colspan="2" class="category-header">--+　人间真实 (Real Life)　+--</td></tr>
+                        <tr class="board-row"><td class="board-name"><a href="#" onclick="navigateTo('list', '职场人生')">职场人生</a></td><td class="board-desc">
+                            <b>【摸鱼技巧 · 薪资揭秘 · 跑路指南】</b><br>
+                            1. <b>摸鱼学</b>：交流如何优雅地“带薪拉屎”、工位摸鱼不被发现、糊弄周报的技巧。<br>
+                            2. <b>职场求生</b>：如何应对PUA老板？如何处理同事甩锅？欢迎晒出具体对话求回怼话术。<br>
+                            3. <b>搞钱与跑路</b>：各行各业真实薪资爆料、离职拿N+1攻略、劳动仲裁全流程分享。
+                        </td></tr>
+                        
+                        <tr class="board-row"><td class="board-name"><a href="#" onclick="navigateTo('list', '校园回响')">校园回响</a></td><td class="board-desc">
+                            <b>【留学生存 · 宿舍宫斗 · 升学焦虑】</b><br>
+                            1. <b>留学党</b>：吐槽国外的“白人饭”有多难吃、赶Due的崩溃、昂贵的中餐、孤独感。<br>
+                            2. <b>宿舍生存</b>：处理极品舍友（半夜连麦、不讲卫生、偷用东西）。<br>
+                            3. <b>升学内卷</b>：考研/保研/留学的真实数据分享，导师避雷指南。
+                        </td></tr>
+                        
+                        <tr class="board-row"><td class="board-name"><a href="#" onclick="navigateTo('list', '萌宠乐园')">萌宠乐园</a></td><td class="board-desc">
+                            <b>【毛孩子 · 拟人化日记 · 救助站】</b><br>
+                            1. <b>拟人化视角</b>：以宠物的口吻写日记（“本喵今天把铲屎官的杯子推下去了”）。<br>
+                            2. <b>劝退指南</b>：真实展示养宠的麻烦（拆家、掉毛、生病费钱），劝退一时冲动的新手。<br>
+                            3. <b>医疗与救助</b>：科学喂养交流，流浪动物救助信息扩散。
+                        </td></tr>
+
+                        <tr class="board-row"><td class="board-name"><a href="#" onclick="navigateTo('list', '美食厨房')">美食厨房</a></td><td class="board-desc">
+                            <b>【中国胃受难记 · 炸厨房 · 红黑榜】</b><br>
+                            1. <b>中国胃受难记</b>：留学生/海外党专属，吐槽国外的奇葩食物，寻找平替食材。<br>
+                            2. <b>炸厨房大赏</b>：晒出你的黑暗料理，虽然不能吃，但能让大家开心。<br>
+                            3. <b>红黑榜与地域战</b>：网红店打假，甜咸豆腐脑、折耳根之争。
+                        </td></tr>
+
+                        <tr><td colspan="2" class="category-header">--+　流量与杂谈 (Traffic & Chaos)　+--</td></tr>
+                        <tr class="board-row"><td class="board-name"><a href="#" onclick="navigateTo('list', '游戏动漫')">游戏动漫</a></td><td class="board-desc">
+                            <b>【二次元 · 党争 · 发疯】</b><br>
+                            1. <b>角色厨力放出</b>：在这里，你可以大声喊出任何角色的名字并叫他/她老婆/老公。<br>
+                            2. <b>强度与剧情</b>：硬核的数据分析，或者对编剧发刀片的愤怒控诉。<br>
+                            3. <b>挂人与避雷</b>：挂游戏里的奇葩队友、骗子、毁号者。
+                        </td></tr>
+                        
+                        <tr class="board-row"><td class="board-name"><a href="#" onclick="navigateTo('list', '闲聊水区')">闲聊水区</a></td><td class="board-desc">
+                            <b>【加密通话 · 吃瓜 · 树洞】</b><br>
+                            1. <b>娱乐圈八卦</b>：请熟练使用缩写（如：dl=顶流，xh=小花）进行加密通话，讨论明星八卦与翻车现场。<br>
+                            2. <b>时事热点</b>：对当下社会热点的锐评。<br>
+                            3. <b>无意义水</b>：单纯的复读机、刷屏、或者“睡不着聊五毛钱的”。
+                        </td></tr>
+                        
+                        <tr class="board-row"><td class="board-name"><a href="#" onclick="navigateTo('list', '自由交易')">自由交易</a></td><td class="board-desc">
+                            <b>【脑洞交易 · 以物易物】</b><br>
+                            1. <b>规则</b>：这里不收金钱，只收“故事”、“寿命”、“运气”、“秘密”或“梦境”作为代价。<br>
+                            2. <b>商品</b>：出售“后悔药”、收购“一个不会醒的梦”、转让“前任的记忆”。<br>
+                            3. <b>玩法</b>：请一本正经地胡说八道，进行一场超现实的交易扮演。
+                        </td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ========================================= -->
+        <!--    页面 2: 帖子列表页                      -->
+        <!-- ========================================= -->
+        <div id="page-list" class="page">
+            <div class="page-header">
+                <div class="back-button" onclick="navigateTo('home')">‹</div>
+                <h1 id="list-title"></h1>
+            </div>
+            <div class="page-content">
+                <div class="list-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span><a href="#" onclick="navigateTo('new-post')">发表新帖子</a></span>
+                    <button onclick="triggerBoardTuqu()" style="font-size:12px; padding:4px 10px; background:var(--jj-blue-link); color:white; border:none; border-radius:12px; cursor:pointer; opacity: 0.9;">本版催更</button>
+                </div>
+                <table class="topic-list-table" cellspacing="1">
+                    <thead><tr><th>主题</th><th>作者</th><th>发表时间</th><th>回复</th></tr></thead>
+                    <tbody id="topic-list-body"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- ========================================= -->
+        <!--    页面 4: 发表新帖子页                   -->
+        <!-- ========================================= -->
+        <div id="page-new-post" class="page">
+             <div class="page-header">
+                <a href="#" class="back-button" onclick="navigateTo('list')">‹</a>
+                <h1 id="new-post-title"></h1>
+            </div>
+            <div class="page-content">
+                <table class="post-form-table">
+                    <tbody>
+                        <tr><td class="form-label">名字：</td><td class="form-input"><input name="username" type="text" maxlength="10"></td></tr>
+                        <tr><td class="form-label">主题：</td><td class="form-input"><input id="new-post-subject" type="text" maxlength="90"></td></tr>
+                        <tr><td class="form-label">内容：</td><td class="form-input"><textarea id="new-post-content"></textarea></td></tr>
+                        <tr><td class="form-label">表情：</td><td class="form-input"><button onclick="openStickerPanel('new-post-content')" style="padding: 5px 15px; background: #fff; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 5px;"><img src="https://i.postimg.cc/qMXdv4V5/IMG-9900.png" style="width: 20px; height: 20px;"> 选择表情</button></td></tr>
+                        <tr><td colspan="2" class="form-buttons"><button onclick="navigateTo('list')">取消</button><button class="submit-btn" onclick="submitNewPost()">发表</button></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ========================================= -->
+        <!--    页面 3: 帖子详情页                      -->
+        <!-- ========================================= -->
+        <div id="page-post" class="page">
+             <div class="page-header" id="post-page-header">
+                <a href="#" class="back-button" onclick="navigateTo('list')">‹</a>
+                <h1 id="post-header-title"></h1>
+                <div class="header-menu" onclick="toggleHeaderMenu()">≡</div>
+            </div>
+            <!-- 新增：右上角下拉菜单 -->
+            <div id="header-dropdown-overlay" class="header-dropdown-overlay" onclick="toggleHeaderMenu()"></div>
+            <div id="header-dropdown-menu" class="header-dropdown-menu">
+                <!-- 已隐藏收藏和分享选项 -->
+                <div class="header-dropdown-item" onclick="handleHeaderAction('update')">
+                    <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                    更新 (催更)
+                </div>
+            </div>
+
+            <div class="page-content">
+                <div id="post-detail-container"></div>
+                <div id="reply-form-container">
+                    <p align="center" style="font-weight:bold; margin: 20px 0 10px;">回复此贴子</p>
+                    <table class="post-form-table">
+                        <tbody>
+                            <tr><td class="form-label">名字：</td><td class="form-input"><input id="reply-username" type="text" maxlength="10"></td></tr>
+                            <tr><td class="form-label">内容：</td><td class="form-input"><div id="reply-quote-area"></div><textarea id="reply-content"></textarea></td></tr>
+                            <tr><td class="form-label">表情：</td><td class="form-input"><button onclick="openStickerPanel('reply-content')" style="padding: 5px 15px; background: #fff; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 5px;"><img src="https://i.postimg.cc/qMXdv4V5/IMG-9900.png" style="width: 20px; height: 20px;"> 选择表情</button></td></tr>
+                            <tr><td colspan="2" class="form-buttons"><button onclick="document.getElementById('reply-content').value=''">清空</button><button class="submit-btn" onclick="submitReply()">发表</button></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================= -->
+        <!--    页面 5: 投诉页                          -->
+        <!-- ========================================= -->
+        <div id="page-report" class="page">
+            <div class="page-header">
+                <div class="back-button" onclick="navigateTo('post')">‹</div>
+                <h1>投诉</h1>
+            </div>
+            <div class="page-content">
+                <div class="report-notice">您的投诉将在48小时内受理，请尽量提交详细的投诉原因。</div>
+                <div class="report-body">
+                    <div class="report-target-title" id="report-target-title"></div>
+                    <div class="report-preview" id="report-preview-content"></div>
+                    
+                    <div class="report-section-title">请选择你想要投诉的类型</div>
+                    <div class="report-tags" id="report-tags-container">
+                        <!-- 标签由 JS 生成 -->
+                    </div>
+
+                    <div class="report-section-title">请填写不少于20字的投诉原因 (选填)</div>
+                    <textarea class="report-textarea" id="report-reason"></textarea>
+
+                    <button class="report-submit-btn" id="report-submit-btn" onclick="submitReport()">提交</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 操作菜单 -->
+    <div id="action-menu-overlay" class="action-menu-overlay" onclick="closeActionMenu()">
+        <div class="action-menu" onclick="event.stopPropagation()">
+            <div class="action-item" onclick="handleMenuAction('quote')">引用/回复</div>
+            <div class="action-item" onclick="handleMenuAction('copy')">复制</div>
+            <div class="action-item" onclick="handleMenuAction('edit')">编辑</div>
+            <div class="action-item" onclick="handleMenuAction('report')">投诉</div>
+            <div class="action-item delete" onclick="handleMenuAction('delete')">删除</div>
+            <div class="action-item cancel" onclick="closeActionMenu()">取消</div>
+        </div>
+    </div>
+
+    <!-- 编辑弹窗 -->
+    <div id="edit-modal-overlay" class="custom-modal-overlay">
+        <div class="custom-modal">
+            <h3 class="modal-title">编辑内容</h3>
+            <div class="modal-body"><textarea id="edit-textarea" class="modal-textarea"></textarea></div>
+            <div class="modal-buttons">
+                <button class="modal-btn btn-cancel" onclick="document.getElementById('edit-modal-overlay').style.display='none'">取消</button>
+                <button class="modal-btn btn-confirm" onclick="confirmEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除确认弹窗 -->
+    <div id="delete-modal-overlay" class="custom-modal-overlay">
+        <div class="custom-modal">
+            <h3 class="modal-title">确认删除</h3>
+            <div class="modal-body" style="text-align: center;">确定要删除这条内容吗？此操作无法撤销。</div>
+            <div class="modal-buttons">
+                <button class="modal-btn btn-cancel" onclick="document.getElementById('delete-modal-overlay').style.display='none'">取消</button>
+                <button class="modal-btn btn-delete" onclick="confirmDelete()">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增：催更选项弹窗 -->
+    <div id="board-trigger-modal" class="tuqu-modal-overlay">
+        <div class="tuqu-modal">
+            <h3 id="trigger-modal-title">本版催更设置</h3>
+            <label style="font-size: 12px; color: #888; display: block; margin-bottom: 5px;">选择核心角色：</label>
+            <select id="trigger-char-select">
+                <option value="">随机路人 (纯净模式)</option>
+            </select>
+            <label style="font-size: 12px; color: #888; display: block; margin-bottom: 5px;">输入世界观/设定 (可选)：</label>
+            <textarea id="trigger-worldview" placeholder="例如：假如角色是皇上 / 假如这是末世背景..." rows="3"></textarea>
+            <div class="btns">
+                <button class="btn-cancel" onclick="closeTriggerModal()">取消</button>
+                <button class="btn-confirm" onclick="confirmBoardTrigger()">确认召唤</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 核心新增：数据库读取工具 ---
+        const imageStore = (function() {
+            const dbName = 'ImageBlobStore';
+            const storeName = 'blobs';
+            let db;
+            async function initDB() {
+                return new Promise((resolve, reject) => {
+                    if (db) return resolve(db);
+                    const request = indexedDB.open(dbName, 1);
+                    request.onerror = (event) => reject("IndexedDB error: " + request.error);
+                    request.onsuccess = (event) => { db = event.target.result; resolve(db); };
+                    request.onupgradeneeded = (event) => {
+                        const dbInstance = event.target.result;
+                        if (!dbInstance.objectStoreNames.contains(storeName)) {
+                            dbInstance.createObjectStore(storeName);
+                        }
+                    };
+                });
+            }
+            async function getItem(key) {
+                const db = await initDB();
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction(storeName, 'readonly');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.get(key);
+                    request.onerror = (event) => reject("Error getting item: " + request.error);
+                    request.onsuccess = (event) => resolve(event.target.result);
+                });
+            }
+            return { getItem };
+        })();
+
+        async function setImageSrc(element, keyOrUrl) {
+            if (!element) return;
+            if (keyOrUrl && keyOrUrl.startsWith('indexeddb:')) {
+                const key = keyOrUrl.substring(10);
+                try {
+                    const blob = await imageStore.getItem(key);
+                    if (blob) {
+                        const objectURL = URL.createObjectURL(blob);
+                        element.src = objectURL;
+                    }
+                } catch (e) {
+                    console.error("Error loading image from IndexedDB", e);
+                }
+            } else {
+                element.src = keyOrUrl || '';
+            }
+        }
+
+        // --- 数据存储和管理 ---
+        let forumData = JSON.parse(localStorage.getItem('jjForumData')) || {};
+        let currentTriggerMode = 'board'; // 新增：用于区分是“版块催更”还是“帖子更新”
+
+        function exitTuquToAppHome() {
+            window.parent.postMessage({ type: 'EXIT_TUQU' }, '*');
+        }
+
+        // 新增：手动触发全站随机动态
+        function triggerRandomTuqu() {
+            window.parent.postMessage({ type: 'MANUAL_TRIGGER_TUQU', mode: 'random' }, '*');
+            alert('指令已发出，匿名网友正在赶来...');
+        }
+
+        // 新增：切换右上角菜单显示
+        function toggleHeaderMenu() {
+            const menu = document.getElementById('header-dropdown-menu');
+            const overlay = document.getElementById('header-dropdown-overlay');
+            if (menu.style.display === 'flex') {
+                menu.style.display = 'none';
+                overlay.style.display = 'none';
+            } else {
+                menu.style.display = 'flex';
+                overlay.style.display = 'block';
+            }
+        }
+
+        // 新增：处理菜单动作
+        function handleHeaderAction(action) {
+            toggleHeaderMenu(); // 关闭菜单
+            if (action === 'favorite') {
+                alert('已收藏本帖 (模拟)');
+            } else if (action === 'share') {
+                alert('分享链接已复制 (模拟)');
+            } else if (action === 'update') {
+                triggerPostUpdate();
+            }
+        }
+
+        // 新增：触发单贴更新
+        function triggerPostUpdate() {
+            currentTriggerMode = 'post';
+            const modal = document.getElementById('board-trigger-modal');
+            const select = document.getElementById('trigger-char-select');
+            document.getElementById('trigger-modal-title').innerText = `更新当前帖子`;
+            
+            // 向父窗口请求角色列表
+            window.parent.postMessage({ type: 'REQUEST_CHARACTER_LIST' }, '*');
+            
+            modal.style.display = 'flex';
+        }
+
+        // 获取当前版块的版规
+        function getBoardRules(boardName) {
+            const rows = document.querySelectorAll('.board-row');
+            for (const row of rows) {
+                const name = row.querySelector('.board-name a').innerText.replace(/\s*\d+$/, '').trim();
+                if (name === boardName) {
+                    return row.querySelector('.board-desc').innerText;
+                }
+            }
+            return "暂无特定版规";
+        }
+
+        // 打开催更弹窗
+        function triggerBoardTuqu() {
+            currentTriggerMode = 'board'; // 新增：标记为版块模式
+            const modal = document.getElementById('board-trigger-modal');
+            const select = document.getElementById('trigger-char-select');
+            document.getElementById('trigger-modal-title').innerText = `在“${currentBoardTitle}”催更`;
+            
+            // 向父窗口请求角色列表
+            window.parent.postMessage({ type: 'REQUEST_CHARACTER_LIST' }, '*');
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeTriggerModal() {
+            document.getElementById('board-trigger-modal').style.display = 'none';
+        }
+
+        // 接收父窗口发来的角色列表
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'RESPONSE_CHARACTER_LIST') {
+                const select = document.getElementById('trigger-char-select');
+                const currentVal = select.value;
+                select.innerHTML = '<option value="">随机路人 (纯净模式)</option>';
+                event.data.list.forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    select.appendChild(opt);
+                });
+                select.value = currentVal;
+            }
+        });
+
+        // 确认提交催更指令
+        function confirmBoardTrigger() {
+            const charName = document.getElementById('trigger-char-select').value;
+            const worldview = document.getElementById('trigger-worldview').value.trim();
+            const rules = getBoardRules(currentBoardTitle);
+
+            if (currentTriggerMode === 'post') {
+                // 发送单贴更新指令
+                window.parent.postMessage({ 
+                    type: 'MANUAL_TRIGGER_TUQU', 
+                    mode: 'post', 
+                    postId: currentPostId, // 传递当前帖子ID
+                    charName: charName,
+                    worldview: worldview,
+                    boardRules: rules
+                }, '*');
+            } else {
+                // 发送版块催更指令 (原有逻辑)
+                window.parent.postMessage({ 
+                    type: 'MANUAL_TRIGGER_TUQU', 
+                    mode: 'board', 
+                    board: currentBoardTitle,
+                    charName: charName,
+                    worldview: worldview,
+                    boardRules: rules
+                }, '*');
+            }
+
+            closeTriggerModal();
+            alert('指令已发出，太太们正在提笔...');
+        }
+
+        function saveForumData() { 
+            // 每次数据变动，更新最后活跃时间
+            localStorage.setItem('jjForumLastActiveTime', Date.now());
+            localStorage.setItem('jjForumData', JSON.stringify(forumData)); 
+            // 新增：每次保存时，主动把数据发送给外层的黑麦手机系统
+            window.parent.postMessage({ type: 'FORUM_DATA_SYNC', data: forumData }, '*');
+        }
+
+        // --- 新增：表情包系统通信 ---
+        let currentActiveTextareaId = null;
+
+        function openStickerPanel(textareaId) {
+            currentActiveTextareaId = textareaId;
+            window.parent.postMessage({ type: 'OPEN_TUQU_STICKER_PANEL' }, '*');
+        }
+
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'TUQU_STICKER_SELECTED' && currentActiveTextareaId) {
+                const textarea = document.getElementById(currentActiveTextareaId);
+                const tag = `[${event.data.stickerType}:${event.data.stickerName}]`;
+                
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const text = textarea.value;
+                textarea.value = text.substring(0, start) + tag + text.substring(end);
+                
+                textarea.focus();
+                textarea.setSelectionRange(start + tag.length, start + tag.length);
+            }
+        });
+        // 新增：页面加载时也发送一次，确保主系统手里有数据
+        window.parent.postMessage({ type: 'FORUM_DATA_SYNC', data: forumData }, '*');
+
+        // --- 新增：接收来自黑麦手机主系统的指令 ---
+        window.addEventListener('message', async function(event) {
+            const data = event.data;
+            if (data.type === 'GET_FORUM_DATA') {
+                window.parent.postMessage({ type: 'FORUM_DATA_RESPONSE', data: forumData }, '*');
+            } else if (data.type === 'AI_POST_TOPIC') {
+                currentBoardTitle = data.board;
+                // 确保 ID 包含下划线和毫秒时间戳
+                const postId = data.forceId || `post_${Date.now()}`;
+                const now = new Date();
+                const timestamp = `${(now.getFullYear()).toString().slice(-2)}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                const locations = ["浙江", "福建", "北京", "湖南", "广东", "山东", "四川", "湖北", "江苏", "辽宁", "广西", "美国"];
+                if (!forumData[currentBoardTitle]) forumData[currentBoardTitle] = [];
+                forumData[currentBoardTitle].unshift({
+                    id: postId,
+                    subject: data.subject,
+                    author: data.author,
+                    location: data.location || locations[Math.floor(Math.random() * locations.length)],
+                    timestamp: timestamp,
+                    replies: 0,
+                    content: data.content,
+                    images: [],
+                    comments: []
+                });
+                saveForumData();
+                if (document.getElementById('page-list').classList.contains('active')) renderTopicList(currentBoardTitle);
+            } else if (data.type === 'AI_POST_COMMENT') {
+                let targetPost = null;
+                for (const board in forumData) {
+                    targetPost = forumData[board].find(p => p.id === data.postId);
+                    if (targetPost) break;
+                }
+                if (targetPost) {
+                    const now = new Date();
+                    const timestamp = `${(now.getFullYear()).toString().slice(-2)}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                    const locations = ["浙江", "福建", "北京", "湖南", "广东", "山东", "四川", "湖北", "江苏", "辽宁", "广西", "美国"];
+                    
+                    // 处理引用逻辑
+                    let quoteHTML = '';
+                    if (data.quote) {
+                        quoteHTML = `<div class="quote-content">${data.quote.text}<div class="quote-meta">№${data.quote.floor} ☆☆☆${data.quote.author}于留言☆☆☆</div></div>`;
+                    }
+
+                    targetPost.comments.push({
+                    // 核心：必须使用毫秒时间戳作为 ID 后缀，用于未读计算
+                    id: `comment_${Date.now()}`, 
+                    author: data.author,
+                        timestamp: timestamp,
+                        content: data.content,
+                        images: [],
+                        quote: quoteHTML,
+                        location: data.location || locations[Math.floor(Math.random() * locations.length)]
+                    });
+                    targetPost.replies += 1;
+                    saveForumData();
+                    if (currentPostId === data.postId && document.getElementById('page-post').classList.contains('active')) renderPostDetail(currentPostId);
+                }
+            } else if (data.type === 'AI_REPORT_ACTION') {
+                let targetPost = null;
+                let targetBoard = '';
+                for (const board in forumData) {
+                    targetPost = forumData[board].find(p => p.id === data.postId);
+                    if (targetPost) { targetBoard = board; break; }
+                }
+                if (targetPost) {
+                    if (data.floor === 0) {
+                        targetPost.isReported = true;
+                        targetPost.reportReason = data.reason;
+                    } else {
+                        const comment = targetPost.comments[data.floor - 1];
+                        if (comment) {
+                            comment.isReported = true;
+                            comment.reportReason = data.reason;
+                        }
+                    }
+                    saveForumData();
+                    // 核心修复：强制重绘当前视图，确保效果立竿见影
+                    if (document.getElementById('page-post').classList.contains('active')) {
+                        renderPostDetail(currentPostId);
+                    }
+                    if (document.getElementById('page-list').classList.contains('active')) {
+                        renderTopicList(targetBoard);
+                    }
+                }
+            }
+        });
+
+        // --- 页面导航逻辑 ---
+        let currentBoardTitle = ''; 
+        let currentPostId = null; 
+
+        // 辅助函数：解析 ID 中的时间戳
+        function getTimeFromId(id) {
+            if (!id) return 0;
+            const idStr = String(id);
+            const parts = idStr.split('_');
+            // 兼容 post_xxx, comment_xxx 以及纯数字 ID
+            const ts = parts.length > 1 ? parseInt(parts[parts.length - 1], 10) : parseInt(idStr, 10);
+            return isNaN(ts) ? 0 : ts;
+        }
+
+        // 计算板块内的新贴数量
+        function getNewPostsCount(boardName) {
+            const lastViewed = parseInt(localStorage.getItem('last_viewed_board_' + boardName) || 0, 10);
+            const posts = forumData[boardName] || [];
+            // 只要帖子的创建时间晚于上次离开板块的时间，就算新贴
+            return posts.filter(p => getTimeFromId(p.id) > lastViewed).length;
+        }
+
+        // 计算帖子内的新回复数量
+        function getNewRepliesCount(post) {
+            const lastViewed = parseInt(localStorage.getItem('last_viewed_topic_' + post.id) || 0, 10);
+            if (!post.comments) return 0;
+            // 只要评论的创建时间晚于上次离开该帖子的时间，就算新回复
+            return post.comments.filter(c => getTimeFromId(c.id) > lastViewed).length;
+        }
+
+        // 刷新首页板块的数字标注 (增强版：支持实时局部更新)
+        function renderBoardBadges() {
+            if (!document.getElementById('page-home').classList.contains('active')) return;
+            
+            document.querySelectorAll('.board-row').forEach(row => {
+                const boardLink = row.querySelector('.board-name a');
+                if (!boardLink) return;
+                
+                // 获取干净的版块名称
+                const boardName = boardLink.getAttribute('onclick').match(/'([^']+)'/)[1];
+                const count = getNewPostsCount(boardName);
+                
+                let badge = row.querySelector('.jj-badge');
+                if (count > 0) {
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'jj-badge';
+                        boardLink.appendChild(badge);
+                    }
+                    badge.textContent = count > 99 ? '99+' : count;
+                } else if (badge) {
+                    badge.remove();
+                }
+            });
+        }
+
+        // 计算帖子内的新回复数量
+        function getNewRepliesCount(post) {
+            const lastViewed = parseInt(localStorage.getItem('last_viewed_topic_' + post.id) || 0, 10);
+            if (!post.comments) return 0;
+            return post.comments.filter(c => {
+                const cTime = c.id ? getTimeFromId(c.id) : 0;
+                // 如果评论没ID（旧数据），用发帖时间凑合，或者在 AI_POST_COMMENT 里补 ID
+                return cTime > lastViewed;
+            }).length;
+        }
+
+        // 刷新首页板块的数字标注
+        function renderBoardBadges() {
+            document.querySelectorAll('.board-row').forEach(row => {
+                const boardLink = row.querySelector('.board-name a');
+                if (!boardLink) return;
+                const boardName = boardLink.innerText.replace(/\s*\d+$/, ''); // 清除旧数字
+                const count = getNewPostsCount(boardName);
+                
+                // 移除旧角标
+                const oldBadge = row.querySelector('.jj-badge');
+                if (oldBadge) oldBadge.remove();
+                
+                if (count > 0) {
+                    const badge = document.createElement('span');
+                    badge.className = 'jj-badge';
+                    badge.textContent = count > 99 ? '99+' : count;
+                    boardLink.appendChild(badge);
+                }
+            });
+        }
+
+        function navigateTo(pageId, title = '') {
+            // 标记已读逻辑
+            if (pageId === 'list' && title) {
+                // 进入板块，标记该板块所有帖子为已读
+                localStorage.setItem('last_viewed_board_' + title, Date.now());
+            } else if (pageId === 'post' && currentPostId) {
+                // 进入帖子，标记该帖子所有回复为已读
+                localStorage.setItem('last_viewed_topic_' + currentPostId, Date.now());
+            } else if (pageId === 'home') {
+                // 返回首页时，刷新一次板块数字
+                renderBoardBadges();
+            }
+
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            const targetPage = document.getElementById(`page-${pageId}`);
+            if (targetPage) {
+                targetPage.classList.add('active');
+                if (title) { currentBoardTitle = title; }
+                
+                if (pageId === 'list') {
+                    document.getElementById('list-title').innerText = currentBoardTitle;
+                    renderTopicList(currentBoardTitle);
+                } else if (pageId === 'new-post') {
+                    document.getElementById('new-post-title').innerText = '在 ' + currentBoardTitle + ' 发表新帖子';
+                    document.querySelector('#page-new-post .back-button').setAttribute('onclick', `navigateTo('list', '${currentBoardTitle}')`);
+                } else if (pageId === 'post') {
+                    const postHeader = document.getElementById('post-page-header');
+                    postHeader.querySelector('.back-button').setAttribute('onclick', `navigateTo('list', '${currentBoardTitle}')`);
+                    postHeader.querySelector('h1').innerText = currentBoardTitle;
+                    renderPostDetail(currentPostId);
+                }
+            }
+             window.scrollTo(0, 0);
+        }
+        
+        async function readFilesAsDataURL(fileInput) {
+            const files = Array.from(fileInput.files);
+            const promises = files.map(file => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsDataURL(file);
+                });
+            });
+            return Promise.all(promises);
+        }
+
+        async function submitNewPost() {
+            const subject = document.getElementById('new-post-subject').value.trim();
+            const content = document.getElementById('new-post-content').value.trim();
+            const author = document.querySelector('#page-new-post input[name="username"]').value.trim() || '游客';
+            const images = []; // 你的HTML中没有文件上传框，所以这里直接设为空数组
+
+            if (!subject || !content) { alert('主题和内容都不能为空！'); return; }
+            if (!forumData[currentBoardTitle]) forumData[currentBoardTitle] = [];
+            
+            const postId = `post_${Date.now()}`;
+            const now = new Date();
+            const timestamp = `${(now.getFullYear()).toString().slice(-2)}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            
+            const newPost = { id: postId, subject, author, timestamp, replies: 0, content, images: images, comments: [] };
+            
+            forumData[currentBoardTitle].unshift(newPost);
+            saveForumData();
+            alert('发表成功！');
+            
+            document.getElementById('new-post-subject').value = '';
+            document.getElementById('new-post-content').value = '';
+            document.querySelector('#page-new-post input[name="username"]').value = '';
+            // 删除了对不存在的 new-post-file 的操作
+
+            navigateTo('list', currentBoardTitle);
+        }
+
+        function renderTopicList(boardTitle) {
+            const topicListBody = document.getElementById('topic-list-body');
+            const topics = forumData[boardTitle] || [];
+
+            if (topics.length === 0) {
+                topicListBody.innerHTML = `<tr><td colspan="4" class="no-topics-message">本版块还没有帖子，快来发表新帖吧！</td></tr>`;
+                return;
+            }
+            
+            topicListBody.innerHTML = topics.map(topic => {
+                const newReplies = getNewRepliesCount(topic);
+                const badgeHtml = newReplies > 0 ? `<span class="jj-badge">${newReplies}</span>` : '';
+                
+                return `
+                <tr>
+                    <td class="topic-title">
+                        <a href="#" onclick="currentPostId='${topic.id}'; navigateTo('post')">${topic.subject}</a>
+                        ${badgeHtml}
+                    </td>
+                    <td class="topic-author">${topic.author}<br><small style="color:#999;font-size:10px;">${topic.location || '未知'}</small></td>
+                    <td class="topic-time">${topic.timestamp}</td>
+                    <td class="topic-replies">${topic.replies}</td>
+                </tr>`}).join('');
+        }
+        
+        function renderPostDetail(postId) {
+            const postDetailContainer = document.getElementById('post-detail-container');
+            let postData = null;
+            for(const board in forumData) {
+                const found = forumData[board].find(p => p.id === postId);
+                if (found) { postData = found; break; }
+            }
+            
+            if (!postData) {
+                postDetailContainer.innerHTML = '<p>帖子不存在或已被删除。</p>';
+                return;
+            }
+            
+            const locations = ["浙江", "福建", "北京", "湖南", "广东", "山东", "四川", "湖北", "江苏", "辽宁", "广西", "美国"];
+            const authorIdMap = {};
+            const generateId = () => Math.random().toString(16).substring(2, 10);
+
+            const getAuthorId = (author) => {
+                if (!authorIdMap[author]) authorIdMap[author] = generateId();
+                return authorIdMap[author];
+            }
+
+            const mainPostImagesHTML = postData.images.map(url => `<img data-src="${url}" class="tuqu-dynamic-img" alt="帖子图片">`).join('');
+
+            // 新增：主贴投诉状态展示
+            let reportBanner = '';
+            if (postData.isReported) {
+                reportBanner = `<div style="background:#fff1f0; border:1px solid #ffa39e; color:#cf1322; padding:10px; margin:10px; border-radius:4px; font-size:13px;">⚠️ 该贴已被投诉成功，原因：${postData.reportReason || '违反版规'}。当前禁止回复。</div>`;
+            }
+
+            // 新增：表情标签解析器
+            const parseStickerTags = (text) => {
+                const stickers = JSON.parse(localStorage.getItem('app-stickers') || '[]');
+                return text.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                    const item = stickers.find(s => s.name === name.trim() && s.type === type.toLowerCase());
+                    if (item) {
+                        if (type === 'emoji') {
+                            return `<img data-src="${item.url}" class="inline-emoji tuqu-dynamic-img" style="height:1.4em; vertical-align:middle; margin:0 2px;">`;
+                        } else {
+                            return `<img data-src="${item.url}" class="tuqu-dynamic-img" style="max-width:150px; max-height:150px; display:block; margin:8px 0; border-radius:4px;">`;
+                        }
+                    }
+                    return match;
+                });
+            };
+
+            const commentsHTML = postData.comments.map((comment, index) => {
+                let commentBody = '';
+                // 解析内容中的表情
+                const parsedContent = parseStickerTags(comment.content).replace(/\n/g, '<br>');
+
+                if (comment.isReported) {
+                    commentBody = `
+                        <div class="reported-banner-active" onclick="this.nextElementSibling.classList.toggle('show')">
+                            ⚠️ 该楼层因“${comment.reportReason}”被投诉成功 [点击展开/隐藏原文]
+                        </div>
+                        <div class="reported-content-hidden">
+                            <div class="text-body" style="opacity: 0.6;">${parsedContent}</div>
+                        </div>
+                    `;
+                } else {
+                    commentBody = `<div class="text-body">${parsedContent}</div>`;
+                }
+                return `
+                 <div class="reply-item" id="floor-${index + 1}" data-floor="${index + 1}" data-author="${comment.author}" data-time="${comment.timestamp}">
+                    <div class="reply-header">
+                        <div class="author-info">
+                            <div class="author-line1"><span class="author-name">${comment.author}</span><span class="author-id">|${getAuthorId(comment.author)}</span></div>
+                            <div class="author-line2">№${index + 1} ${comment.timestamp} <i class="location">来自${comment.location}</i></div>
+                        </div>
+                        <div class="reply-actions-menu" onclick="openActionMenu(${index + 1})">...</div>
+                    </div>
+                    <div class="reply-content">
+                        ${comment.quote || ''}
+                        ${commentBody}
+                        <div class="post-images">${comment.images.map(url => `<img data-src="${url}" class="tuqu-dynamic-img">`).join('')}</div>
+                    </div>
+                </div>
+            `}).join('');
+
+            let html = `
+                ${reportBanner}
+                <h2 class="post-title">${postData.subject}</h2>
+                <div class="reply-list">
+                    <div class="reply-item" id="floor-0" data-floor="0" data-author="${postData.author}" data-time="${postData.timestamp}">
+                        <div class="reply-header">
+                            <div class="author-info">
+                                <div class="author-line1"><span class="author-name">${postData.author}</span><span class="author-id">|${getAuthorId(postData.author)}</span></div>
+                                <div class="author-line2">№0 ${postData.timestamp} <i class="location">来自${locations[Math.floor(Math.random() * locations.length)]}</i></div>
+                            </div>
+                            <div class="reply-actions-menu" onclick="openActionMenu(0)">...</div>
+                        </div>
+                        <div class="reply-content">
+                            <div class="text-body">${parseStickerTags(postData.content).replace(/\n/g, '<br>')}</div>
+                            <div class="post-images">${mainPostImagesHTML}</div>
+                        </div>
+                    </div>
+                    ${commentsHTML}
+                </div>
+            `;
+            postDetailContainer.innerHTML = html;
+            
+            // 核心新增：扫描并加载所有数据库图片
+            postDetailContainer.querySelectorAll('.tuqu-dynamic-img').forEach(img => {
+                setImageSrc(img, img.dataset.src);
+            });
+
+            // 如果主贴被投诉，隐藏底部回复框
+            const replyForm = document.getElementById('reply-form-container');
+            if (replyForm) {
+                replyForm.style.display = postData.isReported ? 'none' : 'block';
+            }
+        }
+
+      let currentActiveFloor = null;
+
+        function openActionMenu(floor) {
+            currentActiveFloor = floor;
+            document.getElementById('action-menu-overlay').style.display = 'flex';
+        }
+
+        function closeActionMenu() {
+            document.getElementById('action-menu-overlay').style.display = 'none';
+        }
+
+        // 兼容安卓的复制函数
+        function copyToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed"; 
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert('已复制到剪贴板');
+            } catch (err) {
+                alert('复制失败，请长按文字手动复制');
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function handleMenuAction(action) {
+            const floorEl = document.getElementById(`floor-${currentActiveFloor}`);
+            
+            if (action === 'quote') {
+                quoteReply(floorEl.querySelector('.reply-actions-menu'));
+                closeActionMenu();
+            } else if (action === 'copy') {
+                const text = floorEl.querySelector('.text-body').innerText;
+                copyToClipboard(text);
+                closeActionMenu();
+            } else if (action === 'edit') {
+                closeActionMenu();
+                showEditModal();
+            } else if (action === 'delete') {
+                closeActionMenu();
+                document.getElementById('delete-modal-overlay').style.display = 'flex';
+            } else if (action === 'report') {
+                closeActionMenu();
+                renderReportPage(currentActiveFloor);
+                navigateTo('report');
+            }
+        }
+
+        // --- 投诉页面逻辑 ---
+        let selectedReportTag = null;
+
+        function renderReportPage(floor) {
+            const floorEl = document.getElementById(`floor-${floor}`);
+            const authorName = floorEl.dataset.author;
+            // 获取显示的ID (去掉前面的 | )
+            const authorIdText = floorEl.querySelector('.author-id').innerText.replace('|', ''); 
+            const contentText = floorEl.querySelector('.text-body').innerText.substring(0, 100) + (floorEl.querySelector('.text-body').innerText.length > 100 ? '...' : '');
+
+            document.getElementById('report-target-title').innerHTML = `投诉 <span style="color:#d98e73">${authorName}</span>|<span>${authorIdText}</span>发布的内容：`;
+            document.getElementById('report-preview-content').innerHTML = `楼层：${floor}楼<br>内容：${contentText}`;
+            
+            const tags = ["涉政", "广告", "色情", "网暴", "血腥暴力", "造谣传谣", "辱骂", "引战", "隐私", "闹版", "昵称违规", "版务相关", "未成年人", "其他"];
+            const tagsContainer = document.getElementById('report-tags-container');
+            tagsContainer.innerHTML = tags.map(tag => `<div class="report-tag" onclick="selectReportTag(this)">${tag}</div>`).join('');
+            
+            selectedReportTag = null;
+            updateReportBtnState();
+            document.getElementById('report-reason').value = '';
+        }
+
+        function selectReportTag(el) {
+            document.querySelectorAll('.report-tag').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            selectedReportTag = el.innerText;
+            updateReportBtnState();
+        }
+
+        function updateReportBtnState() {
+            const btn = document.getElementById('report-submit-btn');
+            if (selectedReportTag) {
+                btn.classList.add('ready');
+            } else {
+                btn.classList.remove('ready');
+            }
+        }
+
+        function submitReport() {
+            if (!selectedReportTag) return;
+            const reason = document.getElementById('report-reason').value.trim() || selectedReportTag;
+            
+            // 获取当前投诉的目标信息（从预览区域解析）
+            const previewText = document.getElementById('report-preview-content').innerText;
+            const floorMatch = previewText.match(/楼层：(\d+)楼/);
+            const floor = floorMatch ? parseInt(floorMatch[1]) : 0;
+
+            // 立即修改数据
+            let targetPost = null;
+            for (const board in forumData) {
+                targetPost = forumData[board].find(p => p.id === currentPostId);
+                if (targetPost) break;
+            }
+
+            if (targetPost) {
+                if (floor === 0) {
+                    targetPost.isReported = true;
+                    targetPost.reportReason = reason;
+                } else {
+                    const comment = targetPost.comments[floor - 1];
+                    if (comment) {
+                        comment.isReported = true;
+                        comment.reportReason = reason;
+                    }
+                }
+                saveForumData();
+                alert('投诉成功！该内容已被屏蔽。');
+                renderPostDetail(currentPostId);
+                navigateTo('post');
+            }
+        }
+
+        function showEditModal() {
+            let postData = null;
+            for(const board in forumData) {
+                const found = forumData[board].find(p => p.id === currentPostId);
+                if (found) { postData = found; break; }
+            }
+            const content = currentActiveFloor === 0 ? postData.content : postData.comments[currentActiveFloor - 1].content;
+            document.getElementById('edit-textarea').value = content;
+            document.getElementById('edit-modal-overlay').style.display = 'flex';
+        }
+
+        function confirmEdit() {
+            const newContent = document.getElementById('edit-textarea').value;
+            let postData = null;
+            for(const board in forumData) {
+                const found = forumData[board].find(p => p.id === currentPostId);
+                if (found) { postData = found; break; }
+            }
+            
+            if (currentActiveFloor === 0) postData.content = newContent;
+            else postData.comments[currentActiveFloor - 1].content = newContent;
+            
+            saveForumData();
+            renderPostDetail(currentPostId);
+            document.getElementById('edit-modal-overlay').style.display = 'none';
+        }
+
+        function confirmDelete() {
+            let postData = null;
+            let boardName = '';
+            for(const board in forumData) {
+                const found = forumData[board].find(p => p.id === currentPostId);
+                if (found) { postData = found; boardName = board; break; }
+            }
+
+            if (currentActiveFloor === 0) {
+                forumData[boardName] = forumData[boardName].filter(p => p.id !== currentPostId);
+                saveForumData();
+                document.getElementById('delete-modal-overlay').style.display = 'none';
+                navigateTo('list');
+            } else {
+                postData.comments.splice(currentActiveFloor - 1, 1);
+                postData.replies -= 1;
+                saveForumData();
+                renderPostDetail(currentPostId);
+                document.getElementById('delete-modal-overlay').style.display = 'none';
+            }
+        }
+
+        function quoteReply(element) {
+            const replyItem = element.closest('.reply-item');
+            const floor = replyItem.dataset.floor;
+            const author = replyItem.dataset.author;
+            const time = replyItem.dataset.time;
+
+            const contentClone = replyItem.querySelector('.reply-content').cloneNode(true);
+            const nestedQuote = contentClone.querySelector('.quote-content');
+            if(nestedQuote) nestedQuote.remove();
+            
+            let content = contentClone.innerHTML.trim();
+            
+            const quoteHTML = `<div class="quote-content">
+                ${content}
+                <div class="quote-meta">№${floor} ☆☆☆${author}|${replyItem.querySelector('.author-id').textContent.slice(1)}于${time}留言☆☆☆</div>
+            </div>`;
+            
+            document.getElementById('reply-quote-area').innerHTML = quoteHTML;
+            document.getElementById('reply-content').focus();
+        }
+        
+        async function submitReply() {
+            const content = document.getElementById('reply-content').value.trim();
+            const author = document.getElementById('reply-username').value.trim() || '游客';
+            if (!content) { alert('回复内容不能为空！'); return; }
+
+            const images = []; // 同样，这里也改为直接使用空数组
+
+            let postData = null;
+            for(const board in forumData) {
+                const found = forumData[board].find(p => p.id === currentPostId);
+                if (found) { postData = found; break; }
+            }
+            if (!postData) { alert('错误：找不到要回复的帖子。'); return; }
+            
+            const now = new Date();
+            const timestamp = `${(now.getFullYear()).toString().slice(-2)}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            
+            const quoteArea = document.getElementById('reply-quote-area');
+            const quoteHTML = quoteArea.innerHTML;
+            const locations = ["浙江", "福建", "北京", "湖南", "广东", "山东", "四川", "湖北", "江苏", "辽宁", "广西", "美国"];
+
+            postData.comments.push({ author, timestamp, content, images: images, quote: quoteHTML, location: locations[Math.floor(Math.random() * locations.length)] });
+            postData.replies += 1;
+            
+            saveForumData();
+            renderPostDetail(currentPostId);
+            
+            alert('回复成功！');
+            
+            quoteArea.innerHTML = '';
+            document.getElementById('reply-username').value = '';
+            document.getElementById('reply-content').value = '';
+            // 删除了对不存在的 reply-file 的操作
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+             renderBoardBadges(); 
+
+             // --- 新增：抓取并同步版规数据 ---
+             const rulesData = {};
+             document.querySelectorAll('.board-row').forEach(row => {
+                 const name = row.querySelector('.board-name a').innerText.replace(/\s*\d+$/, '').trim();
+                 const desc = row.querySelector('.board-desc').innerText.trim();
+                 rulesData[name] = desc;
+             });
+             localStorage.setItem('tuqu_cached_board_rules', JSON.stringify(rulesData));
+             // --- 同步结束 ---
+
+             // 每 3 秒强制刷新一次首页数字和列表数字，实现“无论在不在”都能看到动态变化
+             setInterval(() => {
+                 if (document.getElementById('page-home').classList.contains('active')) {
+                     renderBoardBadges();
+                 } else if (document.getElementById('page-list').classList.contains('active')) {
+                     renderTopicList(currentBoardTitle);
+                 }
+             }, 3000);
+        });
+    </script>
+
+</body>
+</html>

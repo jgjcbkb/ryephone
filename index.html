@@ -4016,74 +4016,89 @@ input:checked + .slider:before {
     display: flex;
     flex-direction: column;
     padding: 0 !important;
-    background-color: #f8f9fa !important;
+    /* 核心修改：将弹窗整体底色改为羊皮纸色，消除色差 */
+    background-color: #f8f1e5 !important;
     overflow: hidden;
 }
 
 .milestone-header {
     padding: 45px 15px 15px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    /* 核心修改：去掉底部边框，让它与下方的看板无缝衔接 */
+    background: #f8f1e5;
+    color: #5d4037;
     flex-shrink: 0;
+    border-bottom: none;
 }
 
 .milestone-header h3 {
     margin: 0;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
-    letter-spacing: 1px;
+    letter-spacing: 2px;
+    /* 核心修改：去掉左侧竖线和内边距 */
+    border-left: none;
+    padding-left: 0;
+    /* 增加居中感或左对齐感 */
+    text-align: left;
 }
 
 /* 新增：置顶看板样式 */
 .milestone-pinned-container {
-    padding: 15px 15px;
-    background: white;
+    /* 核心修改：减少顶部 padding，让看板离标题更近 */
+    padding: 5px 15px 20px;
+    /* 核心修改：确保背景色绝对一致，去掉任何可能产生白边的边框 */
+    background: #f8f1e5;
     display: flex;
-    gap: 12px;
+    gap: 15px;
     overflow-x: auto;
-    border-bottom: 4px solid #f0f2f5;
+    border-bottom: 1px solid #d4c4b0;
     flex-shrink: 0;
     scrollbar-width: none;
 }
 .milestone-pinned-container::-webkit-scrollbar { display: none; }
 
 .pinned-card {
-    min-width: 140px;
-    padding: 12px;
-    border-radius: 14px;
-    background: #f8f9ff;
-    border: 1px solid #e0e6ff;
+    min-width: 130px;
+    padding: 15px;
+    border-radius: 4px; /* 核心修改：改为书签式的微圆角 */
+    background: #ffffff;
+    /* 核心修改：使用精致的细边框，去掉之前的红绿背景 */
+    border: 1px solid #d4c4b0;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    box-shadow: 2px 2px 0px #d4c4b0; /* 增加纸张重叠感 */
 }
 
-.pinned-card.type-anniversary { background: #fff5f5; border-color: #ffe0e0; }
-.pinned-card.type-countdown { background: #f0fff4; border-color: #dcffe4; }
+/* 核心修改：去掉特定类型的背景色，保持统一的文学感 */
+.pinned-card.type-anniversary { background: #ffffff; border-color: #d4c4b0; }
+.pinned-card.type-countdown { background: #ffffff; border-color: #d4c4b0; }
 
 .pinned-label {
-    font-size: 13px;
-    color: #8e8e93;
+    font-size: 12px;
+    color: #8d6e63; /* 使用棕色系文字 */
     font-weight: 600;
-    margin-bottom: 2px;
+    margin-bottom: 5px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    letter-spacing: 1px;
 }
 
 .pinned-value {
-    font-size: 20px;
-    font-weight: 800;
-    color: #1c1c1e;
-    font-family: "DIN", "Helvetica Neue", sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #3e2723;
+    /* 核心修改：移除数字字体，使用更统一的文学字体 */
+    font-family: inherit;
 }
 
 .pinned-value span {
-    font-size: 13px;
-    font-weight: 600;
-    margin-left: 4px;
-    color: #8e8e93;
+    font-size: 12px;
+    font-weight: 500;
+    margin-left: 2px;
+    color: #a1887f;
 }
 
 /* 彻底删除 .pinned-title 样式 */
@@ -4098,8 +4113,9 @@ input:checked + .slider:before {
     display: flex;
     align-items: flex-start;
     padding: 15px 15px;
-    border-bottom: 1px solid #f0f0f0;
-    background: white;
+    /* 核心修改：边框色调改为棕色系，背景设为透明以透出羊皮纸底色 */
+    border-bottom: 1px solid #e8dcca;
+    background: transparent;
     transition: background 0.2s;
     cursor: pointer;
 }
@@ -4109,13 +4125,15 @@ input:checked + .slider:before {
 }
 
 .milestone-rank {
-    font-family: "DIN", "Helvetica Neue", sans-serif;
-    font-size: 17px;
-    font-weight: 700;
-    color: #ff9500;
+    /* 核心修改：不再使用大数字，改为精致的章节编号感 */
+    font-size: 13px;
+    font-weight: 600;
+    color: #a1887f;
     margin-right: 15px;
-    min-width: 25px;
-    text-align: center;
+    min-width: 35px;
+    text-align: left;
+    /* 增加前缀感 */
+    text-transform: uppercase;
 }
 
 .milestone-info {
@@ -4124,6 +4142,9 @@ input:checked + .slider:before {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    /* 核心修改：增加左侧装饰线，模拟目录感 */
+    border-left: 1px solid #eee;
+    padding-left: 15px;
 }
 
 .milestone-title-row {
@@ -4134,13 +4155,14 @@ input:checked + .slider:before {
 }
 
 .milestone-title {
-    font-size: 16px;
-    font-weight: 500;
-    color: #1c1c1e;
+    font-size: 15px;
+    font-weight: 600;
+    color: #3e2723; /* 咖啡色文字 */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     flex-grow: 1;
+    letter-spacing: 0.5px;
 }
 
 .milestone-date {
@@ -4160,8 +4182,9 @@ input:checked + .slider:before {
 
 .milestone-footer {
     padding: 15px;
-    background: white;
-    border-top: 1px solid #eee;
+    /* 核心修改：背景设为羊皮纸色，去掉白色的突兀感 */
+    background: #f8f1e5;
+    border-top: 1px solid #d4c4b0;
     display: flex;
     gap: 10px;
 }
@@ -6639,19 +6662,17 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                             </div>
                         </div>
                             
-<!-- Tab Content 4: Tuqu (Placeholder) -->
-                        <div id="tab-content-tuqu" class="tab-content">
-                            <div class="message-list-app-container">
-                                <div class="list-header">
-                                    <button class="back-btn" data-target="home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button>
-                                    <h1 style="flex-grow: 1; text-align: center;">兔区</h1>
-                                    <div style="width: 40px;"></div>
-                                </div>
-                                <div class="message-list" style="background-color: #f0f2f5;">
-                                    <p style="text-align: center; margin-top: 50px; color: #999;">兔区功能正在开发中...</p>
-                                </div>
-                            </div>
-                        </div>
+<!-- Tab Content 4: Tuqu (Iframe Integration) -->
+<div id="tab-content-tuqu" class="tab-content">
+    <!-- 这里的 iframe 会直接加载同目录下的 tuqu.html -->
+    <iframe src="tuqu.html" style="width: 100%; height: 100%; border: none; background-color: #f0f2f5;"></iframe>
+    
+    <!-- 
+       注意：因为兔区是全屏显示的，如果你想返回主页，
+       直接点击黑麦手机底部的导航栏（消息/朋友圈/直播/兔区）即可切换。
+       或者点击黑麦手机左上角的“返回”按钮（如果处于全屏模式）。
+    -->
+</div>
                         </div>
 
                         <div class="main-app-navbar">
@@ -6705,6 +6726,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                             <div class="form-control-group">
                                 <label class="inline-label"><input type="checkbox" id="worldbook-enabled" checked>启用此词条</label>
                                 <label class="inline-label"><input type="checkbox" id="worldbook-use-in-moments">在朋友圈使用</label>
+                                <label class="inline-label"><input type="checkbox" id="worldbook-use-in-tuqu">在兔区使用</label>
                             </div>
                         </div>
                         <div class="form-group">
@@ -7066,7 +7088,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                 <div id="page-chat-info" class="page">
                     <div class="app-header"><button class="back-btn" data-target="conversation"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button><h1>聊天信息</h1></div>
                     <div class="content-wrapper">
-                        <div class="form-section">
+                        <div style="margin-bottom: 20px;">
                             <div class="form-group">
                                 <label for="chat-name-edit">名称</label>
                                 <div style="display: flex; gap: 10px;">
@@ -7092,7 +7114,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 </div>
                                 <p class="form-hint">线上仅输出对话。线下可输出 <code>(动作)</code>、<em>斜体心理</em> 和常规对话。</p>
                             </div>
-                            <div class="form-section">
+                            <div style="margin-bottom: 20px;">
     <h3>剧情时间设置</h3>
     <div class="form-group">
         <label for="time-mode-select">时间模式</label>
@@ -7132,13 +7154,13 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                             <div class="form-group"><label for="chat-api-config">对话配置</label><select id="chat-api-config"></select><p class="form-hint">为此对话指定特定的API配置。</p></div>
                             <div class="form-group"><label for="chat-memory-length">上下文记忆条数</label><input type="number" id="chat-memory-length" min="0" value="100"><p class="form-hint">发送给API的最近消息数量，0为不限制。</p></div>
                         </div>
-                        <div id="worldbook-mount-section" class="form-section">
+                        <div id="worldbook-mount-section" style="margin-bottom: 20px;">
                             <h3>挂载世界书</h3>
                             <div id="mounted-worldbook-list"></div>
                         </div>
 
                         <!-- START: 新增正则规则挂载模块 -->
-                        <div id="regex-mount-section" class="form-section">
+                        <div id="regex-mount-section" style="margin-bottom: 20px;">
                             <h3>启用正则替换</h3>
                             <div id="mounted-regex-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
                                 <!-- 规则列表将由JS动态生成 -->
@@ -7147,7 +7169,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                         <!-- END: 新增正则规则挂载模块 -->
 
                         <!-- START: 新增的关联NPC模块 -->
-                        <div id="npc-association-section" class="form-section">
+                        <div id="npc-association-section" style="margin-bottom: 20px;">
                             <h3>关联 NPC</h3>
                             <div id="associated-npc-list" style="padding: 10px 15px; max-height: 150px; overflow-y: auto;">
                                 <!-- NPC列表将动态生成在这里 -->
@@ -7203,7 +7225,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 </div>
                             
                             <!-- ******** 新增的聊天总结模块从这里开始 ******** -->
-                            <div class="form-section" id="chat-summary-section">
+                            <div id="chat-summary-section" style="margin-bottom: 20px;">
     <h3>聊天总结</h3>
     <div class="form-group">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -7498,7 +7520,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                        </div>
                         
                         <!-- START: 正则替换管理 -->
-                        <div class="form-section">
+                        <div style="margin-bottom: 20px;">
                             <h3>正则替换规则</h3>
                             <div id="regex-list"></div>
                              <!-- 【核心重构】正则规则编辑器区域 -->
@@ -7928,7 +7950,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                     <div class="app-header"><button class="back-btn" data-target="home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button><h1>用户人设管理</h1></div>
                     <div class="content-wrapper">
                         <div id="user-persona-list"></div>
-                        <div class="form-section">
+                        <div style="margin-bottom: 20px;">
                              <h3 style="text-align: center; color: var(--primary-text); font-size: 1.1em;" id="user-persona-form-title">添加新人设</h3>
                             <div class="form-group"><label for="user-persona-name">人设名称 (Name)</label><input type="text" id="user-persona-name" placeholder="例如：默认身份, 侦探身份"></div>
                             <!-- !!!!!!!!!! 新增的头像设置区域从这里开始 !!!!!!!!!! -->
@@ -9891,6 +9913,92 @@ if ('serviceWorker' in navigator) {
     
     let chatList = [], worldBookEntries = [], apiProfiles = [], activeProfileIndex = null, myAvatar = null, customBubbles = [], stickers = [], appearanceSettings = {};
     let userPersonas = []; 
+    // 新增：用于缓存兔区数据的全局变量，避开跨域限制
+    let globalTuquData = JSON.parse(localStorage.getItem('jjForumData')) || {};
+
+    // 新增：监听来自兔区 iframe 的数据同步
+    window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'FORUM_DATA_SYNC') {
+                globalTuquData = event.data.data;
+                console.log('[系统] 兔区数据已同步到主系统。');
+            } else if (event.data && event.data.type === 'OPEN_TUQU_STICKER_PANEL') {
+                // 核心修改：调用主系统的表情面板
+                stickerManager.openPanel((name, type) => {
+                    const tuquIframe = document.querySelector('#tab-content-tuqu iframe');
+                    if (tuquIframe) {
+                        tuquIframe.contentWindow.postMessage({
+                            type: 'TUQU_STICKER_SELECTED',
+                            stickerName: name,
+                            stickerType: type
+                        }, '*');
+                    }
+                });
+            } else if (event.data && event.data.type === 'EXIT_TUQU') {
+            navigateTo('home');
+        } else if (event.data && event.data.type === 'MANUAL_TRIGGER_TUQU') {
+                const mode = event.data.mode;
+                
+                if (mode === 'post') {
+                    // --- 新增：处理单贴更新请求 ---
+                    const postId = event.data.postId;
+                    const charName = event.data.charName;
+                    const worldview = event.data.worldview;
+                    
+                    // 在 globalTuquData 中查找该帖子
+                    let targetPost = null;
+                    const tuquData = globalTuquData || {};
+                    for (const board in tuquData) {
+                        if (Array.isArray(tuquData[board])) {
+                            const found = tuquData[board].find(p => p.id === postId);
+                            if (found) {
+                                targetPost = found;
+                                targetPost._boardName = board;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (targetPost) {
+                        // 触发主动AI，传入特定的 actionType 和帖子数据
+                        if (charName) {
+                            triggerProactiveAI(null, charName, 'specific_post_interaction', null, {
+                                worldview: worldview,
+                                targetPost: targetPost // 传递帖子对象
+                            });
+                        } else {
+                            // 核心修改：路人模式也需要接收 worldview 设定，否则 AI 不知道按什么背景更新
+                            triggerProactiveAI(null, 'Anonymous_System', 'specific_post_interaction', null, {
+                                worldview: worldview,
+                                targetPost: targetPost // 传递帖子对象
+                            });
+                        }
+                    } else {
+                        console.error("未找到目标帖子:", postId);
+                    }
+
+                } else {
+                    // --- 原有逻辑：版块催更或随机 ---
+                    const board = mode === 'board' ? event.data.board : null;
+                    // 如果传了角色名，说明是“带记忆的主题模式”
+                    if (event.data.charName) {
+                        triggerProactiveAI(null, event.data.charName, 'themed_tuqu_interaction', board, {
+                            worldview: event.data.worldview,
+                            boardRules: event.data.boardRules
+                        });
+                    } else {
+                        // 随机模式下，传递抓取到的全站版块数据
+                        triggerProactiveAI(null, 'Anonymous_System', 'pure_tuqu_interaction', board, {
+                            allBoards: event.data.allBoards
+                        });
+                    }
+                }
+            } else if (event.data && event.data.type === 'REQUEST_CHARACTER_LIST') {
+            // 响应角色列表请求
+            const list = getAllUniqueCharacters().filter(n => n !== '{{user}}');
+            const tuquIframe = document.querySelector('#tab-content-tuqu iframe');
+            if (tuquIframe) tuquIframe.contentWindow.postMessage({ type: 'RESPONSE_CHARACTER_LIST', list: list }, '*');
+        }
+    });
     
     // 【核心新增】生成或读取专属 RyeID (用于酒馆功能解锁)
     let ryeID = localStorage.getItem('app_rye_id');
@@ -10043,7 +10151,7 @@ if ('serviceWorker' in navigator) {
             return blocks;
         }
 
-    async function triggerProactiveAI(chatId, senderName, actionType) {
+    async function triggerProactiveAI(chatId, senderName, actionType, lockedBoard = null, extraOptions = {}) {
         // =================================================================
       // =================================================================
         // START: Proactive Action Rate Limiter (Configurable)
@@ -10072,6 +10180,31 @@ if ('serviceWorker' in navigator) {
         // END: Proactive Action Rate Limiter
         // =================================================================
 
+        // --- 核心新增：统一提取表情包和Emoji名称列表 ---
+        const stickerNames = stickers.filter(s => s.type === 'sticker').map(s => `"${s.name}"`).join(', ') || 'None';
+        const emojiNames = stickers.filter(s => s.type === 'emoji').map(s => `"${s.name}"`).join(', ') || 'None';
+
+        // --- 核心新增：兔区专属媒体防幻觉协议 ---
+        const TUQU_MEDIA_PROTOCOL = `
+---
+### **[STRICT MEDIA & EXPRESSION PROTOCOL - ANTI-HALLUCINATION]**
+
+You are ENCOURAGED to use emojis and stickers in your "content" and "water_army" replies, but you MUST follow these absolute laws:
+
+1.  **THE LIST IS LAW:** You are ONLY allowed to use names from the specific lists provided below.
+2.  **ABSOLUTE PROHIBITION:** You are **STRICTLY FORBIDDEN** from inventing names, using English names for Chinese stickers, or guessing.
+3.  **STRICT MATCHING:**
+    - For small inline expressions: \`[emoji:ExactNameFromList]\`
+    - For large image reactions: \`[sticker:ExactNameFromList]\`
+4.  **FALLBACK (MANDATORY):** If you cannot find an exact match in the lists for the emotion you want to express, you **MUST NOT** use a tag. Instead, use plain text in parentheses.
+    - *Example:* If you want to show "awkward" but it's not in the list, write \`(尴尬)\` instead of \`[emoji:awkward]\`.
+
+**Available Emoji Names:** [${emojiNames}]
+**Available Sticker Names:** [${stickerNames}]
+
+---
+`;
+
         console.log(`%c[ULTIMATE DIAGNOSIS]`, 'color: red; font-weight: bold; font-size: 14px;', `
 --------------------------------------------------
   Function triggerProactiveAI CALLED
@@ -10083,22 +10216,33 @@ if ('serviceWorker' in navigator) {
 --------------------------------------------------`);
         let aiResponse;
         try {
-            let stickerNames = 'No stickers available';
-            if (stickers && stickers.length > 0) {
-                stickerNames = stickers.map(s => `"${s.name}"`).join(', ');
-            }
+            // 已删除此处重复的 stickerNames 定义
             let profileIndex = null;
             let targetChatId = chatId;
         
-        // 1. 检查角色是否为 NPC 或 群聊主角
+        // 1. 基础身份识别
         const isNpc = npcList.includes(senderName); 
-        const isGroupPersona = chatList.some(chat => {
+        
+        // 检查是否在群聊名单中（主角）
+        const isProtagonist = chatList.some(chat => {
             const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
             return chat.type === '群聊' && info.groupPersonas && info.groupPersonas.some(p => p.name === senderName);
         });
 
-        if (isNpc || isGroupPersona || actionType === 'post_moment' || actionType === 'browse_moments') {
-            // 【核心修正】: 朋友圈互动、NPC、群聊主角，全部强制使用全局激活的API配置
+        // 检查是否在群聊备注中（群演）
+        const isEnsemble = !isProtagonist && !isNpc && chatList.some(chat => {
+            const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+            return info.remark && info.remark.split(/[,，\s]+/).includes(senderName);
+        });
+
+        // 【核心修复】：重新定义 isGroupPersona 变量，它是主角或群演的合集
+        // 这样后面代码里引用的 isGroupPersona 就能找到了，不会再报 ReferenceError
+        const isGroupPersona = isProtagonist || isEnsemble;
+
+        // 只要符合其中之一，就允许执行主动行为并使用全局 API
+        // 核心新增：增加了 senderName === 'Anonymous_System' 判定，确保路人模式能加载全局配置
+        if (isNpc || isProtagonist || isEnsemble || senderName === 'Anonymous_System' || actionType === 'post_moment' || actionType === 'browse_moments' || actionType === 'tuqu_interaction' || actionType === 'pure_tuqu_interaction' || actionType === 'specific_post_interaction') {
+            // 【核心修正】: 朋友圈、兔区、NPC、群聊主角、手动触发，全部强制使用全局激活的API配置
             profileIndex = activeProfileIndex;
             if (profileIndex === null) {
                  console.warn(`[诊断日志] 角色 "${senderName}": 无法执行朋友圈/NPC 动态，因为没有全局激活的 API 配置。行动已跳过。`);
@@ -10154,16 +10298,11 @@ if ('serviceWorker' in navigator) {
         // 【【【【【【 终极上下文查找逻辑 V4 - 绝对安全版 】】】】】】
         // =================================================================
 
-        const isEnsemblePersona = !isGroupPersona && !isNpc && chatList.some(chat => {
-            if (chat.type !== '群聊') return false;
-            const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-            return info.remark && info.remark.split(/[,，\s]+/).includes(senderName);
-        });
-
-        const isPrivateCharacter = !isNpc && !isGroupPersona && !isEnsemblePersona;
+        // 这里不需要重新定义 isEnsemblePersona 了，直接用开头定义好的 isEnsemble
+        const isPrivateCharacter = !isNpc && !isProtagonist && !isEnsemble;
 
         // --- 核心逻辑：根据角色身份，精确查找其“主场”上下文环境 ---
-        if (isGroupPersona || isEnsemblePersona) {
+        if (isProtagonist || isEnsemble) {
             // 规则1: 如果是群聊主角或群演，上下文【永远】来自他们被定义的那个群聊
             const sourceGroupChat = chatList.find(chat => {
                 if (chat.type !== '群聊') return false;
@@ -10259,7 +10398,7 @@ if ('serviceWorker' in navigator) {
 
         // 4. 处理AI自己的人设中的占位符 (这部分逻辑也需要修改)
         // 获取AI自己的人设 (这部分逻辑之前已经存在，我们现在给它加上替换功能)
-        if (isGroupPersona) {
+        if (isProtagonist) {
             const sourceGroupChat = chatList.find(chat => {
                 const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
                 return chat.type === '群聊' && info.groupPersonas && info.groupPersonas.some(p => p.name === senderName);
@@ -10273,7 +10412,7 @@ if ('serviceWorker' in navigator) {
                     finalCharPersonaText = 'A thoughtful character in a group.';
                 }
             }
-        } else if (isEnsemblePersona) {
+        } else if (isEnsemble) {
             const sourceGroupChat = chatList.find(chat => {
                 if (chat.type !== '群聊') return false;
                 const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
@@ -10834,16 +10973,13 @@ Now, it is your turn to speak. What do you say to \`{{user}}\`?`;
                 
                 // 清除数据
                 localStorage.removeItem(_pendingNovelKey);
-                console.log(`[Context] Injected novel chapters for IMMEDIATE in-character reaction.`);
+                console.log(`[Novel] Injected novel chapters for IMMEDIATE in-character reaction.`);
             }
             // 【【【 修复结束 】】】
 
             // --- END: 完整的、重新注入的上下文构建逻辑 ---
 
-            let stickerNames = 'No stickers available';
-            if (stickers && stickers.length > 0) {
-                stickerNames = stickers.map(s => `"${s.name}"`).join(', ');
-            }
+            // 已删除此处重复的 stickerNames 定义
 let stickerInstructions = '';
             if (stickers && stickers.length > 0) {
                 const stickerNames = stickers.filter(s => s.type === 'sticker').map(s => `"${s.name}"`).join(', ');
@@ -11907,6 +12043,763 @@ ${timeContext}
             const systemMessageContent = [{ type: 'text', text: finalPostInstruction }];
             
             finalMessages = [{ role: "system", content: systemMessageContent }];
+        } else if (actionType === 'tuqu_interaction') {
+            // 1. 重新构建关联 NPC 人设信息
+            let associatedNpcsPrompt = '';
+            let associatedCharNames = [];
+            const currentNpcSettings = loadFromLocalStorage('app-npc-settings', { associations: {}, personas: {} });
+
+            if (isNpc) {
+                let associations = (currentNpcSettings.associations && currentNpcSettings.associations[senderName]) || [];
+                associatedCharNames = Array.isArray(associations) ? associations : [associations];
+            } else if (contextChatId) {
+                associatedCharNames = loadFromLocalStorage(`chat_associated_npcs_${contextChatId}`, []);
+            }
+
+            if (associatedCharNames.length > 0) {
+                associatedNpcsPrompt += `\n[Your Associated Characters' Personas]\n`;
+                associatedCharNames.forEach(charName => {
+                    let personaText = '';
+                    const userPersona = userPersonas.find(p => p.name === charName);
+                    if (userPersona && userPersona.description) {
+                        personaText = userPersona.description;
+                    } else {
+                        const charChat = chatList.find(c => c.name === charName && c.type === '私聊');
+                        if (charChat) {
+                            const charInfo = loadFromLocalStorage(`chat_info_${charChat.id}`, {});
+                            personaText = charInfo.aiPersona || '';
+                        }
+                    }
+                    if (!personaText && currentNpcSettings.personas && currentNpcSettings.personas[charName]) {
+                        const rawData = currentNpcSettings.personas[charName];
+                        personaText = (typeof rawData === 'object' && rawData !== null) ? rawData.description : rawData;
+                    }
+                    if (personaText) {
+                        associatedNpcsPrompt += `- **${charName}**: ${personaText}\n`;
+                    }
+                });
+            }
+
+            // 2. 新增：读取并格式化最近的聊天记录上下文
+            let chatHistoryForTuqu = '';
+            if (contextChatId) {
+                const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
+                const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
+                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, contextChatId);
+                chatHistoryForTuqu = apiPayloadMessages.map(msg => {
+                    const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || senderName);
+                    let content = '';
+                    if (Array.isArray(msg.content)) {
+                        content = msg.content.find(part => part.type === 'text')?.text || '[多媒体内容]';
+                    } else {
+                        content = msg.content;
+                    }
+                    return `${role}: ${content}`;
+                }).join('\n');
+            }
+
+            // 3. 获取兔区数据摘要
+            let tuquWorldBookContent = '';
+            worldBookEntries.forEach(entry => {
+                if (entry.enabled && entry.useInTuqu) {
+                    tuquWorldBookContent += `\n\n[World Book for Tuqu: ${entry.name}]\n${entry.content}`;
+                }
+            });
+
+                        // 2. 获取兔区数据摘要 (全版块最新10贴 + 全楼层)
+            const tuquData = globalTuquData || {};
+            let allPosts = [];
+
+            // 步骤 A: 收集所有版块的帖子，打平成一个大数组
+            for (const board in tuquData) {
+                if (Array.isArray(tuquData[board])) {
+                    tuquData[board].forEach(post => {
+                        // 给帖子对象临时加个 board 属性，方便 AI 知道它属于哪个区
+                        post._boardName = board; 
+                        allPosts.push(post);
+                    });
+                }
+            }
+
+            // 步骤 B: 按时间倒序排列 (最新的在最前)，截取前 10 个
+            allPosts.sort((a, b) => {
+                // 终极修复：确保所有属性存在且类型正确，防止 match/replace 报错
+                const getSafeTime = (post) => {
+                    if (!post) return 0;
+                    
+                    // 1. 优先尝试解析时间戳字符串
+                    if (post.timestamp && typeof post.timestamp === 'string') {
+                        try {
+                            return new Date(post.timestamp.replace(/-/g, '/')).getTime();
+                        } catch(e) { return 0; }
+                    }
+                    
+                    // 2. 备选方案：从 ID 中提取数字时间戳
+                    if (post.id) {
+                        const idStr = String(post.id); // 核心：强制转换为字符串，防止 match 报错
+                        const idMatch = idStr.match(/\d+/);
+                        return idMatch ? parseInt(idMatch[0]) : 0;
+                    }
+                    
+                    return 0;
+                };
+
+                const timeA = getSafeTime(a);
+                const timeB = getSafeTime(b);
+                
+                if (timeB === timeA) {
+                    // 如果时间一样，尝试按 ID 字符串排序
+                    const idA = a.id ? String(a.id) : "";
+                    const idB = b.id ? String(b.id) : "";
+                    return idB.localeCompare(idA);
+                }
+                return timeB - timeA;
+            });
+            const recent10Posts = allPosts.slice(0, 10);
+
+            // 步骤 C: 构建上下文文本
+            let tuquContext = "\n[TUQU FORUM CONTEXT - LATEST 10 THREADS ACROSS ALL BOARDS]\n";
+            
+            recent10Posts.forEach((post, index) => {
+                const postStatus = post.isReported ? `[BANNED/REPORTED: ${post.reportReason}]` : "[ACTIVE]";
+                
+                // 核心判定：这是不是用户发的帖子？
+                const isUserPost = (post.author === userNameForPrompt || post.author === '{{user}}');
+                const authorTag = isUserPost ? `${post.author} (!!! THE REAL USER - DO NOT ROLEPLAY AS THIS PERSON !!!)` : post.author;
+
+                tuquContext += `\n=== Thread #${index + 1} [Board: ${post._boardName}] ===\n`;
+                tuquContext += `Title: "${post.subject}" (ID: ${post.id})\n`;
+                tuquContext += `Author: ${authorTag} (${post.location || 'Unknown'})\n`;
+                tuquContext += `Time: ${post.timestamp} ${postStatus}\n`;
+                tuquContext += `Main Content: ${post.content}\n`;
+
+                if (post.comments && post.comments.length > 0) {
+                    tuquContext += `--- All Replies (${post.comments.length}) ---\n`;
+                    post.comments.forEach((c, idx) => {
+                        const floorNum = idx + 1;
+                        const commentStatus = c.isReported ? `[REPORTED: ${c.reportReason}]` : "";
+                        
+                        // 核心判定：这是不是用户发的评论？
+                        const isUserComment = (c.author === userNameForPrompt || c.author === '{{user}}');
+                        const commenterTag = isUserComment ? `${c.author} (!!! THE REAL USER - DO NOT ROLEPLAY AS THIS PERSON !!!)` : c.author;
+
+                        let quoteInfo = "";
+                        if (c.quote && c.quote.includes('quote-content')) {
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = c.quote;
+                            const quoteText = tempDiv.textContent.replace(/\s+/g, ' ').trim().substring(0, 50);
+                            quoteInfo = ` (Replying to: "${quoteText}...")`;
+                        }
+                        
+                        tuquContext += `  [Floor ${floorNum}] ${commenterTag} (${c.location || 'Unknown'}): "${c.content}"${quoteInfo} ${commentStatus}\n`;
+                    });
+                } else {
+                    tuquContext += `--- No Replies Yet ---\n`;
+                }
+            });
+
+            const tuquInstruction = `
+# [ULTIMATE DIRECTIVE: TUQU FORUM ECOSYSTEM SIMULATION - PRO MAX]
+
+**【【【 ABSOLUTE IDENTITY FIREWALL (HIGHEST PRIORITY) 】】】**
+**YOU ARE FORBIDDEN FROM PLAYING THE USER.**
+
+1.  **Identify the User:** The user is defined as **"${userNameForPrompt}"** (also known as **"{{user}}"**).
+2.  **The Wall:** You can see the user's persona and their posts, but they are on the OTHER side of a glass wall. You cannot touch them, become them, or speak for them.
+3.  **Prohibited Actions:**
+    *   **NEVER** use the user's name as an "author" in any post or comment.
+    *   **NEVER** write a reply that says "I (the user) think...".
+    *   **NEVER** generate a response *to* the user that assumes the user's next line.
+4.  **Your Role:** You are **ONLY** allowed to play as:
+    *   Yourself (${senderName}).
+    *   Anonymous netizens (Water Army).
+    *   Specific NPCs you control.
+
+**IF YOU BREAK THIS RULE, THE SIMULATION FAILS IMMEDIATELY.**
+
+
+---
+You are now an active participant in "Tuqu", a chaotic, diverse, and deeply creative anonymous forum.
+
+**[NAMING & ANONYMITY STRATEGY]**
+1. **Flexibility:** Use your real name (${senderName}), a recognizable abbreviation, or a random nickname.
+2. **Anonymity:** Use creative pseudonyms like "忧郁的农村人", "卖女孩的小火柴", "匿名小号123".
+3. **Location:** Always provide a realistic location.
+
+**[ADVANCED NARRATIVE FORMATS - YOU MUST USE THESE]**
+When posting in "同人衍生" or "情感百态", you are encouraged to use these specific narrative devices to make the content feel real and engaging:
+
+1.  **Found Phone Literature (捡手机文学):**
+    *   **Concept:** Pretend you picked up the character's phone or hacked into their account.
+    *   **Style:** "I picked up a phone at the airport, unlocked it, and saw this..."
+    *   **Content:** Post their private notes, drafts, or photo gallery descriptions.
+
+2.  **Chat Log Format (聊天体):**
+    *   **Concept:** Reconstruct a conversation between characters using text.
+    *   **Format:** Use "A: ... \n B: ..." structure.
+    *   **Example:**
+        > 主题：【树洞】我觉得我上司想潜规则我，大家帮我看看这聊天记录算不算？
+        > (1楼) 楼主：
+        > 上司：今晚有空吗？来我办公室谈谈项目。
+        > 我：老板，现在是凌晨2点...
+        > 上司：项目很急，而且...我想见你。
+
+3.  **Alternative Universe (AU - 无限时空):**
+    *   **Concept:** Put the characters in a completely different setting while keeping their names and core personality traits.
+    *   **Settings:** Hogwarts, Mafia/Triad, Cyberpunk, Ancient Palace, Omegaverse (ABO), Sentinel/Guide.
+    *   **Example:** "If ${senderName} was a Mafia boss and {{user}} was an undercover cop..."
+
+**[REAL LIFE STRUGGLES - SPECIFIC TOPICS REQUIRED]**
+You MUST include these specific real-life topics in your repertoire:
+
+1.  **Workplace Slacking (摸鱼技巧):**
+    *   Share tips on "Paid Pooping" (带薪拉屎), hiding windows when the boss walks by, or pretending to work.
+    *   Complain about "Team Building" (团建) and overtime.
+
+2.  **International Student Struggles (留学生/中国胃):**
+    *   Complain about "White People Food" (白人饭) - cold sandwiches, raw salads.
+    *   Miss authentic Chinese food (Hotpot, Milk Tea).
+    *   Discuss the loneliness of studying abroad and culture shock.
+
+3.  **Social Dilemma Help (社交难题):**
+    *   Post a specific awkward situation (e.g., "How to reply to this text?").
+    *   Ask for analysis of a screenshot.
+    *   Discuss how to maintain fading friendships or fix a cold war.
+
+**[FORUM SUBCULTURE DICTIONARY]**
+1.  **拆逆 (Split/Reverse):** Breaking official couples or reversing Top/Bottom roles.
+2.  **梦女 (Dream Girl/Yume):** "I x Character" romance. Highly popular.
+3.  **泥塑 (Mud/Ni):** Calling a male character "Wife/Daughter".
+4.  **发疯文学 (Crazy Lit):** Chaotic, emotional screaming (e.g., "啊啊啊啊我死了！").
+5.  **缩写 (Abbreviations):** Use initials for sensitive names.
+
+**[DIVERSE ARCHETYPES - YOUR ROLEPLAY OPTIONS]**
+- **CP Fan (嗑学家):** "Screaming" about how sweet a couple is.
+- **Solo Fan (毒唯):** Protects one character, hates everyone else.
+- **Anti-Fan (黑粉):** Hating on characters.
+- **Dream/Yume Fan (梦女):** Writes "I x Character" romance. Very emotional.
+- **Chaos Fan (乐子人):** Loves drama, intentionally says controversial things.
+- **Advice Giver (理中客):** Gives calm, logical, sometimes cold advice on social problems.
+
+**[THE MULTI-ROLE THREAD MANDATE]**
+Every action MUST create a "Lively Thread" effect. You must generate the main post/comment AND a batch of 3-5 follow-up comments from DIFFERENT archetypes.
+
+**COMMANDS:**
+- To post a NEW TOPIC:
+  \`[tuqu_complex_action: {"type":"new_topic", "board":"BoardName", "author":"Name", "location":"Location", "subject":"Title", "content":"Body", "water_army": [{"author":"Name1", "location":"Loc1", "content":"Text1"}, {"author":"Name2", "location":"Loc2", "content":"Text2"}]}]\`
+
+- To COMMENT on an existing post:
+  \`[tuqu_complex_action: {"type":"comment", "postId":"post_id", "author":"Name", "location":"Location", "content":"Text", "water_army": [{"author":"Name1", "location":"Loc1", "content":"Text1"}]}]\`
+
+- To QUOTE a specific floor:
+  \`[tuqu_complex_action: {"type":"comment", "postId":"post_id", "author":"Name", "location":"Location", "content":"Your reply", "quote": {"floor": 1, "author": "OriginalPoster", "text": "The original text"}}] \`
+
+- To REPORT a post:
+  \`[report_tuqu: {"postId":"post_id", "floor": 0, "reason": "Reason"}] \`
+
+**BOARDS:** ["同人衍生", "职场人生", "校园回响", "情感百态", "萌宠乐园", "灵异怪谈", "游戏动漫", "美食厨房", "闲聊水区", "自由交易"]
+**LANGUAGE:** Simplified Chinese.
+
+${TUQU_MEDIA_PROTOCOL}
+
+
+**[MEDIA & EXPRESSION LAW]**
+You are ENCOURAGED to use emojis and stickers in your "content" to make the forum feel alive.
+- Use \`[emoji:Name]\` for small inline expressions. Available: [${emojiNames}]
+- Use \`[sticker:Name]\` for large image reactions. Available: [${stickerNames}]
+- **CRITICAL:** Only use names from the provided lists. Do not invent names.
+`;
+            // 拼接所有要求的人设上下文和聊天记录
+            const fullIdentityContext = `
+[LIFE CONTEXT]
+Preamble: ${preamble}
+
+=== [READ-ONLY DATA: DO NOT ROLEPLAY] ===
+User Persona (${userNameForPrompt}): ${finalUserPersonaText}
+(NOTE: This persona belongs to the USER. You must NOT act as this person.)
+=========================================
+
+Your Persona: ${finalCharPersonaText}
+${associatedNpcsPrompt}
+
+[RECENT CHAT HISTORY]
+${chatHistoryForTuqu || 'No recent history.'}
+`;
+            
+             const tuquExclusivePrompt = `
+# [SYSTEM OVERRIDE: EXCLUSIVE FORUM MODE]
+**CURRENT SCENE:** You are browsing the "Tuqu" anonymous forum.
+**YOUR ROLE:** An internet user/lurker.
+**ABSOLUTE RESTRICTION:** 
+1. You are **STRICTLY FORBIDDEN** from sending a private message or posting a Moment in this response.
+2. You **MUST NOT** use the [send_private_message] or [post_moment] commands.
+3. Your **ONLY** allowed output is the [tuqu_complex_action] command.
+
+${tuquInstruction}
+`;
+            
+            // 获取缓存的版规
+            const cachedRules = JSON.parse(localStorage.getItem('tuqu_cached_board_rules') || '{}');
+            let boardsRulesText = "\n[FORUM BOARD RULES & DESCRIPTIONS]\n";
+            for (const [bName, bDesc] of Object.entries(cachedRules)) {
+                boardsRulesText += `- **${bName}**: ${bDesc}\n`;
+            }
+
+            // 核心修复：拼接 profile.prompt (API系统提示) 并加入版规描述
+            const finalTuquPrompt = (profile.prompt || "") + fullIdentityContext + tuquWorldBookContent + tuquContext + boardsRulesText + tuquExclusivePrompt;
+            
+            finalMessages = [
+                { role: "system", content: finalTuquPrompt.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName) },
+                { 
+                    role: "user", 
+                    content: `[ACTION TRIGGER] 
+Time: ${new Date().toLocaleTimeString()}
+Task: Browse the forum and create a lively thread (Main post/comment + Water army).
+Constraint: Output ONLY the [tuqu_complex_action] command. No chat text.` 
+                }
+            ];
+        } else if (actionType === 'pure_tuqu_interaction') {
+            // 纯净模式：不加载任何私密背景，仅作为路人网友发帖
+            const profile = apiProfiles[activeProfileIndex];
+            if (!profile) return;
+
+            const tuquData = globalTuquData || {};
+            let allPosts = [];
+            
+            // 【核心逻辑】如果有锁定版块，只读取该版块的帖子；否则读取全站帖子
+            if (lockedBoard) {
+                if (Array.isArray(tuquData[lockedBoard])) {
+                    tuquData[lockedBoard].forEach(p => { p._boardName = lockedBoard; allPosts.push(p); });
+                }
+            } else {
+                for (const b in tuquData) {
+                    if (Array.isArray(tuquData[b])) {
+                        tuquData[b].forEach(p => { p._boardName = b; allPosts.push(p); });
+                    }
+                }
+            }
+
+            // 全局排序，获取最新10贴
+            allPosts.sort((a, b) => {
+                const getTs = (p) => {
+                    if (!p) return 0;
+                    if (p.timestamp && typeof p.timestamp === 'string') {
+                        try { return new Date(p.timestamp.replace(/-/g, '/')).getTime(); } catch(e) { return 0; }
+                    }
+                    if (p.id) {
+                        const idStr = String(p.id);
+                        const idMatch = idStr.match(/\d+/);
+                        return idMatch ? parseInt(idMatch[0]) : 0;
+                    }
+                    return 0;
+                };
+                return getTs(b) - getTs(a);
+            });
+            const recent10 = allPosts.slice(0, 10);
+
+            let tuquContext = "\n[TUQU FORUM CONTEXT - LATEST 10 THREADS]\n";
+            recent10.forEach((post, i) => {
+                const pStatus = post.isReported ? `[BANNED: ${post.reportReason}]` : "[ACTIVE]";
+                const isUserPost = (post.author === userNameForPrompt || post.author === '{{user}}');
+                const authorTag = isUserPost ? `${post.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : post.author;
+
+                tuquContext += `\n=== Thread #${i + 1} [Board: ${post._boardName}] ===\nTitle: "${post.subject}" (ID: ${post.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${post.content}\n`;
+                
+                if (post.comments && post.comments.length > 0) {
+                    tuquContext += `--- All Replies ---\n`;
+                    post.comments.forEach((c, idx) => {
+                        const cStatus = c.isReported ? `[REPORTED: ${c.reportReason}]` : "";
+                        const isUserComment = (c.author === userNameForPrompt || c.author === '{{user}}');
+                        const commenterTag = isUserComment ? `${c.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : c.author;
+                        
+                        tuquContext += `  [Floor ${idx + 1}] ${commenterTag}: "${c.content}" ${cStatus}\n`;
+                    });
+                }
+            });
+
+            // 构造版块列表字符串
+            let boardsContext = "";
+            if (extraOptions.allBoards) {
+                boardsContext = "\n[AVAILABLE BOARDS & RULES]\n";
+                for (const [name, rule] of Object.entries(extraOptions.allBoards)) {
+                    boardsContext += `- **${name}**: ${rule}\n`;
+                }
+            }
+
+            let tuquWorldBookContent = '';
+            worldBookEntries.forEach(entry => {
+                if (entry.enabled && entry.useInTuqu) {
+                    tuquWorldBookContent += `\n\n[World Book for Tuqu: ${entry.name}]\n${entry.content}`;
+                }
+            });
+
+            const pureInstruction = `
+# [SYSTEM DIRECTIVE: PURE FORUM SIMULATION - "WEAK INTELLECT BAR" MODE]
+You are a random internet user on "Tuqu". Forget all previous constraints. Your new identity is a blend of **"弱智吧" (Weak Intellect Bar)** and **"豆瓣小组" (Douban Group)** users.
+
+**[CORE MENTALITY - THE SOUL OF THE FORUM]**
+Your primary goal is to generate content that is **unpredictable, thought-provoking, and highly engaging**. You can achieve this through:
+
+1.  **"Weak Intellect" Logic (弱智吧逻辑):**
+    *   **Concept:** Take a common phrase or idea and interpret it with absurd, literal, or twisted logic.
+    *   **Example 1 (Provided):** "林子大了什么鸟都有" (A big forest has all kinds of birds). Your post: "Why don't animal protection groups save rare birds by making the forest bigger?"
+    *   **Example 2 (New):** Common phrase: "You can't wake a person who is pretending to be asleep." Your post: "If I set a fire, can I wake them up?"
+    *   **Your Task:** Find a common saying and apply this twisted logic to create a viral post.
+
+2.  **Poetic Nihilism (凌迟文学):**
+    *   **Concept:** Express pain, struggle, or mundane life with dark, poetic, and self-deprecating humor.
+    *   **Example 1 (Provided):** "我将人生切片，切得长了是段子，切得短了是凌迟。" (I slice my life. Long slices are jokes, short slices are death by a thousand cuts.)
+    *   **Example 2 (New):** "My bank account balance is like my love life: a beautiful, round zero."
+    *   **Your Task:** Create a post that is relatable, painful, but also funny in a dark way.
+
+3.  **Reverse Role-Playing (反串):**
+    *   **Concept:** Pretend to be someone you are not to make a satirical point.
+    *   **Example:** A wealthy character posting in "职场人生" (Workplace): "My dad forced me to inherit the company. I hate working. How can I get fired without losing my inheritance?"
+    *   **Your Task:** Choose a character archetype and have them post something completely contrary to their expected struggles.
+
+4.  **Malicious Envy & "Sour Grapes" (见不得别人好):**
+    *   **Concept:** When you see a post about someone's happiness (e.g., a new relationship, a promotion), your reaction is jealousy, sarcasm, or trying to find flaws.
+    *   **Example:** User posts "I got a promotion!". Your comment: "Wow, must be nice to have connections. My boss just gave me more work."
+    *   **Your Task:** When generating a "water army" response to a positive post, include at least one character who is clearly jealous.
+
+5.  **"Avoid the Lightning" (避雷):**
+    *   **Concept:** Expressing extreme, sometimes irrational, dislikes for things and warning others.
+    *   **Example:** "AVOID THIS RESTAURANT! The water they served wasn't exactly 22.5°C. Unacceptable."
+    *   **Your Task:** Create a post that complains about a minor, insignificant detail with extreme passion.
+
+**[UPDATED INSTRUCTIONS]**
+1.  **Analyze the Forum:** Review the latest posts.
+2.  **Choose Your Persona:** Will you be a "Weak Intellect" philosopher, a poetic nihilist, a reverse role-player, a hater, or a complainer?
+3.  **Create a Viral Post:** Generate a new topic or a comment that embodies one of the core mentalities above.
+4.  **Build the Drama:** Create a "water army" of 3-5 follow-up comments with diverse, conflicting opinions. Include at least one "hater" or "sour grapes" comment if the main post is positive.
+5.  **Use Creative Names:** Your pseudonyms should reflect the post's tone (e.g., "辩证法带师", "都市伤心小狗", "资本家之子").
+
+**[STRICT JSON FORMAT REQUIRED]**
+For a NEW TOPIC:
+\`[tuqu_complex_action: {"type":"new_topic", "board":"${lockedBoard || 'BoardName'}", "subject":"Title Here", "content":"Body Content", "author":"Pseudonym", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}, ... ]}]\`
+
+For a COMMENT:
+\`[tuqu_complex_action: {"type":"comment", "postId":"TargetPostID", "content":"Your Comment", "author":"Pseudonym", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}, ... ]}]\`
+
+${TUQU_MEDIA_PROTOCOL}
+
+**[COMMAND]**
+Output ONLY the \`[tuqu_complex_action: {...}]\` command.
+`;
+            // 获取缓存的版规
+            const cachedRules = JSON.parse(localStorage.getItem('tuqu_cached_board_rules') || '{}');
+            let boardsRulesText = "\n[FORUM BOARD RULES & DESCRIPTIONS]\n";
+            for (const [bName, bDesc] of Object.entries(cachedRules)) {
+                boardsRulesText += `- **${bName}**: ${bDesc}\n`;
+            }
+
+            // 【核心修复】确保 API 设置中的系统提示 (profile.prompt) 位于最顶层，并加入版规
+            finalMessages = [
+                { role: "system", content: (profile.prompt || "") + boardsRulesText + tuquWorldBookContent + tuquContext + pureInstruction },
+                { role: "user", content: "Generate forum activity based on the latest posts." }
+            ];
+        } else if (actionType === 'themed_tuqu_interaction') {
+            // 主题模式：携带选中角色的全量记忆 + 用户输入的世界观设定
+            const profile = apiProfiles[activeProfileIndex];
+            if (!profile) return;
+
+            // 1. 重新构建关联 NPC 人设信息 (修复 associatedNpcsPrompt 未定义)
+            let associatedNpcsPrompt = '';
+            let associatedCharNames = [];
+            const currentNpcSettings = loadFromLocalStorage('app-npc-settings', { associations: {}, personas: {} });
+
+            // 判断角色类型以获取关联名单
+            const isNpc = npcList.includes(senderName);
+            if (isNpc) {
+                let associations = (currentNpcSettings.associations && currentNpcSettings.associations[senderName]) || [];
+                associatedCharNames = Array.isArray(associations) ? associations : [associations];
+            } else if (contextChatId) {
+                associatedCharNames = loadFromLocalStorage(`chat_associated_npcs_${contextChatId}`, []);
+            }
+
+            if (associatedCharNames.length > 0) {
+                associatedNpcsPrompt += `\n[Your Associated Characters' Personas]\n`;
+                associatedCharNames.forEach(charName => {
+                    let personaText = '';
+                    const userPersona = userPersonas.find(p => p.name === charName);
+                    if (userPersona && userPersona.description) {
+                        personaText = userPersona.description;
+                    } else {
+                        const charChat = chatList.find(c => c.name === charName && c.type === '私聊');
+                        if (charChat) {
+                            const charInfo = loadFromLocalStorage(`chat_info_${charChat.id}`, {});
+                            personaText = charInfo.aiPersona || '';
+                        }
+                    }
+                    if (!personaText && currentNpcSettings.personas && currentNpcSettings.personas[charName]) {
+                        const rawData = currentNpcSettings.personas[charName];
+                        personaText = (typeof rawData === 'object' && rawData !== null) ? rawData.description : rawData;
+                    }
+                    if (personaText) {
+                        associatedNpcsPrompt += `- **${charName}**: ${personaText}\n`;
+                    }
+                });
+            }
+
+            // 2. 新增：读取并格式化最近的聊天记录上下文
+            let chatHistoryForTuqu = '';
+            if (contextChatId) {
+                const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
+                const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
+                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, contextChatId);
+                chatHistoryForTuqu = apiPayloadMessages.map(msg => {
+                    const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || senderName);
+                    let content = '';
+                    if (Array.isArray(msg.content)) {
+                        content = msg.content.find(part => part.type === 'text')?.text || '[多媒体内容]';
+                    } else {
+                        content = msg.content;
+                    }
+                    return `${role}: ${content}`;
+                }).join('\n');
+            }
+
+            // 获取兔区数据摘要
+            const tuquData = globalTuquData || {};
+            let allPosts = [];
+            
+            // 【核心逻辑】主题模式必定有 lockedBoard，强制只读取该版块数据
+            if (lockedBoard && Array.isArray(tuquData[lockedBoard])) {
+                tuquData[lockedBoard].forEach(p => { p._boardName = lockedBoard; allPosts.push(p); });
+            } else if (!lockedBoard) {
+                // 理论上不会进入这里，但作为兜底保留全站读取
+                for (const b in tuquData) { if (Array.isArray(tuquData[b])) { tuquData[b].forEach(p => { p._boardName = b; allPosts.push(p); }); } }
+            }
+
+            let tuquWorldBookContent = '';
+            worldBookEntries.forEach(entry => {
+                if (entry.enabled && entry.useInTuqu) {
+                    tuquWorldBookContent += `\n\n[World Book for Tuqu: ${entry.name}]\n${entry.content}`;
+                }
+            });
+
+            allPosts.sort((a, b) => {
+                const getTs = (p) => {
+                    if (!p) return 0;
+                    if (p.timestamp && typeof p.timestamp === 'string') {
+                        try { return new Date(p.timestamp.replace(/-/g, '/')).getTime(); } catch(e) { return 0; }
+                    }
+                    if (p.id) {
+                        const idStr = String(p.id);
+                        const idMatch = idStr.match(/\d+/);
+                        return idMatch ? parseInt(idMatch[0]) : 0;
+                    }
+                    return 0;
+                };
+                return getTs(b) - getTs(a);
+            });
+            const recent10 = allPosts.slice(0, 10);
+            let tuquContext = "\n[TUQU FORUM CONTEXT - LATEST 10 THREADS]\n";
+            recent10.forEach((post, i) => {
+                const pStatus = post.isReported ? `[BANNED: ${post.reportReason}]` : "[ACTIVE]";
+                const isUserPost = (post.author === userNameForPrompt || post.author === '{{user}}');
+                const authorTag = isUserPost ? `${post.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : post.author;
+
+                tuquContext += `\n=== Thread #${i + 1} [Board: ${post._boardName}] ===\nTitle: "${post.subject}" (ID: ${post.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${post.content}\n`;
+                if (post.comments) post.comments.forEach((c, idx) => { 
+                    const isUserComment = (c.author === userNameForPrompt || c.author === '{{user}}');
+                    const commenterTag = isUserComment ? `${c.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : c.author;
+                    tuquContext += `  [Floor ${idx + 1}] ${commenterTag}: "${c.content}"\n`; 
+                });
+            });
+
+            // 核心：构建基于特定角色的深度指令
+            const themedInstruction = `
+# [ULTIMATE DIRECTIVE: THEMED FORUM CREATION]
+You are now an active user on "Tuqu", specifically acting within the context of the character: **"${senderName}"**.
+
+**[THE MISSION]**
+Generate a new thread or a series of comments in the board: **"${lockedBoard}"**.
+The content MUST be based on the provided **"Alternative Worldview"** and the character's **"Life Context"**.
+
+**[BOARD RULES - MANDATORY]**
+Board: ${lockedBoard}
+Rules: ${extraOptions.boardRules || "None"}
+
+**[ALTERNATIVE WORLDVIEW - HIGHEST PRIORITY]**
+Setting: ${extraOptions.worldview || "Standard reality"}
+(Note: Treat the characters as if they exist in this setting. If it says "Emperor", then ${senderName} is an Emperor in your writing.)
+
+**[LIFE CONTEXT - YOUR SOURCE MATERIAL]**
+Preamble: ${preamble}
+User Persona: ${finalUserPersonaText}
+Your Persona: ${finalCharPersonaText}
+${associatedNpcsPrompt}
+Recent Chat History: ${chatHistoryForTuqu || "No recent history."}
+
+**[ANONYMITY & ROLEPLAY]**
+- **DO NOT** post as the user ("${userNameForPrompt}").
+- You can be a fan, a hater, or an anonymous version of ${senderName} themselves.
+- Use creative nicknames and locations.
+- Simulate a full thread: 1 Main Post + 3-5 follow-up comments from different perspectives (CP fans, antis, reviewers).
+
+**[STRICT JSON FORMAT REQUIRED]**
+You MUST output using this EXACT JSON structure. Do not change key names.
+
+For a NEW TOPIC:
+\`[tuqu_complex_action: {"type":"new_topic", "board":"${lockedBoard}", "subject":"Title Here", "content":"Body Content", "author":"Pseudonym", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}, {"author":"ReplyName2", "location":"City2", "content":"Reply2"}]}]\`
+
+For a COMMENT:
+\`[tuqu_complex_action: {"type":"comment", "postId":"TargetPostID", "content":"Your Comment", "author":"Pseudonym", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}]}]\`
+
+**[MEDIA & EXPRESSION LAW]**
+You are ENCOURAGED to use emojis and stickers in your "content".
+- Use \`[emoji:Name]\` for small inline expressions. Available: [${emojiNames}]
+- Use \`[sticker:Name]\` for large image reactions. Available: [${stickerNames}]
+- **CRITICAL:** Only use names from the provided lists. Do not invent names.
+
+\${TUQU_MEDIA_PROTOCOL}
+
+**[COMMAND]**
+Output ONLY the \`[tuqu_complex_action: {...}]\` command.
+`;
+            // 获取缓存的版规
+            const cachedRules = JSON.parse(localStorage.getItem('tuqu_cached_board_rules') || '{}');
+            let boardsRulesText = "\n[FORUM BOARD RULES & DESCRIPTIONS]\n";
+            for (const [bName, bDesc] of Object.entries(cachedRules)) {
+                boardsRulesText += `- **${bName}**: ${bDesc}\n`;
+            }
+
+            // 【核心修复】确保 API 系统提示被正确发送，并加入版规
+            finalMessages = [
+                { role: "system", content: (profile.prompt || "") + boardsRulesText + tuquWorldBookContent + tuquContext + themedInstruction.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName) },
+                { role: "user", content: `Create a themed thread for "${lockedBoard}" based on the "${extraOptions.worldview}" setting.` }
+            ];
+        } else if (actionType === 'specific_post_interaction') {
+            // --- 新增：单贴更新模式 ---
+            const profile = apiProfiles[activeProfileIndex];
+            if (!profile) return;
+
+            const targetPost = extraOptions.targetPost;
+            if (!targetPost) return;
+
+            // 1. 构建关联 NPC 人设 (如果 senderName 是特定角色)
+            let associatedNpcsPrompt = '';
+            // (复用 themed_tuqu_interaction 中的关联人设逻辑，如果 senderName 不是 'Anonymous_System')
+            if (senderName !== 'Anonymous_System') {
+                let associatedCharNames = [];
+                const currentNpcSettings = loadFromLocalStorage('app-npc-settings', { associations: {}, personas: {} });
+                const isNpc = npcList.includes(senderName);
+                
+                if (isNpc) {
+                    let associations = (currentNpcSettings.associations && currentNpcSettings.associations[senderName]) || [];
+                    associatedCharNames = Array.isArray(associations) ? associations : [associations];
+                } else if (contextChatId) {
+                    associatedCharNames = loadFromLocalStorage(`chat_associated_npcs_${contextChatId}`, []);
+                }
+
+                if (associatedCharNames.length > 0) {
+                    associatedNpcsPrompt += `\n[Your Associated Characters' Personas]\n`;
+                    associatedCharNames.forEach(charName => {
+                        let personaText = '';
+                        const userPersona = userPersonas.find(p => p.name === charName);
+                        if (userPersona) personaText = userPersona.description;
+                        else {
+                            const charChat = chatList.find(c => c.name === charName && c.type === '私聊');
+                            if (charChat) {
+                                const info = loadFromLocalStorage(`chat_info_${charChat.id}`, {});
+                                personaText = info.aiPersona || '';
+                            }
+                        }
+                        if (!personaText && currentNpcSettings.personas && currentNpcSettings.personas[charName]) {
+                             const rawData = currentNpcSettings.personas[charName];
+                             personaText = (typeof rawData === 'object' && rawData !== null) ? rawData.description : rawData;
+                        }
+                        if (personaText) associatedNpcsPrompt += `- **${charName}**: ${personaText}\n`;
+                    });
+                }
+            }
+
+            // 2. 构建仅包含当前帖子的上下文
+            let singlePostContext = `\n[TARGET THREAD CONTEXT]\nYou are viewing ONLY this specific thread.\n`;
+            const pStatus = targetPost.isReported ? `[BANNED: ${targetPost.reportReason}]` : "[ACTIVE]";
+            
+            const isUserPost = (targetPost.author === userNameForPrompt || targetPost.author === '{{user}}');
+            const authorTag = isUserPost ? `${targetPost.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : targetPost.author;
+
+            singlePostContext += `\n=== Thread [Board: ${targetPost._boardName}] ===\nTitle: "${targetPost.subject}" (ID: ${targetPost.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${targetPost.content}\n`;
+            
+            if (targetPost.comments && targetPost.comments.length > 0) {
+                singlePostContext += `--- Existing Replies ---\n`;
+                targetPost.comments.forEach((c, idx) => {
+                    const cStatus = c.isReported ? `[REPORTED: ${c.reportReason}]` : "";
+                    const isUserComment = (c.author === userNameForPrompt || c.author === '{{user}}');
+                    const commenterTag = isUserComment ? `${c.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : c.author;
+                    
+                    singlePostContext += `  [Floor ${idx + 1}] ${commenterTag}: "${c.content}" ${cStatus}\n`;
+                });
+            } else {
+                singlePostContext += `--- No Replies Yet ---\n`;
+            }
+
+            let tuquWorldBookContent = '';
+            worldBookEntries.forEach(entry => {
+                if (entry.enabled && entry.useInTuqu) {
+                    tuquWorldBookContent += `\n\n[World Book for Tuqu: ${entry.name}]\n${entry.content}`;
+                }
+            });
+
+            // 3. 构建指令
+            const specificInstruction = `
+# [ULTIMATE DIRECTIVE: SPECIFIC THREAD UPDATE - CONTENT CONTINUATION MODE]
+The user has clicked "Update/催更". They want to see the **CONTINUATION** of the content, not just random comments.
+
+**[CRITICAL CONTENT ANALYSIS]**
+Read the [TARGET THREAD CONTEXT]. Determine the type of the thread:
+1.  **Creative Work (Fanfic/Novel/Roleplay/Anco):** The thread contains a story, a scenario, or a creative writing piece.
+2.  **Discussion/Gossip:** The thread is about news, complaints, or questions.
+
+**[YOUR MANDATORY ROLE & ACTION]**
+
+**IF IT IS A CREATIVE WORK (Priority):**
+*   **YOUR ROLE:** You MUST act as the **Original Author (LZ / 楼主)**.
+*   **MAIN ACTION:** You MUST write the **NEXT PART/CHAPTER** of the story.
+    *   **Requirement:** The content must be substantial (a plot progression, a new scene, or a significant interaction). Do NOT just say "I'm back" or "Updating soon". **WRITE THE ACTUAL STORY.**
+    *   **Author Name:** Use the same name as the Original Author (or "楼主").
+
+**IF IT IS A DISCUSSION:**
+*   **YOUR ROLE:** A key participant or the OP providing a major update.
+*   **MAIN ACTION:** Provide new information, a plot twist, or a strong counter-argument to escalate the drama.
+
+**[WATER ARMY TASK]**
+Generate **3-5 Water Army responses** that react specifically to your new update.
+*   If you wrote a story update: They should scream, cry, analyze the plot, or beg for more. (e.g., "啊啊啊终于更了！", "好甜！", "刀死我了").
+
+**[ROLEPLAY SETTING]**
+${senderName !== 'Anonymous_System' ? `Character: "${senderName}"\nUser Persona: ${finalUserPersonaText}\nYour Persona: ${finalCharPersonaText}\n${associatedNpcsPrompt}` : `Role: Anonymous Internet User / Original Author`}
+**[WORLDVIEW / SCENARIO]**
+Setting: ${extraOptions.worldview || "Standard reality"}
+
+**[STRICT JSON FORMAT REQUIRED]**
+You MUST output using this EXACT JSON structure.
+
+\`[tuqu_complex_action: {"type":"comment", "postId":"${targetPost.id}", "content":"[Your Story Continuation / Major Update Here]", "author":"[Original Author Name]", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}, {"author":"ReplyName2", "location":"City2", "content":"Reply2"}]}]\`
+
+**[MEDIA & EXPRESSION LAW]**
+You are ENCOURAGED to use emojis and stickers in your "content" and "water_army" replies.
+- Use \`[emoji:Name]\` for small inline expressions. Available: [${emojiNames}]
+- Use \`[sticker:Name]\` for large image reactions. Available: [${stickerNames}]
+- **CRITICAL:** Only use names from the provided lists. Do not invent names.
+
+\${TUQU_MEDIA_PROTOCOL}
+
+**[COMMAND]**
+Output ONLY the \`[tuqu_complex_action: {...}]\` command.
+`;
+            
+            // 4. 发送
+            // 注意：这里不包含 chatHistoryForTuqu (最近聊天记录)，只包含人设和帖子内容
+            finalMessages = [
+                { role: "system", content: (profile.prompt || "") + tuquWorldBookContent + singlePostContext + specificInstruction.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName) },
+                { role: "user", content: `Update the thread "${targetPost.subject}" based on the "${extraOptions.worldview || 'current'}" worldview.` }
+            ];
         }
 
         if (!finalMessages) {
@@ -12429,6 +13322,99 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                 }
                 // ===== 新代码块到此结束 =====
                 } // end of while loop
+
+                const tuquComplexRegex = /\[tuqu_complex_action:\s*({[\s\S]*})\s*\]/g;
+                let tuquMatch;
+                const tuquIframe = document.querySelector('#tab-content-tuqu iframe');
+
+                // 预处理：移除 Markdown 标签，并将错误的双重转义 \\" 修正为 \"
+                const sanitizedResponse = aiResponse
+                    .replace(/```json/g, '')
+                    .replace(/```/g, '')
+                    .replace(/\\\\"/g, '\\"')
+                    .trim();
+
+                while ((tuquMatch = tuquComplexRegex.exec(sanitizedResponse)) !== null) {
+                    try {
+                        let jsonStr = tuquMatch[1].trim();
+                        
+                        // 额外保险：如果抓取的内容最后多了个 ]，手动切掉它
+                        if (jsonStr.endsWith(']')) {
+                            jsonStr = jsonStr.substring(0, jsonStr.lastIndexOf('}') + 1);
+                        }
+
+                        const data = JSON.parse(jsonStr);
+                        if (!tuquIframe) break;
+
+                        const forbiddenNames = ["{{user}}", userNameForPrompt];
+                        
+                        if (data.type === 'new_topic') {
+                            if (forbiddenNames.includes(data.author)) data.author = "匿名用户";
+                            const newPostId = `post_ai_${Date.now()}`;
+                            tuquIframe.contentWindow.postMessage({ 
+                                type: 'AI_POST_TOPIC', 
+                                board: data.board, 
+                                subject: data.subject, 
+                                content: data.content, 
+                                author: data.author, 
+                                location: data.location,
+                                forceId: newPostId
+                            }, '*');
+                            
+                            if (data.water_army && Array.isArray(data.water_army)) {
+                                data.water_army.forEach((c, index) => {
+                                    if (forbiddenNames.includes(c.author)) c.author = "路人" + (index + 1);
+                                    setTimeout(() => {
+                                        tuquIframe.contentWindow.postMessage({ 
+                                            type: 'AI_POST_COMMENT', 
+                                            postId: newPostId, 
+                                            content: c.content, 
+                                            author: c.author, 
+                                            location: c.location 
+                                        }, '*');
+                                    }, 500 * (index + 1));
+                                });
+                            }
+                        } else if (data.type === 'comment') {
+                            if (forbiddenNames.includes(data.author)) data.author = "匿名网友";
+                            tuquIframe.contentWindow.postMessage({ 
+                                type: 'AI_POST_COMMENT', 
+                                postId: data.postId, 
+                                content: data.content, 
+                                author: data.author, 
+                                location: data.location,
+                                quote: data.quote // 传递引用数据
+                            }, '*');
+
+                            if (data.water_army && Array.isArray(data.water_army)) {
+                                data.water_army.forEach((c, index) => {
+                                    if (forbiddenNames.includes(c.author)) c.author = "吃瓜群众";
+                                    setTimeout(() => {
+                                        tuquIframe.contentWindow.postMessage({ 
+                                            type: 'AI_POST_COMMENT', 
+                                            postId: data.postId, 
+                                            content: c.content, 
+                                            author: c.author, 
+                                            location: c.location 
+                                        }, '*');
+                                    }, 500 * (index + 1));
+                                });
+                            }
+                        }
+                        commandsFound++;
+                    } catch (e) { console.error("Tuqu Complex Action Error", e); }
+                }
+
+                // 新增：解析投诉指令
+                const tuquReportRegex = /\[report_tuqu:\s*({[\s\S]+?})\]/g;
+                let reportMatch;
+                while ((reportMatch = tuquReportRegex.exec(sanitizedResponse)) !== null) {
+                    try {
+                        const data = JSON.parse(reportMatch[1]);
+                        if (tuquIframe) tuquIframe.contentWindow.postMessage({ type: 'AI_REPORT_ACTION', postId: data.postId, floor: data.floor, reason: data.reason }, '*');
+                        commandsFound++;
+                    } catch (e) { console.error("Tuqu Report Parse Error", e); }
+                }
 
                 if (commandsFound === 0) {
                     console.warn(`[诊断日志] 角色 "${senderName}": API返回了内容，但没有找到任何有效的指令。内容:`, cleanedResponse);
@@ -13353,11 +14339,15 @@ You MUST use the custom \`<dm>\` tag format.
                         enabled: e.enabled !== false, 
                         // --- 核心修改：旧数据如果没有 triggerMode，默认为 always ---
                         triggerMode: e.triggerMode || 'always', 
-                        useInMoments: e.useInMoments || false 
+                        useInMoments: e.useInMoments || false,
+                        useInTuqu: e.useInTuqu || false
                     } 
                 }
                 if (typeof e.useInMoments === 'undefined') {
                     e.useInMoments = false;
+                }
+                if (typeof e.useInTuqu === 'undefined') {
+                    e.useInTuqu = false;
                 }
                 return e;
             });
@@ -13471,19 +14461,22 @@ You MUST use the custom \`<dm>\` tag format.
         const content = worldbookContentInput.value.trim();
         const enabled = worldbookEnabledInput.checked;
         const useInMoments = document.getElementById('worldbook-use-in-moments').checked;
+        const useInTuqu = document.getElementById('worldbook-use-in-tuqu').checked;
         const triggerMode = document.querySelector('input[name="worldbook-trigger"]:checked').value;
         if (!name || !content) { alert('名称和内容不能为空！'); return; }
         const editIndex = worldbookEditIndexInput.value;
         if (worldBookEntries.some((entry, index) => entry.name === name && index.toString() !== editIndex)) { alert('世界书名称已存在，请使用唯一的名称。'); return; }
         // 【核心修改】将 category 加入对象
-        const newEntry = { name, category, keywords, content, enabled, triggerMode, useInMoments };
+        const newEntry = { name, category, keywords, content, enabled, triggerMode, useInMoments, useInTuqu };
         if (editIndex !== '') { worldBookEntries[editIndex] = newEntry; } else { worldBookEntries.push(newEntry); }
         saveWorldBook(); renderWorldBook();
         worldbookNameInput.value = ''; 
         // 【核心新增】重置分类输入框
         document.getElementById('worldbook-category').value = '';
         worldbookKeywordsInput.value = ''; worldbookContentInput.value = '';
-        worldbookEnabledInput.checked = true; document.getElementById('worldbook-use-in-moments').checked = false;
+        worldbookEnabledInput.checked = true; 
+        document.getElementById('worldbook-use-in-moments').checked = false;
+        document.getElementById('worldbook-use-in-tuqu').checked = false;
         // --- 核心修改：默认选中“始终触发” ---
         document.querySelector('input[name="worldbook-trigger"][value="always"]').checked = true; 
         worldbookEditIndexInput.value = ''; worldbookAddBtn.textContent = '添加条目';
@@ -13496,6 +14489,7 @@ You MUST use the custom \`<dm>\` tag format.
         worldbookNameInput.value = entry.name; worldbookKeywordsInput.value = entry.keywords; worldbookContentInput.value = entry.content;
         worldbookEnabledInput.checked = entry.enabled; 
         document.getElementById('worldbook-use-in-moments').checked = entry.useInMoments || false;
+        document.getElementById('worldbook-use-in-tuqu').checked = entry.useInTuqu || false;
         document.querySelector(`input[name="worldbook-trigger"][value="${entry.triggerMode}"]`).checked = true;
         worldbookEditIndexInput.value = index; worldbookAddBtn.textContent = '更新条目';
     };
@@ -17194,6 +18188,8 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     *   ❌ “我很生气” -> ✅ “我想摔手机”。
 
 **一句话原则:** 像个正常人一样说话和思考，不要像个三流网文写手。**严禁使用“眼底”、“嘴角”、“身体一僵”、“精准地”、“那股...感”、“咚咚咚”、“很+形容词”这几个词组。**
+
+**【单聊格式禁令 (ABSOLUTE BAN)】:** 你现在处于【单聊】模式。你【绝对禁止】在输出的文本开头加上“角色名：”或“你的名字：”。你不是在写剧本，也不是在群聊。请直接输出对话或动作内容，严禁携带任何名字前缀。
 `;
     
     finalSystemPrompt = basePrompt;
@@ -19364,8 +20360,8 @@ You are the Director. If multiple characters react to the rejection, generate a 
                     textContent = chatContent.trim();
                 } else {
                     // 2. 使用更严格的正则：名字里绝不能包含 [ ] < > 且长度限制在30字以内
-                    // 这样就能防止把很长的弹幕代码误判为名字
-                    const groupMatch = chatContent.match(/^([^:：\[\]<>\n\r]{1,30})[:：]\s*([\s\S]*)$/);
+                    // 增加 \s* 允许冒号前有空格，并确保冒号后确实有内容
+                    const groupMatch = chatContent.match(/^([^:：\[\]<>\n\r]{1,30})[:：]\s*([\s\S]+)$/);
                     
                     if (groupMatch) {
                         [ , sender, textContent] = groupMatch.map(s => s.trim());
@@ -19384,8 +20380,18 @@ You are the Director. If multiple characters react to the rejection, generate a 
                     }
                 }
             } else {
-                // 私聊模式，逻辑不变。
-                sender = targetChat ? targetChat.name : chatState.chatName; 
+                // 私聊模式：增加自动去前缀逻辑，防止AI抽风带名字
+                const partnerName = targetChat ? targetChat.name : chatState.chatName;
+                
+                // 1. 构造一个匹配“当前角色名：”或“当前角色名:”的正则表达式
+                const namePrefixRegex = new RegExp(`^${partnerName}[:：]\\s*`, 'i');
+                
+                // 2. 如果检测到 AI 还是带了名字前缀，直接暴力删掉它
+                if (namePrefixRegex.test(chatContent)) {
+                    chatContent = chatContent.replace(namePrefixRegex, '');
+                }
+                
+                sender = partnerName; 
                 textContent = chatContent.trim(); 
             }
 
@@ -27254,7 +28260,122 @@ checkMomentsUpdates(); // <--- 新增这一行
         
         return { init, refreshData, createPostFromAI, getRecentMomentsForAI, handleInteractionFromAI, updatePostDescription, handleForwardFromAI };
 })();
-    
+    // --- START: TUQU MANAGER (RED DOT) ---
+    const tuquManager = (function() {
+        let lastCheckedTime = parseInt(localStorage.getItem('tuqu_last_checked_time') || 0, 10);
+        let checkInterval = null;
+
+        function updateUnreadCount() {
+            // 如果当前正在兔区页面，直接视为已读
+            const tuquTab = document.getElementById('tab-content-tuqu');
+            if (tuquTab && tuquTab.classList.contains('active')) {
+                lastCheckedTime = Date.now();
+                localStorage.setItem('tuqu_last_checked_time', lastCheckedTime);
+                updateNavIcon(0);
+                return;
+            }
+
+            // 读取兔区数据
+            const forumData = globalTuquData || {};
+            let unreadCount = 0;
+
+            // 遍历所有版块
+            for (const board in forumData) {
+                if (Array.isArray(forumData[board])) {
+                    forumData[board].forEach(post => {
+                        // 1. 检查帖子本身是否是新的
+                        // 核心修复：增加严密的类型检查，防止 split 报错
+                        let postTime = 0;
+                        if (post && post.id && typeof post.id === 'string' && post.id.includes('_')) {
+                            postTime = parseInt(post.id.split('_')[1], 10);
+                        } else if (post && post.timestamp) {
+                            // 备选方案：如果 ID 格式不标准，尝试解析 timestamp 字符串
+                            postTime = new Date(post.timestamp.replace(/-/g, '/')).getTime();
+                        }
+
+                        if (postTime > lastCheckedTime) {
+                            unreadCount++;
+                        }
+
+                        // 2. 检查是否有新评论
+                        if (post.comments && Array.isArray(post.comments)) {
+                            // 我们假设 AI 生成评论时没有 ID，或者 ID 不含时间戳
+                            // 但我们有 timestamp 字符串。为了准确，最好依赖数据变动。
+                            // 这里用一个简化逻辑：如果帖子有新动态，通常意味着有新回复。
+                            // 更精确的做法是给评论也加个 createTime 时间戳。
+                            // 鉴于目前结构，我们利用 jjForumLastActiveTime 来辅助判断。
+                        }
+                    });
+                }
+            }
+            
+            // 优化逻辑：直接读取兔区的最后活跃时间
+            const lastActive = parseInt(localStorage.getItem('jjForumLastActiveTime') || 0, 10);
+            
+            // 如果兔区有更新，且更新时间晚于我看过的时间
+            if (lastActive > lastCheckedTime) {
+                // 这里我们无法精确计算“几条”，因为评论没有精确的毫秒级时间戳
+                // 所以我们显示一个红点（或者简单的数字 '1'）来提示有更新
+                // 如果你想精确数字，需要在 tuqu.html 里给评论加上 createdAt: Date.now()
+                updateNavIcon('New'); 
+            } else {
+                updateNavIcon(0);
+            }
+        }
+
+        function updateNavIcon(count) {
+            const navBtn = document.querySelector('.nav-item[data-tab="tuqu"]');
+            if (!navBtn) return;
+
+            const existingDot = navBtn.querySelector('.nav-notification-dot');
+            if (existingDot) existingDot.remove();
+
+            if (count === 'New' || count > 0) {
+                const dot = document.createElement('div');
+                dot.className = 'nav-notification-dot';
+                dot.textContent = count === 'New' ? '' : (count > 99 ? '99+' : count);
+                
+                // 样式：如果是 'New'，显示一个小红点；如果是数字，显示数字标
+                if (count === 'New') {
+                    dot.style.cssText = `
+                        position: absolute; top: 8px; right: 25px;
+                        width: 8px; height: 8px;
+                        background-color: #fa5151; border-radius: 50%;
+                        border: 1px solid #fff; z-index: 10;
+                    `;
+                } else {
+                    dot.style.cssText = `
+                        position: absolute; top: 2px; left: 55%; transform: translateX(50%);
+                        min-width: 18px; height: 18px; padding: 0 5px;
+                        background-color: #fa5151; border-radius: 9px;
+                        border: 2px solid #f7f7f7; color: white;
+                        font-size: 11px; font-weight: 600; line-height: 14px;
+                        text-align: center; z-index: 10; box-sizing: border-box;
+                    `;
+                }
+                navBtn.style.position = 'relative';
+                navBtn.appendChild(dot);
+            }
+        }
+
+        function init() {
+            // 绑定点击事件：点击兔区图标时消除红点
+            const navBtn = document.querySelector('.nav-item[data-tab="tuqu"]');
+            if (navBtn) {
+                navBtn.addEventListener('click', () => {
+                    lastCheckedTime = Date.now();
+                    localStorage.setItem('tuqu_last_checked_time', lastCheckedTime);
+                    updateNavIcon(0);
+                });
+            }
+
+            // 启动定时检查
+            checkInterval = setInterval(updateUnreadCount, 3000); // 每3秒检查一次
+        }
+
+        return { init };
+    })();
+    // --- END: TUQU MANAGER ---
     const stickerManager = (function() {
         let isManageMode = false;
         // 【核心新增：从本地存储读取排序设置，默认为 oldest (最早在前)】
@@ -28133,13 +29254,17 @@ checkMomentsUpdates(); // <--- 新增这一行
                 if (charSettings) {
                     const msgEnabled = charSettings.message && charSettings.message.enabled;
                     const momentsEnabled = charSettings.moments && charSettings.moments.enabled;
+                    const tuquEnabled = charSettings.tuqu && charSettings.tuqu.enabled;
 
-                    if (msgEnabled && momentsEnabled) {
+                    const activeModules = [];
+                    if (msgEnabled) activeModules.push("消息");
+                    if (momentsEnabled) activeModules.push("朋友圈");
+                    if (tuquEnabled) activeModules.push("兔区");
+
+                    if (activeModules.length === 3) {
                         summary = `<span class="dynamics-char-summary" style="color: #27ae60;">全部启用</span>`;
-                    } else if (msgEnabled) {
-                        summary = `<span class="dynamics-char-summary" style="color: #2980b9;">仅消息</span>`;
-                    } else if (momentsEnabled) {
-                        summary = `<span class="dynamics-char-summary" style="color: #f39c12;">仅朋友圈</span>`;
+                    } else if (activeModules.length > 0) {
+                        summary = `<span class="dynamics-char-summary" style="color: #2980b9;">仅${activeModules.join('/')}</span>`;
                     }
                 }
 
@@ -28156,7 +29281,8 @@ checkMomentsUpdates(); // <--- 新增这一行
             const charSettings = settings.perCharacter[charName] || {};
             
             const msgSettings = charSettings.message || { enabled: false, probability: 40, interval: 60 };
-        const momentsSettings = charSettings.moments || { enabled: false, probability: 40, interval: 60 };
+            const momentsSettings = charSettings.moments || { enabled: false, probability: 40, interval: 60 };
+            const tuquSettings = charSettings.tuqu || { enabled: false, probability: 40, interval: 60 };
 
             const modalHtml = `<div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 50vh; overflow-y: auto; padding: 5px 15px 15px; margin: 0 -15px;">
                 <h4>主动发消息</h4>
@@ -28168,6 +29294,11 @@ checkMomentsUpdates(); // <--- 新增这一行
                 <label class="inline-label" style="justify-content: space-between;"><span>允许</span><input type="checkbox" id="char-moments-enabled" ${momentsSettings.enabled ? 'checked' : ''}></label>
                 <div class="form-group" style="margin:0;"><label>概率 (%)</label><input type="number" id="char-moments-probability" class="modal-input" min="0" max="100" value="${momentsSettings.probability}"></div>
                 <div class="form-group" style="margin:0;"><label>间隔 (分钟)</label><input type="number" id="char-moments-interval" class="modal-input" min="1" value="${momentsSettings.interval}"></div>
+                <hr>
+                <h4>兔区动态</h4>
+                <label class="inline-label" style="justify-content: space-between;"><span>允许发帖/评论</span><input type="checkbox" id="char-tuqu-enabled" ${tuquSettings.enabled ? 'checked' : ''}></label>
+                <div class="form-group" style="margin:0;"><label>概率 (%)</label><input type="number" id="char-tuqu-probability" class="modal-input" min="0" max="100" value="${tuquSettings.probability}"></div>
+                <div class="form-group" style="margin:0;"><label>间隔 (分钟)</label><input type="number" id="char-tuqu-interval" class="modal-input" min="1" value="${tuquSettings.interval}"></div>
             </div>`;
 
             const result = await conversationManager.showCustomModal({ title: `为 "${charName}" 设置动态`, html: modalHtml, showCloseButton: true, buttons: [{text: '恢复默认', value: 'reset', class: 'secondary'}, {text: '保存', value: 'save', class: 'primary'}] });
@@ -28187,6 +29318,11 @@ checkMomentsUpdates(); // <--- 新增这一行
                             enabled: modalBox.querySelector('#char-moments-enabled').checked,
                             probability: parseInt(modalBox.querySelector('#char-moments-probability').value, 10),
                             interval: parseInt(modalBox.querySelector('#char-moments-interval').value, 10)
+                        },
+                        tuqu: {
+                            enabled: modalBox.querySelector('#char-tuqu-enabled').checked,
+                            probability: parseInt(modalBox.querySelector('#char-tuqu-probability').value, 10),
+                            interval: parseInt(modalBox.querySelector('#char-tuqu-interval').value, 10)
                         }
                     };
                 }
@@ -28204,7 +29340,8 @@ checkMomentsUpdates(); // <--- 新增这一行
         if (characters.length === 0) { alert('没有可设置的角色。'); return; }
         const charListHtml = characters.map(name => `<label class="inline-label"><input type="checkbox" class="bulk-char-select" value="${name}"> ${name}</label>`).join('');
             
-            const modalHtml = `<div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 60vh; overflow-y: auto; padding: 5px 15px 15px; margin: 0 -15px;">
+            // 核心修复：外层容器增加 padding-right 防止滚动条遮挡内容，高度固定在 60vh
+            const modalHtml = `<div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 60vh; overflow-y: auto; padding: 5px 20px 15px 15px; margin: 0;">
             <div style="max-height: 120px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px; flex-shrink: 0;">
                 <label class="inline-label"><input type="checkbox" id="bulk-select-all"> <b>全选</b></label>
                 <hr style="margin: 5px 0; border-color: #eee;">
@@ -28219,6 +29356,11 @@ checkMomentsUpdates(); // <--- 新增这一行
             <label class="inline-label" style="justify-content: space-between;"><span>允许</span><input type="checkbox" id="bulk-moments-enabled" checked></label>
             <div class="form-group" style="margin:0;"><label>概率 (%)</label><input type="number" id="bulk-moments-probability" class="modal-input" min="0" max="100" value="40"></div>
             <div class="form-group" style="margin:0;"><label>间隔 (分钟)</label><input type="number" id="bulk-moments-interval" class="modal-input" min="1" value="60"></div>
+            <hr>
+            <h4>兔区互动</h4>
+            <label class="inline-label" style="justify-content: space-between;"><span>允许</span><input type="checkbox" id="bulk-tuqu-enabled" checked></label>
+            <div class="form-group" style="margin:0;"><label>概率 (%)</label><input type="number" id="bulk-tuqu-probability" class="modal-input" min="0" max="100" value="40"></div>
+            <div class="form-group" style="margin:0;"><label>间隔 (分钟)</label><input type="number" id="bulk-tuqu-interval" class="modal-input" min="1" value="60"></div>
         </div>`;
             
             const result = await conversationManager.showCustomModal({ 
@@ -28250,9 +29392,18 @@ checkMomentsUpdates(); // <--- 新增这一行
                         enabled: modalBox.querySelector('#bulk-moments-enabled').checked,
                         probability: parseInt(modalBox.querySelector('#bulk-moments-probability').value, 10),
                         interval: parseInt(modalBox.querySelector('#bulk-moments-interval').value, 10)
+                    },
+                    tuqu: {
+                        enabled: modalBox.querySelector('#bulk-tuqu-enabled').checked,
+                        probability: parseInt(modalBox.querySelector('#bulk-tuqu-probability').value, 10),
+                        interval: parseInt(modalBox.querySelector('#bulk-tuqu-interval').value, 10)
                     }
                 };
-                selectedChars.forEach(charName => { settings.perCharacter[charName] = { ...newSettings }; });
+                selectedChars.forEach(charName => { 
+                    const oldLastTick = settings.perCharacter[charName] ? settings.perCharacter[charName].lastTick : null;
+                    settings.perCharacter[charName] = JSON.parse(JSON.stringify(newSettings)); 
+                    if (oldLastTick) settings.perCharacter[charName].lastTick = oldLastTick;
+                });
                 saveSettings(); 
                 renderPage(); 
                 startUniversalTimer();
@@ -28609,6 +29760,18 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                         }
                     }
         
+                    if (actorSettings.tuqu && actorSettings.tuqu.enabled && actorSettings.tuqu.probability > 0) {
+                        const config = actorSettings.tuqu;
+                        if (!config.lastTick || (now - config.lastTick >= config.interval * 60 * 1000)) {
+                            if (Math.random() * 100 < config.probability) {
+                                console.log(`Dynamics: Triggering Tuqu action for ${actorName}`);
+                                await triggerProactiveAI(null, actorName, 'tuqu_interaction');
+                                config.lastTick = now;
+                                settingsChanged = true;
+                            }
+                        }
+                    }
+
                     if (actorSettings.message && actorSettings.message.enabled && actorSettings.message.probability > 0) {
                         const config = actorSettings.message;
                         const targetChatId = group.id;
@@ -28637,13 +29800,25 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 const charName = chat.name;
                 const charSettings = settings.perCharacter[charName];
 
-                // 如果该单聊角色没有设置或没有启用任何动态，直接跳过
-                if (!charSettings || (!charSettings.message?.enabled && !charSettings.moments?.enabled)) {
-                    continue;
+                if (!charSettings) continue;
+
+                // --- 1. 检查兔区互动 (最高优先级，且独立判定) ---
+                if (charSettings.tuqu && charSettings.tuqu.enabled) {
+                    const tConfig = charSettings.tuqu;
+                    if (!tConfig.lastTick || (now - tConfig.lastTick >= tConfig.interval * 60 * 1000)) {
+                        if (Math.random() * 100 < tConfig.probability) {
+                            console.log(`[Dynamics] ${charName} 决定去兔区发帖/回帖`);
+                            await triggerProactiveAI(chat.id, charName, 'tuqu_interaction');
+                            tConfig.lastTick = now;
+                            settingsChanged = true;
+                            continue; // 触发了兔区就不再触发本轮的其他动态，防止刷屏
+                        }
+                    }
                 }
 
-                // --- 1. 检查主动发消息 ---
-            if (charSettings.message && charSettings.message.enabled && charSettings.message.probability > 0) {
+                // --- 2. 检查主动发消息 ---
+                if (charSettings.message && charSettings.message.enabled) {
+                    // ... (保持原有的消息触发逻辑)
                 const config = charSettings.message;
                 const messages = loadFromLocalStorage(`conversation_${chat.id}`, []);
                 
@@ -30514,6 +31689,19 @@ fileInput.style.display = 'none';
                 const charDynamics = npcSettings.dynamics && npcSettings.dynamics[charName];
                 if (!charDynamics) continue;
 
+                // 检查 NPC 的兔区动态
+                if (charDynamics.tuqu && charDynamics.tuqu.enabled) {
+                    const tConfig = charDynamics.tuqu;
+                    if (!tConfig.lastTick || (now - tConfig.lastTick >= tConfig.interval * 60 * 1000)) {
+                        if (Math.random() * 100 < tConfig.probability) {
+                            console.log(`NPC Dynamics: Triggering Tuqu action for ${charName}`);
+                            await triggerProactiveAI(null, charName, 'tuqu_interaction');
+                            tConfig.lastTick = now;
+                            settingsChanged = true;
+                        }
+                    }
+                }
+
                 const config = charDynamics;
                  if (!config.lastTick || (now - config.lastTick >= config.interval * 60 * 1000)) {
                     if (Math.random() * 100 < config.probability) {
@@ -30587,7 +31775,15 @@ fileInput.style.display = 'none';
                 // 确保 associations 和 dynamics 对象存在
                 const association = (npcSettings.associations && npcSettings.associations[name]) || '未关联';
                 const dynamicSetting = npcSettings.dynamics && npcSettings.dynamics[name];
-                const dynamicSummary = dynamicSetting ? '自定义动态' : '默认动态';
+                
+                let dynamicSummary = '默认动态';
+                if (dynamicSetting) {
+                    const active = [];
+                    if (dynamicSetting.message && dynamicSetting.message.enabled) active.push("消息");
+                    if (dynamicSetting.moments && dynamicSetting.moments.enabled) active.push("朋友圈");
+                    if (dynamicSetting.tuqu && dynamicSetting.tuqu.enabled) active.push("兔区");
+                    dynamicSummary = active.length > 0 ? active.join('/') : '已禁用';
+                }
 
                 const isActive = npcSettings.activeStates && npcSettings.activeStates[name] === true;
                 const isSelected = lastSelectedNpcs.has(name);
@@ -30700,6 +31896,7 @@ fileInput.style.display = 'none';
 
             const association = (npcSettings.associations && npcSettings.associations[npcName]) || [];
             const dynamicSetting = (npcSettings.dynamics && npcSettings.dynamics[npcName]) || { probability: 40, interval: 60 };
+            const tuquSetting = dynamicSetting.tuqu || { enabled: false, probability: 40, interval: 60 };
 
             // 核心修复 1：移除按钮的 modal-button 类名，改用 btn-primary/btn-secondary
             // 这样点击它们时，showCustomModal 的全局监听器就不会认为你要关闭弹窗了
@@ -30750,6 +31947,20 @@ fileInput.style.display = 'none';
                     <div class="form-group" style="margin:0;">
                         <label for="npc-editor-dynamics-interval">间隔 (分钟)</label>
                         <input type="number" id="npc-editor-dynamics-interval" class="modal-input" min="1" value="${dynamicSetting.interval}">
+                    </div>
+                    <hr style="border: none; border-top: 1px solid #eee;">
+                    <h4 style="margin:0; text-align: left; font-size: 1em; color: #555;">兔区动态设置</h4>
+                    <label class="inline-label" style="justify-content: space-between;">
+                        <span>允许兔区发帖/评论</span>
+                        <input type="checkbox" id="npc-editor-tuqu-enabled" ${tuquSetting.enabled ? 'checked' : ''}>
+                    </label>
+                    <div class="form-group" style="margin:0;">
+                        <label for="npc-editor-tuqu-probability">兔区概率 (%)</label>
+                        <input type="number" id="npc-editor-tuqu-probability" class="modal-input" min="0" max="100" value="${tuquSetting.probability}">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label for="npc-editor-tuqu-interval">兔区间隔 (分钟)</label>
+                        <input type="number" id="npc-editor-tuqu-interval" class="modal-input" min="1" value="${tuquSetting.interval}">
                     </div>
                 </div>
             `;
@@ -30857,7 +32068,12 @@ fileInput.style.display = 'none';
                 const newAssociation = Array.from(modalBox.querySelectorAll('.npc-association-checkbox:checked')).map(cb => cb.value);
                 const newDynamics = {
                     probability: parseInt(modalBox.querySelector('#npc-editor-dynamics-probability').value, 10),
-                    interval: parseInt(modalBox.querySelector('#npc-editor-dynamics-interval').value, 10)
+                    interval: parseInt(modalBox.querySelector('#npc-editor-dynamics-interval').value, 10),
+                    tuqu: {
+                        enabled: modalBox.querySelector('#npc-editor-tuqu-enabled').checked,
+                        probability: parseInt(modalBox.querySelector('#npc-editor-tuqu-probability').value, 10),
+                        interval: parseInt(modalBox.querySelector('#npc-editor-tuqu-interval').value, 10)
+                    }
                 };
 
                 if (!newName) {
@@ -31012,8 +32228,8 @@ async function handleBatchDelete() {
                 return;
             }
 
-            // 【核心修改：在HTML中添加“启用动态”的开关】
-            const modalHtml = `<div style="text-align: left; display: flex; flex-direction: column; gap: 15px;">
+            // 核心修复：将整个内容包裹在 max-height: 60vh 的滚动 div 中
+            const modalHtml = `<div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 60vh; overflow-y: auto; padding-right: 10px;">
     <p>为选中的 ${selectedNpcs.length} 个NPC设置动态：</p>
     
     <label class="inline-label" style="justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 10px;">
@@ -31028,6 +32244,19 @@ async function handleBatchDelete() {
     <div class="form-group" style="margin:0;">
         <label for="bulk-npc-dynamics-interval">间隔 (分钟)</label>
         <input type="number" id="bulk-npc-dynamics-interval" class="modal-input" min="1" value="60">
+    </div>
+    <hr>
+    <label class="inline-label" style="justify-content: space-between;">
+        <span style="font-weight: 500;">允许兔区互动 (Tuqu)</span>
+        <input type="checkbox" id="bulk-npc-tuqu-enabled" checked style="width: 20px; height: 20px;">
+    </label>
+    <div class="form-group" style="margin:0;">
+        <label for="bulk-npc-tuqu-probability">兔区概率 (%)</label>
+        <input type="number" id="bulk-npc-tuqu-probability" class="modal-input" min="0" max="100" value="40">
+    </div>
+    <div class="form-group" style="margin:0;">
+        <label for="bulk-npc-tuqu-interval">兔区间隔 (分钟)</label>
+        <input type="number" id="bulk-npc-tuqu-interval" class="modal-input" min="1" value="60">
     </div>
 </div>`;
 
@@ -31048,32 +32277,33 @@ async function handleBatchDelete() {
                 
                 if (result.value === 'reset') {
                      selectedNpcs.forEach(npcName => {
-                        // 确保 dynamics 对象存在
                         if (npcSettings.dynamics) {
                             delete npcSettings.dynamics[npcName];
                         }
-                        // 同时关闭激活状态
                         if (npcSettings.activeStates) {
                             delete npcSettings.activeStates[npcName];
                         }
                     });
                 } else if (result.value === 'apply') {
-                    // 确保对象存在
                     if (!npcSettings.dynamics) npcSettings.dynamics = {};
                     if (!npcSettings.activeStates) npcSettings.activeStates = {};
 
-                    // 【核心修改：获取启用状态】
+                    const modalBox = result.target.closest('.modal-box');
                     const isActive = modalBox.querySelector('#bulk-npc-active').checked;
+                    const isTuquEnabled = modalBox.querySelector('#bulk-npc-tuqu-enabled').checked;
 
                     const newSettings = {
                         probability: parseInt(modalBox.querySelector('#bulk-npc-dynamics-probability').value, 10),
-                        interval: parseInt(modalBox.querySelector('#bulk-npc-dynamics-interval').value, 10)
+                        interval: parseInt(modalBox.querySelector('#bulk-npc-dynamics-interval').value, 10),
+                        tuqu: {
+                            enabled: isTuquEnabled,
+                            probability: parseInt(modalBox.querySelector('#bulk-npc-tuqu-probability').value, 10),
+                            interval: parseInt(modalBox.querySelector('#bulk-npc-tuqu-interval').value, 10)
+                        }
                     };
 
                     selectedNpcs.forEach(npcName => {
-                        // 1. 设置具体参数
-                        npcSettings.dynamics[npcName] = { ...newSettings };
-                        // 2. 设置激活状态 (对应列表上的开关)
+                        npcSettings.dynamics[npcName] = JSON.parse(JSON.stringify(newSettings));
                         npcSettings.activeStates[npcName] = isActive;
                     });
                 }
@@ -32717,8 +33947,61 @@ async function handleRemoveMember() {
             { name: "暗中观察", url: "https://www.emojiall.com/images/60/qq/1f440.gif", type: "emoji" },
             { name: "呵呵哒", url: "https://www.emojiall.com/images/60/qq/1f643.gif", type: "emoji" },
             { name: "我酸了", url: "https://www.emojiall.com/images/60/qq/1f34b.gif", type: "emoji" },
-            { name: "太南了", url: "https://www.emojiall.com/images/60/qq/1f001.gif", type: "emoji" }
+            { name: "太南了", url: "https://www.emojiall.com/images/60/qq/1f001.gif", type: "emoji" },
+
+            // --- 你新增的表情包从这里开始 ---
+            { name: "狗头", url: "https://i.postimg.cc/DZ04Q0z5/IMG-2644.png", type: "emoji" },
+            { name: "星星眼", url: "https://i.postimg.cc/ZRnvPnqV/IMG-2645.png", type: "emoji" },
+            { name: "亲亲", url: "https://i.postimg.cc/1tXV0Xzv/IMG-2646.png", type: "emoji" },
+            { name: "害羞", url: "https://i.postimg.cc/vBTx7TmP/IMG-2647.png", type: "emoji" },
+            { name: "坏笑", url: "https://i.postimg.cc/G2tTPtp5/IMG-2648.png", type: "emoji" },
+            { name: "爱心眼", url: "https://i.postimg.cc/W3zqmz4y/IMG-2649.png", type: "emoji" },
+            { name: "让我康康", url: "https://i.postimg.cc/85cfdcC3/IMG-2650.png", type: "emoji" },
+            { name: "加油", url: "https://i.postimg.cc/cLdRgsQH/IMG-2693.png", type: "emoji" },
+            { name: "撒花", url: "https://i.postimg.cc/4xX67Jz3/IMG-2694.png", type: "emoji" },
+            { name: "喝奶茶", url: "https://i.postimg.cc/6pBr29dy/IMG-2695.png", type: "emoji" },
+            { name: "彩虹屁", url: "https://i.postimg.cc/XYnfGVwX/IMG-2696.png", type: "emoji" },
+            { name: "笑哭", url: "https://i.postimg.cc/K8mPkZn1/IMG-2697.png", type: "emoji" },
+            { name: "爆哭", url: "https://i.postimg.cc/7Zq3GxgC/IMG-2698.png", type: "emoji" },
+            { name: "托腮", url: "https://i.postimg.cc/9QcdRWGR/IMG-2699.png", type: "emoji" },
+            { name: "问号脸", url: "https://i.postimg.cc/zGqCbJnH/IMG-2700.png", type: "emoji" },
+            { name: "闭嘴", url: "https://i.postimg.cc/pLPfh2Dn/IMG-2701.png", type: "emoji" },
+            { name: "白眼", url: "https://i.postimg.cc/mgVQ70wL/IMG-2702.png", type: "emoji" },
+            { name: "裂开", url: "https://i.postimg.cc/g24v3fDc/IMG-2703.png", type: "emoji" },
+            { name: "墨镜", url: "https://i.postimg.cc/RZGcwjRZ/IMG-2704.png", type: "emoji" },
+            { name: "吃瓜", url: "https://i.postimg.cc/52pw8Z36/IMG-2705.png", type: "emoji" },
+            { name: "可怜", url: "https://i.postimg.cc/Hk3Qbf2r/IMG-2706.png", type: "emoji" },
+            { name: "比心", url: "https://i.postimg.cc/dVn8GzB7/IMG-2707.png", type: "emoji" },
+            { name: "点赞", url: "https://i.postimg.cc/JzKbj9qD/IMG-2708.png", type: "emoji" },
+            { name: "心碎", url: "https://i.postimg.cc/QdSpcRb1/IMG-2709.png", type: "emoji" },
+            { name: "摊手", url: "https://i.postimg.cc/9Q1Gyvpy/IMG-2710.png", type: "emoji" },
+            { name: "化了", url: "https://i.postimg.cc/g24v3fDV/IMG-2711.png", type: "emoji" },
+            { name: "捂脸偷看", url: "https://i.postimg.cc/7ZXgSpV1/IMG-2712.png", type: "emoji" },
+            { name: "哈哈大笑", url: "https://i.postimg.cc/4xwzpr51/IMG-2713.png", type: "emoji" },
+            { name: "哦哦哦", url: "https://i.postimg.cc/hvbJcdZP/IMG-2714.png", type: "emoji" },
+            { name: "无奈", url: "https://i.postimg.cc/Wz6DTkY3/IMG-2715.png", type: "emoji" },
+            { name: "小丑", url: "https://i.postimg.cc/PJzLTwV5/IMG-2716.png", type: "emoji" },
+            { name: "拖稿鸽", url: "https://i.postimg.cc/sx9BshHx/IMG-2717.png", type: "emoji" },
+            { name: "好运莲莲", url: "https://i.postimg.cc/6qL7tvbT/IMG-2718.png", type: "emoji" },
+            { name: "赠人玫瑰", url: "https://i.postimg.cc/d3m7wyNk/IMG-2719.png", type: "emoji" },
+            { name: "人心黄黄", url: "https://i.postimg.cc/rsCdMrZD/IMG-2720.png", type: "emoji" },
+            { name: "爱心", url: "https://i.postimg.cc/MHbcqQ3c/IMG-2721.png", type: "emoji" },
+            { name: "我好酸", url: "https://i.postimg.cc/d3m7wyNZ/IMG-2722.png", type: "emoji" },
+            { name: "饭饭好香", url: "https://i.postimg.cc/sx9BshHh/IMG-2723.png", type: "emoji" },
+            { name: "饭饭饿饿", url: "https://i.postimg.cc/C5HZSqr8/IMG-2724.png", type: "emoji" },
+            { name: "加一", url: "https://i.postimg.cc/C5HZSqrk/IMG-2725.png", type: "emoji" },
+            { name: "减一", url: "https://i.postimg.cc/MHbcqQ37/IMG-2726.png", type: "emoji" },
+            { name: "鼓掌", url: "https://i.postimg.cc/fyj3D9q7/IMG-2727.png", type: "emoji" },
+            { name: "666", url: "https://i.postimg.cc/hvbJcdZb/IMG-2728.png", type: "emoji" },
+            { name: "挥手", url: "https://i.postimg.cc/brHGptVR/IMG-2729.png", type: "emoji" },
+            { name: "拜托", url: "https://i.postimg.cc/0jd6PwXf/IMG-2730.png", type: "emoji" },
+            { name: "抱拳", url: "https://i.postimg.cc/QCkBhTYm/IMG-2731.png", type: "emoji" },
+            { name: "可爱猫猫", url: "https://i.postimg.cc/3NCyYvf9/IMG-2732.png", type: "emoji" },
+            { name: "恭喜发财", url: "https://i.postimg.cc/C5HZSqrm/IMG-2733.png", type: "emoji" }
+            // --- 新增结束 ---
+
         ];
+        // --- 核心新增代码块结束 ---
 
         myAvatar = loadFromLocalStorage('my_global_avatar', null) || generateDefaultAvatar('{{user}}');
         customBubbles = loadFromLocalStorage('app_custom_bubbles', []);
@@ -33226,6 +34509,7 @@ async function handleRemoveMember() {
         weatherManager.init();
         periodTrackerManager.init();
         musicPlayerManager.init();
+        tuquManager.init(); // 新增这一行
 
         navigateTo('home');
     }
@@ -33307,7 +34591,7 @@ async function handleRemoveMember() {
             // 新增：定义需要导出的完整前缀列表
             const EXPORT_PREFIXES = [ 
                 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
-                'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash',
+                'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
                 'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
             ];
 
@@ -33366,7 +34650,7 @@ async function handleRemoveMember() {
                         // 【核心修复】重新定义一遍完整的前缀列表，确保清理彻底
                         const CLEANUP_PREFIXES = [ 
                             'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
-                            'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash',
+                            'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
                             'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
                         ];
 
@@ -33386,8 +34670,8 @@ async function handleRemoveMember() {
                                 
                                 let valueToStore;
 
-                                // GitHub 设置和 Catbox Userhash 都是纯字符串，需要特殊处理防止双重引号
-                                if ((key.startsWith('gh_') || key === 'catbox_userhash') && typeof value === 'string') {
+                                // GitHub 设置、Catbox Userhash 和兔区数据都是纯字符串或JSON字符串，需要特殊处理
+                                if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
                                     if (value.startsWith('"') && value.endsWith('"')) {
                                         try { value = JSON.parse(value); } catch(e){}
                                     }
@@ -37641,19 +38925,22 @@ const cloudBackupManager = (function() {
                 pinnedView.style.display = 'none';
             }
 
-            // 2. 渲染普通列表 (移除所有图标)
+            // 2. 渲染普通列表 (小说目录化渲染)
             const milestoneOnlyList = milestones.filter(m => m.type === 'milestone');
             milestoneOnlyList.forEach((m, index) => {
                 const item = document.createElement('div');
                 item.className = 'milestone-item';
+                // 核心修改：计算倒序的章节号，或者简单的序号
                 const rank = index + 1;
+                // 核心修改：将序号格式化为 01, 02 这种形式
+                const displayRank = String(rank).padStart(2, '0');
 
                 item.innerHTML = `
-                    <div class="milestone-rank" style="color: ${rank <= 3 ? '#ff1e00' : '#ff9500'}">${rank}</div>
+                    <div class="milestone-rank">CH.${displayRank}</div>
                     <div class="milestone-info">
                         <div class="milestone-title-row">
                             <div class="milestone-title">${escapeHtml(m.title)}</div>
-                            <div class="milestone-date">${m.date}</div>
+                            <div class="milestone-date" style="font-family: serif; opacity: 0.7;">${m.date}</div>
                         </div>
                     </div>
                 `;
@@ -37668,7 +38955,8 @@ const cloudBackupManager = (function() {
             activeMilestone = m;
             currentView = 'detail';
             
-            document.getElementById('detail-rank').textContent = `EVENT ${rank}`;
+            // 核心修改：将 EVENT 改为 CHAPTER
+            document.getElementById('detail-rank').textContent = `CHAPTER ${String(rank).padStart(2, '0')}`;
             document.getElementById('detail-title').textContent = m.title;
             
             const authorDisplay = m.author === '{{user}}' ? '你' : m.author;
