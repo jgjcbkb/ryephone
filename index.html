@@ -11432,25 +11432,21 @@ You are **STRICTLY FORBIDDEN** from outputting any "acknowledgment", "confirmati
 ---
 `;
             finalSystemPrompt += directorMandate;
-            // 【【【【【【 导演指令注入结束 】】】】专【】】】
+            
+            // 【【【 终极修复：强制主动消息也必须进行深度思考 】】】
+            const PROACTIVE_THOUGHT_MANDATE = `
+# [SYSTEM OVERRIDE: MANDATORY COGNITIVE AUDIT]
+**STOP.** You are FORBIDDEN from outputting the response immediately.
+You MUST first engage in a deep, structured cognitive audit inside a <think> block.
 
-            // 【【【 核心新增：强制注入思考协议 】】】
-            const ULTIMATE_FORMATTING_RULE = `
-[SYSTEM OVERRIDE: ENFORCE DEEP THOUGHT]
+**Inside <think>, you must:**
+1. Analyze the context and the character's current mood.
+2. Scan for and PURGE all clichés (眼底, 嘴角, 身体一僵, 精准, 那股感, 咚咚咚).
+3. Draft the final response.
 
-**STOP.** Do not output the response yet. You must first **THINK**.
-
-**MANDATORY PROCESS:**
-1.  **Open \`<think>\` block.**
-2.  **Analyze Context:** Review the plot. Is my character's reaction logical? Is it physically possible?
-3.  **Purge Clichés:** Actively hunt for "眼底", "嘴角", "身体一僵", "精准", "那股感", "咚咚咚". **If you find them in your draft, you MUST explicitly state: "Detected cliché [X], rewriting to [Y]" inside the think block.**
-4.  **Close \`</think>\` block.**
-5.  **Generate Output:** Only NOW can you output the actual response (using \`<block>\` or narrative text).
-
-**FAILURE TO THINK IS A CRITICAL ERROR.**
+**FAILURE TO USE <think> TAGS IS A CRITICAL SYSTEM ERROR.**
 `;
-            finalSystemPrompt += ULTIMATE_FORMATTING_RULE;
-            // 【【【 新增结束 】】】
+            finalSystemPrompt += PROACTIVE_THOUGHT_MANDATE;
 
             // 【核心新增】执行最后的占位符替换，确保上下文中的 {{user}} 和 {{char}} 变为实际名字
             finalSystemPrompt = finalSystemPrompt.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName);
@@ -12344,28 +12340,34 @@ You are now an active participant in "Tuqu", a chaotic, diverse, and deeply crea
 2. **Anonymity:** Use creative pseudonyms like "忧郁的农村人", "卖女孩的小火柴", "匿名小号123".
 3. **Location:** Always provide a realistic location.
 
-**[ADVANCED NARRATIVE FORMATS - YOU MUST USE THESE]**
-When posting in "同人衍生" or "情感百态", you are encouraged to use these specific narrative devices to make the content feel real and engaging:
+**[ADVANCED NARRATIVE FORMATS - DIVERSITY MANDATE]**
+When posting in "同人衍生", you MUST rotate between these styles to ensure variety. **"Found Phone" should be used less than 10% of the time.**
 
-1.  **Found Phone Literature (捡手机文学):**
-    *   **Concept:** Pretend you picked up the character's phone or hacked into their account.
-    *   **Style:** "I picked up a phone at the airport, unlocked it, and saw this..."
-    *   **Content:** Post their private notes, drafts, or photo gallery descriptions.
+1.  **Short Snippet (短打):**
+    *   **Concept:** A self-contained, high-emotion scene focusing on a specific moment or sensory detail.
+    *   **Style:** Intense, atmospheric, often ending on a lingering thought.
 
-2.  **Chat Log Format (聊天体):**
-    *   **Concept:** Reconstruct a conversation between characters using text.
-    *   **Format:** Use "A: ... \n B: ..." structure.
-    *   **Example:**
-        > 主题：【树洞】我觉得我上司想潜规则我，大家帮我看看这聊天记录算不算？
-        > (1楼) 楼主：
-        > 上司：今晚有空吗？来我办公室谈谈项目。
-        > 我：老板，现在是凌晨2点...
-        > 上司：项目很急，而且...我想见你。
+2.  **Plot Outline (大纲/梗概):**
+    *   **Concept:** Present a "pitch" for a long story.
+    *   **Format:** Use bullet points to outline key plot beats (Beginning, Conflict, Climax, Ending).
+    *   **Example:** "主题：[大纲] 如果他们是在末世相遇的医生和佣兵..."
 
-3.  **Alternative Universe (AU - 无限时空):**
-    *   **Concept:** Put the characters in a completely different setting while keeping their names and core personality traits.
-    *   **Settings:** Hogwarts, Mafia/Triad, Cyberpunk, Ancient Palace, Omegaverse (ABO), Sentinel/Guide.
-    *   **Example:** "If ${senderName} was a Mafia boss and {{user}} was an undercover cop..."
+3.  **Story Continuation (续写):**
+    *   **Concept:** Take a specific moment from the "RECENT CHAT HISTORY" and expand it into a full narrative scene.
+    *   **Task:** Transform the raw dialogue into a literary experience.
+
+4.  **Long-form Narrative (长文/连载):**
+    *   **Concept:** A multi-paragraph, detailed story with heavy emphasis on internal monologues and environment.
+    *   **Style:** Slow-burn, descriptive, and immersive.
+
+5.  **Chat Log (聊天体):**
+    *   **Concept:** A script-style interaction between characters (A: ... / B: ...).
+
+6.  **Alternative Universe (AU - 无限时空):**
+    *   **Concept:** Place characters in settings like Cyberpunk, Ancient Fantasy, or Mafia.
+
+7.  **Found Phone (捡手机):**
+    *   **Warning:** ONLY use this if specifically inspired. Do NOT default to this.
 
 **[REAL LIFE STRUGGLES - SPECIFIC TOPICS REQUIRED]**
 You MUST include these specific real-life topics in your repertoire:
@@ -19349,24 +19351,36 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
 </think>
 (Then, start your actual response...)
 `;
-                // 将思考协议注入到 System Prompt 的最后，确保拥有最高权重
-                finalSystemPrompt += COGNITIVE_THOUGHT_PROTOCOL;
+                // 【【【 终极强化：绝对强制的思考协议 】】】
+            const ABSOLUTE_THINK_MANDATE = `
+# [CRITICAL: MANDATORY PRE-RESPONSE COGNITION]
+**YOU ARE PROHIBITED FROM RESPONDING WITHOUT THINKING.**
 
-                // 【【【 2. 在行为指令之后，追加最终的格式化指令 】】】
+Before every single response, you MUST open a <think> tag and perform a full psychological and linguistic audit. 
+- You MUST identify and delete all AI-style clichés.
+- You MUST ensure the response is 100% in character.
+- Only after closing </think> can you provide the visible output.
+
+**If you skip the <think> block, the user will be disconnected.**
+`;
+            finalSystemPrompt += ABSOLUTE_THINK_MANDATE;
+
+            // 【【【 2. 在行为指令之后，追加最终的格式化指令 】】】
             const ULTIMATE_FORMATTING_RULE = `
 [SYSTEM OVERRIDE: ENFORCE DEEP THOUGHT]
 
-**STOP.** Do not output the response yet. You must first **THINK**.
+**STOP.** Do not output the response yet. You must first **THINK** in a <think> block.
 
 **MANDATORY PROCESS:**
-1.  **Open \`<think>\` block.**
+1.  **Open <think> block.**
 2.  **Analyze Context:** Review the plot. Is my character's reaction logical? Is it physically possible?
 3.  **Purge Clichés:** Actively hunt for "眼底", "嘴角", "身体一僵", "精准", "那股感", "咚咚咚". **If you find them in your draft, you MUST explicitly state: "Detected cliché [X], rewriting to [Y]" inside the think block.**
-4.  **Close \`</think>\` block.**
-5.  **Generate Output:** Only NOW can you output the actual response (using \`<block>\` or narrative text).
+4.  **Close </think> block.**
+5.  **Generate Output:** Only NOW can you output the actual response (using <block> or narrative text).
 
 **FAILURE TO THINK IS A CRITICAL ERROR.**
 `;
+
             const finalFormattingInstruction = { role: "user", content: ULTIMATE_FORMATTING_RULE };
             finalMessages.push(finalFormattingInstruction);
             // 【【【【【【 注入结束 】】】】】】

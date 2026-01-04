@@ -238,7 +238,7 @@ html, body {
             <div class="page-header">
                 <div class="back-button" onclick="exitTuquToAppHome()">‹</div>
                 <h1>兔区</h1>
-                <button onclick="triggerRandomTuqu()" style="position:absolute; right:10px; bottom:12px; font-size:12px; padding:5px 10px; background:#ff4d4f; color:white; border:none; border-radius:15px; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">全站乱炖</button>
+                <button onclick="triggerRandomTuqu()" style="position:absolute; right:10px; bottom:12px; font-size:12px; padding:5px 10px; background:#ff4d4f; color:white; border:none; border-radius:15px; cursor:pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">更新</button>
             </div>
             <div class="page-content">
                 <table class="board-list-table" cellpadding="5" cellspacing="1">
@@ -335,7 +335,7 @@ html, body {
             <div class="page-content">
                 <div class="list-header" style="display: flex; justify-content: space-between; align-items: center;">
                     <span><a href="#" onclick="navigateTo('new-post')">发表新帖子</a></span>
-                    <button onclick="triggerBoardTuqu()" style="font-size:12px; padding:4px 10px; background:var(--jj-blue-link); color:white; border:none; border-radius:12px; cursor:pointer; opacity: 0.9;">本版催更</button>
+                    <button onclick="triggerBoardTuqu()" style="font-size:12px; padding:4px 10px; background:var(--jj-blue-link); color:white; border:none; border-radius:12px; cursor:pointer; opacity: 0.9;">更新</button>
                 </div>
                 <table class="topic-list-table" cellspacing="1">
                     <thead><tr><th>主题</th><th>作者</th><th>发表时间</th><th>回复</th></tr></thead>
@@ -380,7 +380,7 @@ html, body {
                 <!-- 已隐藏收藏和分享选项 -->
                 <div class="header-dropdown-item" onclick="handleHeaderAction('update')">
                     <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-                    更新 (催更)
+                    更新
                 </div>
             </div>
 
@@ -471,7 +471,7 @@ html, body {
             <h3 id="trigger-modal-title">本版催更设置</h3>
             <label style="font-size: 12px; color: #888; display: block; margin-bottom: 5px;">选择核心角色：</label>
             <select id="trigger-char-select">
-                <option value="">随机路人 (纯净模式)</option>
+                <option value="">随机路人</option>
             </select>
             <label style="font-size: 12px; color: #888; display: block; margin-bottom: 5px;">输入世界观/设定 (可选)：</label>
             <textarea id="trigger-worldview" placeholder="例如：假如角色是皇上 / 假如这是末世背景..." rows="3"></textarea>
@@ -619,7 +619,7 @@ html, body {
             if (event.data.type === 'RESPONSE_CHARACTER_LIST') {
                 const select = document.getElementById('trigger-char-select');
                 const currentVal = select.value;
-                select.innerHTML = '<option value="">随机路人 (纯净模式)</option>';
+                select.innerHTML = '<option value="">随机路人</option>';
                 event.data.list.forEach(name => {
                     const opt = document.createElement('option');
                     opt.value = name;
