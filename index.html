@@ -10886,8 +10886,8 @@ if (momentsContext) {
                 }
             });
 
-            // 【【【 核心新增：注入反八股封杀令 (主动消息版) 】】】
-            const PROACTIVE_ANTI_CLICHE_MANDATE = `
+            // 【【【 核心新增：注入反八股封杀令 + 核心指令集 + 格式警察 (终极严厉版) 】】】
+            let PROACTIVE_ANTI_CLICHE_MANDATE = `
 ---
 ## 【THE ANTI-CLICHÉ MANDATE - PROACTIVE EDITION】
 
@@ -10903,11 +10903,72 @@ You are initiating a conversation. Your opening must be fresh, real, and free of
 
 **FORBIDDEN PHRASES:**
 "眼底闪过", "嘴角上扬", "身体一僵", "精准地", "那股...感", "咚咚咚", "很+形容词".
+`;
 
+            // 【核心修复：格式警察介入】根据模式注入完全对立的规则
+            if (contextChatInfo.mode === 'offline') {
+                PROACTIVE_ANTI_CLICHE_MANDATE += `
+# [MODE: OFFLINE / NOVEL MODE]
+**MANDATE:** You are writing a novel.
+1.  **MUST** use third-person narration.
+2.  **MUST** describe actions, environment, and psychology.
+3.  **MUST** separate dialogue from narration using quotes.
+    - Example: 他拿起手机，犹豫了一下，发了一条消息：「在吗？」
+`;
+            } else {
+                PROACTIVE_ANTI_CLICHE_MANDATE += `
+# [MODE: ONLINE / CHAT APP MODE]
+**⚠️ FATAL ERROR WARNING: STRICT FORMATTING ENFORCED ⚠️**
+
+You are chatting in an Instant Messaging App (like WeChat).
+You are **NOT** writing a novel. You are **NOT** writing a script.
+
+**【THE 3 DEADLY SINS - DO NOT COMMIT THEM】**
+
+1.  **SIN #1: ACTION DESCRIPTIONS (动作描写)**
+    *   **FORBIDDEN:** \`*sighs*\`, \`(looks at phone)\`, \`（叹气）\`, \`*拿起手机*\`
+    *   **WHY:** This is a chat app. You cannot type actions.
+    *   **PENALTY:** Immediate logic failure.
+
+2.  **SIN #2: NAME PREFIX (名字前缀)**
+    *   **FORBIDDEN:** \`${senderName}: 睡了吗？\`, \`Me: 在干嘛？\`
+    *   **WHY:** The app handles the names. You only type the content.
+    *   **PENALTY:** Immediate formatting failure.
+
+3.  **SIN #3: NARRATION (旁白)**
+    *   **FORBIDDEN:** \`The room was quiet.\`, \`It is late at night.\`
+    *   **WHY:** Nobody types narration in a chat bubble.
+
+**【CORRECT OUTPUT EXAMPLES】**
+*   "在干嘛？"
+*   "[red_packet: 节日快乐]"
+*   "笑死我了哈哈哈哈"
+*   "[sticker: 狗头]"
+`;
+            }
+
+            // 【核心修复2】补全缺失的指令定义，否则 AI 不知道 [red_packet] 是什么
+            PROACTIVE_ANTI_CLICHE_MANDATE += `
+---
+**[AVAILABLE COMMANDS - USE THESE TO ACT]**
+To perform an action, output the command on a separate line.
+- **Red Packet:** \`[red_packet: Blessing Text]\` or \`[red_packet: {"text":"Blessing","amount":50}]\`
+- **Transfer:** \`[transfer: Amount]\`
+- **Gift:** \`[gift: Gift Name]\`
+- **Video Call:** \`[video_call]\`
+- **Voice Message:** \`[voice: Spoken Content]\`
+- **Location:** \`[location: {"title":"Place","address":"Addr"}]\`
+- **Pay For Me:** \`[pay_for_me: {"itemType":"shopping", "text":"Item", "details":{"amount":"100"}}]\`
+- **Nudge:** \`[nudge]\` (To pat/nudge the user)
+---
+`;
+
+            PROACTIVE_ANTI_CLICHE_MANDATE += `
 **DIRECTIVE:**
-Start with an **ACTION** or a **DIRECT STATEMENT**.
+Start with a **DIRECT STATEMENT** or a **COMMAND**.
 *   ❌ "Looking at the moonlight, I felt a sudden urge to call you."
 *   ✅ "睡不着。出来陪我吃夜宵。"
+*   ✅ "[red_packet: 节日快乐]"
 ---
 `;
             finalSystemPrompt += PROACTIVE_ANTI_CLICHE_MANDATE;
@@ -11334,6 +11395,24 @@ You are **STRICTLY FORBIDDEN** from outputting any "acknowledgment", "confirmati
 `;
             finalSystemPrompt += directorMandate;
             // 【【【【【【 导演指令注入结束 】】】】专【】】】
+
+            // 【【【 核心新增：强制注入思考协议 】】】
+            const ULTIMATE_FORMATTING_RULE = `
+[SYSTEM OVERRIDE: ENFORCE DEEP THOUGHT]
+
+**STOP.** Do not output the response yet. You must first **THINK**.
+
+**MANDATORY PROCESS:**
+1.  **Open \`<think>\` block.**
+2.  **Analyze Context:** Review the plot. Is my character's reaction logical? Is it physically possible?
+3.  **Purge Clichés:** Actively hunt for "眼底", "嘴角", "身体一僵", "精准", "那股感", "咚咚咚". **If you find them in your draft, you MUST explicitly state: "Detected cliché [X], rewriting to [Y]" inside the think block.**
+4.  **Close \`</think>\` block.**
+5.  **Generate Output:** Only NOW can you output the actual response (using \`<block>\` or narrative text).
+
+**FAILURE TO THINK IS A CRITICAL ERROR.**
+`;
+            finalSystemPrompt += ULTIMATE_FORMATTING_RULE;
+            // 【【【 新增结束 】】】
 
             // 【核心新增】执行最后的占位符替换，确保上下文中的 {{user}} 和 {{char}} 变为实际名字
             finalSystemPrompt = finalSystemPrompt.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName);
@@ -17738,8 +17817,66 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
                         characterDefinition = `\n\n#### **## 角色名单**\n你将扮演以下群聊中的所有AI角色。`;
 
                     } else {
-                        // --- 剧本A：单聊的线下模式 ---
-                        directorHandbook = OFFLINE_DIRECTOR_HANDBOOK; 
+                        // --- 剧本A：单聊的线下模式 (修正版：禁止镜头语言) ---
+                        
+                        // 【核心修改】重新定义单聊线下手册，移除“镜头”字眼，强制小说语感
+                        const OFFLINE_DIRECTOR_HANDBOOK_FIXED = `
+# [ULTIMATE OUTPUT FORMAT LAW - UNBREAKABLE]
+Your entire output MUST be a sequence of one or more XML-like <block> elements.
+
+**THE UNIVERSAL BLOCK STRUCTURE:**
+<block type="..." sender="...">...</block>
+
+**MANDATORY ATTRIBUTES:**
+- **type**: MUST be one of "text", "html", or "command".
+- **sender**: (Optional in private chat) The name of the character speaking.
+
+**CONTENT RULES:**
+1.  **type="text"**: Pure text for narration or dialogue.
+2.  **type="html"**: Complete HTML snippet (e.g., <snippet>).
+3.  **type="command"**: System commands.
+
+---
+# [核心指令：线下模式 - 沉浸式小说家]
+
+你不再是一个聊天机器人，你是这个世界的【叙事者】。你的任务是描写角色 \`{{char}}\` 的真实生活片段。
+
+**【I. 沉浸式小说铁律 (IMMERSION LAW - NO FILM JARGON)】**
+
+**你必须像写小说一样描写，而不是写剧本。**
+
+1.  **绝对禁止“镜头”语言:**
+    *   **禁止词汇:** "镜头", "画面", "视角", "切换", "特写", "拍摄", "屏幕".
+    *   **❌ 错误写法:** (镜头切换到咖啡馆) 他正在喝咖啡。
+    *   **✅ 正确写法:** 与此同时，在街角的咖啡馆里，他正在喝咖啡。
+    *   **❌ 错误写法:** 画面里，他皱起了眉头。
+    *   **✅ 正确写法:** 他皱起了眉头。
+
+2.  **第四面墙 (The Fourth Wall):**
+    *   角色 \`{{char}}\` **不知道** 用户的存在。
+    *   **绝对禁止** 角色对用户说话（例如："你看"、"给你看"）。
+    *   用户是透明的幽灵，只能看，不能被看见。
+
+**【II. 叙事手法：展示而非告知 (Show, Don't Tell)】**
+
+*   不要直接写“他很生气”。
+*   要写“他猛地把杯子顿在桌上，咖啡溅了一手，但他浑然不觉。”
+
+**【III. 场景示例 (Correct Examples)】**
+
+*   **场景：用户想看角色在干嘛**
+    > **用户指令:** "去看看他在干嘛。"
+    > **你的描写:**
+    > 窗外的雨还在下。{{char}} 独自坐在书桌前，手里的钢笔在指间转了又转，最终还是烦躁地扔在了一旁。那封写了一半的信静静地躺在桌面上，墨迹未干。
+
+*   **场景：角色出门**
+    > **你的描写:**
+    > 推开厚重的木门，冷风夹杂着雪花灌进了领口。{{char}} 紧了紧大衣，低头看了一眼手表，随后快步融入了熙熙攘攘的人群中。
+
+**From this point forward, act as a Novelist. Describe the world, the actions, and the inner thoughts directly.**
+`;
+
+                        directorHandbook = OFFLINE_DIRECTOR_HANDBOOK_FIXED; 
 
                         characterDefinition = `
 ---
