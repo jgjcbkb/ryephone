@@ -13680,156 +13680,169 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
             return;
         }
 
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.style.display = 'none';
-        fileInput.accept = 'image/png,application/json,.json,.png';
-        document.body.appendChild(fileInput);
+        // 【iOS 修复核心】：不再直接创建 input，而是弹出一个专用窗口
+        // 这样可以确保 input.click() 是由用户在这个新窗口上的点击直接触发的
+        await conversationManager.showCustomModal({
+            title: '导入角色卡',
+            html: `
+                <div style="padding: 10px 0; text-align: center;">
+                    <p style="font-size: 14px; color: #666; margin-bottom: 20px;">
+                        支持 SillyTavern 格式的 PNG 图片或 JSON 文件。
+                    </p>
+                    <!-- 这个按钮将直接触发文件选择 -->
+                    <button id="st-real-upload-btn" class="modal-button primary" style="width: 100%; padding: 12px; font-size: 16px;">
+                        点击选择文件
+                    </button>
+                    <!-- 隐藏的 input -->
+                    <input type="file" id="st-hidden-input" accept="image/png,application/json,.json,.png" style="display:none;">
+                </div>
+            `,
+            showCloseButton: true,
+            // 这里的 onRender 是关键，它保证了点击事件的同步性
+            onRender: (modalDOM, closeModal) => {
+                const btn = modalDOM.querySelector('#st-real-upload-btn');
+                const input = modalDOM.querySelector('#st-hidden-input');
 
-        fileInput.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) {
-                document.body.removeChild(fileInput);
-                return;
-            }
+                // 1. 绑定点击：用户点按钮 -> 立即触发 input
+                btn.onclick = () => {
+                    input.click();
+                };
 
-            try {
-                let charData = null;
-                if (file.type === 'application/json' || file.name.endsWith('.json')) {
-                    const text = await file.text();
-                    charData = JSON.parse(text);
-                } else {
-                    charData = await extractDataFromPng(file);
-                }
-
-                if (charData) {
-                    const data = charData.data ? charData.data : charData;
-                    const name = (data.name || "未命名角色").trim();
-                    const chatId = generateUniqueChatId('私聊');
+                // 2. 绑定文件改变：选中文件后开始处理
+                input.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
                     
-                    // --- 1. 处理核心人设 ---
-                    let fullPersona = "";
-                    if (data.description) fullPersona += `[Description]\n${data.description}\n\n`;
-                    if (data.personality) fullPersona += `[Personality]\n${data.personality}\n\n`;
-                    if (data.scenario) fullPersona += `[Scenario]\n${data.scenario}\n\n`;
-                    if (data.mes_example) fullPersona += `[Examples of Dialogue]\n${data.mes_example}\n\n`;
+                    // 选中文件后，先关闭弹窗，显示加载状态
+                    closeModal();
+                    
+                    // 给一点延时让弹窗动画跑完
+                    setTimeout(async () => {
+                        try {
+                            let charData = null;
+                            if (file.type === 'application/json' || file.name.endsWith('.json')) {
+                                const text = await file.text();
+                                charData = JSON.parse(text);
+                            } else {
+                                charData = await extractDataFromPng(file);
+                            }
 
-                    // --- 2. 处理世界书 (Lorebook) 并自动挂载 (修复无关键词条目丢失问题) ---
-                    let importedWbNames = [];
-                    if (data.character_book && data.character_book.entries && Array.isArray(data.character_book.entries)) {
-                        data.character_book.entries.forEach((entry, index) => {
-                            // 只要有内容就允许导入
-                            if (entry.content && entry.content.trim()) {
-                                // 检查是否有关键词
-                                const hasKeys = entry.keys && Array.isArray(entry.keys) && entry.keys.length > 0;
+                            if (charData) {
+                                const data = charData.data ? charData.data : charData;
+                                const name = (data.name || "未命名角色").trim();
+                                const chatId = generateUniqueChatId('私聊');
                                 
-                                // 【核心修改】生成唯一名称：优先使用 comment 字段，其次是 name，最后是关键词或索引
-                                const entryTitle = entry.comment || entry.name || (hasKeys ? entry.keys[0] : `Entry_${index}`);
-                                const wbName = `${name}_${entryTitle}`;
+                                // --- 1. 处理核心人设 ---
+                                let fullPersona = "";
+                                if (data.description) fullPersona += `[Description]\n${data.description}\n\n`;
+                                if (data.personality) fullPersona += `[Personality]\n${data.personality}\n\n`;
+                                if (data.scenario) fullPersona += `[Scenario]\n${data.scenario}\n\n`;
+                                if (data.mes_example) fullPersona += `[Examples of Dialogue]\n${data.mes_example}\n\n`;
 
-                                // 检查全局库中是否已存在
-                                if (!worldBookEntries.some(wb => wb.name === wbName)) {
-                                    worldBookEntries.push({
-                                        name: wbName,
-                                        // 【核心新增】导入时自动将分类设为角色名
-                                        category: name,
-                                        // 如果有关键词则合并为字符串，否则为空
-                                        keywords: hasKeys ? entry.keys.join(', ') : '',
-                                        content: entry.content,
-                                        enabled: true,
-                                        // 核心逻辑：有关键词用 keyword 模式，没关键词用 always 模式
-                                        triggerMode: hasKeys ? 'keyword' : 'always',
-                                        useInMoments: false
+                                // --- 2. 处理世界书 (Lorebook) ---
+                                let importedWbNames = [];
+                                if (data.character_book && data.character_book.entries && Array.isArray(data.character_book.entries)) {
+                                    data.character_book.entries.forEach((entry, index) => {
+                                        if (entry.content && entry.content.trim()) {
+                                            const hasKeys = entry.keys && Array.isArray(entry.keys) && entry.keys.length > 0;
+                                            const entryTitle = entry.comment || entry.name || (hasKeys ? entry.keys[0] : `Entry_${index}`);
+                                            const wbName = `${name}_${entryTitle}`;
+
+                                            if (!worldBookEntries.some(wb => wb.name === wbName)) {
+                                                worldBookEntries.push({
+                                                    name: wbName,
+                                                    category: name,
+                                                    keywords: hasKeys ? entry.keys.join(', ') : '',
+                                                    content: entry.content,
+                                                    enabled: true,
+                                                    triggerMode: hasKeys ? 'keyword' : 'always',
+                                                    useInMoments: false
+                                                });
+                                            }
+                                            importedWbNames.push(wbName);
+                                        }
+                                    });
+                                    saveWorldBook();
+                                    renderWorldBook();
+                                }
+
+                                // --- 3. 处理多开场白 ---
+                                let alternateBranches = [];
+                                if (data.alternate_greetings && Array.isArray(data.alternate_greetings)) {
+                                    data.alternate_greetings.forEach((greet, i) => {
+                                        if (!greet.trim()) return;
+                                        alternateBranches.push({
+                                            id: `branch_greet_${i}_${Date.now()}`,
+                                            name: `开场白变体 ${i + 1}`,
+                                            timestamp: Date.now() - (i * 1000),
+                                            preview: greet.substring(0, 150), 
+                                            messages: [{
+                                                id: `msg-greet-${i}`,
+                                                type: 'text',
+                                                text: greet,
+                                                side: 'received',
+                                                timestamp: Date.now()
+                                            }]
+                                        });
                                     });
                                 }
-                                // 将此条目加入该角色的自动挂载名单
-                                importedWbNames.push(wbName);
+
+                                // --- 4. 创建聊天窗口 ---
+                                const newChat = { 
+                                    id: chatId, 
+                                    name: name, 
+                                    type: '私聊', 
+                                    lastMessage: data.first_mes || '角色卡导入成功', 
+                                    timestamp: '刚刚' 
+                                };
+                                chatList.unshift(newChat);
+                                saveChatList();
+
+                                const chatInfo = {
+                                    aiPersona: fullPersona.trim(),
+                                    remark: name,
+                                    enabledRegexes: [],
+                                    userPersonaName: "无"
+                                };
+                                saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+                                
+                                if (importedWbNames.length > 0) {
+                                    saveToLocalStorage(`chat_mounted_wb_${chatId}`, importedWbNames);
+                                }
+
+                                if (alternateBranches.length > 0) {
+                                    saveToLocalStorage(`chat_branches_${chatId}`, alternateBranches);
+                                }
+
+                                // --- 5. 头像与主线消息 ---
+                                if (file.type.includes('image')) {
+                                    const dbKey = `avatar-st-${Date.now()}`;
+                                    await imageStore.setItem(dbKey, file);
+                                    saveToLocalStorage(`chat_avatar_${chatId}`, `indexeddb:${dbKey}`);
+                                }
+
+                                if (data.first_mes) {
+                                    const firstMsg = {
+                                        id: `msg-main-${Date.now()}`,
+                                        type: 'text',
+                                        text: data.first_mes,
+                                        side: 'received',
+                                        timestamp: Date.now()
+                                    };
+                                    saveToLocalStorage(`conversation_${chatId}`, [firstMsg]);
+                                }
+
+                                renderChatList();
+                                alert(`导入成功！\n角色: ${name}`);
                             }
-                        });
-                        saveWorldBook();
-                        renderWorldBook();
-                    }
-
-                    // --- 3. 处理多开场白 (存入分支) ---
-                    let alternateBranches = [];
-                    if (data.alternate_greetings && Array.isArray(data.alternate_greetings)) {
-                        data.alternate_greetings.forEach((greet, i) => {
-                            if (!greet.trim()) return;
-                            alternateBranches.push({
-                                id: `branch_greet_${i}_${Date.now()}`,
-                                name: `开场白变体 ${i + 1}`,
-                                timestamp: Date.now() - (i * 1000), // 稍微错开时间
-                                // 核心修改：增加截取长度，以便在预览中能看到更多换行后的内容
-                                preview: greet.substring(0, 150), 
-                                messages: [{
-                                    id: `msg-greet-${i}`,
-                                    type: 'text',
-                                    text: greet,
-                                    side: 'received',
-                                    timestamp: Date.now()
-                                }]
-                            });
-                        });
-                    }
-
-                    // --- 4. 创建聊天窗口与基本信息 ---
-                    const newChat = { 
-                        id: chatId, 
-                        name: name, 
-                        type: '私聊', 
-                        lastMessage: data.first_mes || '角色卡导入成功', 
-                        timestamp: '刚刚' 
-                    };
-                    chatList.unshift(newChat);
-                    saveChatList();
-
-                    const chatInfo = {
-                        aiPersona: fullPersona.trim(),
-                        remark: name,
-                        enabledRegexes: [],
-                        userPersonaName: "无"
-                    };
-                    saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
-                    
-                    // 自动挂载世界书
-                    if (importedWbNames.length > 0) {
-                        saveToLocalStorage(`chat_mounted_wb_${chatId}`, importedWbNames);
-                    }
-
-                    // 保存分支记录
-                    if (alternateBranches.length > 0) {
-                        saveToLocalStorage(`chat_branches_${chatId}`, alternateBranches);
-                    }
-
-                    // --- 5. 头像与主线消息 ---
-                    if (file.type.includes('image')) {
-                        const dbKey = `avatar-st-${Date.now()}`;
-                        await imageStore.setItem(dbKey, file);
-                        saveToLocalStorage(`chat_avatar_${chatId}`, `indexeddb:${dbKey}`);
-                    }
-
-                    if (data.first_mes) {
-                        const firstMsg = {
-                            id: `msg-main-${Date.now()}`,
-                            type: 'text',
-                            text: data.first_mes,
-                            side: 'received',
-                            timestamp: Date.now()
-                        };
-                        saveToLocalStorage(`conversation_${chatId}`, [firstMsg]);
-                    }
-
-                    renderChatList();
-                    alert(`导入成功！\n角色: ${name}\n导入世界书: ${importedWbNames.length} 条 (已自动关联)\n替代开场白: ${alternateBranches.length} 条 (已存入“回溯历史”菜单)`);
-                }
-            } catch (err) {
-                console.error(err);
-                alert("导入失败，请检查文件格式。");
-            } finally {
-                document.body.removeChild(fileInput);
+                        } catch (err) {
+                            console.error(err);
+                            alert("导入失败，请检查文件格式。");
+                        }
+                    }, 100);
+                };
             }
-        };
-        fileInput.click();
+        });
     }
 
     async function extractDataFromPng(file) {
