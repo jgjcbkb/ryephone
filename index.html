@@ -38225,96 +38225,66 @@ const cloudBackupManager = (function() {
     async function getCompressedBackupData() {
         if (typeof JSZip === 'undefined') throw new Error("JSZip 未加载");
         
-        // 【核心修复】同步更新云端备份的前缀白名单
         const APP_DATA_PREFIXES = [ 
-            'app-', 'app_', 
-            'chat-', 'chat_', 
-            'my_', 
-            'conversation_', 
-            'moments_', 
-            'gh_',           // GitHub 设置
-            'auto_',         // 自动回复
-            'video_',        // 视频通话
-            'pending_',      // 临时状态
-            'catbox_userhash', // 新增：Catbox 密钥
-            'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+            'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
+            'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash',
+            'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 
+            'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
         ];
+
         const allData = {};
+        const statusEl = document.getElementById('gh-status-msg');
+
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                if (statusEl) statusEl.textContent = `正在打包数据 (${i}/${localStorage.length})...`;
+                
                 const rawValue = localStorage.getItem(key);
                 let valueToProcess;
-                try { valueToProcess = JSON.parse(rawValue); } catch (e) { valueToProcess = rawValue; }
+                try { 
+                    valueToProcess = JSON.parse(rawValue); 
+                } catch (e) { 
+                    valueToProcess = rawValue; 
+                }
+                
+                // 处理图片数据
                 allData[key] = await conversationManager.makeDataPortable(valueToProcess);
+                
+                // 核心修复：每处理一条数据，强制休眠 10 毫秒，让 iOS 有时间回收内存并防止 UI 冻结
+                await new Promise(resolve => setTimeout(resolve, 10));
             }
         }
+
+        if (statusEl) statusEl.textContent = "正在生成压缩包，请勿切出网页...";
+        
         const jsonStr = JSON.stringify(allData);
+        
+        // 核心修复：手动清空大型对象，释放内存
+        for (let key in allData) delete allData[key];
 
         var zip = new JSZip();
         zip.file("backup_content.json", jsonStr);
-        return await zip.generateAsync({ type: "base64", compression: "DEFLATE", compressionOptions: { level: 9 } });
+        
+        // 核心修复：降低压缩等级。Level 9 在手机上非常吃 CPU 和内存，Level 6 是平衡点
+        return await zip.generateAsync({ 
+            type: "base64", 
+            compression: "DEFLATE", 
+            compressionOptions: { level: 6 } 
+        });
     }
 
     // 【新增】初始化仓库逻辑
-    async function performInitialization() {
-        var info = getRepoInfo();
-        if (!info) return alert("请先填写仓库链接和Token！");
-
-        var statusEl = document.getElementById('gh-status-msg');
-        statusEl.textContent = "正在初始化...";
-
-        try {
-            // 目标：创建一个 README.md 文件
-            var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/README.md";
-            
-            // 简单的内容 Base64 编码
-            var content = btoa("# Backup Repository\nInitialized by Black Rye Phone.");
-            
-            var bodyData = {
-                message: "Initialize Repo",
-                content: content
-            };
-
-            var response = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'token ' + info.token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(bodyData)
-            });
-
-            if (!response.ok) {
-                // 如果返回 422，通常说明文件已存在，这其实算成功
-                if (response.status === 422) {
-                    statusEl.textContent = "✅ 仓库已准备就绪 (文件已存在)";
-                    alert("仓库已经初始化过了，可以直接备份！");
-                    return;
-                }
-                var errText = await response.text();
-                throw new Error(response.status + " " + errText);
-            }
-
-            // 保存配置
-            localStorage.setItem('gh_saved_url', document.getElementById('gh-full-url').value);
-            localStorage.setItem('gh_saved_token', info.token);
-
-            statusEl.textContent = "✅ 初始化成功！";
-            alert("初始化成功！现在可以点击“立即备份”了。");
-
-        } catch (e) {
-            console.error(e);
-            statusEl.textContent = "❌ " + e.message;
-            alert("初始化失败: " + e.message);
-        }
-    }
-
     async function performBackup(isAuto = false) {
         var info = getRepoInfo();
         if (!info) {
             if (!isAuto) alert("请先填写仓库链接和Token！");
             return;
+        }
+
+        // 核心修复：备份开始前，先弹出非阻塞提示，告知 iOS 用户不要操作
+        if (!isAuto) {
+            showNotification("正在准备云端备份，请保持网页开启...");
         }
 
         localStorage.setItem('gh_saved_url', document.getElementById('gh-full-url').value);
@@ -38325,11 +38295,17 @@ const cloudBackupManager = (function() {
         if (!isAuto) setupAutoBackup(info.autoInterval);
 
         var statusEl = document.getElementById('gh-status-msg');
-        if (statusEl) statusEl.textContent = isAuto ? "正在自动备份..." : "正在处理...";
+        if (statusEl) {
+            statusEl.style.color = "#666";
+            statusEl.textContent = isAuto ? "正在自动备份..." : "正在准备数据...";
+        }
         
         try {
             var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/" + info.filename;
+            
+            // 这里会进入耗时且耗内存的压缩逻辑
             var contentBase64 = await getCompressedBackupData();
+            
             var sha = await getFileSha(apiUrl, info.token);
             
             var bodyData = {
@@ -38337,6 +38313,8 @@ const cloudBackupManager = (function() {
                 content: contentBase64
             };
             if (sha) bodyData.sha = sha;
+
+            if (statusEl) statusEl.textContent = "正在上传到 GitHub...";
 
             var response = await fetch(apiUrl, {
                 method: 'PUT',
