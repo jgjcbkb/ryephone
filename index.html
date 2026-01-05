@@ -30318,6 +30318,22 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                         const config = actorSettings.tuqu;
                         if (!config.lastTick || (Date.now() - config.lastTick >= config.interval * 60 * 1000)) {
                             if (Math.random() * 100 < config.probability) {
+                                // 【核心修复】：将 charName 修正为 actorName，解决未定义报错
+                                console.log(`Dynamics: Triggering Tuqu action for ${actorName}`);
+                                // 核心修复：更新时间戳并保存设置
+                                config.lastTick = Date.now();
+                                saveSettings();
+                                // 【核心修复】：将 charName 修正为 actorName，解决未定义报错
+                                await triggerProactiveAI(null, actorName, 'tuqu_interaction');
+                                continue; 
+                            }
+                        }
+                    }
+        
+                    if (actorSettings.tuqu && actorSettings.tuqu.enabled && actorSettings.tuqu.probability > 0) {
+                        const config = actorSettings.tuqu;
+                        if (!config.lastTick || (Date.now() - config.lastTick >= config.interval * 60 * 1000)) {
+                            if (Math.random() * 100 < config.probability) {
                                 console.log(`Dynamics: Triggering Tuqu action for ${charName}`);
                                 // 核心修复：更新时间戳并保存设置
                                 config.lastTick = Date.now();
