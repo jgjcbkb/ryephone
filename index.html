@@ -38187,7 +38187,7 @@ Your optional message to the user about the update.
     // --- END: ACCOUNT MANAGER ---
     
     
-        // --- START: CLOUD BACKUP MANAGER (含初始化功能) ---
+        // --- START: CLOUD BACKUP MANAGER (分片上传版) ---
 const cloudBackupManager = (function() {
     let autoBackupTimer = null;
     let lastBackupTime = 0;
@@ -38208,35 +38208,13 @@ const cloudBackupManager = (function() {
         return { owner: owner, repo: repo, token: token, filename: filename, autoInterval: autoInterval };
     }
 
-    async function getFileSha(apiBase, token) {
-        try {
-            const response = await fetch(apiBase, {
-                method: 'GET',
-                headers: { 'Authorization': 'token ' + token }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                return data.sha;
-            }
-        } catch (e) { }
-        return null;
-    }
-
-async function getCompressedBackupData() {
+    // 1. 获取所有数据并打包成 ZIP Blob (不转 Base64，省内存)
+    async function getBackupBlob() {
         if (typeof JSZip === 'undefined') throw new Error("JSZip 未加载");
         
-        // 【核心修复】同步更新云端备份的前缀白名单
         const APP_DATA_PREFIXES = [ 
-            'app-', 'app_', 
-            'chat-', 'chat_', 
-            'my_', 
-            'conversation_', 
-            'moments_', 
-            'gh_',           // GitHub 设置
-            'auto_',         // 自动回复
-            'video_',        // 视频通话
-            'pending_',      // 临时状态
-            'catbox_userhash', // 新增：Catbox 密钥
+            'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
+            'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 
             'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
         ];
         const allData = {};
@@ -38254,60 +38232,150 @@ async function getCompressedBackupData() {
         var zip = new JSZip();
         zip.file("backup_content.json", jsonStr);
         
-        // 【核心修改】：将 level: 9 改为 level: 4
-        // 9 = 极限压缩 (iOS内存杀手)
-        // 4 = 平衡模式 (速度快，省内存，体积也足够小)
-        // 1 = 极速模式 (如果4还是白屏，请改成1)
-        return await zip.generateAsync({ type: "base64", compression: "DEFLATE", compressionOptions: { level: 4 } });
+        // 核心修改：仅使用 level 1 极速压缩，并直接输出 Blob 对象
+        return await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 1 } });
     }
 
-    // 【新增】初始化仓库逻辑
+    // 2. 将 Blob 转为纯 Base64 (不带 data: 前缀)
+    function blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64String = reader.result;
+                // 去掉 "data:application/zip;base64," 前缀
+                const pureBase64 = base64String.split(',')[1];
+                resolve(pureBase64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    // 3. 核心：使用 Git Blob API 上传大文件
+    async function uploadBlob(contentBase64, info) {
+        const blobUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/blobs`;
+        const response = await fetch(blobUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'token ' + info.token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                content: contentBase64,
+                encoding: 'base64'
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`Blob上传失败 (${response.status}): ${err}`);
+        }
+        const data = await response.json();
+        return data.sha; // 返回文件的 SHA
+    }
+
+    // 4. 获取当前分支的最新 Commit SHA
+    async function getLatestCommitSha(info) {
+        const refUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/refs/heads/main`; // 默认 main 分支
+        const response = await fetch(refUrl, {
+            headers: { 'Authorization': 'token ' + info.token }
+        });
+        // 如果 main 不存在，尝试 master
+        if (!response.ok) {
+            const masterUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/refs/heads/master`;
+            const masterRes = await fetch(masterUrl, { headers: { 'Authorization': 'token ' + info.token } });
+            if (!masterRes.ok) throw new Error("无法获取分支信息 (main/master)");
+            const data = await masterRes.json();
+            return { sha: data.object.sha, branch: 'master' };
+        }
+        const data = await response.json();
+        return { sha: data.object.sha, branch: 'main' };
+    }
+
+    // 5. 创建 Tree (将文件挂载到目录)
+    async function createTree(baseTreeSha, fileSha, info) {
+        const treeUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/trees`;
+        const response = await fetch(treeUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'token ' + info.token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                base_tree: baseTreeSha,
+                tree: [{
+                    path: info.filename, // 文件名
+                    mode: '100644',      // 文件权限 (普通文件)
+                    type: 'blob',
+                    sha: fileSha         // 刚才上传的 Blob SHA
+                }]
+            })
+        });
+        if (!response.ok) throw new Error("Tree创建失败");
+        const data = await response.json();
+        return data.sha;
+    }
+
+    // 6. 创建 Commit
+    async function createCommit(treeSha, parentSha, info, isAuto) {
+        const commitUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/commits`;
+        const response = await fetch(commitUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'token ' + info.token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: (isAuto ? "Auto " : "Manual ") + "Backup: " + new Date().toLocaleString(),
+                tree: treeSha,
+                parents: [parentSha]
+            })
+        });
+        if (!response.ok) throw new Error("Commit创建失败");
+        const data = await response.json();
+        return data.sha;
+    }
+
+    // 7. 更新引用 (Ref) - 让分支指向新 Commit
+    async function updateRef(newCommitSha, branch, info) {
+        const refUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/refs/heads/${branch}`;
+        const response = await fetch(refUrl, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': 'token ' + info.token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sha: newCommitSha,
+                force: true
+            })
+        });
+        if (!response.ok) throw new Error("Ref更新失败");
+    }
+
+    // 初始化仓库逻辑 (保持不变，用于创建 README)
     async function performInitialization() {
         var info = getRepoInfo();
         if (!info) return alert("请先填写仓库链接和Token！");
-
         var statusEl = document.getElementById('gh-status-msg');
         statusEl.textContent = "正在初始化...";
-
         try {
-            // 目标：创建一个 README.md 文件
             var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/README.md";
-            
-            // 简单的内容 Base64 编码
             var content = btoa("# Backup Repository\nInitialized by Black Rye Phone.");
-            
-            var bodyData = {
-                message: "Initialize Repo",
-                content: content
-            };
-
+            var bodyData = { message: "Initialize Repo", content: content };
             var response = await fetch(apiUrl, {
                 method: 'PUT',
-                headers: {
-                    'Authorization': 'token ' + info.token,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Authorization': 'token ' + info.token, 'Content-Type': 'application/json' },
                 body: JSON.stringify(bodyData)
             });
-
-            if (!response.ok) {
-                // 如果返回 422，通常说明文件已存在，这其实算成功
-                if (response.status === 422) {
-                    statusEl.textContent = "✅ 仓库已准备就绪 (文件已存在)";
-                    alert("仓库已经初始化过了，可以直接备份！");
-                    return;
-                }
+            if (!response.ok && response.status !== 422) {
                 var errText = await response.text();
                 throw new Error(response.status + " " + errText);
             }
-
-            // 保存配置
             localStorage.setItem('gh_saved_url', document.getElementById('gh-full-url').value);
             localStorage.setItem('gh_saved_token', info.token);
-
             statusEl.textContent = "✅ 初始化成功！";
             alert("初始化成功！现在可以点击“立即备份”了。");
-
         } catch (e) {
             console.error(e);
             statusEl.textContent = "❌ " + e.message;
@@ -38315,12 +38383,10 @@ async function getCompressedBackupData() {
         }
     }
 
+    // 主备份流程 (Git Data API 模式)
     async function performBackup(isAuto = false) {
         var info = getRepoInfo();
-        if (!info) {
-            if (!isAuto) alert("请先填写仓库链接和Token！");
-            return;
-        }
+        if (!info) { if (!isAuto) alert("请先填写仓库链接和Token！"); return; }
 
         localStorage.setItem('gh_saved_url', document.getElementById('gh-full-url').value);
         localStorage.setItem('gh_saved_token', info.token);
@@ -38330,32 +38396,31 @@ async function getCompressedBackupData() {
         if (!isAuto) setupAutoBackup(info.autoInterval);
 
         var statusEl = document.getElementById('gh-status-msg');
-        if (statusEl) statusEl.textContent = isAuto ? "正在自动备份..." : "正在处理...";
+        if (statusEl) statusEl.textContent = isAuto ? "正在自动备份 (打包中)..." : "正在处理 (打包中)...";
         
         try {
-            var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/" + info.filename;
-            var contentBase64 = await getCompressedBackupData();
-            var sha = await getFileSha(apiUrl, info.token);
+            // 1. 打包并获取 Base64
+            const zipBlob = await getBackupBlob();
+            const base64Content = await blobToBase64(zipBlob);
             
-            var bodyData = {
-                message: (isAuto ? "Auto " : "Manual ") + "Backup: " + new Date().toLocaleString(),
-                content: contentBase64
-            };
-            if (sha) bodyData.sha = sha;
+            if (statusEl) statusEl.textContent = "正在上传数据...";
 
-            var response = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'token ' + info.token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(bodyData)
-            });
+            // 2. 上传 Blob (文件实体)
+            const fileSha = await uploadBlob(base64Content, info);
+            
+            if (statusEl) statusEl.textContent = "正在同步版本...";
 
-            if (!response.ok) {
-                var errText = await response.text();
-                throw new Error(response.status + " " + errText);
-            }
+            // 3. 获取当前分支最新状态
+            const { sha: latestCommitSha, branch } = await getLatestCommitSha(info);
+
+            // 4. 创建 Tree
+            const treeSha = await createTree(latestCommitSha, fileSha, info);
+
+            // 5. 创建 Commit
+            const newCommitSha = await createCommit(treeSha, latestCommitSha, info, isAuto);
+
+            // 6. 更新分支引用
+            await updateRef(newCommitSha, branch, info);
 
             lastBackupTime = Date.now();
             localStorage.setItem('gh_last_backup_time', lastBackupTime);
@@ -38364,7 +38429,7 @@ async function getCompressedBackupData() {
                 statusEl.style.color = "#28a745";
                 statusEl.textContent = `✅ ${isAuto ? '自动' : ''}备份成功 (${new Date().toLocaleTimeString()})`;
             }
-            if (!isAuto) alert("备份成功！");
+            if (!isAuto) alert("备份成功！(Git Data API 模式)");
 
         } catch (e) {
             console.error(e);
@@ -38379,7 +38444,6 @@ async function getCompressedBackupData() {
     function setupAutoBackup(intervalMinutes) {
         if (autoBackupTimer) clearInterval(autoBackupTimer);
         if (intervalMinutes > 0) {
-            console.log(`自动备份已开启：每 ${intervalMinutes} 分钟`);
             checkAutoBackup();
             autoBackupTimer = setInterval(checkAutoBackup, 60000);
         }
@@ -38406,7 +38470,6 @@ async function getCompressedBackupData() {
             var intervalMs = info.autoInterval * 60 * 1000;
             var lastTime = parseInt(localStorage.getItem('gh_last_backup_time') || 0, 10);
             if (now - lastTime > intervalMs) {
-                console.log("Triggering auto GitHub backup...");
                 performBackup(true);
             }
         }
@@ -38426,32 +38489,16 @@ async function getCompressedBackupData() {
             setupAutoBackup(parseInt(savedInterval, 10));
         }
 
-        // 绑定两个按钮的事件
         document.getElementById('gh-init-btn').addEventListener('click', performInitialization);
         document.getElementById('gh-backup-btn').addEventListener('click', () => performBackup(false));
-        
         document.getElementById('gh-auto-interval').addEventListener('input', onIntervalChange);
-
-        // 【核心新增】实时保存输入框内容，防止刷新丢失
-        document.getElementById('gh-full-url').addEventListener('input', (e) => {
-            localStorage.setItem('gh_saved_url', e.target.value.trim());
-        });
+        document.getElementById('gh-full-url').addEventListener('input', (e) => localStorage.setItem('gh_saved_url', e.target.value.trim()));
+        document.getElementById('gh-token').addEventListener('input', (e) => localStorage.setItem('gh_saved_token', e.target.value.trim()));
+        document.getElementById('gh-filename').addEventListener('input', (e) => localStorage.setItem('gh_saved_filename', e.target.value.trim()));
         
-        document.getElementById('gh-token').addEventListener('input', (e) => {
-            localStorage.setItem('gh_saved_token', e.target.value.trim());
-        });
-
-        document.getElementById('gh-filename').addEventListener('input', (e) => {
-            localStorage.setItem('gh_saved_filename', e.target.value.trim());
-        });
-
-        // 【Catbox 设置初始化】
         const savedCatboxHash = localStorage.getItem('catbox_userhash');
         if (savedCatboxHash) document.getElementById('catbox-userhash').value = savedCatboxHash;
-        
-        document.getElementById('catbox-userhash').addEventListener('input', (e) => {
-            localStorage.setItem('catbox_userhash', e.target.value.trim());
-        });
+        document.getElementById('catbox-userhash').addEventListener('input', (e) => localStorage.setItem('catbox_userhash', e.target.value.trim()));
     }
 
     return { init: init };
