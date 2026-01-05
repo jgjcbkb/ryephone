@@ -33261,7 +33261,8 @@ async function handleRemoveMember() {
     function triggerFileInput(onFileSelected) {
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
-        fileInput.accept = '.json,application/json';
+        // 核心修改：添加对 zip 格式的支持
+        fileInput.accept = '.json,application/json,.zip,application/zip';
         fileInput.style.display = 'none';
 
         fileInput.onchange = (e) => {
@@ -35218,71 +35219,100 @@ async function handleRemoveMember() {
     function importAllData() {
         triggerFileInput(file => {
             const reader = new FileReader();
+            
+            // 核心修改：根据文件后缀决定读取方式
+            if (file.name.endsWith('.zip')) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsText(file);
+            }
+
             reader.onload = async (event) => {
                 try {
-                    const importedRawData = JSON.parse(event.target.result);
+                    let importedRawData;
+                    const isZip = file.name.endsWith('.zip');
+
                     const confirmed = await conversationManager.customConfirm(
                         '这将清除并覆盖当前应用的所有数据（包括聊天记录、设置、头像等），此操作不可逆，确定要导入吗？',
                         '危险操作确认'
                     );
+                    if (!confirmed) return;
 
-                    if (confirmed) {
-                        await conversationManager.customAlert("正在导入数据并转换图片，请稍候...");
+                    await conversationManager.customAlert("正在解压并恢复数据，请稍候...");
 
-                        // 1. 递归还原图片数据 (Base64 -> IndexedDB Blob)
-                        const rehydratedData = await rehydrateDataFromPortable(importedRawData);
-
-                        // 2. 清除当前相关的旧数据
-                        // 【核心修复】重新定义一遍完整的前缀列表，确保清理彻底
-                        const CLEANUP_PREFIXES = [ 
-                            'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
-                            'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
-                            'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
-                        ];
-
-                        const keysToRemove = [];
-                        for (let i = 0; i < localStorage.length; i++) {
-                           const key = localStorage.key(i);
-                           if (CLEANUP_PREFIXES.some(prefix => key.startsWith(prefix))) {
-                               keysToRemove.push(key);
-                           }
-                        }
-                        keysToRemove.forEach(key => localStorage.removeItem(key));
-
-                        // 3. 写入新数据
-                        for (const key in rehydratedData) {
-                            if (Object.prototype.hasOwnProperty.call(rehydratedData, key)) {
-                                let value = rehydratedData[key];
-                                
-                                let valueToStore;
-
-                                // GitHub 设置、Catbox Userhash 和兔区数据都是纯字符串或JSON字符串，需要特殊处理
-                                if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
-                                    if (value.startsWith('"') && value.endsWith('"')) {
-                                        try { value = JSON.parse(value); } catch(e){}
-                                    }
-                                    valueToStore = value;
-                                } 
-                                else {
-                                    // 【核心修复】：除了 GitHub 设置外，所有存入 localStorage 的数据
-                                    // 必须统一经过 JSON.stringify 处理。
-                                    // 这样即使是 "indexeddb:xxx" 这样的字符串，存进去也会变成 "\"indexeddb:xxx\""
-                                    // 确保 loadFromLocalStorage 里的 JSON.parse 不会报错。
-                                    valueToStore = JSON.stringify(value);
-                                }
-                                
-                                localStorage.setItem(key, valueToStore);
+                    if (isZip) {
+                        // --- 处理新版 ZIP 备份 ---
+                        const zip = await JSZip.loadAsync(event.target.result);
+                        
+                        // 1. 恢复图片数据到 IndexedDB (直接存入二进制，不经过Base64)
+                        const blobFolder = zip.folder("blobs");
+                        if (blobFolder) {
+                            const blobFiles = [];
+                            blobFolder.forEach((relativePath, zipEntry) => {
+                                if (!zipEntry.dir) blobFiles.push(zipEntry);
+                            });
+                            
+                            for (const zipEntry of blobFiles) {
+                                const blob = await zipEntry.async("blob");
+                                const fileName = zipEntry.name.split('/').pop();
+                                await imageStore.setItem(fileName, blob);
                             }
                         }
-                        await conversationManager.customAlert('数据导入成功！应用即将刷新以加载新数据。');
-                        location.reload();
+
+                        // 2. 读取文本数据
+                        const contentFile = zip.file("backup_content.json");
+                        if (!contentFile) throw new Error("压缩包内缺少 backup_content.json");
+                        const contentText = await contentFile.async("string");
+                        importedRawData = JSON.parse(contentText);
+                    } else {
+                        // --- 处理旧版 JSON 备份 ---
+                        const parsedData = JSON.parse(event.target.result);
+                        // 旧版需要 Base64 递归转换
+                        importedRawData = await rehydrateDataFromPortable(parsedData);
                     }
+
+                    // 3. 清除当前相关的旧数据
+                    const CLEANUP_PREFIXES = [ 
+                        'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
+                        'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
+                        'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+                    ];
+
+                    const keysToRemove = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                       const key = localStorage.key(i);
+                       if (CLEANUP_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                           keysToRemove.push(key);
+                       }
+                    }
+                    keysToRemove.forEach(key => localStorage.removeItem(key));
+
+                    // 4. 写入新数据
+                    for (const key in importedRawData) {
+                        if (Object.prototype.hasOwnProperty.call(importedRawData, key)) {
+                            let value = importedRawData[key];
+                            let valueToStore;
+
+                            if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
+                                valueToStore = value;
+                            } else {
+                                // 核心修改：如果是ZIP导入，数据已经是字符串了，不需要再stringify
+                                if (isZip && typeof value === 'string') {
+                                    valueToStore = value;
+                                } else {
+                                    valueToStore = JSON.stringify(value);
+                                }
+                            }
+                            localStorage.setItem(key, valueToStore);
+                        }
+                    }
+                    await conversationManager.customAlert('数据导入成功！应用即将刷新以加载新数据。');
+                    location.reload();
                 } catch (error) {
                     console.error("Import failed:", error);
-                    await conversationManager.customAlert(`导入失败: ${error.message}\n\n请检查文件是否为正确的备份文件，且未损坏。\n如果文件过大，可能是浏览器内存不足导致，请尝试在更强大的设备上操作。`);
+                    await conversationManager.customAlert(`导入失败: ${error.message}`);
                 }
             };
-            reader.readAsText(file);
         });
     }
 
@@ -38320,35 +38350,61 @@ const cloudBackupManager = (function() {
     async function getCompressedBackupData() {
         if (typeof JSZip === 'undefined') throw new Error("JSZip 未加载");
         
-        // 【核心修复】同步更新云端备份的前缀白名单
         const APP_DATA_PREFIXES = [ 
             'app-', 'app_', 
             'chat-', 'chat_', 
             'my_', 
             'conversation_', 
             'moments_', 
-            'gh_',           // GitHub 设置
-            'auto_',         // 自动回复
-            'video_',        // 视频通话
-            'pending_',      // 临时状态
-            'catbox_userhash', // 新增：Catbox 密钥
+            'gh_',           
+            'auto_',         
+            'video_',        
+            'pending_',      
+            'catbox_userhash', 
             'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
         ];
+        
         const allData = {};
+        const blobKeys = new Set();
+        var zip = new JSZip();
+
+        // 1. 扫描所有文本数据，提取图片引用
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
                 const rawValue = localStorage.getItem(key);
-                let valueToProcess;
-                try { valueToProcess = JSON.parse(rawValue); } catch (e) { valueToProcess = rawValue; }
-                allData[key] = await conversationManager.makeDataPortable(valueToProcess);
+                allData[key] = rawValue; // 直接存入原始字符串，不再转Base64
+                
+                // 使用正则找出所有形如 indexeddb:xxxx 的引用
+                const matches = rawValue.match(/indexeddb:([a-zA-Z0-9_-]+)/g);
+                if (matches) {
+                    matches.forEach(m => blobKeys.add(m.split(':')[1]));
+                }
             }
         }
-        const jsonStr = JSON.stringify(allData);
 
-        var zip = new JSZip();
-        zip.file("backup_content.json", jsonStr);
-        return await zip.generateAsync({ type: "base64", compression: "DEFLATE", compressionOptions: { level: 9 } });
+        // 2. 将纯文本 JSON 放入 ZIP
+        zip.file("backup_content.json", JSON.stringify(allData));
+
+        // 3. 逐个提取图片文件并放入 ZIP 的 blobs 文件夹
+        const blobFolder = zip.folder("blobs");
+        for (const blobKey of blobKeys) {
+            try {
+                const blob = await imageStore.getItem(blobKey);
+                if (blob) {
+                    blobFolder.file(blobKey, blob);
+                }
+            } catch (e) {
+                console.warn(`无法读取图片数据: ${blobKey}`, e);
+            }
+        }
+
+        // 4. 生成压缩包 (使用流式处理思路，减少内存峰值)
+        return await zip.generateAsync({ 
+            type: "base64", 
+            compression: "DEFLATE", 
+            compressionOptions: { level: 6 } // 调低压缩率以换取速度和稳定性
+        });
     }
 
     // 【新增】初始化仓库逻辑
