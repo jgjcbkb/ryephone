@@ -6881,10 +6881,11 @@ body.preview-fullscreen-active #page-conversation .chat-content {
         <p class="form-hint" style="margin-top: 5px;">例如输入 30 代表每 30 分钟备份一次。</p>
     </div>
 
-    <!-- 【修改：双按钮布局 (初始化 + 备份)】 -->
-    <div class="form-group" style="display: flex; gap: 10px; margin-top: 20px;">
-        <button id="gh-init-btn" class="btn-primary" style="flex: 1; background-color: #6f42c1;">初始化仓库</button>
-        <button id="gh-backup-btn" class="btn-primary" style="flex: 1; background-color: #28a745;">立即备份</button>
+    <!-- 【修改：三按钮布局 (初始化 + 备份 + 恢复)】 -->
+    <div class="form-group" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px;">
+        <button id="gh-init-btn" class="btn-primary" style="flex: 1; min-width: 120px; background-color: #6f42c1;">初始化仓库</button>
+        <button id="gh-backup-btn" class="btn-primary" style="flex: 1; min-width: 120px; background-color: #28a745;">立即备份</button>
+        <button id="gh-restore-btn" class="btn-primary" style="flex: 1; min-width: 120px; background-color: #007aff;">从云端恢复</button>
     </div>
     
     <p id="gh-status-msg" style="font-size: 12px; color: #666; text-align: center; margin-top: 10px; min-height: 1.5em;"></p>
@@ -38341,71 +38342,15 @@ const cloudBackupManager = (function() {
             });
             if (response.ok) {
                 const data = await response.json();
-                return data.sha;
+                // 如果返回的是数组，说明是文件夹列表，返回整个数组
+                // 如果是单个对象，返回其 sha
+                return data;
             }
         } catch (e) { }
         return null;
     }
 
-    async function getCompressedBackupData() {
-        if (typeof JSZip === 'undefined') throw new Error("JSZip 未加载");
-        
-        const APP_DATA_PREFIXES = [ 
-            'app-', 'app_', 
-            'chat-', 'chat_', 
-            'my_', 
-            'conversation_', 
-            'moments_', 
-            'gh_',           
-            'auto_',         
-            'video_',        
-            'pending_',      
-            'catbox_userhash', 
-            'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
-        ];
-        
-        const allData = {};
-        const blobKeys = new Set();
-        var zip = new JSZip();
-
-        // 1. 扫描所有文本数据，提取图片引用
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
-                const rawValue = localStorage.getItem(key);
-                allData[key] = rawValue; // 直接存入原始字符串，不再转Base64
-                
-                // 使用正则找出所有形如 indexeddb:xxxx 的引用
-                const matches = rawValue.match(/indexeddb:([a-zA-Z0-9_-]+)/g);
-                if (matches) {
-                    matches.forEach(m => blobKeys.add(m.split(':')[1]));
-                }
-            }
-        }
-
-        // 2. 将纯文本 JSON 放入 ZIP
-        zip.file("backup_content.json", JSON.stringify(allData));
-
-        // 3. 逐个提取图片文件并放入 ZIP 的 blobs 文件夹
-        const blobFolder = zip.folder("blobs");
-        for (const blobKey of blobKeys) {
-            try {
-                const blob = await imageStore.getItem(blobKey);
-                if (blob) {
-                    blobFolder.file(blobKey, blob);
-                }
-            } catch (e) {
-                console.warn(`无法读取图片数据: ${blobKey}`, e);
-            }
-        }
-
-        // 4. 生成压缩包 (使用流式处理思路，减少内存峰值)
-        return await zip.generateAsync({ 
-            type: "base64", 
-            compression: "DEFLATE", 
-            compressionOptions: { level: 6 } // 调低压缩率以换取速度和稳定性
-        });
-    }
+    
 
     // 【新增】初始化仓库逻辑
     async function performInitialization() {
@@ -38468,6 +38413,7 @@ const cloudBackupManager = (function() {
             return;
         }
 
+        // 保存设置
         localStorage.setItem('gh_saved_url', document.getElementById('gh-full-url').value);
         localStorage.setItem('gh_saved_token', info.token);
         localStorage.setItem('gh_saved_filename', info.filename);
@@ -38476,31 +38422,86 @@ const cloudBackupManager = (function() {
         if (!isAuto) setupAutoBackup(info.autoInterval);
 
         var statusEl = document.getElementById('gh-status-msg');
-        if (statusEl) statusEl.textContent = isAuto ? "正在自动备份..." : "正在处理...";
+        if (statusEl) statusEl.textContent = isAuto ? "正在增量备份..." : "正在准备增量备份...";
         
         try {
-            var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/" + info.filename;
-            var contentBase64 = await getCompressedBackupData();
-            var sha = await getFileSha(apiUrl, info.token);
-            
-            var bodyData = {
-                message: (isAuto ? "Auto " : "Manual ") + "Backup: " + new Date().toLocaleString(),
-                content: contentBase64
-            };
-            if (sha) bodyData.sha = sha;
+            const APP_DATA_PREFIXES = [ 
+                'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
+                'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
+                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+            ];
 
-            var response = await fetch(apiUrl, {
+            // 1. 准备文本数据和图片引用列表
+            const allTextData = {};
+            const blobKeys = new Set();
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                    const rawValue = localStorage.getItem(key);
+                    allTextData[key] = rawValue;
+                    const matches = rawValue.match(/indexeddb:([a-zA-Z0-9_-]+)/g);
+                    if (matches) matches.forEach(m => blobKeys.add(m.split(':')[1]));
+                }
+            }
+
+            // 2. 获取 GitHub 上已有的文件列表（用于获取 SHA）
+            const baseDir = "rye_backup_v2";
+            const apiBaseUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/contents/${baseDir}`;
+            const existingFiles = await getFileSha(apiBaseUrl, info.token) || [];
+            const existingBlobs = await getFileSha(`${apiBaseUrl}/blobs`, info.token) || [];
+
+            const getSha = (list, name) => {
+                const file = list.find(f => f.name === name);
+                return file ? file.sha : null;
+            };
+
+            // 3. 上传文本配置文件 (data.json)
+            if (statusEl) statusEl.textContent = "正在同步文本数据...";
+            const jsonContent = btoa(unescape(encodeURIComponent(JSON.stringify(allTextData))));
+            const jsonSha = getSha(existingFiles, "data.json");
+            
+            await fetch(`${apiBaseUrl}/data.json`, {
                 method: 'PUT',
-                headers: {
-                    'Authorization': 'token ' + info.token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(bodyData)
+                headers: { 'Authorization': 'token ' + info.token, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: "Update metadata",
+                    content: jsonContent,
+                    sha: jsonSha
+                })
             });
 
-            if (!response.ok) {
-                var errText = await response.text();
-                throw new Error(response.status + " " + errText);
+            // 4. 逐个上传图片 (核心：一张一张处理，防止白屏)
+            let count = 0;
+            const total = blobKeys.size;
+            for (const blobKey of blobKeys) {
+                count++;
+                if (statusEl) statusEl.textContent = `正在同步图片 (${count}/${total})...`;
+                
+                const blobSha = getSha(existingBlobs, blobKey);
+                // 如果 GitHub 上已经有这个文件且 SHA 存在，理论上可以跳过（此处为了绝对安全选择覆盖或根据逻辑跳过）
+                // 这里我们简单处理：获取本地数据，如果本地有，就上传
+                const blob = await imageStore.getItem(blobKey);
+                if (blob) {
+                    const base64 = await new Promise(resolve => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                        reader.readAsDataURL(blob);
+                    });
+
+                    const res = await fetch(`${apiBaseUrl}/blobs/${blobKey}`, {
+                        method: 'PUT',
+                        headers: { 'Authorization': 'token ' + info.token, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: `Upload blob ${blobKey}`,
+                            content: base64,
+                            sha: blobSha
+                        })
+                    });
+                    
+                    if (!res.ok && res.status !== 422) {
+                        console.error(`图片 ${blobKey} 上传失败`);
+                    }
+                }
             }
 
             lastBackupTime = Date.now();
@@ -38508,9 +38509,9 @@ const cloudBackupManager = (function() {
 
             if (statusEl) {
                 statusEl.style.color = "#28a745";
-                statusEl.textContent = `✅ ${isAuto ? '自动' : ''}备份成功 (${new Date().toLocaleTimeString()})`;
+                statusEl.textContent = `✅ 备份成功！共同步 ${total} 张图片`;
             }
-            if (!isAuto) alert("备份成功！");
+            if (!isAuto) alert("备份成功！数据已分类存储在 rye_backup_v2 文件夹中。");
 
         } catch (e) {
             console.error(e);
@@ -38521,7 +38522,112 @@ const cloudBackupManager = (function() {
             if (!isAuto) alert("备份失败: " + e.message);
         }
     }
+async function performRestore() {
+        var info = getRepoInfo();
+        if (!info) return alert("请先填写仓库链接和Token！");
 
+        const confirmed = await conversationManager.customConfirm(
+            "这将从 GitHub 下载并覆盖当前手机的所有数据。建议操作前先手动备份一次。确定要继续吗？",
+            "云端恢复确认"
+        );
+        if (!confirmed) return;
+
+        var statusEl = document.getElementById('gh-status-msg');
+        if (statusEl) {
+            statusEl.style.color = "#007aff";
+            statusEl.textContent = "正在连接云端...";
+        }
+
+        try {
+            const baseDir = "rye_backup_v2";
+            const apiBaseUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/contents/${baseDir}`;
+
+            // 1. 下载 data.json (文本数据)
+            if (statusEl) statusEl.textContent = "正在同步文本数据...";
+            const jsonRes = await fetch(`${apiBaseUrl}/data.json`, {
+                headers: { 
+                    'Authorization': 'token ' + info.token,
+                    // 核心修改：强制要求返回原始文件内容，绕过 1MB 限制
+                    'Accept': 'application/vnd.github.v3.raw' 
+                }
+            });
+            if (!jsonRes.ok) throw new Error("无法获取文本备份文件，请确认已执行过新版备份。");
+            
+            // 既然是 Raw 模式，返回的就是纯文本 JSON，直接解析即可，无需 atob
+            const allTextData = await jsonRes.json();
+
+            // 2. 扫描 data.json 找出所有需要的图片 ID
+            const blobKeys = new Set();
+            for (const key in allTextData) {
+                const rawValue = allTextData[key];
+                const matches = rawValue.match(/indexeddb:([a-zA-Z0-9_-]+)/g);
+                if (matches) matches.forEach(m => blobKeys.add(m.split(':')[1]));
+            }
+
+            // 3. 逐个同步图片 (核心：一张一张下载，防止白屏)
+            let count = 0;
+            const total = blobKeys.size;
+            for (const blobKey of blobKeys) {
+                count++;
+                if (statusEl) statusEl.textContent = `正在同步图片 (${count}/${total})...`;
+
+                // 检查本地是否已经有这张图了，如果有就跳过，节省流量和时间
+                const localExists = await imageStore.getItem(blobKey);
+                if (localExists) continue;
+
+                const blobRes = await fetch(`${apiBaseUrl}/blobs/${blobKey}`, {
+                    headers: { 
+                        'Authorization': 'token ' + info.token,
+                        // 核心修改：直接获取二进制图片流
+                        'Accept': 'application/vnd.github.v3.raw'
+                    }
+                });
+
+                if (blobRes.ok) {
+                    // 直接作为 Blob 接收，不经过字符串转换，极大地节省内存，防止白屏
+                    const blob = await blobRes.blob();
+                    await imageStore.setItem(blobKey, blob);
+                }
+            }
+
+            // 4. 清理旧的 LocalStorage 并写入新数据
+            if (statusEl) statusEl.textContent = "正在应用更改...";
+            const CLEANUP_PREFIXES = [ 
+                'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
+                'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
+                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+            ];
+
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (CLEANUP_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+
+            for (const key in allTextData) {
+                localStorage.setItem(key, allTextData[key]);
+            }
+
+            if (statusEl) {
+                statusEl.style.color = "#28a745";
+                statusEl.textContent = "✅ 恢复成功！正在重启...";
+            }
+            
+            alert("恢复成功！应用即将刷新。");
+            location.reload();
+
+        } catch (e) {
+            console.error(e);
+            if (statusEl) {
+                statusEl.style.color = "#d73a49";
+                statusEl.textContent = `❌ 恢复失败: ${e.message}`;
+            }
+            alert("恢复失败: " + e.message);
+        }
+    }
     function setupAutoBackup(intervalMinutes) {
         if (autoBackupTimer) clearInterval(autoBackupTimer);
         if (intervalMinutes > 0) {
@@ -38572,9 +38678,10 @@ const cloudBackupManager = (function() {
             setupAutoBackup(parseInt(savedInterval, 10));
         }
 
-        // 绑定两个按钮的事件
+        // 绑定三个按钮的事件
         document.getElementById('gh-init-btn').addEventListener('click', performInitialization);
         document.getElementById('gh-backup-btn').addEventListener('click', () => performBackup(false));
+        document.getElementById('gh-restore-btn').addEventListener('click', () => performRestore());
         
         document.getElementById('gh-auto-interval').addEventListener('input', onIntervalChange);
 
@@ -38600,7 +38707,10 @@ const cloudBackupManager = (function() {
         });
     }
 
-    return { init: init };
+    return { 
+        init: init,
+        performRestore: performRestore 
+    };
 })();
 // --- END: CLOUD BACKUP MANAGER ---
 
