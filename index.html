@@ -13503,13 +13503,19 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                         const data = JSON.parse(jsonStr);
                         if (!tuquIframe) break;
 
-                        // 【核心修复】定义内部解析函数，将标题和内容中的 [emoji:xx] 转换为 <img> 标签
+                        // 【核心修复】定义内部解析函数，区分处理 Emoji 和 Sticker 的显示尺寸
                         const parseTuquMedia = (text) => {
                             if (!text) return "";
                             return text.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
                                 const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type.toLowerCase());
                                 if (item) {
-                                    return `<img src="${item.url}" alt="${name}" class="inline-emoji" style="height:1.2em; vertical-align:middle; margin:0 2px;">`;
+                                    if (type.toLowerCase() === 'emoji') {
+                                        // Emoji 保持行内小尺寸，跟随文字高度
+                                        return `<img src="${item.url}" alt="${name}" class="inline-emoji" style="height:1.2em; vertical-align:middle; margin:0 2px;">`;
+                                    } else {
+                                        // 表情包 (Sticker) 使用大尺寸，且强制换行显示，更符合论坛表情包习惯
+                                        return `<img src="${item.url}" alt="${name}" style="max-width: 120px; max-height: 120px; display: block; margin: 8px 0; border-radius: 8px;">`;
+                                    }
                                 }
                                 return match;
                             });
@@ -28740,7 +28746,7 @@ if (momentsCommentStickerBtn) {
 checkMomentsUpdates(); // <--- 新增这一行
         }
         
-        return { init, refreshData, createPostFromAI, getRecentMomentsForAI, handleInteractionFromAI, updatePostDescription, handleForwardFromAI };
+        return { init, refreshData, createPostFromAI, getRecentMomentsForAI, handleInteractionFromAI, updatePostDescription, handleForwardFromAI, showNotification };
 })();
     // --- START: TUQU MANAGER (RED DOT) ---
     const tuquManager = (function() {
