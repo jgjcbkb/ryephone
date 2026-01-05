@@ -38282,7 +38282,7 @@ const cloudBackupManager = (function() {
         return null;
     }
 
-    async function getCompressedBackupData() {
+        async function getCompressedBackupData() {
         if (typeof JSZip === 'undefined') throw new Error("JSZip 未加载");
         
         // 【核心修复】同步更新云端备份的前缀白名单
@@ -38313,13 +38313,7 @@ const cloudBackupManager = (function() {
 
         var zip = new JSZip();
         zip.file("backup_content.json", jsonStr);
-        // 恢复 level: 9 压缩，这是绕过 GitHub 25MB 限制的唯一方法
-        // 50MB 的文本数据在 level 9 下通常能压到 10MB 以内
-        return await zip.generateAsync({ 
-            type: "base64", 
-            compression: "DEFLATE", 
-            compressionOptions: { level: 9 } 
-        });
+        return await zip.generateAsync({ type: "base64", compression: "DEFLATE", compressionOptions: { level: 9 } });
     }
 
     // 【新增】初始化仓库逻辑
@@ -38391,61 +38385,53 @@ const cloudBackupManager = (function() {
         if (!isAuto) setupAutoBackup(info.autoInterval);
 
         var statusEl = document.getElementById('gh-status-msg');
-        if (statusEl) {
-            statusEl.style.color = "#666";
-            statusEl.textContent = isAuto ? "正在自动备份..." : "正在准备 50MB 大数据，请勿切出页面...";
-        }
+        if (statusEl) statusEl.textContent = isAuto ? "正在自动备份..." : "正在处理...";
         
-        // 【iOS 白屏终极修复】
-        // 必须强制等待 300ms。这 300ms 是给 iOS 浏览器的“喘息时间”，
-        // 确保它能把“正在准备数据”这行字画在屏幕上。
-        // 如果没有这一步，后续的 getCompressedBackupData(level 9) 会瞬间锁死主线程，
-        // 导致浏览器还没来得及画字就卡住了，用户看到的就是白屏。
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        try {
-            var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/" + info.filename;
-            // 此时执行耗时的 level 9 压缩，虽然会卡顿几秒，但因为屏幕上有字，系统不会判定为死机
-            var contentBase64 = await getCompressedBackupData();
-            var sha = await getFileSha(apiUrl, info.token);
-            
-            var bodyData = {
-                message: (isAuto ? "Auto " : "Manual ") + "Backup: " + new Date().toLocaleString(),
-                content: contentBase64
-            };
-            if (sha) bodyData.sha = sha;
+        // 使用 setTimeout 将耗时操作推迟到下一个事件循环
+        setTimeout(async () => {
+            try {
+                var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/" + info.filename;
+                var contentBase64 = await getCompressedBackupData();
+                var sha = await getFileSha(apiUrl, info.token);
+                
+                var bodyData = {
+                    message: (isAuto ? "Auto " : "Manual ") + "Backup: " + new Date().toLocaleString(),
+                    content: contentBase64
+                };
+                if (sha) bodyData.sha = sha;
 
-            var response = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'token ' + info.token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(bodyData)
-            });
+                var response = await fetch(apiUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'token ' + info.token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(bodyData)
+                });
 
-            if (!response.ok) {
-                var errText = await response.text();
-                throw new Error(response.status + " " + errText);
+                if (!response.ok) {
+                    var errText = await response.text();
+                    throw new Error(response.status + " " + errText);
+                }
+
+                lastBackupTime = Date.now();
+                localStorage.setItem('gh_last_backup_time', lastBackupTime);
+
+                if (statusEl) {
+                    statusEl.style.color = "#28a745";
+                    statusEl.textContent = `✅ ${isAuto ? '自动' : ''}备份成功 (${new Date().toLocaleTimeString()})`;
+                }
+                if (!isAuto) alert("备份成功！");
+
+            } catch (e) {
+                console.error(e);
+                if (statusEl) {
+                    statusEl.style.color = "#d73a49";
+                    statusEl.textContent = `❌ 备份失败: ${e.message}`;
+                }
+                if (!isAuto) alert("备份失败: " + e.message);
             }
-
-            lastBackupTime = Date.now();
-            localStorage.setItem('gh_last_backup_time', lastBackupTime);
-
-            if (statusEl) {
-                statusEl.style.color = "#28a745";
-                statusEl.textContent = `✅ ${isAuto ? '自动' : ''}备份成功 (${new Date().toLocaleTimeString()})`;
-            }
-            if (!isAuto) alert("备份成功！");
-
-        } catch (e) {
-            console.error(e);
-            if (statusEl) {
-                statusEl.style.color = "#d73a49";
-                statusEl.textContent = `❌ 备份失败: ${e.message}`;
-            }
-            if (!isAuto) alert("备份失败: " + e.message);
-        }
+        }, 0); // 延迟0毫秒，意味着在当前任务完成后立即执行
     }
 
     function setupAutoBackup(intervalMinutes) {
