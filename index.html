@@ -38222,22 +38222,33 @@ const cloudBackupManager = (function() {
         return null;
     }
 
-    async function getCompressedBackupData() {
+async function getCompressedBackupData() {
         if (typeof JSZip === 'undefined') throw new Error("JSZip 未加载");
         
+        // 1. 智能检测设备类型
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        
+        // 2. 设定压缩策略
+        // iOS: 使用 Level 1 (极速压缩)。内存占用极低，不白屏，但能把体积压下来，避免 GitHub 422 报错。
+        // 安卓/PC: 使用 Level 6 (标准压缩)。压缩率更好。
+        const compressionLevel = isIOS ? 1 : 6;
+        
+        console.log(`[Backup] 检测到设备: ${isIOS ? 'iOS' : 'Android/PC'}, 采用压缩等级: ${compressionLevel}`);
+
         const APP_DATA_PREFIXES = [ 
             'app-', 'app_', 
             'chat-', 'chat_', 
             'my_', 
             'conversation_', 
             'moments_', 
-            'gh_',           // GitHub 设置
-            'auto_',         // 自动回复
-            'video_',        // 视频通话
-            'pending_',      // 临时状态
-            'catbox_userhash', // 新增：Catbox 密钥
+            'gh_',           
+            'auto_',         
+            'video_',        
+            'pending_',      
+            'catbox_userhash',
             'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
         ];
+        
         const allData = {};
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
@@ -38253,8 +38264,12 @@ const cloudBackupManager = (function() {
         var zip = new JSZip();
         zip.file("backup_content.json", jsonStr);
         
-        // 【核心修复】改为 "STORE" (仅打包不压缩)，内存占用极低，杜绝白屏！
-        return await zip.generateAsync({ type: "base64", compression: "STORE" });
+        // 3. 执行智能压缩
+        return await zip.generateAsync({ 
+            type: "base64", 
+            compression: "DEFLATE", 
+            compressionOptions: { level: compressionLevel } 
+        });
     }
 
     // 【新增】初始化仓库逻辑
