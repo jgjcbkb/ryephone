@@ -16135,10 +16135,11 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
             
             // <<<< 3. 等所有循环都跑完，我们在这里统一检查并发送唯一的一条消息 >>>>
             if (systemMessageToShow) {
-                // --- 核心修复：把消息类型从 'text' 和 'received' 改为正确的 'system' ---
                 await conversationManager.addMessage({ type: 'system', text: systemMessageToShow.text, side: 'system' }, targetChatId);
             }
             
+            // 【核心修复】：先替换掉所有后台更新标签，再进行 trim()
+            // 这样如果回复里只有标签，返回的就是一个彻底的空字符串 ""
             const finalCleanedText = tempResponse.replace(updateRegex, '').trim();
             
             return finalCleanedText;
@@ -19713,36 +19714,13 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
         
                if (aiResponse && aiResponse.trim()) {
                     // 【终极修复】：在交给解析器之前，彻底清除所有思考内容（含未闭合标签）
-                    // 使用更强大的正则，确保即便 AI 没写完 </think> 也能被正确拦截
                     let responseToProcess = aiResponse
                         .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
                         .replace(/<thought>[\s\S]*?(?:<\/thought>|$)/gi, '')
                         .trim();
 
-                    // --- 核心修改：在这里解析并提取图片描述 ---
-                    const descriptionRegex = /<private_note type="image_description">([\s\S]*?)<\/private_note>/;
-                    const descriptionMatch = responseToProcess.match(descriptionRegex);
-
-                    if (descriptionMatch) {
-                        const imageDescription = descriptionMatch[1].trim();
-                        // 从后往前找到最近的一条图片消息
-                        const lastImageMessage = [...chatState.messages].reverse().find(m => m.type === 'photo' && m.side === 'sent');
-                        
-                        if (lastImageMessage && imageDescription) {
-                            // 将描述附加到图片消息对象上
-                            lastImageMessage.imageDescription = imageDescription;
-                            console.log(`Image description saved for message ${lastImageMessage.id}: "${imageDescription}"`);
-                            // 这里我们只更新了数据，不需要立刻重绘DOM，因为描述是不可见的
-                            saveConversation(); // 立即保存更新后的消息数据
-                        }
-
-                        // 从AI的回复中移除这个私有标签，确保它不会被显示出来
-                        responseToProcess = responseToProcess.replace(descriptionRegex, '').trim();
-                    }
-                    // --- 修改结束 ---
-
-                    const cleanedText = await executeBackgroundUpdatesAndCleanText(responseToProcess, originatingChatId, chatState.chatName);
-                    if (!cleanedText) {
+                    // 如果清理完思考后已经没有任何内容了，直接退出，防止产生空白头像
+                    if (!responseToProcess) {
                         loadingStates[originatingChatId] = false;
                         if (chatState.chatId === originatingChatId) {
                             dynamicDecorationBtn.classList.remove('loading');
@@ -19750,14 +19728,30 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                         return;
                     }
 
-                    // 【核心修复】：改用 parseResponseIntoBlocks 确保无标签文本也能显示
+                    // --- 核心修改：在这里解析并提取图片描述 ---
+                    // ... (此处保持你之前的图片描述解析代码不变) ...
+
+                    // 执行后台更新（如心事、备忘录）并获取剩余的正文
+                    const cleanedText = await executeBackgroundUpdatesAndCleanText(responseToProcess, originatingChatId, chatState.chatName);
+                    
+                    // 【关键修复】：如果经过后台任务清理后，正文只剩下空格或为空，坚决不进入后续渲染
+                    if (!cleanedText || cleanedText.trim() === "") {
+                        loadingStates[originatingChatId] = false;
+                        if (chatState.chatId === originatingChatId) {
+                            dynamicDecorationBtn.classList.remove('loading');
+                        }
+                        return;
+                    }
+
+                    // 将清理后的正文切成块
                     const blocks = parseResponseIntoBlocks(cleanedText);
                     
                     for (const block of blocks) {
                         const trimmed = block.trim();
+                        // 【二次防御】：确保每一个子块也不是空的
                         if (!trimmed) continue;
 
-                        // 尝试匹配是否为标准 block 格式
+                        // 尝试匹配标准的 <block> 标签
                         const match = trimmed.match(/^<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>$/);
                         
                         if (match) {
