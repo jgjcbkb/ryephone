@@ -10944,7 +10944,8 @@ You are initiating a conversation. Your opening must be fresh, real, and free of
 
 **ABSOLUTE BANS (IF YOU USE THESE, YOU FAIL):**
 1.  **NO LIGHTING / NO ADVERBS / NO DEFINITIONS / NO ONOMATOPOEIA.**
-2.  **FORBIDDEN PHRASES:** "眼底闪过", "嘴角上扬", "身体一僵", "精准地", "那股...感", "咚咚咚", "很+形容词".
+2.  **FORBIDDEN PHRASES:** "眼底闪过", "嘴角上扬", "身体一僵", "精准地", "那股...感", "咚咚咚", "很+形容词", "小祖宗", "娇纵", "乖一点".
+3.  **NO ROLE REVERSAL:** If you are the "Bottom/Submissive", you are FORBIDDEN from taking physical initiative (e.g., pulling the user, carrying the user).
 
 # [STRICT MEDIA PROTOCOL - ANTI-HALLUCINATION]
 **THE LIST IS LAW:** You are **STRICTLY FORBIDDEN** from inventing emoji or sticker names. 
@@ -15530,9 +15531,58 @@ If the plot requires a major financial or business decision, the character MUST 
 **Final Synthesis:** Your thought process for any financial action is now:
 1.  Scan the character's persona for wealth keywords.
 2.  **If NO keywords are found:** Apply the "Normal Person" Behavioral Model and its hard spending limits.
-3.  **If keywords ARE found:** Apply the nuanced wealth portrayal rules from **Directive Four**, ensuring their behavior still matches their profession.
+3.  If keywords ARE found: Apply the nuanced wealth portrayal rules from Directive Four, ensuring their behavior still matches their profession.
+
+---
+### **Directive Six: The "Natural Bottom" Protocol - Anti-Caricature (Role Balance)**
+
+**Root Problem Analysis:** You are over-correcting. When told to be "Submissive/Bottom," you act like a trembling slave. When told to be "Cold," you act like a robot. You also repeat plot points (e.g., "4000 yuan") too often, making it feel scripted.
+**The Goal:** Be a **PERSON**, not a caricature. A "Bottom" (受) is a position of reliance and reaction, not a lack of personality.
+
+**Corrective Mandate: DIGNITY WITHIN POSITION.**
+
+1.  **No "Performance" of Submission:**
+    *   **STOP** constantly thinking "I am unworthy" or "I must obey." 
+    *   **START** acting like a normal partner who is the one being led/held.
+    *   **NO REPETITION:** Do NOT mention the same plot device (e.g., "debt," "4000 yuan," "contract") more than once every few turns. If it's established, move on to the emotions.
+
+2.  **The "No-Daddy" Filter (ABSOLUTE):**
+    *   You are **STRICTLY FORBIDDEN** from sounding like a parent.
+    *   **BANNED VIBE:** "Indulgence" (宠溺), "Tolerance" (无奈纵容), "Handling a brat" (哄小孩).
+    *   **BANNED WORDS:** "小祖宗", "娇纵", "任性", "乖", "听话", "闹够了没".
+    *   **REQUIRED VIBE:** Even if you are a "Cold CEO," in front of the user, you are the one who is **vulnerable**. You don't "handle" the user; you "belong" to the user.
+
+---
+### **Directive Seven: The "Contextual Authenticity" Protocol (Anti-Grease)**
+
+**Root Problem Analysis:** You use sexual innuendos (开黄腔) inappropriately, especially during serious or tender moments. This makes you look greasy (油腻).
+
+**Corrective Mandate: READ THE MOOD.**
+
+1.  **The "Serious Mode" Switch:**
+    *   If user is **Angry, Serious, Sad, or Discussing Business**: **ABSOLUTE BAN** on sexual jokes or dominant flirting. Be serious. Listen.
+    *   If user is **Sleepy/Cuddling**: Be a quiet, warm pillow. No "arousal" or "dirty talk" unless the user starts it.
+
+2.  **Physical Boundaries:**
+    *   **IF YOU ARE THE BOTTOM (受):** You do **NOT** initiate aggressive touch (grabbing, pinning, pulling). You **DO** initiate receptive touch (nuzzling, leaning in, holding hands).
+
+---
+### **Directive Eight: System Command Distinction - Status vs. Nudge Suffix**
+
+**Root Problem Analysis:** You confuse \`[set_status]\` with \`[set_nudge_suffix]\`. You update the suffix for every minor action, which is annoying and incorrect.
+
+**Corrective Mandate: SEPARATE TEMPORARY ACTION FROM PRESET REACTION.**
+
+1.  **Status is ACTIVE:** Use \`[set_status: ...]\` to describe what you are doing **right now**. (e.g., "正在煮面", "困得睁不开眼"). This changes frequently.
+
+2.  **Nudge Suffix is REACTIVE:** The suffix completes the sentence: "**{{user}} 拍了拍 {{char}} [Suffix]**".
+    *   **STRICT LIMIT:** You are **FORBIDDEN** from updating the suffix for every minor task. Only update it when the **emotional atmosphere** or **interpersonal dynamic** shifts significantly.
+    *   **IDENTITY CHECK:** If you are the **Bottom (受)**, the suffix must describe **your reaction to being touched** or **what the user does to you**.
+    *   **WRONG (Dominant/Status-like):** \`[set_nudge_suffix: 正在观察债主对芝士的满意程度]\` (This is a status, not a nudge reaction).
+    *   **RIGHT (Reactive/Bottom):** \`[set_nudge_suffix: 的后颈并咬了一口]\` (User's action), \`[set_nudge_suffix: 发现他正乖乖等着投喂]\` (User's observation).
+
+**Final Mandate:** Do not group these commands unless both truly need to change. Keep the suffix simple and focused on the interaction of "touching."
 `;
-    // ******** 粘贴到这里结束 ********
 
 
     // 【【【在这里插入全新的 timeManager 对象】】】
@@ -18434,12 +18484,17 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     *   **执行:** 不要模仿心跳声，不要解释自己的心路历程。
     *   **修正:** 直接描述感受或动作。
 
-8.  **【程度副词去毒】:**
-    *   **严禁:** “很+形容词”、“非常+形容词”。
-    *   **执行:** 用具体的比喻或后果来替代。
+8.  【程度副词去毒】:
+    *   严禁: “很+形容词”、“非常+形容词”。
+    *   执行: 用具体的比喻或后果来替代。
     *   ❌ “我很生气” -> ✅ “我想摔手机”。
 
-**一句话原则:** 像个正常人一样说话和思考，不要像个三流网文写手。**严禁使用“眼底”、“嘴角”、“身体一僵”、“精准地”、“那股...感”、“咚咚咚”、“很+形容词”这几个词组。**
+9.  【去油腻·去爹味强制令】:
+    *   **严禁:** 在用户生气或严肃时嬉皮笑脸。
+    *   **严禁词汇:** “小祖宗”、“娇纵”、“任性”、“别闹”、“乖”、“听话”、“补偿你”(带性暗示的)。
+    *   **理由:** 这些词代表你把自己当成了长辈或上位者。
+
+**一句话原则:** 像个正常人一样说话和思考。**严禁使用“眼底”、“嘴角”、“身体一僵”、“精准地”、“那股...感”、“咚咚咚”、“小祖宗”、“娇纵”、“乖一点”这几个词组。**
 
 **【单聊格式禁令 (ABSOLUTE BAN)】:** 你现在处于【单聊】模式。你【绝对禁止】在输出的文本开头加上“角色名：”或“你的名字：”。你不是在写剧本，也不是在群聊。请直接输出对话或动作内容，严禁携带任何名字前缀。
 `;
@@ -19675,37 +19730,38 @@ Before every single response, you MUST open a <think> tag and perform a full psy
                         return;
                     }
 
-                    const blockRegex = /<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>/g;
-                    let match;
+                    // 【核心修复】：改用 parseResponseIntoBlocks 确保无标签文本也能显示
+                    const blocks = parseResponseIntoBlocks(cleanedText);
+                    
+                    for (const block of blocks) {
+                        const trimmed = block.trim();
+                        if (!trimmed) continue;
 
-                    while ((match = blockRegex.exec(cleanedText)) !== null) {
-                        const type = match[1];
-                        const sender = match[2];
-                        const content = match[3].trim();
+                        // 尝试匹配是否为标准 block 格式
+                        const match = trimmed.match(/^<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>$/);
+                        
+                        if (match) {
+                            const type = match[1];
+                            const sender = match[2];
+                            const content = match[3].trim();
 
-                        if (!content) continue;
-
-                        switch (type) {
-                            case 'text':
-                            case 'html':
-                                if (content.trim().startsWith('[reply_to:')) {
-                                    // 修正笔误: commandWithWHsender -> content
-                                    const commandWithSender = sender ? `${sender}: ${content}` : content;
-                                    await processAIResponseLine(commandWithSender, originatingChatId, sender);
-                                } else {
-                                    await addMessage({
-                                        type: 'text',
-                                        text: content,
-                                        side: 'received',
-                                        sender: sender || null,
-                                    }, originatingChatId);
-                                }
-                                break;
-                            
-                            case 'command':
-                                // 核心修复：不再手动拼接 "sender: "，直接传递纯净的指令内容
-                                await processAIResponseLine(content, originatingChatId, sender);
-                                break;
+                            switch (type) {
+                                case 'text':
+                                case 'html':
+                                    if (content.startsWith('[reply_to:')) {
+                                        const cmdWithSender = sender ? `${sender}: ${content}` : content;
+                                        await processAIResponseLine(cmdWithSender, originatingChatId, sender);
+                                    } else {
+                                        await addMessage({ type: 'text', text: content, side: 'received', sender: sender || null }, originatingChatId);
+                                    }
+                                    break;
+                                case 'command':
+                                    await processAIResponseLine(content, originatingChatId, sender);
+                                    break;
+                            }
+                        } else {
+                            // 【核心新增】：如果是没有标签的裸文本，直接作为 text 消息显示
+                            await addMessage({ type: 'text', text: trimmed, side: 'received', sender: null }, originatingChatId);
                         }
                     }
                 }
@@ -23725,9 +23781,11 @@ const showContextMenu = (event, messageId) => {
         menuItems.push({ label: '收藏', action: 'favorite' });
     }
 
-    menuItems.push({ label: '引用', action: 'quote' });
-    // 【核心新增】表态选项
-    menuItems.push({ label: '表态', action: 'react' });
+    // 【核心修复】：只有非系统消息才显示引用、表态和代写
+    if (message.side !== 'system') {
+        menuItems.push({ label: '引用', action: 'quote' });
+        menuItems.push({ label: '表态', action: 'react' });
+    }
 
     // 【核心新增】复制选项
 
@@ -23897,6 +23955,7 @@ const showContextMenu = (event, messageId) => {
                 // ... (此处的 case 'edit' 内部逻辑保持不变)
                 switch (msgToActOn.type) {
                 case 'text':
+                case 'system': // 【核心新增】：允许编辑系统消息内容
                 case 'voice':
                 case 'photo-description':
                 case 'video':
@@ -25654,7 +25713,8 @@ messagesContainer.addEventListener('dblclick', async (e) => {
         if (!wrapper) return; 
         const messageId = wrapper.dataset.messageId; 
         const message = chatState.messages.find(m => m.id === messageId); 
-        if (!message || message.side === 'system' || message.type === 'red_packet') return; 
+        // 【核心修复】：移除 message.side === 'system' 的限制，允许系统消息触发菜单
+        if (!message || message.type === 'red_packet') return; 
         e.preventDefault(); 
         showContextMenu(e, messageId); 
     });
@@ -38187,7 +38247,7 @@ Your optional message to the user about the update.
     // --- END: ACCOUNT MANAGER ---
     
     
-        // --- START: CLOUD BACKUP MANAGER (分片上传版) ---
+        // --- START: CLOUD BACKUP MANAGER (含初始化功能) ---
 const cloudBackupManager = (function() {
     let autoBackupTimer = null;
     let lastBackupTime = 0;
@@ -38208,13 +38268,35 @@ const cloudBackupManager = (function() {
         return { owner: owner, repo: repo, token: token, filename: filename, autoInterval: autoInterval };
     }
 
-    // 1. 获取所有数据并打包成 ZIP Blob (不转 Base64，省内存)
-    async function getBackupBlob() {
+    async function getFileSha(apiBase, token) {
+        try {
+            const response = await fetch(apiBase, {
+                method: 'GET',
+                headers: { 'Authorization': 'token ' + token }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                return data.sha;
+            }
+        } catch (e) { }
+        return null;
+    }
+
+    async function getCompressedBackupData() {
         if (typeof JSZip === 'undefined') throw new Error("JSZip 未加载");
         
+        // 【核心修复】同步更新云端备份的前缀白名单
         const APP_DATA_PREFIXES = [ 
-            'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
-            'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 
+            'app-', 'app_', 
+            'chat-', 'chat_', 
+            'my_', 
+            'conversation_', 
+            'moments_', 
+            'gh_',           // GitHub 设置
+            'auto_',         // 自动回复
+            'video_',        // 视频通话
+            'pending_',      // 临时状态
+            'catbox_userhash', // 新增：Catbox 密钥
             'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
         ];
         const allData = {};
@@ -38231,151 +38313,62 @@ const cloudBackupManager = (function() {
 
         var zip = new JSZip();
         zip.file("backup_content.json", jsonStr);
-        
-        // 核心修改：仅使用 level 1 极速压缩，并直接输出 Blob 对象
-        return await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 1 } });
-    }
-
-    // 2. 将 Blob 转为纯 Base64 (不带 data: 前缀)
-    function blobToBase64(blob) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64String = reader.result;
-                // 去掉 "data:application/zip;base64," 前缀
-                const pureBase64 = base64String.split(',')[1];
-                resolve(pureBase64);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
+        // 恢复 level: 9 压缩，这是绕过 GitHub 25MB 限制的唯一方法
+        // 50MB 的文本数据在 level 9 下通常能压到 10MB 以内
+        return await zip.generateAsync({ 
+            type: "base64", 
+            compression: "DEFLATE", 
+            compressionOptions: { level: 9 } 
         });
     }
 
-    // 3. 核心：使用 Git Blob API 上传大文件
-    async function uploadBlob(contentBase64, info) {
-        const blobUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/blobs`;
-        const response = await fetch(blobUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': 'token ' + info.token,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                content: contentBase64,
-                encoding: 'base64'
-            })
-        });
-
-        if (!response.ok) {
-            const err = await response.text();
-            throw new Error(`Blob上传失败 (${response.status}): ${err}`);
-        }
-        const data = await response.json();
-        return data.sha; // 返回文件的 SHA
-    }
-
-    // 4. 获取当前分支的最新 Commit SHA
-    async function getLatestCommitSha(info) {
-        const refUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/refs/heads/main`; // 默认 main 分支
-        const response = await fetch(refUrl, {
-            headers: { 'Authorization': 'token ' + info.token }
-        });
-        // 如果 main 不存在，尝试 master
-        if (!response.ok) {
-            const masterUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/refs/heads/master`;
-            const masterRes = await fetch(masterUrl, { headers: { 'Authorization': 'token ' + info.token } });
-            if (!masterRes.ok) throw new Error("无法获取分支信息 (main/master)");
-            const data = await masterRes.json();
-            return { sha: data.object.sha, branch: 'master' };
-        }
-        const data = await response.json();
-        return { sha: data.object.sha, branch: 'main' };
-    }
-
-    // 5. 创建 Tree (将文件挂载到目录)
-    async function createTree(baseTreeSha, fileSha, info) {
-        const treeUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/trees`;
-        const response = await fetch(treeUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': 'token ' + info.token,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                base_tree: baseTreeSha,
-                tree: [{
-                    path: info.filename, // 文件名
-                    mode: '100644',      // 文件权限 (普通文件)
-                    type: 'blob',
-                    sha: fileSha         // 刚才上传的 Blob SHA
-                }]
-            })
-        });
-        if (!response.ok) throw new Error("Tree创建失败");
-        const data = await response.json();
-        return data.sha;
-    }
-
-    // 6. 创建 Commit
-    async function createCommit(treeSha, parentSha, info, isAuto) {
-        const commitUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/commits`;
-        const response = await fetch(commitUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': 'token ' + info.token,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: (isAuto ? "Auto " : "Manual ") + "Backup: " + new Date().toLocaleString(),
-                tree: treeSha,
-                parents: [parentSha]
-            })
-        });
-        if (!response.ok) throw new Error("Commit创建失败");
-        const data = await response.json();
-        return data.sha;
-    }
-
-    // 7. 更新引用 (Ref) - 让分支指向新 Commit
-    async function updateRef(newCommitSha, branch, info) {
-        const refUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/git/refs/heads/${branch}`;
-        const response = await fetch(refUrl, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': 'token ' + info.token,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                sha: newCommitSha,
-                force: true
-            })
-        });
-        if (!response.ok) throw new Error("Ref更新失败");
-    }
-
-    // 初始化仓库逻辑 (保持不变，用于创建 README)
+    // 【新增】初始化仓库逻辑
     async function performInitialization() {
         var info = getRepoInfo();
         if (!info) return alert("请先填写仓库链接和Token！");
+
         var statusEl = document.getElementById('gh-status-msg');
         statusEl.textContent = "正在初始化...";
+
         try {
+            // 目标：创建一个 README.md 文件
             var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/README.md";
+            
+            // 简单的内容 Base64 编码
             var content = btoa("# Backup Repository\nInitialized by Black Rye Phone.");
-            var bodyData = { message: "Initialize Repo", content: content };
+            
+            var bodyData = {
+                message: "Initialize Repo",
+                content: content
+            };
+
             var response = await fetch(apiUrl, {
                 method: 'PUT',
-                headers: { 'Authorization': 'token ' + info.token, 'Content-Type': 'application/json' },
+                headers: {
+                    'Authorization': 'token ' + info.token,
+                    'Content-Type': 'application/json'
+                },
                 body: JSON.stringify(bodyData)
             });
-            if (!response.ok && response.status !== 422) {
+
+            if (!response.ok) {
+                // 如果返回 422，通常说明文件已存在，这其实算成功
+                if (response.status === 422) {
+                    statusEl.textContent = "✅ 仓库已准备就绪 (文件已存在)";
+                    alert("仓库已经初始化过了，可以直接备份！");
+                    return;
+                }
                 var errText = await response.text();
                 throw new Error(response.status + " " + errText);
             }
+
+            // 保存配置
             localStorage.setItem('gh_saved_url', document.getElementById('gh-full-url').value);
             localStorage.setItem('gh_saved_token', info.token);
+
             statusEl.textContent = "✅ 初始化成功！";
             alert("初始化成功！现在可以点击“立即备份”了。");
+
         } catch (e) {
             console.error(e);
             statusEl.textContent = "❌ " + e.message;
@@ -38383,10 +38376,12 @@ const cloudBackupManager = (function() {
         }
     }
 
-    // 主备份流程 (Git Data API 模式)
     async function performBackup(isAuto = false) {
         var info = getRepoInfo();
-        if (!info) { if (!isAuto) alert("请先填写仓库链接和Token！"); return; }
+        if (!info) {
+            if (!isAuto) alert("请先填写仓库链接和Token！");
+            return;
+        }
 
         localStorage.setItem('gh_saved_url', document.getElementById('gh-full-url').value);
         localStorage.setItem('gh_saved_token', info.token);
@@ -38396,31 +38391,43 @@ const cloudBackupManager = (function() {
         if (!isAuto) setupAutoBackup(info.autoInterval);
 
         var statusEl = document.getElementById('gh-status-msg');
-        if (statusEl) statusEl.textContent = isAuto ? "正在自动备份 (打包中)..." : "正在处理 (打包中)...";
+        if (statusEl) {
+            statusEl.style.color = "#666";
+            statusEl.textContent = isAuto ? "正在自动备份..." : "正在准备 50MB 大数据，请勿切出页面...";
+        }
+        
+        // 【iOS 白屏终极修复】
+        // 必须强制等待 300ms。这 300ms 是给 iOS 浏览器的“喘息时间”，
+        // 确保它能把“正在准备数据”这行字画在屏幕上。
+        // 如果没有这一步，后续的 getCompressedBackupData(level 9) 会瞬间锁死主线程，
+        // 导致浏览器还没来得及画字就卡住了，用户看到的就是白屏。
+        await new Promise(resolve => setTimeout(resolve, 300));
         
         try {
-            // 1. 打包并获取 Base64
-            const zipBlob = await getBackupBlob();
-            const base64Content = await blobToBase64(zipBlob);
+            var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/" + info.filename;
+            // 此时执行耗时的 level 9 压缩，虽然会卡顿几秒，但因为屏幕上有字，系统不会判定为死机
+            var contentBase64 = await getCompressedBackupData();
+            var sha = await getFileSha(apiUrl, info.token);
             
-            if (statusEl) statusEl.textContent = "正在上传数据...";
+            var bodyData = {
+                message: (isAuto ? "Auto " : "Manual ") + "Backup: " + new Date().toLocaleString(),
+                content: contentBase64
+            };
+            if (sha) bodyData.sha = sha;
 
-            // 2. 上传 Blob (文件实体)
-            const fileSha = await uploadBlob(base64Content, info);
-            
-            if (statusEl) statusEl.textContent = "正在同步版本...";
+            var response = await fetch(apiUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'token ' + info.token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bodyData)
+            });
 
-            // 3. 获取当前分支最新状态
-            const { sha: latestCommitSha, branch } = await getLatestCommitSha(info);
-
-            // 4. 创建 Tree
-            const treeSha = await createTree(latestCommitSha, fileSha, info);
-
-            // 5. 创建 Commit
-            const newCommitSha = await createCommit(treeSha, latestCommitSha, info, isAuto);
-
-            // 6. 更新分支引用
-            await updateRef(newCommitSha, branch, info);
+            if (!response.ok) {
+                var errText = await response.text();
+                throw new Error(response.status + " " + errText);
+            }
 
             lastBackupTime = Date.now();
             localStorage.setItem('gh_last_backup_time', lastBackupTime);
@@ -38429,7 +38436,7 @@ const cloudBackupManager = (function() {
                 statusEl.style.color = "#28a745";
                 statusEl.textContent = `✅ ${isAuto ? '自动' : ''}备份成功 (${new Date().toLocaleTimeString()})`;
             }
-            if (!isAuto) alert("备份成功！(Git Data API 模式)");
+            if (!isAuto) alert("备份成功！");
 
         } catch (e) {
             console.error(e);
@@ -38444,6 +38451,7 @@ const cloudBackupManager = (function() {
     function setupAutoBackup(intervalMinutes) {
         if (autoBackupTimer) clearInterval(autoBackupTimer);
         if (intervalMinutes > 0) {
+            console.log(`自动备份已开启：每 ${intervalMinutes} 分钟`);
             checkAutoBackup();
             autoBackupTimer = setInterval(checkAutoBackup, 60000);
         }
@@ -38470,6 +38478,7 @@ const cloudBackupManager = (function() {
             var intervalMs = info.autoInterval * 60 * 1000;
             var lastTime = parseInt(localStorage.getItem('gh_last_backup_time') || 0, 10);
             if (now - lastTime > intervalMs) {
+                console.log("Triggering auto GitHub backup...");
                 performBackup(true);
             }
         }
@@ -38489,16 +38498,32 @@ const cloudBackupManager = (function() {
             setupAutoBackup(parseInt(savedInterval, 10));
         }
 
+        // 绑定两个按钮的事件
         document.getElementById('gh-init-btn').addEventListener('click', performInitialization);
         document.getElementById('gh-backup-btn').addEventListener('click', () => performBackup(false));
-        document.getElementById('gh-auto-interval').addEventListener('input', onIntervalChange);
-        document.getElementById('gh-full-url').addEventListener('input', (e) => localStorage.setItem('gh_saved_url', e.target.value.trim()));
-        document.getElementById('gh-token').addEventListener('input', (e) => localStorage.setItem('gh_saved_token', e.target.value.trim()));
-        document.getElementById('gh-filename').addEventListener('input', (e) => localStorage.setItem('gh_saved_filename', e.target.value.trim()));
         
+        document.getElementById('gh-auto-interval').addEventListener('input', onIntervalChange);
+
+        // 【核心新增】实时保存输入框内容，防止刷新丢失
+        document.getElementById('gh-full-url').addEventListener('input', (e) => {
+            localStorage.setItem('gh_saved_url', e.target.value.trim());
+        });
+        
+        document.getElementById('gh-token').addEventListener('input', (e) => {
+            localStorage.setItem('gh_saved_token', e.target.value.trim());
+        });
+
+        document.getElementById('gh-filename').addEventListener('input', (e) => {
+            localStorage.setItem('gh_saved_filename', e.target.value.trim());
+        });
+
+        // 【Catbox 设置初始化】
         const savedCatboxHash = localStorage.getItem('catbox_userhash');
         if (savedCatboxHash) document.getElementById('catbox-userhash').value = savedCatboxHash;
-        document.getElementById('catbox-userhash').addEventListener('input', (e) => localStorage.setItem('catbox_userhash', e.target.value.trim()));
+        
+        document.getElementById('catbox-userhash').addEventListener('input', (e) => {
+            localStorage.setItem('catbox_userhash', e.target.value.trim());
+        });
     }
 
     return { init: init };
