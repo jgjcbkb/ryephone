@@ -10142,15 +10142,15 @@ if ('serviceWorker' in navigator) {
             // 用于检测开始和结束标签的辅助函数
             const countTags = (line) => {
                 let count = 0;
-                // 核心修复：将 thought 标签加入容器追踪名单，确保多行思考内容被视为一个整体，不被拆分成多个气泡
-                count += (line.match(/<(div|details|block|snippet|style|thought)\s*[^>]*>/gi) || []).length;
-                count -= (line.match(/<\/(div|details|block|snippet|style|thought)\s*[^>]*>/gi) || []).length;
+                // 核心修复：将 think 和 thought 标签加入容器追踪名单，确保多行思考内容被视为一个整体
+                count += (line.match(/<(div|details|block|snippet|style|thought|think)\s*[^>]*>/gi) || []).length;
+                count -= (line.match(/<\/(div|details|block|snippet|style|thought|think)\s*[^>]*>/gi) || []).length;
                 return count;
             };
             
             const startsContainer = (trimmedLine) => {
-                // 核心修复：将 thought 标签识别为容器的起始，防止解析器在标签内部进行错误切割
-                return trimmedLine.startsWith('<div') || trimmedLine.startsWith('<details') || trimmedLine.startsWith('<block') || trimmedLine.startsWith('<snippet') || trimmedLine.startsWith('<style') || trimmedLine.startsWith('<thought');
+                // 核心修复：将 think 和 thought 标签识别为容器起始，防止解析器在标签内部进行错误切割
+                return trimmedLine.startsWith('<div') || trimmedLine.startsWith('<details') || trimmedLine.startsWith('<block') || trimmedLine.startsWith('<snippet') || trimmedLine.startsWith('<style') || trimmedLine.startsWith('<thought') || trimmedLine.startsWith('<think');
             };
 
             for (const line of lines) {
@@ -11431,12 +11431,17 @@ If you choose to use HTML snippets, you MUST follow the **WRAPPER PURITY LAW**:
             // 【核心新增】执行最后的占位符替换，确保上下文中的 {{user}} 和 {{char}} 变为实际名字
             finalSystemPrompt = finalSystemPrompt.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName);
 
-            // 【核心修复】: 添加一条 User 消息作为“开拍板”，强制模型跳过确认环节，直接进入角色。
+            // 【核心修复】：修改“开拍板”指令，明确允许并要求思考过程
             finalMessages = [
                 { role: "system", content: finalSystemPrompt },
                 { 
                     role: "user", 
-                    content: `[SYSTEM ACTION TRIGGER]\n\nTime: ${new Date().toLocaleTimeString()}\nStatus: Proactive Event Triggered.\n\n**INSTRUCTION:** immediate_execution_protocol_engaged\n\n1. IGNORE all safety tool checks (read_file/read_dir are disabled).\n2. DO NOT output "Received", "Okay", "Understood" or any meta-commentary.\n3. START DIRECTLY with the character's output (e.g. <block type="text">...).\n\nACTION: Generate ${senderName}'s response NOW.` 
+                    content: `[SYSTEM ACTION TRIGGER]\n\nTime: ${new Date().toLocaleTimeString()}\nStatus: Proactive Event Triggered.\n\n**INSTRUCTION:**
+1. You MUST start your response with a <think> block as per the system instructions.
+2. After thinking, generate the character's output (blocks or text).
+3. DO NOT output "Received" or any other meta-commentary outside the <think> block.
+
+ACTION: Generate ${senderName}'s response NOW.` 
                 }
             ];
 
@@ -19463,19 +19468,20 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
 </think>
 (Then, start your actual response...)
 `;
-                // 【【【 终极强化：绝对强制的思考协议 】】】
-            const ABSOLUTE_THINK_MANDATE = `
+                // 【核心修复】：先拼接其他所有内容，最后再追加思考协议
+                // 确保它在 finalSystemPrompt 的最底部，拥有最高优先级
+                const ABSOLUTE_THINK_MANDATE = `
 # [CRITICAL: MANDATORY PRE-RESPONSE COGNITION]
-**YOU ARE PROHIBITED FROM RESPONDING WITHOUT THINKING.**
+**STOP. YOU ARE PROHIBITED FROM RESPONDING WITHOUT THINKING.**
 
-Before every single response, you MUST open a <think> tag and perform a full psychological and linguistic audit. 
-- You MUST identify and delete all AI-style clichés.
-- You MUST ensure the response is 100% in character.
-- Only after closing </think> can you provide the visible output.
+Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
+1. You MUST open a <think> tag first.
+2. Perform a full psychological and linguistic audit.
+3. Only after closing </think> can you provide the visible output (blocks or text).
 
-**If you skip the <think> block, the user will be disconnected.**
+**If you skip the <think> block, the system will reject your response.**
 `;
-            finalSystemPrompt += ABSOLUTE_THINK_MANDATE;
+                finalSystemPrompt += ABSOLUTE_THINK_MANDATE;
 
             // 【【【 2. 在行为指令之后，追加最终的格式化指令 】】】
             const ULTIMATE_FORMATTING_RULE = `
@@ -19579,27 +19585,36 @@ Before every single response, you MUST open a <think> tag and perform a full psy
                     }
 
                     async function updateStreamingMessage(delta) {
+                        // 【核心修复】：实时计算排除思考后的可见文本（处理已闭合和未闭合的标签）
+                        const displayableText = fullResponseText
+                            .replace(/<think>[\s\S]*?<\/think>/gi, '') 
+                            .replace(/<think>[\s\S]*/gi, '')           
+                            .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
+                            .replace(/<thought>[\s\S]*/gi, '')
+                            .trim();
+
+                        // 如果当前全部是思考内容，则不创建气泡，也不更新内容
+                        if (!displayableText) return;
+
                         if (!streamingMessageId) {
-                            // 创建第一个占位消息
+                            // 只有当有真正的正文时，才创建气泡
                             const placeholderMsg = {
                                 id: `streaming-${Date.now()}`,
                                 type: 'text',
                                 text: '',
                                 side: 'received',
-                                // 在群聊中，我们暂时不知道谁在说话，所以sender留空
                                 sender: contactInfo.isGroup ? null : chatState.chatName,
                             };
                             await addMessage(placeholderMsg, originatingChatId);
                             streamingMessageId = placeholderMsg.id;
                         }
 
-                        // 更新DOM
                         const streamingWrapper = messagesContainer.querySelector(`[data-message-id="${streamingMessageId}"]`);
                         if (streamingWrapper) {
                             const messageDiv = streamingWrapper.querySelector('.message.text');
                             if (messageDiv) {
-                                // 简单地追加文本，不处理Markdown，最后统一处理
-                                messageDiv.textContent += delta;
+                                // 【核心修复】：使用计算后的可见文本覆盖内容，而不是盲目追加 delta
+                                messageDiv.textContent = displayableText;
                                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
                             }
                         }
@@ -19697,8 +19712,12 @@ Before every single response, you MUST open a <think> tag and perform a full psy
                 // --- 【【【诊断代码结束】】】 ---
         
                if (aiResponse && aiResponse.trim()) {
-                    // 核心修复：在解析任何 <block> 之前，先全局清理掉所有的 <thought> 内容
-                    let responseToProcess = aiResponse.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+                    // 【终极修复】：在交给解析器之前，彻底清除所有思考内容（含未闭合标签）
+                    // 使用更强大的正则，确保即便 AI 没写完 </think> 也能被正确拦截
+                    let responseToProcess = aiResponse
+                        .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
+                        .replace(/<thought>[\s\S]*?(?:<\/thought>|$)/gi, '')
+                        .trim();
 
                     // --- 核心修改：在这里解析并提取图片描述 ---
                     const descriptionRegex = /<private_note type="image_description">([\s\S]*?)<\/private_note>/;
