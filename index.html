@@ -16956,7 +16956,8 @@ A girl with long pink hair is standing under a cherry blossom tree. She is weari
                     }
                     case 'gift': descriptiveText = `[${senderName} sent a gift: "${msg.text}"]`; break;
                     case 'location': try { const loc = JSON.parse(msg.text); descriptiveText = `[${senderName} shared a location: "${loc.title}" at "${loc.address}"]`; } catch (e) {} break;
-                    case 'pay_for_me': descriptiveText = `[${senderName} sent a 'Pay For Me' request for "${msg.text}" with the amount ¥${msg.details.amount || 'N/A'}.]`; break;
+                    // 【核心修复】：增加 ?. 防止 details 缺失时导致整个 AI 触发器崩溃
+                    case 'pay_for_me': descriptiveText = `[${senderName} sent a 'Pay For Me' request for "${msg.text}" with the amount ¥${msg.details?.amount || 'N/A'}.]`; break;
                     case 'video': descriptiveText = `[${senderName} sent a video card with the description: "${msg.text}"]`; break;
                     case 'photo-description': descriptiveText = `[${senderName} sent a photo card with the text: "${msg.text}"]`; break;
                 }
@@ -21172,6 +21173,8 @@ You are the Director. If multiple characters react to the rejection, generate a 
                     if (cmd.command === 'pay_for_me' && cmd.value) {
                         try {
                             const payData = JSON.parse(cmd.value);
+                            // 【核心修复】：确保解析出的对象里一定有 details 属性，没有就补一个，防止后续报错
+                            if (!payData.details) payData.details = { amount: '0.00' };
                             messageData = { ...messageData, ...payData, payStatus: 'pending' };
                             // 【【【 【【【 全新、绝对正确的代付修复 】】】 】】】
                             messageData.sender = sender; 
@@ -22151,11 +22154,11 @@ You are the Director. If multiple characters react to the rejection, generate a 
                 else if (msg.type === 'location') { try { const data = JSON.parse(msg.text); div.innerHTML = `<div class="location-text"><div class="title">${data.title}</div><div class="address">${data.address}</div></div><div class="card-map-area"><div class="card-pin-icon"></div></div>`; } catch (e) { div.textContent = '[位置消息格式错误]'; } }
                 else if (msg.type === 'gift') { let statusText = ''; const isFinished = msg.giftStatus === 'finished'; const isExpired = msg.giftStatus === 'expired'; if (isFinished) { statusText = '已领取'; } else if (isExpired) { statusText = '已过期'; } div.innerHTML = `<div class="gift-bubble ${isFinished || isExpired ? 'finished' : ''}"><div class="gift-content"><div class="gift-icon"></div><div class="gift-text"><div class="gift-name">${msg.text}</div>${statusText ? `<div class="gift-status">${statusText}</div>` : ''}</div></div><div class="gift-footer">礼物</div></div>`; }
                 else if (msg.type === 'pay_for_me') {
-                    // 【核心修复】增加 try-catch 和空值检查，防止 AI 生成烂数据导致崩溃
                     try {
                         const isPaid = msg.payStatus === 'paid';
-                        const itemType = msg.itemType || 'shopping'; // 默认为购物
-                        const details = msg.details || {}; // 确保 details 存在
+                        const itemType = msg.itemType || 'shopping';
+                        // 【核心修改】：如果 details 彻底不存在，强制给它一个空对象和默认金额，防止下方读取 .amount 报错
+                        const details = msg.details || { amount: '0.00' }; 
 
                         div.classList.toggle('paid', isPaid);
                         div.classList.add(`pay-for-me-${itemType}`);
@@ -22770,11 +22773,11 @@ You are the Director. If multiple characters react to the rejection, generate a 
                 else if (msg.type === 'location') { try { const data = JSON.parse(msg.text); div.innerHTML = `<div class="location-text"><div class="title">${data.title}</div><div class="address">${data.address}</div></div><div class="card-map-area"><div class="card-pin-icon"></div></div>`; } catch (e) { div.textContent = '[位置消息格式错误]'; } }
                 else if (msg.type === 'gift') { let statusText = ''; const isFinished = msg.giftStatus === 'finished'; const isExpired = msg.giftStatus === 'expired'; if (isFinished) { statusText = '已领取'; } else if (isExpired) { statusText = '已过期'; } div.innerHTML = `<div class="gift-bubble ${isFinished || isExpired ? 'finished' : ''}"><div class="gift-content"><div class="gift-icon"></div><div class="gift-text"><div class="gift-name">${msg.text}</div>${statusText ? `<div class="gift-status">${statusText}</div>` : ''}</div></div><div class="gift-footer">礼物</div></div>`; }
                 else if (msg.type === 'pay_for_me') {
-                    // 【核心修复】增加 try-catch 和空值检查，防止 AI 生成烂数据导致崩溃
                     try {
                         const isPaid = msg.payStatus === 'paid';
-                        const itemType = msg.itemType || 'shopping'; // 默认为购物
-                        const details = msg.details || {}; // 确保 details 存在
+                        const itemType = msg.itemType || 'shopping';
+                        // 【核心修改】：如果 details 彻底不存在，强制给它一个空对象和默认金额，防止下方读取 .amount 报错
+                        const details = msg.details || { amount: '0.00' }; 
 
                         div.classList.toggle('paid', isPaid);
                         div.classList.add(`pay-for-me-${itemType}`);
@@ -23946,7 +23949,8 @@ const showContextMenu = (event, messageId) => {
                         // 4. 保存并重绘
                         saveConversation();
                         reRenderMessages();
-                        showNotification('已清理后续对话并重置状态');
+                        // 【核心修复】：由于上面已经全局化，这里可以放心直接调用
+                        window.showNotification('已清理后续对话并重置状态');
                     }
                 }
                 break;
@@ -27133,7 +27137,8 @@ const momentsManager = (function() {
 
         let notificationTimeout;
 
-        function showNotification(message) {
+        // 【核心修复】：将函数挂载到 window，使其全局化，解决“is not defined”报错
+        window.showNotification = function(message) {
             if (notificationTimeout) clearTimeout(notificationTimeout);
             notificationArea.textContent = message;
             notificationArea.classList.add('visible');
@@ -27141,7 +27146,7 @@ const momentsManager = (function() {
                 notificationArea.classList.remove('visible');
                 notificationTimeout = null;
             }, 3000);
-        }
+        };
 
         // --- ↓↓↓ 全新的红点检查函数 从这里开始 ↓↓↓ ---
         // 渲染上传时的九宫格预览
@@ -28806,7 +28811,8 @@ if (momentsCommentStickerBtn) {
 checkMomentsUpdates(); // <--- 新增这一行
         }
         
-        return { init, refreshData, createPostFromAI, getRecentMomentsForAI, handleInteractionFromAI, updatePostDescription, handleForwardFromAI, showNotification };
+        // 【核心修改】：从返回对象中移除 showNotification，因为它已经是全局 window.showNotification 了
+        return { init, refreshData, createPostFromAI, getRecentMomentsForAI, handleInteractionFromAI, updatePostDescription, handleForwardFromAI };
 })();
     // --- START: TUQU MANAGER (RED DOT) ---
     const tuquManager = (function() {
@@ -38282,7 +38288,7 @@ const cloudBackupManager = (function() {
         return null;
     }
 
-        async function getCompressedBackupData() {
+    async function getCompressedBackupData() {
         if (typeof JSZip === 'undefined') throw new Error("JSZip 未加载");
         
         // 【核心修复】同步更新云端备份的前缀白名单
@@ -38387,51 +38393,48 @@ const cloudBackupManager = (function() {
         var statusEl = document.getElementById('gh-status-msg');
         if (statusEl) statusEl.textContent = isAuto ? "正在自动备份..." : "正在处理...";
         
-        // 使用 setTimeout 将耗时操作推迟到下一个事件循环
-        setTimeout(async () => {
-            try {
-                var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/" + info.filename;
-                var contentBase64 = await getCompressedBackupData();
-                var sha = await getFileSha(apiUrl, info.token);
-                
-                var bodyData = {
-                    message: (isAuto ? "Auto " : "Manual ") + "Backup: " + new Date().toLocaleString(),
-                    content: contentBase64
-                };
-                if (sha) bodyData.sha = sha;
+        try {
+            var apiUrl = "https://api.github.com/repos/" + info.owner + "/" + info.repo + "/contents/" + info.filename;
+            var contentBase64 = await getCompressedBackupData();
+            var sha = await getFileSha(apiUrl, info.token);
+            
+            var bodyData = {
+                message: (isAuto ? "Auto " : "Manual ") + "Backup: " + new Date().toLocaleString(),
+                content: contentBase64
+            };
+            if (sha) bodyData.sha = sha;
 
-                var response = await fetch(apiUrl, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': 'token ' + info.token,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(bodyData)
-                });
+            var response = await fetch(apiUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': 'token ' + info.token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bodyData)
+            });
 
-                if (!response.ok) {
-                    var errText = await response.text();
-                    throw new Error(response.status + " " + errText);
-                }
-
-                lastBackupTime = Date.now();
-                localStorage.setItem('gh_last_backup_time', lastBackupTime);
-
-                if (statusEl) {
-                    statusEl.style.color = "#28a745";
-                    statusEl.textContent = `✅ ${isAuto ? '自动' : ''}备份成功 (${new Date().toLocaleTimeString()})`;
-                }
-                if (!isAuto) alert("备份成功！");
-
-            } catch (e) {
-                console.error(e);
-                if (statusEl) {
-                    statusEl.style.color = "#d73a49";
-                    statusEl.textContent = `❌ 备份失败: ${e.message}`;
-                }
-                if (!isAuto) alert("备份失败: " + e.message);
+            if (!response.ok) {
+                var errText = await response.text();
+                throw new Error(response.status + " " + errText);
             }
-        }, 0); // 延迟0毫秒，意味着在当前任务完成后立即执行
+
+            lastBackupTime = Date.now();
+            localStorage.setItem('gh_last_backup_time', lastBackupTime);
+
+            if (statusEl) {
+                statusEl.style.color = "#28a745";
+                statusEl.textContent = `✅ ${isAuto ? '自动' : ''}备份成功 (${new Date().toLocaleTimeString()})`;
+            }
+            if (!isAuto) alert("备份成功！");
+
+        } catch (e) {
+            console.error(e);
+            if (statusEl) {
+                statusEl.style.color = "#d73a49";
+                statusEl.textContent = `❌ 备份失败: ${e.message}`;
+            }
+            if (!isAuto) alert("备份失败: " + e.message);
+        }
     }
 
     function setupAutoBackup(intervalMinutes) {
