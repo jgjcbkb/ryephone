@@ -4389,8 +4389,47 @@ input:checked + .slider:before {
 
 /* --- MOOD CARD STYLES (MODAL) --- */
 #mood-card-modal-overlay .card-deck-container { width: 100%; max-width: 700px; position: relative; perspective: 1000px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-#mood-card-modal-overlay .card-deck { position: relative; width: 95%; max-width: 650px; aspect-ratio: 650 / 750; }
-#mood-card-modal-overlay .bubble { width: 95%; max-width: 650px; aspect-ratio: 1245 / 1417; position: relative; background-color: transparent; overflow: hidden; }
+#mood-card-modal-overlay .card-deck { 
+    position: relative; 
+    width: 95%; 
+    max-width: 650px; 
+    aspect-ratio: 650 / 750; 
+    /* 修改：核心修复。当卡片向左或向右滑出屏幕时，强制隐藏超出部分，防止屏幕出现横向滚动条 */
+    overflow: hidden !important; 
+    /* 新增：确保容器不响应任何横向原生的滚动指令 */
+    touch-action: pan-y;
+}
+/* 彻底隐藏心事弹窗内所有可能的横向滚动条 */
+#mood-card-modal-overlay *::-webkit-scrollbar:horizontal {
+    display: none !important;
+    height: 0 !important;
+    width: 0 !important;
+}
+
+#mood-card-modal-overlay .card-deck-container,
+#mood-card-modal-overlay .card-deck,
+#mood-card-modal-overlay .card,
+#mood-card-modal-overlay .content-wrapper {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;     /* Firefox */
+}
+
+/* 针对 iOS Safari 的特殊补丁：防止内容在滑动时触发橡皮筋效果产生的横向位移 */
+#mood-card-modal-overlay .modal-box {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+}
+#mood-card-modal-overlay .bubble { 
+    width: 95%; 
+    max-width: 650px; 
+    aspect-ratio: 1245 / 1417; 
+    position: relative; 
+    background-color: transparent; 
+    /* 修改：确保卡片内部任何元素（包括背景图）都不允许横向撑开 */
+    overflow: hidden !important; 
+    /* 新增：强制硬件加速，防止滑动时出现白边或滚动条 */
+    transform: translateZ(0);
+}
 #mood-card-modal-overlay .mood-card-background-img {
     position: absolute;
     top: 0;
@@ -4414,14 +4453,14 @@ input:checked + .slider:before {
     font-size: 14px;
     font-weight: 500;
     line-height: 1.5;
-    /* 修改：使用 break-all 强制截断长链接或单词，防止撑开横向宽度 */
+    /* 修改：强制所有字符（含长链接）在边界处换行 */
     word-break: break-all; 
     z-index: 2;
     box-sizing: border-box;
     padding: 0;
     text-align: left;
     overflow-y: auto;
-    /* 修改：强制隐藏横向溢出，并确保优先级 */
+    /* 修改：强制禁用横向滚动并隐藏溢出 */
     overflow-x: hidden !important; 
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.5) transparent;
@@ -4432,6 +4471,8 @@ input:checked + .slider:before {
     height: auto;
     width: auto;
     white-space: pre-wrap;
+    /* 新增：禁止 iOS 默认的横向触控手势干扰 */
+    touch-action: pan-y;
 }
 
 /* 新增：专门针对苹果 Safari 和 Chrome 浏览器内核，彻底抹除横向滚动条的占位高度 */
