@@ -13636,8 +13636,8 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                 // ===== 新代码块到此结束 =====
                 } // end of while loop
 
-                // 【核心修复】使用更强力的正则捕获整个 JSON 块
-                const tuquComplexRegex = /\[tuqu_complex_action:\s*(\{[\s\S]+?\})\s*\]/g;
+                // 【核心修复】将 +? 改为 *，实行贪婪匹配，确保抓取到最后一个 ] 之前的全部内容
+                const tuquComplexRegex = /\[tuqu_complex_action:\s*(\{[\s\S]*\})\s*\]/g;
                 let tuquMatch;
                 const tuquIframe = document.querySelector('#tab-content-tuqu iframe');
 
@@ -13652,17 +13652,24 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                     try {
                         let jsonStr = tuquMatch[1].trim();
 
-                        // 【暴力提取函数：支持提取任意字段，自动处理转义和换行】
+                        // 【暴力提取函数：增加对超长文本的穿透能力】
                         const fastExtract = (source, field) => {
-                            const regex = new RegExp('"' + field + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"', 's');
-                            const m = source.match(regex);
+                            // 使用贪婪匹配字段内容的结尾，确保 HTML 代码里的引号不会干扰提取
+                            const regex = new RegExp('"' + field + '"\\s*:\\s*"([\\s\\S]*?)"(?=\\s*[,}])', 'g');
+                            let m = regex.exec(source);
+                            // 如果正则没抓到，尝试最基础的引号间提取
+                            if (!m) {
+                                const simpleRegex = new RegExp('"' + field + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"', 's');
+                                m = source.match(simpleRegex);
+                            }
+                            
                             if (m && m[1]) {
                                 return m[1].replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\').trim();
                             }
                             return '';
                         };
 
-                        // 1. 提取主贴/主评论基础字段
+                        // 1. 提取主贴基础字段
                         const typeVal = (jsonStr.match(/"type"\s*:\s*"([^"]+)"/) || [])[1];
                         const boardVal = (jsonStr.match(/"board"\s*:\s*"([^"]+)"/) || [])[1];
                         
@@ -13679,12 +13686,11 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                             water_army: []
                         };
 
-                        // 2. 【核心重构】暴力提取水军/评论列表 (water_army)
-                        // 寻找 "water_army": [ ... ] 之间的所有内容
-                        const armyBlockMatch = jsonStr.match(/"water_army"\s*:\s*\[([\s\S]+)\]/);
+                        // 2. 【核心重构】贪婪提取水军列表
+                        const armyBlockMatch = jsonStr.match(/"water_army"\s*:\s*\[([\s\S]*)\]/);
                         if (armyBlockMatch) {
                             const armyBlock = armyBlockMatch[1];
-                            // 使用正则匹配每一对 { ... } 块
+                            // 逐个抓取水军对象
                             const itemRegex = /\{([\s\S]+?)\}/g;
                             let itemMatch;
                             while ((itemMatch = itemRegex.exec(armyBlock)) !== null) {
@@ -13692,7 +13698,6 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                 const armyAuthor = fastExtract(itemStr, 'author');
                                 const armyContent = fastExtract(itemStr, 'content');
                                 
-                                // 只有当作者和内容都不为空时才加入列表
                                 if (armyAuthor || armyContent) {
                                     data.water_army.push({
                                         author: armyAuthor,
