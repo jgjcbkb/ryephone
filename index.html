@@ -10286,6 +10286,79 @@ if ('serviceWorker' in navigator) {
 
         return Array.from(characterSet).sort(); 
     }
+    // 新增：论坛流式动作处理器
+    function handleLiveTuquAction(jsonString) {
+        try {
+            const data = JSON.parse(jsonString.replace(/\\\\"/g, '\\"'));
+            const tuquIframe = document.querySelector('#tab-content-tuqu iframe');
+            if (!tuquIframe) return;
+
+            // 复用原有的标签解析逻辑（Emoji/Sticker）
+            const parseTuquMedia = (text) => {
+                if (!text) return "";
+                return text.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                    const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type.toLowerCase());
+                    if (item) {
+                        return type.toLowerCase() === 'emoji' 
+                            ? `<img src="${item.url}" class="inline-emoji" style="height:1.2em; vertical-align:middle;">`
+                            : `<img src="${item.url}" style="max-width:120px; display:block; margin:8px 0; border-radius:8px;">`;
+                    }
+                    return match;
+                });
+            };
+
+            if (data.type === 'new_topic') {
+                const newPostId = `post_ai_${Date.now()}`;
+                tuquIframe.contentWindow.postMessage({ 
+                    type: 'AI_POST_TOPIC', 
+                    board: data.board, 
+                    subject: parseTuquMedia(data.subject), 
+                    content: parseTuquMedia(data.content), 
+                    author: data.author, 
+                    location: data.location,
+                    forceId: newPostId
+                }, '*');
+                
+                // 水军评论依然保持短延迟，模拟“回帖潮”
+                if (data.water_army) {
+                    data.water_army.forEach((c, i) => {
+                        setTimeout(() => {
+                            tuquIframe.contentWindow.postMessage({ 
+                                type: 'AI_POST_COMMENT', 
+                                postId: newPostId, 
+                                content: parseTuquMedia(c.content), 
+                                author: c.author, 
+                                location: c.location 
+                            }, '*');
+                        }, 800 * (i + 1));
+                    });
+                }
+            } else if (data.type === 'comment') {
+                tuquIframe.contentWindow.postMessage({ 
+                    type: 'AI_POST_COMMENT', 
+                    postId: data.postId, 
+                    content: parseTuquMedia(data.content), 
+                    author: data.author, 
+                    location: data.location,
+                    quote: data.quote 
+                }, '*');
+                
+                if (data.water_army) {
+                    data.water_army.forEach((c, i) => {
+                        setTimeout(() => {
+                            tuquIframe.contentWindow.postMessage({ 
+                                type: 'AI_POST_COMMENT', 
+                                postId: data.postId, 
+                                content: parseTuquMedia(c.content), 
+                                author: c.author, 
+                                location: c.location 
+                            }, '*');
+                        }, 800 * (i + 1));
+                    });
+                }
+            }
+        } catch (e) { console.error("Live Tuqu Action Error:", e); }
+    }
     // 新增：一个强大的、基于状态和嵌套计数的区块解析器 (V2 - 修复嵌套DIV问题)
         // 最终版本：兼容 <details> 标签的强大区块解析器
         function parseResponseIntoBlocks(text) {
@@ -13630,90 +13703,13 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                     .trim();
 
                 while ((tuquMatch = tuquComplexRegex.exec(sanitizedResponse)) !== null) {
+                    // 核心修改：检查这个指令是否已经被流式逻辑处理过了
+                    if (sanitizedResponse.includes('[PROCESSED_TUQU_ACTION]')) {
+                        console.log("[Dynamics] 指令已在流式阶段处理，跳过重复执行。");
+                        continue;
+                    }
                     try {
-                        let jsonStr = tuquMatch[1].trim();
-                        
-                        if (jsonStr.endsWith(']')) {
-                            jsonStr = jsonStr.substring(0, jsonStr.lastIndexOf('}') + 1);
-                        }
-
-                        const data = JSON.parse(jsonStr);
-                        if (!tuquIframe) break;
-
-                        // 【核心修复】定义内部解析函数，区分处理 Emoji 和 Sticker 的显示尺寸
-                        const parseTuquMedia = (text) => {
-                            if (!text) return "";
-                            return text.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
-                                const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type.toLowerCase());
-                                if (item) {
-                                    if (type.toLowerCase() === 'emoji') {
-                                        // Emoji 保持行内小尺寸，跟随文字高度
-                                        return `<img src="${item.url}" alt="${name}" class="inline-emoji" style="height:1.2em; vertical-align:middle; margin:0 2px;">`;
-                                    } else {
-                                        // 表情包 (Sticker) 使用大尺寸，且强制换行显示，更符合论坛表情包习惯
-                                        return `<img src="${item.url}" alt="${name}" style="max-width: 120px; max-height: 120px; display: block; margin: 8px 0; border-radius: 8px;">`;
-                                    }
-                                }
-                                return match;
-                            });
-                        };
-
-                        const forbiddenNames = ["{{user}}", userNameForPrompt];
-                        
-                        if (data.type === 'new_topic') {
-                            if (forbiddenNames.includes(data.author)) data.author = "匿名用户";
-                            const newPostId = `post_ai_${Date.now()}`;
-                            tuquIframe.contentWindow.postMessage({ 
-                                type: 'AI_POST_TOPIC', 
-                                board: data.board, 
-                                subject: parseTuquMedia(data.subject), // 解析标题中的表情
-                                content: parseTuquMedia(data.content), // 解析正文中的表情
-                                author: data.author, 
-                                location: data.location,
-                                forceId: newPostId
-                            }, '*');
-                            
-                            if (data.water_army && Array.isArray(data.water_army)) {
-                                data.water_army.forEach((c, index) => {
-                                    if (forbiddenNames.includes(c.author)) c.author = "路人" + (index + 1);
-                                    setTimeout(() => {
-                                        tuquIframe.contentWindow.postMessage({ 
-                                            type: 'AI_POST_COMMENT', 
-                                            postId: newPostId, 
-                                            content: parseTuquMedia(c.content), // 解析水军评论中的表情
-                                            author: c.author, 
-                                            location: c.location 
-                                        }, '*');
-                                    }, 500 * (index + 1));
-                                });
-                            }
-                        } else if (data.type === 'comment') {
-                            if (forbiddenNames.includes(data.author)) data.author = "匿名网友";
-                            tuquIframe.contentWindow.postMessage({ 
-                                type: 'AI_POST_COMMENT', 
-                                postId: data.postId, 
-                                content: parseTuquMedia(data.content), // 解析评论中的表情
-                                author: data.author, 
-                                location: data.location,
-                                quote: data.quote 
-                            }, '*');
-
-                            if (data.water_army && Array.isArray(data.water_army)) {
-                                data.water_army.forEach((c, index) => {
-                                    if (forbiddenNames.includes(c.author)) c.author = "吃瓜群众";
-                                    setTimeout(() => {
-                                        tuquIframe.contentWindow.postMessage({ 
-                                            type: 'AI_POST_COMMENT', 
-                                            postId: data.postId, 
-                                            content: parseTuquMedia(c.content), // 解析水军评论中的表情
-                                            author: c.author, 
-                                            location: c.location 
-                                        }, '*');
-                                    }, 500 * (index + 1));
-                                });
-                            }
-                        }
-                        commandsFound++;
+                        handleLiveTuquAction(tuquMatch[1]);
                     } catch (e) { console.error("Tuqu Complex Action Error", e); }
                 }
 
