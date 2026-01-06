@@ -334,11 +334,16 @@ html, body {
             </div>
             <div class="page-content">
                 <div class="list-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span><a href="#" onclick="navigateTo('new-post')">发表新帖子</a></span>
+                    <div style="display: flex; gap: 15px; align-items: center;">
+                        <span><a href="#" onclick="navigateTo('new-post')">发表新帖子</a></span>
+                        <!-- 新增批量删除按钮 -->
+                        <span id="batch-delete-btn" onclick="deleteSelectedTopics()" style="color: var(--jj-red-link-hover); cursor: pointer; display: none;">删除选中</span>
+                    </div>
                     <button onclick="triggerBoardTuqu()" style="font-size:12px; padding:4px 10px; background:var(--jj-blue-link); color:white; border:none; border-radius:12px; cursor:pointer; opacity: 0.9;">更新</button>
                 </div>
                 <table class="topic-list-table" cellspacing="1">
-                    <thead><tr><th>主题</th><th>作者</th><th>发表时间</th><th>回复</th></tr></thead>
+                    <!-- 表头增加全选勾选框列 -->
+                    <thead><tr><th style="width: 30px;"><input type="checkbox" id="topic-select-all" onclick="toggleAllTopics(this)"></th><th>主题</th><th>作者</th><th>发表时间</th><th>回复</th></tr></thead>
                     <tbody id="topic-list-body"></tbody>
                 </table>
             </div>
@@ -465,6 +470,19 @@ html, body {
         </div>
     </div>
 
+    <!-- 新增：批量删除确认弹窗 -->
+    <div id="batch-delete-modal-overlay" class="custom-modal-overlay">
+        <div class="custom-modal">
+            <h3 class="modal-title">批量删除</h3>
+            <div class="modal-body" id="batch-delete-msg" style="text-align: center; color: #ff4d4f; font-weight: bold;"></div>
+            <div class="modal-body" style="text-align: center; font-size: 13px;">删除后数据将无法找回，请谨慎操作。</div>
+            <div class="modal-buttons">
+                <button class="modal-btn btn-cancel" onclick="document.getElementById('batch-delete-modal-overlay').style.display='none'">取消</button>
+                <button class="modal-btn btn-delete" onclick="executeBatchDelete()">确认删除</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 新增：催更选项弹窗 -->
     <div id="board-trigger-modal" class="tuqu-modal-overlay">
         <div class="tuqu-modal">
@@ -536,6 +554,7 @@ html, body {
         // --- 数据存储和管理 ---
         let forumData = JSON.parse(localStorage.getItem('jjForumData')) || {};
         let currentTriggerMode = 'board'; // 新增：用于区分是“版块催更”还是“帖子更新”
+        let selectedTopicIds = []; // 【核心新增】用于跨刷新记住勾选的帖子ID
 
         function exitTuquToAppHome() {
             window.parent.postMessage({ type: 'EXIT_TUQU' }, '*');
@@ -873,9 +892,15 @@ html, body {
         function navigateTo(pageId, title = '') {
             // 标记已读逻辑
             if (pageId === 'list' && title) {
-                // 进入板块，标记该板块所有帖子为已读
+                // 【核心修复】切换版块时清空勾选记忆
+                selectedTopicIds = [];
+                const selectAllEl = document.getElementById('topic-select-all');
+                if (selectAllEl) selectAllEl.checked = false;
+
                 localStorage.setItem('last_viewed_board_' + title, Date.now());
             } else if (pageId === 'post' && currentPostId) {
+                // 离开列表页时，清空勾选记忆
+                selectedTopicIds = [];
                 // 进入帖子，标记该帖子所有回复为已读
                 localStorage.setItem('last_viewed_topic_' + currentPostId, Date.now());
             } else if (pageId === 'home') {
@@ -949,16 +974,23 @@ html, body {
             const topics = forumData[boardTitle] || [];
 
             if (topics.length === 0) {
-                topicListBody.innerHTML = `<tr><td colspan="4" class="no-topics-message">本版块还没有帖子，快来发表新帖吧！</td></tr>`;
+                topicListBody.innerHTML = `<tr><td colspan="5" class="no-topics-message">本版块还没有帖子，快来发表新帖吧！</td></tr>`;
                 return;
             }
             
+            const selectAllEl = document.getElementById('topic-select-all');
+            const isAllChecked = selectAllEl ? selectAllEl.checked : false;
+
             topicListBody.innerHTML = topics.map(topic => {
                 const newReplies = getNewRepliesCount(topic);
                 const badgeHtml = newReplies > 0 ? `<span class="jj-badge">${newReplies}</span>` : '';
                 
+                const shouldCheck = isAllChecked || selectedTopicIds.includes(topic.id);
+                const checkedAttr = shouldCheck ? 'checked' : '';
+
                 return `
                 <tr>
+                    <td style="text-align: center;"><input type="checkbox" class="topic-checkbox" value="${topic.id}" onclick="handleSingleCheckboxClick(this)" ${checkedAttr}></td>
                     <td class="topic-title">
                         <a href="#" onclick="currentPostId='${topic.id}'; navigateTo('post')">${topic.subject}</a>
                         ${badgeHtml}
@@ -967,8 +999,65 @@ html, body {
                     <td class="topic-time">${topic.timestamp}</td>
                     <td class="topic-replies">${topic.replies}</td>
                 </tr>`}).join('');
+
+            updateBatchDeleteBtnUI();
         }
-        
+
+        function handleSingleCheckboxClick(el) {
+            const id = el.value;
+            if (el.checked) {
+                if (!selectedTopicIds.includes(id)) selectedTopicIds.push(id);
+            } else {
+                selectedTopicIds = selectedTopicIds.filter(item => item !== id);
+                const selectAllEl = document.getElementById('topic-select-all');
+                if (selectAllEl) selectAllEl.checked = false;
+            }
+            updateBatchDeleteBtnUI();
+        }
+
+        function toggleAllTopics(source) {
+            const checkboxes = document.querySelectorAll('.topic-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = source.checked;
+                const id = cb.value;
+                if (source.checked) {
+                    if (!selectedTopicIds.includes(id)) selectedTopicIds.push(id);
+                } else {
+                    selectedTopicIds = selectedTopicIds.filter(item => item !== id);
+                }
+            });
+            updateBatchDeleteBtnUI();
+        }
+
+        function updateBatchDeleteBtnUI() {
+            const checkedCount = selectedTopicIds.length;
+            const btn = document.getElementById('batch-delete-btn');
+            if (btn) {
+                btn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+                btn.innerText = `删除选中(${checkedCount})`;
+            }
+        }
+
+        let idsPendingDelete = []; 
+        function deleteSelectedTopics() {
+            if (selectedTopicIds.length === 0) return;
+            idsPendingDelete = [...selectedTopicIds];
+            document.getElementById('batch-delete-msg').innerText = `确定要删除选中的 ${idsPendingDelete.length} 个帖子吗？`;
+            document.getElementById('batch-delete-modal-overlay').style.display = 'flex';
+        }
+
+        function executeBatchDelete() {
+            document.getElementById('batch-delete-modal-overlay').style.display = 'none';
+            forumData[currentBoardTitle] = forumData[currentBoardTitle].filter(topic => !idsPendingDelete.includes(topic.id));
+            saveForumData();
+            idsPendingDelete = [];
+            selectedTopicIds = [];
+            const selectAllEl = document.getElementById('topic-select-all');
+            if (selectAllEl) selectAllEl.checked = false;
+            renderTopicList(currentBoardTitle);
+            alert('批量删除成功');
+        }
+
         function renderPostDetail(postId) {
             const postDetailContainer = document.getElementById('post-detail-container');
             let postData = null;
