@@ -1104,10 +1104,20 @@ html, body {
                 });
             };
 
+            // 【核心新增】Markdown 格式化函数
+            const applyMarkdown = (text) => {
+                if (!text) return "";
+                // 处理双星号加粗
+                let processed = text.replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight:bold;">$1</strong>');
+                // 处理单星号斜体
+                processed = processed.replace(/\*(.*?)\*/g, '<em style="font-style:italic; opacity:0.9;">$1</em>');
+                return processed;
+            };
+
             const commentsHTML = postData.comments.map((comment, index) => {
                 let commentBody = '';
-                // 解析内容中的表情
-                const parsedContent = parseStickerTags(comment.content).replace(/\n/g, '<br>');
+                // 解析内容中的表情和 Markdown 格式
+                const parsedContent = applyMarkdown(parseStickerTags(comment.content)).replace(/\n/g, '<br>');
 
                 if (comment.isReported) {
                     commentBody = `
@@ -1149,11 +1159,11 @@ html, body {
                                 <div class="author-line2">№0 ${postData.timestamp} <i class="location">来自${locations[Math.floor(Math.random() * locations.length)]}</i></div>
                             </div>
                             <div class="reply-actions-menu" onclick="openActionMenu(0)">...</div>
-                        </div>
-                        <div class="reply-content">
-                            <div class="text-body">${parseStickerTags(postData.content).replace(/\n/g, '<br>')}</div>
-                            <div class="post-images">${mainPostImagesHTML}</div>
-                        </div>
+                    </div>
+                    <div class="reply-content">
+                        <div class="text-body">${applyMarkdown(parseStickerTags(postData.content)).replace(/\n/g, '<br>')}</div>
+                        <div class="post-images">${mainPostImagesHTML}</div>
+                    </div>
                     </div>
                     ${commentsHTML}
                 </div>
