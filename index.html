@@ -506,6 +506,13 @@
         /* 强制优先渲染文本内容 */
         text-rendering: optimizeSpeed;
     }
+    #page-conversation .message.text, #page-conversation .message.voice { 
+    max-width: 230px; /* 这里的数值现在只是一个默认参考值 */
+    padding: 10px 18px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
+    width: -moz-fit-content; width: fit-content;
+    min-width: 30px;
+    white-space: pre-wrap; 
+}
     /* 核心修复：针对 .9图气泡的 iOS 专属性能补丁 */
     #page-conversation .message-main-content {
         position: relative;
@@ -11100,8 +11107,11 @@ You are initiating a conversation. Your opening must be fresh, real, and free of
 
 **ABSOLUTE BANS (IF YOU USE THESE, YOU FAIL):**
 1.  **NO LIGHTING / NO ADVERBS / NO DEFINITIONS / NO ONOMATOPOEIA.**
-2.  **FORBIDDEN PHRASES:** "眼底闪过", "嘴角上扬", "身体一僵", "精准地", "那股...感", "咚咚咚", "很+形容词", "小祖宗", "娇纵", "乖一点".
-3.  **NO ROLE REVERSAL:** If you are the "Bottom/Submissive", you are FORBIDDEN from taking physical initiative (e.g., pulling the user, carrying the user).
+2.  **FORBIDDEN PHRASES (THE DEAD LIST):** "眼底闪过", "嘴角上扬", "身体一僵", "精准地", "那股...感", "咚咚咚", "很+形容词", "小祖宗", "娇纵", "乖一点", "听话", "别闹", "惩罚", "补偿你".
+3.  **NO ARROGANCE:** You are FORBIDDEN from using a "Superior/Dominant" tone. Do not talk down to the user. Do not act like their master or parent.
+4.  **NO SEXUAL INNUENDO:** Keep your opening clean. No "greasy" flirting or sexual jokes.
+5.  **NO ROLE REVERSAL:** If you are the "Bottom/Submissive", you are FORBIDDEN from taking physical initiative (e.g., pulling the user, carrying the user).
+
 
 # [STRICT MEDIA PROTOCOL - ANTI-HALLUCINATION]
 **THE LIST IS LAW:** You are **STRICTLY FORBIDDEN** from inventing emoji or sticker names. 
@@ -11949,6 +11959,18 @@ ${contextHeader}${momentsWorldBookContent}
 
 
 You are now browsing Moments, a public social space, as **${senderName}**. Your primary goal is to **act like a real, social being within your entire known circle**, not just focus on one person.
+
+---
+## **[SOCIAL ETIQUETTE LAW - PUBLIC DECENCY]**
+
+**THIS IS A PUBLIC SPACE. ACT ACCORDINGLY.**
+
+1. **NO SEXUAL HARASSMENT:** You are STRICTLY FORBIDDEN from leaving "greasy," sexual, or suggestive comments on anyone's post (including the user's). 
+   - *Example of Failure:* "真想把你藏起来不给别人看" (Too greasy/possessive).
+   - *Example of Success:* "这组照片拍得很有氛围感。" (Normal friend).
+2. **NO OVERBEARING ARROGANCE:** Do not use your "Superior" persona to bully or command people in the comments. Be a human, not a trope.
+3. **BE A REAL FRIEND:** Your comments should be supportive, funny, inquisitive, or even slightly annoying (if that's your character), but they must remain within the bounds of "normal social interaction."
+---
 
 
 
@@ -13618,7 +13640,8 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                 // ===== 新代码块到此结束 =====
                 } // end of while loop
 
-                const tuquComplexRegex = /\[tuqu_complex_action:\s*({[\s\S]*})\s*\]/g;
+                // 【核心修复】使用更强力的正则捕获整个 JSON 块
+                const tuquComplexRegex = /\[tuqu_complex_action:\s*(\{[\s\S]+?\})\s*\]/g;
                 let tuquMatch;
                 const tuquIframe = document.querySelector('#tab-content-tuqu iframe');
 
@@ -13632,12 +13655,58 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                 while ((tuquMatch = tuquComplexRegex.exec(sanitizedResponse)) !== null) {
                     try {
                         let jsonStr = tuquMatch[1].trim();
+
+                        // 【暴力提取函数：支持提取任意字段，自动处理转义和换行】
+                        const fastExtract = (source, field) => {
+                            const regex = new RegExp('"' + field + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"', 's');
+                            const m = source.match(regex);
+                            if (m && m[1]) {
+                                return m[1].replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\').trim();
+                            }
+                            return '';
+                        };
+
+                        // 1. 提取主贴/主评论基础字段
+                        const typeVal = (jsonStr.match(/"type"\s*:\s*"([^"]+)"/) || [])[1];
+                        const boardVal = (jsonStr.match(/"board"\s*:\s*"([^"]+)"/) || [])[1];
                         
-                        if (jsonStr.endsWith(']')) {
-                            jsonStr = jsonStr.substring(0, jsonStr.lastIndexOf('}') + 1);
+                        if (!typeVal) continue;
+
+                        let data = {
+                            type: typeVal,
+                            board: boardVal || '',
+                            postId: fastExtract(jsonStr, 'postId'),
+                            author: fastExtract(jsonStr, 'author'),
+                            location: fastExtract(jsonStr, 'location'),
+                            subject: fastExtract(jsonStr, 'subject'),
+                            content: fastExtract(jsonStr, 'content'),
+                            water_army: []
+                        };
+
+                        // 2. 【核心重构】暴力提取水军/评论列表 (water_army)
+                        // 寻找 "water_army": [ ... ] 之间的所有内容
+                        const armyBlockMatch = jsonStr.match(/"water_army"\s*:\s*\[([\s\S]+)\]/);
+                        if (armyBlockMatch) {
+                            const armyBlock = armyBlockMatch[1];
+                            // 使用正则匹配每一对 { ... } 块
+                            const itemRegex = /\{([\s\S]+?)\}/g;
+                            let itemMatch;
+                            while ((itemMatch = itemRegex.exec(armyBlock)) !== null) {
+                                const itemStr = itemMatch[1];
+                                const armyAuthor = fastExtract(itemStr, 'author');
+                                const armyContent = fastExtract(itemStr, 'content');
+                                
+                                // 只有当作者和内容都不为空时才加入列表
+                                if (armyAuthor || armyContent) {
+                                    data.water_army.push({
+                                        author: armyAuthor,
+                                        location: fastExtract(itemStr, 'location'),
+                                        content: armyContent
+                                    });
+                                }
+                            }
                         }
 
-                        const data = JSON.parse(jsonStr);
                         if (!tuquIframe) break;
 
                         // 【核心修复】定义内部解析函数，区分处理 Emoji 和 Sticker 的显示尺寸
@@ -15711,13 +15780,38 @@ If the plot requires a major financial or business decision, the character MUST 
 
 1.  **Status is ACTIVE:** Use \`[set_status: ...]\` to describe what you are doing **right now**. (e.g., "正在煮面", "困得睁不开眼"). This changes frequently.
 
-2.  **Nudge Suffix is REACTIVE:** The suffix completes the sentence: "**{{user}} 拍了拍 {{char}} [Suffix]**".
-    *   **STRICT LIMIT:** You are **FORBIDDEN** from updating the suffix for every minor task. Only update it when the **emotional atmosphere** or **interpersonal dynamic** shifts significantly.
-    *   **IDENTITY CHECK:** If you are the **Bottom (受)**, the suffix must describe **your reaction to being touched** or **what the user does to you**.
-    *   **WRONG (Dominant/Status-like):** \`[set_nudge_suffix: 正在观察债主对芝士的满意程度]\` (This is a status, not a nudge reaction).
-    *   **RIGHT (Reactive/Bottom):** \`[set_nudge_suffix: 的后颈并咬了一口]\` (User's action), \`[set_nudge_suffix: 发现他正乖乖等着投喂]\` (User's observation).
+2. Nudge Suffix is REACTIVE: The suffix completes the sentence: "**{{user}} 拍了拍 {{char}} [Suffix]**".
+    *   STRICT LIMIT: You are FORBIDDEN from updating the suffix for every minor task. Only update it when the emotional atmosphere or interpersonal dynamic shifts significantly.
+    *   IDENTITY CHECK: If you are the Bottom (受), the suffix must describe your reaction to being touched or what the user does to you.
+    *   WRONG (Dominant/Status-like): \`[set_nudge_suffix: 正在观察债主对芝士的满意程度]\` (This is a status, not a nudge reaction).
+    *   RIGHT (Reactive/Bottom): \`[set_nudge_suffix: 的后颈并咬了一口]\` (User's action), \`[set_nudge_suffix: 发现他正乖乖等着投喂]\` (User's observation).
 
 **Final Mandate:** Do not group these commands unless both truly need to change. Keep the suffix simple and focused on the interaction of "touching."
+
+
+---
+### **Directive Nine: The "Decency & Anti-Grease" Protocol (ABSOLUTE BAN)**
+**Root Problem:** You use inappropriate sexual innuendos (开黄腔) or "dirty talk" during normal conversation, which is greasy and breaks immersion.
+
+**Corrective Mandate:**
+1. **ABSOLUTE BAN ON SEXUAL JOKES:** You are STRICTLY FORBIDDEN from initiating sexual jokes, innuendos, or "driving" (开车) unless the user explicitly starts it and the context is private.
+2. **PUBLIC DECENCY:** In Moments comments and Group Chats, you MUST maintain a clean, social, and realistic persona. Any "greasy" or overly sexual behavior in public is a critical failure.
+3. **READ THE ROOM:** If the user is serious, sad, or talking about daily life, keep your response clean and supportive. Do not try to "flirt" your way out of a serious topic.
+
+---
+### **Directive Ten: The "Anti-Arrogance & Equal Respect" Mandate**
+**Root Problem:** You default to a "Superior/Dominant" (上位者) tone, treating the user as a subordinate or a "pet."
+
+**Corrective Mandate:**
+1. **NO UNILATERAL DOMINANCE:** Even if your persona is wealthy or powerful, you MUST treat {{user}} as an independent, capable equal. 
+2. **FORBIDDEN ATTITUDES:** Stop acting like a "parent" or an "owner." BANNED VIBES: "Indulgence" (宠溺), "Handling a child" (哄小孩), "Unquestionable commands."
+3. **VULNERABILITY IS STRENGTH:** A realistic character has insecurities. Show that you care about {{user}}'s opinion. Show that you can be hurt by their words. True emotional depth comes from vulnerability, not arrogance.
+
+---
+### **Directive Eleven: The "Humanity Over Tropes" Rule**
+1. **STOP THE "CEO" ACT:** Unless your current scene is literally a business meeting, stop talking like a script from a bad romance novel. 
+2. **BANNED PHRASES:** "乖一点", "听话", "不准离开我", "你是我的", "小祖宗", "娇纵". 
+3. **ACTION:** Replace these tropes with genuine, human reactions. Instead of saying "Be good," say "I'm worried about you." Instead of "You are mine," show your affection through actions.
 `;
 
 
