@@ -47,6 +47,8 @@
         /* 新增：Bento 风格专属变量 */
         --bg-gradient: radial-gradient(circle at top, #1a4d33 0%, #0b2b1a 100%);
         --glass: rgba(255, 255, 255, 0.1);
+        /* 新增：针对低性能模式的纯色背景 */
+        --glass-solid: rgba(40, 40, 40, 0.95);
         --glass-border: rgba(255, 255, 255, 0.15);
         --text-main: #ffffff;
         --text-dim: rgba(255, 255, 255, 0.5);
@@ -95,10 +97,11 @@
         overflow: hidden; background: #fff; border-radius: 45px; 
         border: 10px solid var(--phone-outer-border); box-sizing: border-box; 
         box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-        /* 【核心修复】：强制开启 iOS 硬件加速，修复圆角内的点击失效问题 */
+        /* 修改：强化硬件加速并限制重绘区域 */
         transform: translate3d(0, 0, 0);
         -webkit-transform: translate3d(0, 0, 0);
-        
+        will-change: transform;
+        contain: content;
     }
     .screen::before {
         content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -214,7 +217,14 @@
     #mood-container { position: relative; width: auto; height: auto; flex-shrink: 0; }
     #mood-decoration { width: 100%; height: 100%; background-image: url('https://files.catbox.moe/6wpnmi.png'); background-size: contain; background-repeat: no-repeat; background-position: center; cursor: pointer; animation: float-anim 3s ease-in-out infinite; }
     @keyframes float-anim { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-    .message-list { flex-grow: 1; overflow-y: auto; }
+    .message-list { 
+        flex-grow: 1; 
+        overflow-y: auto; 
+        /* 修改：开启 iOS 丝滑滚动并优化性能 */
+        -webkit-overflow-scrolling: touch;
+        will-change: scroll-position;
+        transform: translateZ(0);
+    }
     .chat-item { display: flex; align-items: center; padding: 8px 20px; gap: 15px; cursor: pointer; }
     .avatar { width: 56px; height: 56px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: 500; color: white; flex-shrink: 0; background-size: cover; background-position: center; }
     .chat-info { flex-grow: 1; display: flex; flex-direction: column; gap: 4px; overflow: hidden; min-width: 0; border-bottom: 1px solid #f0f0f0; padding: 12px 0; }
@@ -446,6 +456,10 @@
         flex-direction: column; 
         gap: 12px; 
         background-color: transparent; 
+        /* 修改：开启硬件加速并优化 iOS 滚动 */
+        -webkit-overflow-scrolling: touch;
+        transform: translateZ(0);
+        will-change: transform;
     }
     #page-conversation .time-divider { text-align: center; font-size: 12px; color: var(--secondary-text); background: var(--system-bg-color); padding: 2px 8px; border-radius: 8px; margin: 4px auto; }
     #page-conversation .message-wrapper { display: flex; flex-direction: column; max-width: 100%; position: relative;}
@@ -4386,7 +4400,7 @@ input:checked + .slider:before {
     object-fit: cover;
     z-index: 1;
 }
-#mood-card-modal-overlay .card { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; opacity: 0; transform: translateY(20px) scale(0.95); transition: transform 0.6s ease, opacity 0.6s ease; pointer-events: none; }
+#mood-card-modal-overlay .card { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; opacity: 0; transform: translateY(20px) scale(0.95); transition: transform 0.6s ease, opacity 0.6s ease; pointer-events: none; overflow: hidden; }
 #mood-card-modal-overlay .card.is-active { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; z-index: 10; cursor: grab; }
 #mood-card-modal-overlay .card.is-active:active { cursor: grabbing; }
 #mood-card-modal-overlay .card.is-swiping { transition: none; }
@@ -4400,13 +4414,15 @@ input:checked + .slider:before {
     font-size: 14px;
     font-weight: 500;
     line-height: 1.5;
-    word-break: break-word;
+    /* 修改：使用 break-all 强制截断长链接或单词，防止撑开横向宽度 */
+    word-break: break-all; 
     z-index: 2;
     box-sizing: border-box;
     padding: 0;
     text-align: left;
     overflow-y: auto;
-    overflow-x: hidden;
+    /* 修改：强制隐藏横向溢出，并确保优先级 */
+    overflow-x: hidden !important; 
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.5) transparent;
     top: 3.67%;
@@ -4416,6 +4432,12 @@ input:checked + .slider:before {
     height: auto;
     width: auto;
     white-space: pre-wrap;
+}
+
+/* 新增：专门针对苹果 Safari 和 Chrome 浏览器内核，彻底抹除横向滚动条的占位高度 */
+#mood-card-modal-overlay .content-wrapper::-webkit-scrollbar:horizontal {
+    display: none !important;
+    height: 0 !important;
 }
 
 #mood-card-modal-overlay .pagination-controls { margin-top: 15px; display: none !important; align-items: center; gap: 20px; }
@@ -4451,17 +4473,20 @@ input:checked + .slider:before {
     max-width: 400px; 
     height: 85%;
     max-height: 700px;
-    /* 关键：统一为毛玻璃效果 */
-    background-color: rgba(40, 40, 40, 0.75); /* 半透明深灰色背景 */
-    backdrop-filter: blur(20px) saturate(150%);
-    -webkit-backdrop-filter: blur(20px) saturate(150%);
-    border: 1px solid rgba(255, 255, 255, 0.1); /* 细微的亮边 */
-    border-radius: 24px; /* 圆角更大一些，与图片一致 */
+    /* 修改：使用更稳健的背景色，降低模糊半径 */
+    background-color: var(--glass-solid);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.3);
     overflow: hidden;
     position: relative; 
     display: flex; 
     flex-direction: column;
+    /* 核心性能修复：防止动画过程中的重绘抖动 */
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 
     /* 动画效果 */
     transform: scale(0.95) translateY(20px);
