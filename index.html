@@ -13308,10 +13308,9 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 
         // 【核心修复】：在任何处理之前，暴力移除 DeepSeek R1 的思维链
         if (aiResponse) {
-            aiResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-            // 核心修复：同步移除自定义的 thought 标签及其内部所有内容，防止其进入后续的区块解析流程
-            aiResponse = aiResponse.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
-        }
+                        // 核心修复：使用混合正则，同时匹配 think 或 thought 的开头和结尾，解决混用标签导致的内容泄露
+                        aiResponse = aiResponse.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '').trim();
+                    }
 
         // =================================================================
         // =================== END: GEMINI COMPATIBILITY BLOCK (FINAL) ===========
@@ -19810,9 +19809,8 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                     }
 
                     if (aiResponse) {
-                        aiResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-                        // 核心修复：在常规回复中同步拦截并移除 thought 标签，确保内心独白在任何模式下都不会泄露给用户
-                        aiResponse = aiResponse.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+                        // 核心修复：使用混合正则，无论 AI 用哪种标签开头或结尾，都能准确识别并抹除思考内容
+                        aiResponse = aiResponse.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '').trim();
                     }
                     
 
@@ -19845,10 +19843,10 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                 // --- 【【【诊断代码结束】】】 ---
         
                if (aiResponse && aiResponse.trim()) {
-                    // 【终极修复】：在交给解析器之前，彻底清除所有思考内容（含未闭合标签）
+                    // 【终极修复】：合并正则逻辑。此正则会匹配以 think 或 thought 开头的块，
+                    // 并且会一直匹配到对应的闭合标签，或者直到字符串末尾（处理未闭合情况）。
                     let responseToProcess = aiResponse
-                        .replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '')
-                        .replace(/<thought>[\s\S]*?(?:<\/thought>|$)/gi, '')
+                        .replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '')
                         .trim();
 
                     // 如果清理完思考后已经没有任何内容了，直接退出，防止产生空白头像
@@ -20737,10 +20735,8 @@ You are the Director. If multiple characters react to the rejection, generate a 
         }
 
         async function processAIResponseLine(line, targetChatId = null, forcedSender = null) {
-            // 【核心修复】：移除 DeepSeek R1 等模型的思维链 (Thinking Process)
-            line = line.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-            // 核心修复：兜底清理，如果 thought 标签作为独立区块传入，则将其内容彻底抹除，确保不会生成空气泡或残留文字
-            line = line.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+            // 【核心修复】：使用标签无关的混合正则，彻底拦截所有形式的思维链内容，防止混用标签导致的解析失败
+            line = line.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '').trim();
 
             // --- 核心修复：在处理前，将占位符恢复为真正的换行符 ---
             line = line.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
