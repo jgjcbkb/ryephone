@@ -10305,45 +10305,48 @@ if ('serviceWorker' in navigator) {
             // 用于检测开始和结束标签的辅助函数
             const countTags = (line) => {
                 let count = 0;
-                // 核心修复：将 think 和 thought 标签加入容器追踪名单，确保多行思考内容被视为一个整体
                 count += (line.match(/<(div|details|block|snippet|style|thought|think)\s*[^>]*>/gi) || []).length;
                 count -= (line.match(/<\/(div|details|block|snippet|style|thought|think)\s*[^>]*>/gi) || []).length;
                 return count;
             };
             
             const startsContainer = (trimmedLine) => {
-                // 核心修复：将 think 和 thought 标签识别为容器起始，防止解析器在标签内部进行错误切割
-                return trimmedLine.startsWith('<div') || trimmedLine.startsWith('<details') || trimmedLine.startsWith('<block') || trimmedLine.startsWith('<snippet') || trimmedLine.startsWith('<style') || trimmedLine.startsWith('<thought') || trimmedLine.startsWith('<think');
+                // 【核心修复】增加对 [ 指令的识别，确保指令不被合并进普通文本
+                return trimmedLine.startsWith('<div') || trimmedLine.startsWith('<details') || trimmedLine.startsWith('<block') || trimmedLine.startsWith('<snippet') || trimmedLine.startsWith('<style') || trimmedLine.startsWith('<thought') || trimmedLine.startsWith('<think') || trimmedLine.startsWith('[');
             };
 
+            let textBuffer = []; // 用于收集连续的普通文本行
+
             for (const line of lines) {
-// ... (函数剩余部分保持不变)
                 const trimmedLine = line.trim();
 
                 if (state === 'default') {
                     if (startsContainer(trimmedLine)) {
+                        // 1. 遇到容器标签，先把之前攒着的文本发出去
+                        if (textBuffer.length > 0) {
+                            blocks.push(textBuffer.join('\n'));
+                            textBuffer = [];
+                        }
+                        // 2. 开始处理容器
                         buffer.push(line);
                         state = 'in_container';
-                        // 首次进入时，计算当前行的净嵌套层级
                         containerNestingLevel = countTags(line);
 
-                        // 核心：处理单行闭合的情况（例如 <div ...>...</div>）
                         if (containerNestingLevel <= 0) {
                              blocks.push(buffer.join('\n'));
                              buffer = [];
                              state = 'default';
                              containerNestingLevel = 0;
                         }
-
-                    } else if (trimmedLine) {
-                        // 纯文本消息块，直接加入
-                        blocks.push(line);
+                    } else {
+                        // 3. 没遇到标签，就把这行存进文本缓冲区，而不是直接 push
+                        // 即使是空行也保留，以维持用户想要的换行间距
+                        textBuffer.push(line);
                     }
                 } 
                 
                 else if (state === 'in_container') {
                     buffer.push(line);
-                    // 核心：在容器内部，累加嵌套层级
                     containerNestingLevel += countTags(line);
 
                     if (containerNestingLevel <= 0) {
@@ -10355,9 +10358,9 @@ if ('serviceWorker' in navigator) {
                 }
             }
 
-            // 清理缓冲区中剩余的内容（以防AI回复不完整）
-            if (buffer.length > 0) {
-                blocks.push(buffer.join('\n'));
+            // 【核心修复】最后循环结束，如果缓冲区还有剩下的文本，一次性发出去
+            if (textBuffer.length > 0) {
+                blocks.push(textBuffer.join('\n'));
             }
 
             return blocks;
