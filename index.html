@@ -16670,6 +16670,20 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
             } else {
                 chatContent.style.backgroundImage = '';
             }
+
+            // 核心新增：刷新时从硬盘恢复 Token 显示
+            const savedTokenUsage = loadFromLocalStorage(`token_usage_${chatId}`, null);
+            const usageEl = document.getElementById('token-usage-display');
+            const inputVal = document.getElementById('token-input-val');
+            const outputVal = document.getElementById('token-output-val');
+            if (savedTokenUsage && usageEl && inputVal && outputVal) {
+                usageEl.style.display = 'block';
+                inputVal.textContent = savedTokenUsage.input || 0;
+                outputVal.textContent = savedTokenUsage.output || 0;
+            } else if (usageEl) {
+                usageEl.style.display = 'none';
+            }
+
             loadPersonalizationSettings(); loadAutoReplySettings(); 
             reRenderMessages(true);
         }
@@ -19913,18 +19927,25 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                     }
                     const data = await response.json();
                     
-                    // --- 新增：更新 Token 显示逻辑 ---
+                    // 持久化保存并更新 Token 消耗显示
                     if (data.usage) {
+                        const usageData = {
+                            input: data.usage.prompt_tokens || 0,
+                            output: data.usage.completion_tokens || 0
+                        };
+                        // 存入硬盘
+                        saveToLocalStorage(`token_usage_${originatingChatId}`, usageData);
+                        
+                        // 更新界面
                         const usageEl = document.getElementById('token-usage-display');
                         const inputVal = document.getElementById('token-input-val');
                         const outputVal = document.getElementById('token-output-val');
                         if (usageEl && inputVal && outputVal) {
                             usageEl.style.display = 'block';
-                            inputVal.textContent = data.usage.prompt_tokens || 0;
-                            outputVal.textContent = data.usage.completion_tokens || 0;
+                            inputVal.textContent = usageData.input;
+                            outputVal.textContent = usageData.output;
                         }
                     }
-                    // ------------------------------
 
                     if (profile.url.includes('googleapis.com')) {
                         aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
