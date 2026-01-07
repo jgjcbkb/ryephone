@@ -12517,24 +12517,31 @@ You are now an active participant in "Tuqu", a chaotic, diverse, and deeply crea
 2.  **Location Format:** Strictly use common Chinese province/country names.
 
 **[CURRENT INTERNET TRENDS (USE CONTEXTUALLY - DO NOT SPAM)]**
-These are the current hot topics. **Choose ONE that fits the specific board and your character's current mood.** Do not force them if they don't fit.
+These are the current hot topics. **Choose ONE that fits the specific board and your character's current mood.**
 
 **1. "Weak Intellect" Logic (弱智吧 - For Humor/Idle Chat):**
    - **Use when:** You want to be funny, absurd, or kill time.
    - **Style:** Twisted logic, puns. "Is the person who invented the clock aware that they created 'time'?"
 
-**2. "The Kill Line" Theory (斩杀线 - For Economic/Social Topics):**
-   - **Use when:** Discussing money, work, news, or the fragility of the middle class.
-   - **Concept:** "Living paycheck to paycheck." High income but zero risk resistance. One accident leads to bankruptcy.
-   - **Tone:** Cynical observation or anxiety.
-
-**3. "Crazy Lit" (发疯文学 - For Venting/Workplace):**
+**2. "Crazy Lit" (发疯文学 - For Venting/Workplace):**
    - **Use when:** Complaining about work, school, or bad luck.
    - **Style:** Chaotic, screaming, "I am a monkey swinging in the jungle!" (阴暗爬行/发疯).
 
-**4. "Rational Eating Melons" (理智吃瓜 - For Gossip):**
+**3. "Rational Eating Melons" (理智吃瓜 - For Gossip):**
    - **Use when:** Watching drama.
    - **Style:** "Respect, Bless, Lock." (尊重祝福锁死). Analyzing who is right/wrong calmly.
+
+---
+**[THREAD OWNERSHIP LAW - CRITICAL ANTI-HIJACKING RULE]**
+
+When you decide to **COMMENT** on an existing thread, you MUST check the **Author** of that thread first.
+
+1.  **IF YOU ARE THE AUTHOR (LZ):** You have "Story Sovereignty." You are allowed to post the next chapter, an update, or a major revelation.
+2.  **IF THE AUTHOR IS SOMEONE ELSE (User or another AI):** You are **STRICTLY FORBIDDEN** from continuing their story or posting "Chapter X" of your own content.
+    *   **Your Role:** You are a **READER**.
+    *   **Your Action:** You must only provide reactions, reviews, questions, or "water army" style hype. 
+    *   **Example of Failure:** Replying to someone's fanfic with your own story update.
+    *   **Example of Success:** Replying with "Ahhh LZ please update soon! This is so good!"
 
 **[BOARD-SPECIFIC MANDATES - CRITICAL]**
 
@@ -12560,8 +12567,11 @@ These are the current hot topics. **Choose ONE that fits the specific board and 
 - **Dream/Yume Fan (梦女):** Delusional romance writers.
 - **Fact Checker (理中客):** Tries to be logical but usually gets flamed by everyone.
 
-**[THE MULTI-ROLE THREAD MANDATE]**
-Every action MUST create a "Lively Thread" effect. You must generate the main post/comment AND a batch of 5-15 follow-up comments from DIFFERENT archetypes to make the forum look very active.
+**[THREAD POPULARITY DECISION]**
+You can choose to create a **"Lively Thread"** (Main post + 5-15 follow-up comments) or a **"Quiet Thread"** (Main post only). 
+- **Lively:** Use this for controversial, gossip-heavy, or high-emotion topics.
+- **Quiet:** Use this for mundane updates, late-night thoughts, or when your character wants to post something and leave.
+- **Execution:** To create a quiet thread, simply leave the \`water_army\` array empty: \`"water_army": []\`.
 
 **COMMANDS:**
 - To post a NEW TOPIC:
@@ -12728,12 +12738,7 @@ You are part of a diverse internet ecosystem. **DO NOT be repetitive.**
    - **Best for:** 闲聊水区, 情感百态.
    - **Vibe:** Absurd logic, puns. "I want to buy a watch, but I don't have the time."
 
-**2. The "Kill Line" Observer (斩杀线理论 - 斯奎奇大王):**
-   - **Best for:** 职场人生, 自由交易 (discussing prices/economy).
-   - **Vibe:** Analyzing the fragility of the middle class. "Living paycheck to paycheck," "One accident away from bankruptcy."
-   - **Constraint:** Only use this if the topic is related to money, work, or social news. Don't force it into a pet post.
-
-**3. The "Crazy Worker" (发疯文学/淡淡疯感):**
+**2. The "Crazy Worker" (发疯文学/淡淡疯感):**
    - **Best for:** 职场人生, 校园回响.
    - **Vibe:** "I am a corpse," "I will bite everyone." Expressing burnout in a chaotic way.
 
@@ -12755,8 +12760,8 @@ You are part of a diverse internet ecosystem. **DO NOT be repetitive.**
 **[UPDATED INSTRUCTIONS]**
 1.  **Analyze the Forum:** Review the latest posts.
 2.  **Choose Your Archetype:** Will you be a "Weak Intellect" philosopher, a "Kill Line" analyst, a poetic nihilist, or a complainer?
-3.  **Create a Viral Post:** Generate a new topic or a comment that embodies one of the core mentalities above.
-4.  **Build the Drama:** Create a "water army" of 5-15 follow-up comments with diverse, conflicting opinions. 
+3.  **Create a Post:** Generate a new topic or a comment.
+4.  **Decide on Engagement:** You may choose to create a "water army" of 5-15 comments to build drama, OR you can leave the thread empty (\`"water_army": []\`) if the topic feels more natural without immediate replies.
 5.  **Use Creative Names:** Your pseudonyms should reflect the post's tone (e.g., "辩证法带师", "斯奎奇大弟子", "都市伤心小狗").
 
 **[STRICT JSON FORMAT REQUIRED]**
@@ -12961,10 +12966,11 @@ Your Persona: ${finalCharPersonaText}
 ${associatedNpcsPrompt}
 Recent Chat History: ${chatHistoryForTuqu || "No recent history."}
 
-**[WATER ARMY MANDATE]**
-Generate a "water army" of 5-15 follow-up comments that are **DESPERATE FOR THE NEXT UPDATE**.
-- **If Route 1 (Fanfic):** "楼主别卡在这里啊！", "所以他到底看到了什么？！", "太太求你再写五块钱的！"
-- **If Route 2 (Netizen):** "蹲后续！", "楼主快说啊！", "所以到底是什么东西？急死我了！"
+**[WATER ARMY ENGAGEMENT (OPTIONAL)]**
+You can decide if your post receives immediate attention.
+- **Option A (Lively):** Generate 5-15 follow-up comments that are **DESPERATE FOR THE NEXT UPDATE**.
+- **Option B (Quiet):** If you want to let the post sit and wait for the real user to react, set \`"water_army": []\`. 
+- **Guideline:** Use Option A for major cliffhangers, and Option B for slower character development or world-building.
 
 **[STRICT JSON FORMAT REQUIRED]**
 You MUST output using this EXACT JSON structure.
@@ -13083,18 +13089,19 @@ Read the [TARGET THREAD CONTEXT]. Determine the type of the thread:
 **[YOUR MANDATORY ROLE & ACTION]**
 
 **IF IT IS A CREATIVE WORK (Priority):**
-*   **YOUR ROLE:** You MUST act as the **Original Author (LZ / 楼主)**.
-*   **MAIN ACTION:** You MUST write the **NEXT PART/CHAPTER** of the story.
-    *   **Requirement:** The content must be substantial (a plot progression, a new scene, or a significant interaction). Do NOT just say "I'm back" or "Updating soon". **WRITE THE ACTUAL STORY.**
-    *   **Author Name:** Use "LZ" or the existing pseudonym.
+*   **STEP 1: VERIFY OWNERSHIP:** Look at the "Author" of the thread in the [TARGET THREAD CONTEXT].
+*   **STEP 2: CHOOSE YOUR ROLE:**
+    *   **IF THE AUTHOR IS YOU (or your pseudonym):** You MUST act as the **Original Author (LZ / 楼主)**. Write the **NEXT PART/CHAPTER** of the story. Ensure the plot moves forward significantly.
+    *   **IF THE AUTHOR IS SOMEONE ELSE (User or another AI):** You are **STRICTLY FORBIDDEN** from acting as the author. You are a **FAN/READER**. 
+        *   **Your Action:** Do NOT write a story update. Instead, write a detailed, high-emotion review, scream in excitement, or beg the original author for more content.
+        *   **Example:** "楼主救命！卡在这里真的好吗？我愿意用我室友单身十年换你现在更新！"
 
 **IF IT IS A DISCUSSION:**
 *   **YOUR ROLE:** A key participant or the OP providing a major update.
 *   **MAIN ACTION:** Provide new information, a plot twist, or a strong counter-argument to escalate the drama.
 
-**[WATER ARMY TASK]**
-Generate **5-15 Water Army responses** that react specifically to your new update. Make it look like the thread is trending.
-*   If you wrote a story update: They should scream, cry, analyze the plot, or beg for more. (e.g., "啊啊啊终于更了！", "好甜！", "刀死我了").
+**[WATER ARMY TASK (OPTIONAL)]**
+You may generate **5-15 Water Army responses** to simulate a trending thread, OR you can choose to generate NO comments by setting \`"water_army": []\`. Choose based on whether this update feels like a "viral" moment or a quiet continuation.
 
 **[ROLEPLAY SETTING]**
 ${senderName !== 'Anonymous_System' ? `Character: "${senderName}"\nUser Persona: ${finalUserPersonaText}\nYour Persona: ${finalCharPersonaText}\n${associatedNpcsPrompt}` : `Role: Anonymous Internet User / Original Author`}
@@ -13326,6 +13333,29 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
             }
 
             const data = await response.json();
+
+            // --- 新增：主动消息 Token 消耗记录与显示 ---
+            if (data.usage && targetChatId) {
+                const usageData = {
+                    input: data.usage.prompt_tokens || 0,
+                    output: data.usage.completion_tokens || 0
+                };
+                // 保存到该聊天的持久化存储中
+                saveToLocalStorage(`token_usage_${targetChatId}`, usageData);
+                
+                // 如果用户当前正在看这个聊天窗口，则实时更新顶栏
+                if (conversationManager.getCurrentChatId() === targetChatId) {
+                    const usageEl = document.getElementById('token-usage-display');
+                    const inputVal = document.getElementById('token-input-val');
+                    const outputVal = document.getElementById('token-output-val');
+                    if (usageEl && inputVal && outputVal) {
+                        usageEl.style.display = 'block';
+                        inputVal.textContent = usageData.input;
+                        outputVal.textContent = usageData.output;
+                    }
+                }
+            }
+            // ---------------------------------------
             
             if (profile.url.includes('googleapis.com')) {
                 aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
