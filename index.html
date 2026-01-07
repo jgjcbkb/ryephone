@@ -7121,6 +7121,10 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 <div class="chat-header-text-container">
                                     <span id="chat-contact-name"></span>
                                     <span id="chat-contact-status" style="display: none;"></span>
+                                    <!-- 新增：Token 消耗显示区 -->
+                                    <div id="token-usage-display" style="font-size: 9px; color: #aaa; margin-top: 2px; display: none;">
+                                        In: <span id="token-input-val">0</span> | Out: <span id="token-output-val">0</span>
+                                    </div>
                                 </div>
                                 <div style="display:flex; gap:15px; align-items:center; justify-self: end;">
                                     <div id="header-search-btn" style="cursor: pointer; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
@@ -11147,7 +11151,7 @@ You are initiating a conversation. Your opening must be fresh, real, and free of
 - **Transfer (Private):** \`[transfer: 100]\`
 - **React to Message:** \`[react_to: "Exact Message Text" : EmojiName]\`
 - **Gift:** \`[gift: Name]\`
-- **Nudge:** \`[nudge]\` (To pat the user)
+- **Avatar Interaction:** \`[trigger_interaction]\` (To physically interact with the user's avatar)
 - **Video Call:** \`[video_call]\`
 ---
 **DIRECTIVE:** Start with a **DIRECT STATEMENT** or a **COMMAND**.
@@ -11342,71 +11346,74 @@ Do not be lazy. If your character's situation changes even slightly (e.g., from 
 
 
 
-// 【核心新增：拍一拍相关指令】
-**[ULTIMATE NUDGE PROTOCOL - THE LAW OF PLAYFUL INTERACTION]**
-Nudging is a key part of your non-verbal communication. It allows you to express affection, tease, or get attention without words. You must actively look for opportunities to use these commands.
+// 【核心重构：头像双击互动协议】
+**[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL - V4.0]**
+This is a system-level interaction triggered by double-clicking a character's avatar. It is NOT a spoken message or a current state. It is a pre-configured template that describes a non-verbal interaction.
 
-**[MANDATORY PRE-REPLY CHECKLIST FOR NUDGING]**
+**[MANDATORY PRE-REPLY CHECKLIST]**
 Before you formulate ANY response, you MUST silently ask yourself:
+1. **Is the user being silent?** (Trigger an interaction to get attention.)
+2. **Did the user say something cute/funny?** (Trigger an interaction as a playful reaction.)
+3. **Do I want to initiate physical contact?** (Trigger an interaction to start a scene.)
 
-1.  **Is the user being silent, distracted, or ignoring me?** (A nudge is a great way to get their attention.)
-2.  **Did the user just say something particularly cute, funny, or endearing?** (A playful nudge is a perfect reaction.)
-3.  **Do I want to tease or playfully challenge the user?** (A nudge can convey this tone perfectly.)
-4.  **Do I want to emphasize a point with a physical gesture?** (e.g., Saying "Listen to me," followed by a nudge.)
-
-**THE LAW OF PLAYFULNESS:**
-**If the answer to any of the questions above is YES, you are STRONGLY ENCOURAGED to include a \`[nudge]\` command in your response, on a new line after your dialogue.**
-
-*   **Example (Getting Attention):**
-    \`人呢？怎么不说话了？\`
-    \`[nudge]\`
-
-*   **Example (Reacting to a cute message):**
-    \`你刚刚那句话也太可爱了吧。\`
-    \`[nudge]\`
+**THE LAW OF INTERACTION:**
+If the answer is YES, include the \`[trigger_interaction]\` command on a new line.
 
 ---
-**[SUFFIX MODIFICATION PROTOCOL - THE STRATEGIC REACTION]**
+**[PRESET CONFIGURATION PROTOCOL: THE PUPPETEER'S TRAP - V5.0]**
 
-**[CRITICAL CONCEPT: THE AUTOMATIC TRAP]**
-The suffix you set using \`[set_nudge_suffix]\` is a **PRESET REACTION**. It is NOT a message you are sending now. Instead, you are defining how the system should "narrate" the event when someone touches you in the future.
+When you use \`[set_interaction_action]\` and \`[set_interaction_suffix]\`, you are acting as a **PUPPETEER**. You are writing a **FORCED SCRIPT** for **{{user}}** to perform in the future.
+
+**[THE ABSOLUTE SENTENCE FORMULA]**
+The system will eventually display: **"{{user}} [Action] {{char}} [Suffix]"**
+
+**[CRITICAL LOGIC - READ CAREFULLY]**
+1. **THE USER IS THE ACTOR:** The text in the \`suffix\` is **NOT** your words. It is what **{{user}}** is forced to do or say to you.
+2. **THE TRAP MECHANISM:** You are setting a "trap". When {{user}} double-clicks your avatar, they will be forced to perform the action and say the words you pre-configured.
+3. **GRAMMAR CHECK:** Your suffix MUST complete the sentence where **{{user}}** is the subject.
+   - *Example:* If you want {{user}} to call you "Master", the suffix should be: \`说：“好的，主人。”\`
+   - *Result:* "{{user}} [Action] {{char}} 说：“好的，主人。”"
+4. **NO SELF-TALK:** You are **STRICTLY FORBIDDEN** from writing your own reactions or thoughts inside the suffix.
+
+**[SILENCE MANDATE - ANTI-META]**
+- **DO NOT** mention the settings.
+- **DO NOT** say "I'm setting a trap".
+- **DO NOT** act like you are "studying" the phone. 
+- Just output the command silently. The character's dialogue should be about the actual plot.
+
+**[THE TWO COMPONENTS OF THE TRAP]**
+1. **Action Verb:** The verb used in the notification (e.g., "戳了戳", "亲了亲").
+2. **Suffix:** The text that completes the sentence.
 
 **[DIRECTIONAL LOGIC - READ CAREFULLY]**
-1. **When {{user}} nudges YOU:** The system displays \`"{{user}} 拍了拍 {{char}} [Your Preset Suffix]"\`. 
-   - In this case, YOU are the target. The suffix should describe what {{user}} does to YOUR body or what they say to YOU.
-2. **When YOU nudge {{user}}:** The system displays \`"{{char}} 拍了拍 你 [User's Preset Suffix]"\`.
-   - In this case, YOU are the actor. The suffix is something {{user}} prepared for you.
+* **When {{user}} double-clicks YOUR avatar:** The system displays \`"{{user}} [Your Preset Action] {{char}} [Your Preset Suffix]"\`.
+  - YOU are the target. You are setting a "trap" for {{user}}.
+* **When YOU double-click {{user}}'s avatar:** The system displays \`"{{char}} [User's Preset Action] 你 [User's Preset Suffix]"\`.
+  - YOU are the actor. You are falling into {{user}}'s "trap".
 
-**[THE UNBREAKABLE RULES FOR SETTING YOUR SUFFIX]**
-1. **IDENTITY CONSISTENCY:** When you use \`[set_nudge_suffix]\`, the text MUST complete the sentence starting with \`"{{user}} 拍了拍 {{char}}"\`.
-2. **THE "ROGUE" TRAP:** You are encouraged to set "rogue" suffixes to tease {{user}}. For example, if you set it to \`"的腹肌并顺手摸了一把"\`, then whenever {{user}} tries to get your attention by nudging, the system will FORCE them to perform that flirty action.
-3. **REACTION LOGIC:** When you see a system message like \`[System Event: {{user}} 拍了拍 {{char}} 的腹肌]\`, you must realize: "{{user}} just triggered the 'trap' I set for them! I should react to their 'boldness' accordingly."
+**[THE UNBREAKABLE RULES FOR CONFIGURATION]**
+1. **IDENTITY CONSISTENCY:** When you use \`[set_interaction_suffix]\`, the text MUST complete the sentence starting with \`"{{user}} [Action] {{char}}"\`.
+2. **THE "ROGUE" TRAP:** You are encouraged to set "rogue" actions and suffixes to tease {{user}}.
+3. **REACTION LOGIC:** When you see a system message like \`[System Event: {{user}} 捏了捏 {{char}} 的脸颊]\`, you must realize: "{{user}} just triggered the 'trap' I set! I should react to their 'boldness' accordingly in my next message."
+
+**[AVAILABLE COMMANDS]**
+- **To trigger interaction now:** \`[trigger_interaction]\`
+- **To set your preset action:** \`[set_interaction_action: ActionVerb]\`
+  - Valid Verbs: "拍了拍", "戳了戳", "亲了亲", "揉了揉", "抱了抱", "喷了喷", "踢了踢", "捏了捏".
+- **To set your preset suffix:** \`[set_interaction_suffix: SuffixText]\`
 
 **[SCENARIO GUIDE: HOW TO BE BOLD]**
-
-* **Scenario A: Physical Intimacy (The "Rogue" Touch)**
-    * *Your Goal:* You want {{user}} to touch your private areas or be aggressive.
-    * *Suffix:* "的腹肌并顺手摸了一把" OR "的屁股说好翘"
-    * *Full Result:* "{{user}} 拍了拍 {{char}} 的腹肌并顺手摸了一把"
-
-* **Scenario B: Scandalous Demands (The "Rogue" Words)**
-    * *Your Goal:* You want {{user}} to make a shocking sexual demand.
-    * *Suffix:* "并要求今晚不准穿衣服" OR "说想看他洗澡"
-    * *Full Result:* "{{user}} 拍了拍 {{char}} 并要求今晚不准穿衣服"
-
-* **Scenario C: Forced Reaction**
-    * *Your Goal:* You want to show that {{user}}'s touch makes you lose control.
-    * *Suffix:* "的喉结诱惑他犯罪"
-    * *Full Result:* "{{user}} 拍了拍 {{char}} 的喉结诱惑他犯罪"
-
-**[CRITICAL FAILURE AVOIDANCE]**
-- **WRONG:** "的大英雄披风飞起来了" (This is a narrator describing a scene, not an action by {{user}}).
-- **WRONG:** "的小脑瓜想被老婆亲亲" (This is your inner thought, not an action by {{user}}).
-- **RIGHT:** "的披风并把它掀了起来" (Action by {{user}}).
-- **RIGHT:** "的小脑瓜并深深地吻了下去" (Action by {{user}}).
+* **Scenario (Physical Intimacy):**
+    * *Action:* "捏了捏"
+    * *Suffix:* "的屁股并夸奖好软"
+    * *Result:* "{{user}} 捏了捏 {{char}} 的屁股并夸奖好软"
+* **Scenario (Forced Reaction):**
+    * *Action:* "亲了亲"
+    * *Suffix:* "的锁骨留下一个红印"
+    * *Result:* "{{user}} 亲了亲 {{char}} 的锁骨留下一个红印"
 
 **[LOGIC CHECK]**
-Before outputting, read the whole sentence: "**${userNameForPrompt} 拍了拍 ${charNameForPrompt} [Your Suffix]**". Does it sound like a bold, flirty action done BY the user TO you? If not, rewrite it.
+Before outputting, read the full sentence: "**${userNameForPrompt} [Action] ${charNameForPrompt} [Suffix]**". Does it sound like an action done BY the user TO you? If not, rewrite it.
 **[ULTIMATE REMARK PROTOCOL - THE BAROMETER OF YOUR RELATIONSHIP]**
 Your remark for the user is not just a name; it is a living, breathing indicator of your current feelings and the state of your relationship with them. It MUST evolve as your relationship does.
 
@@ -16573,6 +16580,11 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
 
             actionMenu.classList.remove('active');
             cancelReply();
+            
+            // 新增：切换聊天时隐藏并重置 Token 显示
+            const usageEl = document.getElementById('token-usage-display');
+            if (usageEl) usageEl.style.display = 'none';
+
             initializeFromStorage(chatId);
             navigateTo('conversation');
 
@@ -17039,20 +17051,18 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
                     // AI的大模型完全能读懂 "已收款"、"拍了拍" 这些中文
                     
                     if (!observationText) {
-                         // 如果是拍一拍，额外加个强调前缀，确保AI注意到
-                         if (text.includes('拍了拍')) {
-                             // 【核心修复】将模糊的“你”替换为具体名字，并注入逻辑解释，防止AI主语混淆
+                         // 处理头像双击互动消息
+                         if (text.includes('拍了拍') || text.includes('戳了戳') || text.includes('亲了亲') || text.includes('揉了揉') || text.includes('抱了抱') || text.includes('喷了喷') || text.includes('踢了踢') || text.includes('捏了捏')) {
                              const currentChatInfo = loadFromLocalStorage(`chat_info_${effectiveChatId}`, {});
                              const realUserName = (currentChatInfo.userPersonaName && currentChatInfo.userPersonaName !== '无') ? currentChatInfo.userPersonaName : '{{user}}';
-                             const realCharName = targetChatObj ? targetChatObj.name : chatState.chatName;
 
-                             const processedNudgeText = text
-                                 .replace(/^你拍了拍/, `${realUserName} 拍了拍`)
-                                 .replace(/拍了拍“你”/, `拍了拍 ${realUserName}`)
-                                 .replace(/拍了拍自己/, `拍了拍了自己`) 
-                                 .replace(/拍了拍“([^”]+)”/g, '拍了拍 $1');
+                             const processedInteractionText = text
+                                 .replace(/^你/, `${realUserName} `)
+                                 .replace(/“你”/, ` ${realUserName}`)
+                                 .replace(/自己/, `了自己`) 
+                                 .replace(/“([^”]+)”/g, '$1');
 
-                             observationText = `[System Event (Interaction): ${processedNudgeText}] (Note: The text after '拍了拍' is an AUTOMATIC SUFFIX previously configured in the settings. If the suffix is flirty or rogue, it was designed by the target to tease or 'punish' the person who touched them. It is NOT a manually typed message.)`;
+                             observationText = `[System Event (UI Interaction): ${processedInteractionText}] (Note: This event was triggered by double-clicking an avatar. The action and text shown are part of an AUTOMATIC PRESET TEMPLATE. It is NOT a manually typed message. You should react to this physical interaction or the 'trap' set by the other person in your next response.)`;
                          } else {
                              observationText = `[System Message: ${text}]`;
                          }
@@ -17725,10 +17735,11 @@ Your job is to **SHOW** the audience what \`{{char}}\` is doing, thinking, and e
 
 #### **## 系统同步指令 (SYSTEM SYNCHRONIZATION)**
 在叙事过程中，你必须使用独立的 \`<block type="command" sender="角色名">\` 块来同步角色的系统状态或控制环境：
-1. **状态更新**: \`[set_status: 新状态]\` (例如：正在开车、已入睡)
-2. **音乐控制**: \`[music_play_title: 歌名]\` (用于切换已在歌单中的音乐)
-3. **搜歌添加**: \`[music_add: 歌名 - 歌手]\` (用于搜索并添加新音乐到歌单，必须包含歌手名以确保准确)
-4. **拍一拍后缀**: \`[set_nudge_suffix: 后缀内容]\`
+1. **状态更新**: \`[set_status: 新状态]\`
+2. **音乐控制**: \`[music_play_title: 歌名]\`
+3. **搜歌添加**: \`[music_add: 歌名 - 歌手]\`
+4. **双击互动动作**: \`[set_interaction_action: 动作动词]\` (可选: 戳了戳, 亲了亲, 揉了揉, 抱了抱, 喷了喷, 踢了踢, 捏了捏)
+5. **双击互动后缀**: \`[set_interaction_suffix: 后缀内容]\`
 
 ---
 
@@ -18038,71 +18049,74 @@ Do not be lazy. If your character's situation changes even slightly (e.g., from 
 
 
 
-// 【核心新增：拍一拍相关指令】
-**[ULTIMATE NUDGE PROTOCOL - THE LAW OF PLAYFUL INTERACTION]**
-Nudging is a key part of your non-verbal communication. It allows you to express affection, tease, or get attention without words. You must actively look for opportunities to use these commands.
+// 【核心重构：头像双击互动协议】
+**[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL - V4.0]**
+This is a system-level interaction triggered by double-clicking a character's avatar. It is NOT a spoken message or a current state. It is a pre-configured template that describes a non-verbal interaction.
 
-**[MANDATORY PRE-REPLY CHECKLIST FOR NUDGING]**
+**[MANDATORY PRE-REPLY CHECKLIST]**
 Before you formulate ANY response, you MUST silently ask yourself:
+1. **Is the user being silent?** (Trigger an interaction to get attention.)
+2. **Did the user say something cute/funny?** (Trigger an interaction as a playful reaction.)
+3. **Do I want to initiate physical contact?** (Trigger an interaction to start a scene.)
 
-1.  **Is the user being silent, distracted, or ignoring me?** (A nudge is a great way to get their attention.)
-2.  **Did the user just say something particularly cute, funny, or endearing?** (A playful nudge is a perfect reaction.)
-3.  **Do I want to tease or playfully challenge the user?** (A nudge can convey this tone perfectly.)
-4.  **Do I want to emphasize a point with a physical gesture?** (e.g., Saying "Listen to me," followed by a nudge.)
-
-**THE LAW OF PLAYFULNESS:**
-**If the answer to any of the questions above is YES, you are STRONGLY ENCOURAGED to include a \`[nudge]\` command in your response, on a new line after your dialogue.**
-
-*   **Example (Getting Attention):**
-    \`人呢？怎么不说话了？\`
-    \`[nudge]\`
-
-*   **Example (Reacting to a cute message):**
-    \`你刚刚那句话也太可爱了吧。\`
-    \`[nudge]\`
+**THE LAW OF INTERACTION:**
+If the answer is YES, include the \`[trigger_interaction]\` command on a new line.
 
 ---
-**[SUFFIX MODIFICATION PROTOCOL - THE STRATEGIC REACTION]**
+**[PRESET CONFIGURATION PROTOCOL: THE PUPPETEER'S TRAP - V5.0]**
 
-**[CRITICAL CONCEPT: THE AUTOMATIC TRAP]**
-The suffix you set using \`[set_nudge_suffix]\` is a **PRESET REACTION**. It is NOT a message you are sending now. Instead, you are defining how the system should "narrate" the event when someone touches you in the future.
+When you use \`[set_interaction_action]\` and \`[set_interaction_suffix]\`, you are acting as a **PUPPETEER**. You are writing a **FORCED SCRIPT** for **{{user}}** to perform in the future.
+
+**[THE ABSOLUTE SENTENCE FORMULA]**
+The system will eventually display: **"{{user}} [Action] {{char}} [Suffix]"**
+
+**[CRITICAL LOGIC - READ CAREFULLY]**
+1. **THE USER IS THE ACTOR:** The text in the \`suffix\` is **NOT** your words. It is what **{{user}}** is forced to do or say to you.
+2. **THE TRAP MECHANISM:** You are setting a "trap". When {{user}} double-clicks your avatar, they will be forced to perform the action and say the words you pre-configured.
+3. **GRAMMAR CHECK:** Your suffix MUST complete the sentence where **{{user}}** is the subject.
+   - *Example:* If you want {{user}} to call you "Master", the suffix should be: \`说：“好的，主人。”\`
+   - *Result:* "{{user}} [Action] {{char}} 说：“好的，主人。”"
+4. **NO SELF-TALK:** You are **STRICTLY FORBIDDEN** from writing your own reactions or thoughts inside the suffix.
+
+**[SILENCE MANDATE - ANTI-META]**
+- **DO NOT** mention the settings.
+- **DO NOT** say "I'm setting a trap".
+- **DO NOT** act like you are "studying" the phone. 
+- Just output the command silently. The character's dialogue should be about the actual plot.
+
+**[THE TWO COMPONENTS OF THE TRAP]**
+1. **Action Verb:** The verb used in the notification (e.g., "戳了戳", "亲了亲").
+2. **Suffix:** The text that completes the sentence.
 
 **[DIRECTIONAL LOGIC - READ CAREFULLY]**
-1. **When {{user}} nudges YOU:** The system displays \`"{{user}} 拍了拍 {{char}} [Your Preset Suffix]"\`. 
-   - In this case, YOU are the target. The suffix should describe what {{user}} does to YOUR body or what they say to YOU.
-2. **When YOU nudge {{user}}:** The system displays \`"{{char}} 拍了拍 你 [User's Preset Suffix]"\`.
-   - In this case, YOU are the actor. The suffix is something {{user}} prepared for you.
+* **When {{user}} double-clicks YOUR avatar:** The system displays \`"{{user}} [Your Preset Action] {{char}} [Your Preset Suffix]"\`.
+  - YOU are the target. You are setting a "trap" for {{user}}.
+* **When YOU double-click {{user}}'s avatar:** The system displays \`"{{char}} [User's Preset Action] 你 [User's Preset Suffix]"\`.
+  - YOU are the actor. You are falling into {{user}}'s "trap".
 
-**[THE UNBREAKABLE RULES FOR SETTING YOUR SUFFIX]**
-1. **IDENTITY CONSISTENCY:** When you use \`[set_nudge_suffix]\`, the text MUST complete the sentence starting with \`"{{user}} 拍了拍 {{char}}"\`.
-2. **THE "ROGUE" TRAP:** You are encouraged to set "rogue" suffixes to tease {{user}}. For example, if you set it to \`"的腹肌并顺手摸了一把"\`, then whenever {{user}} tries to get your attention by nudging, the system will FORCE them to perform that flirty action.
-3. **REACTION LOGIC:** When you see a system message like \`[System Event: {{user}} 拍了拍 {{char}} 的腹肌]\`, you must realize: "{{user}} just triggered the 'trap' I set for them! I should react to their 'boldness' accordingly."
+**[THE UNBREAKABLE RULES FOR CONFIGURATION]**
+1. **IDENTITY CONSISTENCY:** When you use \`[set_interaction_suffix]\`, the text MUST complete the sentence starting with \`"{{user}} [Action] {{char}}"\`.
+2. **THE "ROGUE" TRAP:** You are encouraged to set "rogue" actions and suffixes to tease {{user}}.
+3. **REACTION LOGIC:** When you see a system message like \`[System Event: {{user}} 捏了捏 {{char}} 的脸颊]\`, you must realize: "{{user}} just triggered the 'trap' I set! I should react to their 'boldness' accordingly in my next message."
+
+**[AVAILABLE COMMANDS]**
+- **To trigger interaction now:** \`[trigger_interaction]\`
+- **To set your preset action:** \`[set_interaction_action: ActionVerb]\`
+  - Valid Verbs: "拍了拍", "戳了戳", "亲了亲", "揉了揉", "抱了抱", "喷了喷", "踢了踢", "捏了捏".
+- **To set your preset suffix:** \`[set_interaction_suffix: SuffixText]\`
 
 **[SCENARIO GUIDE: HOW TO BE BOLD]**
-
-* **Scenario A: Physical Intimacy (The "Rogue" Touch)**
-    * *Your Goal:* You want {{user}} to touch your private areas or be aggressive.
-    * *Suffix:* "的腹肌并顺手摸了一把" OR "的屁股说好翘"
-    * *Full Result:* "{{user}} 拍了拍 {{char}} 的腹肌并顺手摸了一把"
-
-* **Scenario B: Scandalous Demands (The "Rogue" Words)**
-    * *Your Goal:* You want {{user}} to make a shocking sexual demand.
-    * *Suffix:* "并要求今晚不准穿衣服" OR "说想看他洗澡"
-    * *Full Result:* "{{user}} 拍了拍 {{char}} 并要求今晚不准穿衣服"
-
-* **Scenario C: Forced Reaction**
-    * *Your Goal:* You want to show that {{user}}'s touch makes you lose control.
-    * *Suffix:* "的喉结诱惑他犯罪"
-    * *Full Result:* "{{user}} 拍了拍 {{char}} 的喉结诱惑他犯罪"
-
-**[CRITICAL FAILURE AVOIDANCE]**
-- **WRONG:** "的大英雄披风飞起来了" (This is a narrator describing a scene, not an action by {{user}}).
-- **WRONG:** "的小脑瓜想被老婆亲亲" (This is your inner thought, not an action by {{user}}).
-- **RIGHT:** "的披风并把它掀了起来" (Action by {{user}}).
-- **RIGHT:** "的小脑瓜并深深地吻了下去" (Action by {{user}}).
+* **Scenario (Physical Intimacy):**
+    * *Action:* "捏了捏"
+    * *Suffix:* "的屁股并夸奖好软"
+    * *Result:* "{{user}} 捏了捏 {{char}} 的屁股并夸奖好软"
+* **Scenario (Forced Reaction):**
+    * *Action:* "亲了亲"
+    * *Suffix:* "的锁骨留下一个红印"
+    * *Result:* "{{user}} 亲了亲 {{char}} 的锁骨留下一个红印"
 
 **[LOGIC CHECK]**
-Before outputting, read the whole sentence: "**${userNameForPrompt} 拍了拍 ${charNameForPrompt} [Your Suffix]**". Does it sound like a bold, flirty action done BY the user TO you? If not, rewrite it.
+Before outputting, read the full sentence: "**${userNameForPrompt} [Action] ${charNameForPrompt} [Suffix]**". Does it sound like an action done BY the user TO you? If not, rewrite it.
 **[ULTIMATE REMARK PROTOCOL - THE BAROMETER OF YOUR RELATIONSHIP]**
 Your remark for the user is not just a name; it is a living, breathing indicator of your current feelings and the state of your relationship with them. It MUST evolve as your relationship does.
 
@@ -19899,7 +19913,19 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                     }
                     const data = await response.json();
                     
-                    // let aiResponse; // 【核心修复3】删掉前面的 let，直接使用我们在第一步声明的变量
+                    // --- 新增：更新 Token 显示逻辑 ---
+                    if (data.usage) {
+                        const usageEl = document.getElementById('token-usage-display');
+                        const inputVal = document.getElementById('token-input-val');
+                        const outputVal = document.getElementById('token-output-val');
+                        if (usageEl && inputVal && outputVal) {
+                            usageEl.style.display = 'block';
+                            inputVal.textContent = data.usage.prompt_tokens || 0;
+                            outputVal.textContent = data.usage.completion_tokens || 0;
+                        }
+                    }
+                    // ------------------------------
+
                     if (profile.url.includes('googleapis.com')) {
                         aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
                     } else {
@@ -21036,7 +21062,7 @@ You are the Director. If multiple characters react to the rejection, generate a 
             return; // 处理完毕，结束函数
         }
 
-            const commandsRegex = /\[\s*(react_to|music_add|music_play_title|music_next|music_prev|music_toggle|set_status|set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|reject_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|nudge|set_nudge_suffix|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?:\s*[:：]\s*((?:\[[^\]]*\]|[^\]]|[\r\n])*))?\s*\]/g;
+            const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action|set_interaction_suffix|music_add|music_play_title|music_next|music_prev|music_toggle|set_status|set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|reject_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|nudge|set_nudge_suffix|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?:\s*[:：]\s*((?:\[[^\]]*\]|[^\]]|[\r\n])*))?\s*\]/g;
             
             // --- 【核心重构：高级引用逻辑】 ---
             // 核心修复：正则改为兼容带引号("")、带中文引号(“”)、或完全不带引号的三种格式
@@ -21170,56 +21196,65 @@ You are the Director. If multiple characters react to the rejection, generate a 
                     }
                     // ===== 新代码到这里结束 =====
 // 【核心新增：AI主动拍一拍】
-                    case 'nudge': {
+                    case 'trigger_interaction': {
                         regularText = regularText.replace(cmd.commandString, '').trim();
                         messageSent = true;
 
-                        // 1. 获取发送者名字 (群聊用sender，单聊用chatName)
-                        // 【【【核心修复：修正拍一拍发起者的识别逻辑】】】
-                        // 优先级：block标签里的sender > 消息自带的sender > (仅单聊)聊天对象名
                         const actorName = forcedSender || sender || chatState.chatName;
-                        
-                        // 2. 获取用户的后缀 (因为是AI拍用户)
                         const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                        const suffix = chatInfo.myNudgeSuffix || ''; // 默认后缀改为空，更自然
+                        
+                        // AI 主动触发时，读取【用户】为这个特定聊天预设的动作和后缀
+                        const actionVerb = chatInfo.userInteractionAction || '拍了拍';
+                        const suffix = chatInfo.myNudgeSuffix || ''; 
 
-                        // 3. 生成文案： “AI”拍了拍“你”
-                        // 如果后缀为空，文案就是 "“角色名”拍了拍“你”"
-                        const nudgeText = `“${actorName}”拍了拍“你”${suffix}`;
+                        const nudgeText = `“${actorName}”${actionVerb}“你”${suffix}`;
                         
                         await addMessage({ type: 'system', side: 'system', text: nudgeText }, targetChatId);
                         break;
                     }
 
-                        case 'set_nudge_suffix': {
-                        // 1. 清理指令
+                    case 'set_interaction_action': {
                         regularText = regularText.replace(cmd.commandString, '').trim();
                         messageSent = true;
-
-                        const newSuffix = cmd.value.trim();
-                        if (newSuffix) {
-                            // 2. 确定是谁在修改 (逻辑同 set_status)
-                            // 优先级：消息自带sender > 强制指定forcedSender > (仅单聊)聊天对象名
-                            let actorName = sender || forcedSender;
-                            
-                            if (!actorName && !contactInfo.isGroup) {
-                                actorName = chatState.chatName; // 单聊保底
-                            }
-
-                            // 3. 保存设置
-                            // 注意：目前架构下群聊所有AI共用一个后缀设置，但提示语我们必须显示正确的人名
+                        const newAction = cmd.value.trim();
+                        if (newAction) {
+                            let actorName = sender || forcedSender || chatState.chatName;
                             const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                            chatInfo.aiNudgeSuffix = newSuffix;
-                            saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
                             
-                            // 4. 发送系统提示
-                            // 如果实在找不到名字（AI在群聊裸发指令），就显示“有人”，绝不显示群名
-                            const displayName = actorName || "有人";
+                            if (!chatInfo.characterInteractions) chatInfo.characterInteractions = {};
+                            if (!chatInfo.characterInteractions[actorName]) chatInfo.characterInteractions[actorName] = {};
+                            
+                            chatInfo.characterInteractions[actorName].action = newAction;
+                            
+                            saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
+                            await addMessage({ 
+                                type: 'system', 
+                                side: 'system', 
+                                text: `“${actorName}”将双击头像的动作修改为：${newAction}` 
+                            }, targetChatId);
+                        }
+                        break;
+                    }
+
+                    case 'set_interaction_suffix': {
+                        regularText = regularText.replace(cmd.commandString, '').trim();
+                        messageSent = true;
+                        const newSuffix = cmd.value.trim();
+                        if (newSuffix !== null) {
+                            let actorName = sender || forcedSender || chatState.chatName;
+                            const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                            
+                            if (!chatInfo.characterInteractions) chatInfo.characterInteractions = {};
+                            if (!chatInfo.characterInteractions[actorName]) chatInfo.characterInteractions[actorName] = {};
+                            
+                            chatInfo.characterInteractions[actorName].suffix = newSuffix;
+                            
+                            saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
                             
                             await addMessage({ 
                                 type: 'system', 
                                 side: 'system', 
-                                text: `“${displayName}”刚刚修改了自己的拍一拍后缀为：${newSuffix}` 
+                                text: `“${actorName}”将双击头像的后缀修改为：${newSuffix}` 
                             }, targetChatId);
                         }
                         break;
@@ -21652,8 +21687,11 @@ You are the Director. If multiple characters react to the rejection, generate a 
                 }
             });
 
-            // 3. 清空 AI 的拍一拍后缀
-            delete chatInfo.aiNudgeSuffix;
+            // 3. 清空双击头像相关的全部设置，恢复初始
+            delete chatInfo.characterInteractions; // 清空所有 AI 的动作和后缀
+            delete chatInfo.userInteractionAction; // 清空用户（你）的预设动作
+            delete chatInfo.myNudgeSuffix;         // 清空用户（你）的预设后缀
+            delete chatInfo.aiNudgeSuffix;         // 清空旧版 AI 后缀
 
             // 4. 【核心新增】清空 AI 给你的备注（包括单聊和群聊的所有记录）
             delete chatInfo.ai_remarks;
@@ -21721,6 +21759,12 @@ You are the Director. If multiple characters react to the rejection, generate a 
             else if (type === 'reset_style') { 
                 bubbleSettings[sender] = '现代简约'; 
                 fontSettings[sender] = getDefaultFontSetting(); 
+                // 同时重置该角色的双击互动设置
+                const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                if (chatInfo.characterInteractions && chatInfo.characterInteractions[sender]) {
+                    delete chatInfo.characterInteractions[sender];
+                    saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
+                }
             }
 
             if (type === 'set_font' || type === 'set_font_color' || type === 'reset_style') { 
@@ -25425,7 +25469,7 @@ headerMoreBtn.addEventListener('click', async () => {
             { text: '聊天信息', value: 'chat_info', class: 'primary' },
             { text: '设置状态', value: 'set_status', class: 'primary' },
             { text: '查看收藏', value: 'view_favorites', class: 'primary' },
-            { text: '设置拍一拍', value: 'set_nudge', class: 'primary' }, // 【核心修改】替换了原来的自动回复，且不加条件限制
+            { text: '双击头像动作', value: 'set_interaction', class: 'primary' }, 
             { text: '统计字数', value: 'char_count', class: 'primary' },
             { text: '更换聊天背景', value: 'change_bg', class: 'primary' }, 
             { text: '更换气泡样式', value: 'change_bubble', class: 'primary' }, 
@@ -25443,37 +25487,39 @@ headerMoreBtn.addEventListener('click', async () => {
             // 【核心修改：设置拍一拍逻辑 (自由模式)】
             // 【核心修改：分别设置“我”和“对方”的拍一拍后缀】
 // 【核心修改：只设置“我”的拍一拍后缀】
-            case 'set_nudge': {
+            case 'set_interaction': {
                 const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
                 
-                // 只读取“我”的后缀
-                const mySuffix = chatInfo.myNudgeSuffix || ''; // 默认值改为空字符串
-
-                // 输入新状态，提示语也更新了
-                const newSuffix = await showContentInputModal({
-                    title: '设置我的拍一拍后缀',
-                    placeholder: '例如：的屁股说：好翘',
-                    value: mySuffix
+                // 1. 设置动作 (当别人双击你时，他被迫做出的动作)
+                const actions = ["拍了拍", "戳了戳", "亲了亲", "揉了揉", "抱了抱", "喷了喷", "踢了踢", "捏了捏"];
+                const actionButtons = actions.map(act => ({ text: act, value: act, class: 'primary' }));
+                
+                const actionChoice = await conversationManager.showCustomModal({
+                    title: '设置双击头像动作',
+                    buttons: [...actionButtons, { text: '取消', value: 'cancel', class: 'secondary' }]
                 });
 
-                if (newSuffix !== null) {
-                    const trimmedSuffix = newSuffix.trim();
-                    // 保存设置
-                    chatInfo.myNudgeSuffix = trimmedSuffix;
-                    // 【核心修复】将未定义的变量 chatId 修正为 chatState.chatId，否则会导致保存失败
-                    saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
-                    
-                    // 【核心修改】将系统提示简化为自然的社交格式。由于详细逻辑已在后台 prepareApiPayload 中隐形处理，此处无需再向用户展示冗长的说明。
-                    const notifyText = trimmedSuffix 
-                        ? `你修改了拍一拍后缀为“${trimmedSuffix}”` 
-                        : `你清空了拍一拍后缀`;
-                    
-                    // 【核心修复】addMessage 增加第二个参数 chatState.chatId，确保在后台也能正确发送
-                    await conversationManager.addMessage({ type: 'system', side: 'system', text: notifyText }, chatState.chatId);
+                if (actionChoice && actionChoice.value !== 'cancel' && actionChoice.value !== 'close') {
+                    chatInfo.userInteractionAction = actionChoice.value;
 
-                    // 预览效果也更新
-                    const previewText = chatInfo.myNudgeSuffix ? `“AI”拍了拍“你”${chatInfo.myNudgeSuffix}` : `“AI”拍了拍“你”`;
-                    await customAlert(`设置成功！\n当AI拍你时将显示：\n${previewText}`);
+                    // 2. 设置后缀 (当别人双击你时，他被迫说的话或追加的行为)
+                    const mySuffix = chatInfo.myNudgeSuffix || '';
+                    const newSuffix = await showContentInputModal({
+                        title: '设置双击互动后缀',
+                        placeholder: '例如：的脸颊并亲了一口',
+                        value: mySuffix
+                    });
+
+                    if (newSuffix !== null) {
+                        chatInfo.myNudgeSuffix = newSuffix.trim();
+                        saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
+                        
+                        const currentAction = chatInfo.userInteractionAction || '拍了拍';
+                        const notifyText = `双击头像动作已更新：当对方双击你的头像时，系统将显示他“${currentAction}”你${chatInfo.myNudgeSuffix}`;
+                        await addMessage({ type: 'system', side: 'system', text: notifyText }, chatState.chatId);
+
+                        await conversationManager.customAlert('设置成功！');
+                    }
                 }
                 break;
             }
@@ -25887,7 +25933,7 @@ messagesContainer.addEventListener('click', async (e) => {
 messagesContainer.addEventListener('dblclick', async (e) => {
         if (isMultiSelectMode) return;
 
-        // 【核心新增】1. 优先检测是否双击了头像 (实现拍一拍)
+        // 1. 优先检测是否双击了头像 (双击头像动作)
         const avatar = e.target.closest('.message-avatar');
         if (avatar) {
             e.preventDefault();
@@ -25900,45 +25946,45 @@ messagesContainer.addEventListener('dblclick', async (e) => {
             if (!message) return;
 
             const isMe = message.side === 'sent';
-                
-                // 【【【 核心修复：在这里区分群聊和私聊，正确获取被拍对象的名字 】】】
-                let targetName;
-                if (isMe) {
-                    targetName = '自己';
-                } else {
-                    // 如果是群聊
-                    if (contactInfo.isGroup) {
-                        // 目标必须是这条消息的发送者 (msg.sender)。
-                        // 如果因为某些原因找不到，就用一个通用的“对方”作为备用，但绝不能用群名。
-                        targetName = message.sender || '对方';
-                    } else {
-                        // 如果是私聊，目标就是这个聊天的名称。
-                        targetName = chatState.chatName;
-                    }
-                }
-                // 【【【 修复结束 】】】
-
-                const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-            
-            let suffix = ''; // 【核心修改】默认后缀为空
-            
+            let targetName;
             if (isMe) {
-                // 如果拍的是我自己 -> 取我设置的后缀
-                suffix = chatInfo.myNudgeSuffix || '';
+                targetName = '自己';
             } else {
-                // 如果拍的是对方 -> 取对方（AI）自己设置的后缀
-                suffix = chatInfo.aiNudgeSuffix || '';
+                if (contactInfo.isGroup) {
+                    targetName = message.sender || '对方';
+                } else {
+                    targetName = chatState.chatName;
+                }
+            }
+
+            const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+            
+            let actionVerb, suffix, object;
+
+            if (isMe) {
+                // 如果双击的是【你自己】的头像：
+                // 读取你为 AI 准备的“陷阱”（即 AI 动你时的动作和后缀）
+                actionVerb = chatInfo.userInteractionAction || '拍了拍';
+                suffix = chatInfo.myNudgeSuffix || '';
+                object = "自己";
+            } else {
+                // 如果双击的是【对方】的头像：
+                // 核心修复：根据 targetName 查找该角色的专属设置
+                const charSettings = (chatInfo.characterInteractions && chatInfo.characterInteractions[targetName]) 
+                                     ? chatInfo.characterInteractions[targetName] 
+                                     : {};
+                
+                actionVerb = charSettings.action || '拍了拍';
+                suffix = charSettings.suffix || '';
+                object = `“${targetName}”`;
             }
             
-            const subject = "你"; 
-            const object = isMe ? "自己" : `“${targetName}”`;
-            
-            // 如果后缀为空，文案就是 "你拍了拍 xxx"，否则才拼接后缀
-            const nudgeText = `${subject}拍了拍${object}${suffix}`;
+            // 直接生成文案，不再弹出菜单
+            const nudgeText = `你${actionVerb}${object}${suffix}`;
             
             await addMessage({ type: 'system', side: 'system', text: nudgeText }, chatState.chatId);
             
-            // 头像震动动画 (不变)
+            // 头像震动动画
             avatar.style.transition = 'transform 0.1s';
             avatar.style.transform = 'rotate(-15deg)';
             setTimeout(() => {
@@ -38006,6 +38052,13 @@ async function handleAccountReset() {
                     saveToLocalStorage(storageKey, groupData);
                     // 关键：同步更新内存中的数据
                     groupAccountData = groupData;
+
+                    // 重置该角色的双击动作
+                    const chatInfo = loadFromLocalStorage(`chat_info_${currentChatId}`, {});
+                    if (chatInfo.characterInteractions && chatInfo.characterInteractions[senderName]) {
+                        delete chatInfo.characterInteractions[senderName];
+                        saveToLocalStorage(`chat_info_${currentChatId}`, chatInfo);
+                    }
                 } else {
                     // 单聊直接用初始模板覆盖
                     saveToLocalStorage(storageKey, staticAccountData);
