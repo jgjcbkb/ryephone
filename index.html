@@ -9082,26 +9082,48 @@ if ('serviceWorker' in navigator) {
 
                 const syncToggle = document.getElementById('lt-sync-ai-toggle');
                 const syncKey = `app_lt_sync_ai_${chatId}_${memberName}`;
+                const accKey = `app_lt_acc_ms_${chatId}_${memberName}`;
+                const startTimeKey = `app_lt_start_time_${chatId}_${memberName}`;
+                
                 const isSyncEnabled = loadFromLocalStorage(syncKey, false);
                 syncToggle.checked = isSyncEnabled;
+
+                // 初始渲染：计算并显示当前已有的总时长（累积 + 当前运行中）
+                const renderInitialTime = () => {
+                    const accMs = loadFromLocalStorage(accKey, 0);
+                    const startTime = loadFromLocalStorage(startTimeKey, null);
+                    let totalMs = accMs;
+                    if (startTime) totalMs += (Date.now() - startTime);
+                    const totalSec = Math.floor(totalMs / 1000);
+                    document.getElementById('lt-duration').textContent = 
+                        `${String(Math.floor(totalSec / 60)).padStart(2, '0')}:${String(totalSec % 60).padStart(2, '0')}`;
+                };
+                renderInitialTime();
 
                 if (isSyncEnabled) {
                     startSimulations(chatId, memberName);
                 } else {
                     if (durationInterval) clearInterval(durationInterval);
-                    document.getElementById('lt-duration').textContent = '00:00';
                 }
 
                 syncToggle.onchange = () => {
                     const nowEnabled = syncToggle.checked;
                     saveToLocalStorage(syncKey, nowEnabled);
                     if (nowEnabled) {
-                        saveToLocalStorage(`app_lt_start_time_${chatId}_${memberName}`, Date.now());
+                        // 开启：记录本次开始时间
+                        saveToLocalStorage(startTimeKey, Date.now());
                         startSimulations(chatId, memberName);
                     } else {
-                        localStorage.removeItem(`app_lt_start_time_${chatId}_${memberName}`);
+                        // 关闭（暂停）：将本次运行的时长结算到累积时长中
+                        const currentStart = loadFromLocalStorage(startTimeKey, null);
+                        if (currentStart) {
+                            const sessionMs = Date.now() - currentStart;
+                            const newTotal = loadFromLocalStorage(accKey, 0) + sessionMs;
+                            saveToLocalStorage(accKey, newTotal);
+                        }
+                        localStorage.removeItem(startTimeKey);
                         if (durationInterval) clearInterval(durationInterval);
-                        document.getElementById('lt-duration').textContent = '00:00';
+                        renderInitialTime(); // 停止后保持显示暂停时的数字
                     }
                 };
             };
@@ -9210,16 +9232,21 @@ if ('serviceWorker' in navigator) {
 
             durationInterval = setInterval(() => {
                 const startTimeKey = `app_lt_start_time_${chatId}_${memberName}`;
-                // 【核心修复】：如果找不到起始时间，说明同步已关闭，立即停止计时
+                const accKey = `app_lt_acc_ms_${chatId}_${memberName}`;
+                
                 const savedStartTime = JSON.parse(localStorage.getItem(startTimeKey));
                 if (!savedStartTime) {
                     clearInterval(durationInterval);
                     return;
                 }
 
-                const elapsed = Math.floor((Date.now() - savedStartTime) / 1000);
-                const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
-                const secs = String(elapsed % 60).padStart(2, '0');
+                // 计算总时长：之前的累积 + 本次已跑的时长
+                const accMs = JSON.parse(localStorage.getItem(accKey)) || 0;
+                const totalMs = accMs + (Date.now() - savedStartTime);
+                const totalSec = Math.floor(totalMs / 1000);
+
+                const mins = String(Math.floor(totalSec / 60)).padStart(2, '0');
+                const secs = String(totalSec % 60).padStart(2, '0');
                 
                 const durationEl = document.getElementById('lt-duration');
                 if (durationEl && currentSelectedMember === memberName) {
@@ -9257,11 +9284,19 @@ if ('serviceWorker' in navigator) {
             allChars.forEach(name => {
                 const syncKey = `app_lt_sync_ai_${chatId}_${name}`;
                 const startTimeKey = `app_lt_start_time_${chatId}_${name}`;
+                const accKey = `app_lt_acc_ms_${chatId}_${name}`;
                 
-                if (loadFromLocalStorage(syncKey, false)) {
-                    const startTime = loadFromLocalStorage(startTimeKey, Date.now());
-                    const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
-                    const durationStr = `${Math.floor(elapsedSec / 60)}分${elapsedSec % 60}秒`;
+                const isSyncing = loadFromLocalStorage(syncKey, false);
+                const accMs = loadFromLocalStorage(accKey, 0);
+                const startTime = loadFromLocalStorage(startTimeKey, null);
+                
+                // 只要有过累积时长，或者正在同步，就发送给 AI
+                if (isSyncing || accMs > 0) {
+                    let totalMs = accMs;
+                    if (startTime) totalMs += (Date.now() - startTime);
+                    
+                    const totalSec = Math.floor(totalMs / 1000);
+                    const durationStr = `${Math.floor(totalSec / 60)}分${totalSec % 60}秒`;
                     activeListeners.push({ name, duration: durationStr });
                 }
             });
@@ -13692,25 +13727,26 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                     try {
                         let jsonStr = tuquMatch[1].trim();
 
-                        // 【暴力提取函数：增加对超长文本的穿透能力】
+                        // 【核心重构】：能够处理转义引号的精准提取函数
                         const fastExtract = (source, field) => {
-                            // 使用贪婪匹配字段内容的结尾，确保 HTML 代码里的引号不会干扰提取
-                            const regex = new RegExp('"' + field + '"\\s*:\\s*"([\\s\\S]*?)"(?=\\s*[,}])', 'g');
-                            let m = regex.exec(source);
-                            // 如果正则没抓到，尝试最基础的引号间提取
-                            if (!m) {
-                                const simpleRegex = new RegExp('"' + field + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"', 's');
-                                m = source.match(simpleRegex);
-                            }
-                            
+                            // 匹配 "field" : "内容"
+                            // 内容部分使用 (?:\\.|[^"\\])* 逻辑：匹配转义字符(\\.)或者非引号非反斜杠字符([^"\\])
+                            // 这样遇到 \" 时，正则会知道这是内容的一部分，而不是字符串的结尾
+                            const regex = new RegExp('"' + field + '"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"', 'i');
+                            const m = source.match(regex);
                             if (m && m[1]) {
-                                return m[1].replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\').trim();
+                                // 还原转义字符：\" 还原为 ", \\n 还原为 换行, \\\\ 还原为 \
+                                return m[1]
+                                    .replace(/\\"/g, '"')
+                                    .replace(/\\n/g, '\n')
+                                    .replace(/\\\\/g, '\\')
+                                    .trim();
                             }
                             return '';
                         };
 
-                        // 1. 提取主贴基础字段
-                        const typeVal = (jsonStr.match(/"type"\s*:\s*"([^"]+)"/) || [])[1];
+                        // 1. 提取主贴基础字段 (使用新的提取函数确保安全)
+                        const typeVal = fastExtract(jsonStr, 'type');
                         const boardVal = (jsonStr.match(/"board"\s*:\s*"([^"]+)"/) || [])[1];
                         
                         if (!typeVal) continue;
@@ -13726,22 +13762,25 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                             water_army: []
                         };
 
-                        // 2. 【核心重构】贪婪提取水军列表
-                        const armyBlockMatch = jsonStr.match(/"water_army"\s*:\s*\[([\s\S]*)\]/);
+                        // 2. 【核心重构】提取水军列表
+                        const armyBlockMatch = jsonStr.match(/"water_army"\s*:\s*\[([\s\S]*)\]/i);
                         if (armyBlockMatch) {
                             const armyBlock = armyBlockMatch[1];
-                            // 逐个抓取水军对象
+                            // 逐个抓取 { ... } 对象
                             const itemRegex = /\{([\s\S]+?)\}/g;
                             let itemMatch;
                             while ((itemMatch = itemRegex.exec(armyBlock)) !== null) {
                                 const itemStr = itemMatch[1];
+                                
+                                // 全部使用加强版提取函数
                                 const armyAuthor = fastExtract(itemStr, 'author');
                                 const armyContent = fastExtract(itemStr, 'content');
+                                const armyLocation = fastExtract(itemStr, 'location');
                                 
                                 if (armyAuthor || armyContent) {
                                     data.water_army.push({
                                         author: armyAuthor,
-                                        location: fastExtract(itemStr, 'location'),
+                                        location: armyLocation,
                                         content: armyContent
                                     });
                                 }
@@ -13776,8 +13815,8 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                             tuquIframe.contentWindow.postMessage({ 
                                 type: 'AI_POST_TOPIC', 
                                 board: data.board, 
-                                subject: parseTuquMedia(data.subject), // 解析标题中的表情
-                                content: parseTuquMedia(data.content), // 解析正文中的表情
+                                subject: parseTuquMedia(data.subject), 
+                                content: parseTuquMedia(data.content), 
                                 author: data.author, 
                                 location: data.location,
                                 forceId: newPostId
@@ -13789,8 +13828,47 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                     setTimeout(() => {
                                         tuquIframe.contentWindow.postMessage({ 
                                             type: 'AI_POST_COMMENT', 
+                                            board: data.board, // 核心修复：带上板块名
                                             postId: newPostId, 
-                                            content: parseTuquMedia(c.content), // 解析水军评论中的表情
+                                            content: parseTuquMedia(c.content), 
+                                            author: c.author, 
+                                            location: data.location 
+                                        }, '*');
+                                    }, 500 * (index + 1));
+                                });
+                            }
+                        } else if (data.type === 'comment') {
+                            if (forbiddenNames.includes(data.author)) data.author = "匿名网友";
+                            
+                            // 【核心修复】：如果 AI 没提供版块名，自动从全局数据中检索该帖子所属版块
+                            if (!data.board) {
+                                for (const boardName in globalTuquData) {
+                                    if (Array.isArray(globalTuquData[boardName]) && globalTuquData[boardName].some(p => p.id === data.postId)) {
+                                        data.board = boardName;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            tuquIframe.contentWindow.postMessage({ 
+                                type: 'AI_POST_COMMENT', 
+                                board: data.board, // 核心修复：带上确定的板块名
+                                postId: data.postId, 
+                                content: parseTuquMedia(data.content), 
+                                author: data.author, 
+                                location: data.location,
+                                quote: data.quote 
+                            }, '*');
+
+                            if (data.water_army && Array.isArray(data.water_army)) {
+                                data.water_army.forEach((c, index) => {
+                                    if (forbiddenNames.includes(c.author)) c.author = "吃瓜群众";
+                                    setTimeout(() => {
+                                        tuquIframe.contentWindow.postMessage({ 
+                                            type: 'AI_POST_COMMENT', 
+                                            board: data.board, // 水军评论同步带上板块名
+                                            postId: data.postId, 
+                                            content: parseTuquMedia(c.content), 
                                             author: c.author, 
                                             location: c.location 
                                         }, '*');
