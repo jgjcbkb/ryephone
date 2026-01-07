@@ -13711,7 +13711,7 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                 // ===== 新代码块到此结束 =====
                 } // end of while loop
 
-                // 【核心修复】将 +? 改为 *，实行贪婪匹配，确保抓取到最后一个 ] 之前的全部内容
+                // 【核心修复】将 +? 改为 *，实行贪婪匹配
                 const tuquComplexRegex = /\[tuqu_complex_action:\s*(\{[\s\S]*\})\s*\]/g;
                 let tuquMatch;
                 const tuquIframe = document.querySelector('#tab-content-tuqu iframe');
@@ -13726,80 +13726,145 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                 while ((tuquMatch = tuquComplexRegex.exec(sanitizedResponse)) !== null) {
                     try {
                         let jsonStr = tuquMatch[1].trim();
+                        let data = null;
 
-                        // 【核心重构】：能够处理转义引号的精准提取函数
-                        const fastExtract = (source, field) => {
-                            // 匹配 "field" : "内容"
-                            // 内容部分使用 (?:\\.|[^"\\])* 逻辑：匹配转义字符(\\.)或者非引号非反斜杠字符([^"\\])
-                            // 这样遇到 \" 时，正则会知道这是内容的一部分，而不是字符串的结尾
-                            const regex = new RegExp('"' + field + '"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"', 'i');
-                            const m = source.match(regex);
-                            if (m && m[1]) {
-                                // 还原转义字符：\" 还原为 ", \\n 还原为 换行, \\\\ 还原为 \
-                                return m[1]
-                                    .replace(/\\"/g, '"')
-                                    .replace(/\\n/g, '\n')
-                                    .replace(/\\\\/g, '\\')
-                                    .trim();
-                            }
-                            return '';
-                        };
+                        // 【步骤 1：优先尝试标准 JSON 解析】
+                        try {
+                            data = JSON.parse(jsonStr);
+                        } catch (e) {
+                            // JSON 解析失败，进入暴力切片模式
+                        }
 
-                        // 1. 提取主贴基础字段 (使用新的提取函数确保安全)
-                        const typeVal = fastExtract(jsonStr, 'type');
-                        const boardVal = (jsonStr.match(/"board"\s*:\s*"([^"]+)"/) || [])[1];
-                        
-                        if (!typeVal) continue;
+                        // 【步骤 2：字符串暴力切片提取 (放弃正则，纯物理定位)】
+                        if (!data) {
+                            // 辅助函数：通过 indexOf 查找字段值
+                            const extractFieldRaw = (fullStr, key) => {
+                                // 1. 定位 key 的开始，例如 "type": "
+                                const keyStr = `"${key}"`;
+                                let keyIndex = fullStr.indexOf(keyStr);
+                                if (keyIndex === -1) return "";
 
-                        let data = {
-                            type: typeVal,
-                            board: boardVal || '',
-                            postId: fastExtract(jsonStr, 'postId'),
-                            author: fastExtract(jsonStr, 'author'),
-                            location: fastExtract(jsonStr, 'location'),
-                            subject: fastExtract(jsonStr, 'subject'),
-                            content: fastExtract(jsonStr, 'content'),
-                            water_army: []
-                        };
-
-                        // 2. 【核心重构】提取水军列表
-                        const armyBlockMatch = jsonStr.match(/"water_army"\s*:\s*\[([\s\S]*)\]/i);
-                        if (armyBlockMatch) {
-                            const armyBlock = armyBlockMatch[1];
-                            // 逐个抓取 { ... } 对象
-                            const itemRegex = /\{([\s\S]+?)\}/g;
-                            let itemMatch;
-                            while ((itemMatch = itemRegex.exec(armyBlock)) !== null) {
-                                const itemStr = itemMatch[1];
-                                
-                                // 全部使用加强版提取函数
-                                const armyAuthor = fastExtract(itemStr, 'author');
-                                const armyContent = fastExtract(itemStr, 'content');
-                                const armyLocation = fastExtract(itemStr, 'location');
-                                
-                                if (armyAuthor || armyContent) {
-                                    data.water_army.push({
-                                        author: armyAuthor,
-                                        location: armyLocation,
-                                        content: armyContent
-                                    });
+                                // 2. 找到冒号后的第一个引号
+                                let startQuoteIndex = fullStr.indexOf('"', keyIndex + keyStr.length);
+                                while (startQuoteIndex !== -1 && fullStr[startQuoteIndex - 1] === '\\') {
+                                    // 如果引号前面有转义符，找下一个
+                                    startQuoteIndex = fullStr.indexOf('"', startQuoteIndex + 1);
                                 }
+                                if (startQuoteIndex === -1) return "";
+
+                                // 3. 寻找结束位置：下一个字段的特征 ", "key":
+                                // 我们遍历所有可能的字段名，找到最近的一个
+                                const allKeys = ["type", "board", "postId", "author", "location", "subject", "content", "water_army", "quote"];
+                                let minEndIndex = fullStr.length; // 默认取到最后
+                                let foundNextKey = false;
+
+                                allKeys.forEach(nextKey => {
+                                    // 特征：逗号+空格+引号+key+引号+冒号
+                                    const nextKeyMarker = `, "${nextKey}":`;
+                                    const nextKeyIndex = fullStr.indexOf(nextKeyMarker, startQuoteIndex + 1);
+                                    if (nextKeyIndex !== -1 && nextKeyIndex < minEndIndex) {
+                                        minEndIndex = nextKeyIndex;
+                                        foundNextKey = true;
+                                    }
+                                });
+
+                                // 4. 如果没找到下一个字段，尝试找 JSON 结尾的 "} 或 "}]
+                                if (!foundNextKey) {
+                                    // 倒序查找最后一个引号（忽略末尾的括号）
+                                    // 这里简单粗暴一点：假设它是最后一个字段，取到倒数第二个字符
+                                    // 为了保险，我们直接截取到字符串末尾，稍后由清理函数去掉多余的符号
+                                    minEndIndex = fullStr.length;
+                                }
+
+                                // 5. 截取并返回
+                                let rawValue = fullStr.substring(startQuoteIndex + 1, minEndIndex);
+                                
+                                // 如果是因为没找到下一个key而取到了末尾，需要把末尾的 } ] 去了
+                                // 简单的去尾逻辑：从后往前找最后一个非转义的引号
+                                if (!foundNextKey) {
+                                    let lastQuote = rawValue.lastIndexOf('"');
+                                    while (lastQuote !== -1 && rawValue[lastQuote - 1] === '\\') {
+                                        lastQuote = rawValue.lastIndexOf('"', lastQuote - 1);
+                                    }
+                                    if (lastQuote !== -1) {
+                                        rawValue = rawValue.substring(0, lastQuote);
+                                    }
+                                }
+
+                                return rawValue;
+                            };
+
+                            // 清理函数：处理转义字符和换行
+                            const clean = (str) => {
+                                if (!str) return "";
+                                return str
+                                    .replace(/\\"/g, '"')      // 还原双引号
+                                    .replace(/\\\\/g, '\\')    // 还原反斜杠
+                                    .replace(/\\n/g, '<br>')   // 【重点】将 \n 转义符变成换行标签
+                                    .replace(/\n/g, '<br>')    // 【重点】将真实换行符变成换行标签
+                                    .trim();
+                            };
+
+                            // 开始暴力提取
+                            // 注意：water_army 是数组，这里我们先不管它，只提取主贴内容，防止卡死
+                            // 如果需要水军，可以用正则单独提 water_army 部分，因为它结构相对固定
+                            
+                            data = {
+                                type: clean(extractFieldRaw(jsonStr, 'type')),
+                                board: clean(extractFieldRaw(jsonStr, 'board')),
+                                postId: clean(extractFieldRaw(jsonStr, 'postId')),
+                                author: clean(extractFieldRaw(jsonStr, 'author')),
+                                location: clean(extractFieldRaw(jsonStr, 'location')),
+                                subject: clean(extractFieldRaw(jsonStr, 'subject')),
+                                content: clean(extractFieldRaw(jsonStr, 'content')), // 这里的 content 绝对不会被中间的引号截断
+                                water_army: []
+                            };
+
+                            // 单独处理水军 (正则提取数组部分，然后循环提取)
+                            const armyMatch = jsonStr.match(/"water_army"\s*:\s*\[([\s\S]*)\]/);
+                            if (armyMatch) {
+                                const armyBlock = armyMatch[1];
+                                // 简单的 {} 分割
+                                const items = armyBlock.split('},');
+                                items.forEach(item => {
+                                    // 补全被 split 吃掉的 }
+                                    if (!item.trim().endsWith('}')) item += '}';
+                                    
+                                    const aAuthor = clean(extractFieldRaw(item, 'author'));
+                                    const aContent = clean(extractFieldRaw(item, 'content'));
+                                    const aLoc = clean(extractFieldRaw(item, 'location'));
+                                    
+                                    if (aAuthor || aContent) {
+                                        data.water_army.push({
+                                            author: aAuthor,
+                                            content: aContent,
+                                            location: aLoc
+                                        });
+                                    }
+                                });
                             }
                         }
 
+                        if (!data || !data.type) continue;
                         if (!tuquIframe) break;
 
                         // 【核心修复】定义内部解析函数，区分处理 Emoji 和 Sticker 的显示尺寸
                         const parseTuquMedia = (text) => {
                             if (!text) return "";
-                            return text.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                            
+                            // 1. 移除 <snippet> 标签
+                            let cleanText = text.replace(/<snippet>/g, '').replace(/<\/snippet>/g, '');
+                            
+                            // 2. 【双重保险】再次确保换行符被转换 (防止 JSON.parse 出来的 \n 没变)
+                            cleanText = cleanText.replace(/\n/g, '<br>');
+
+                            // 3. 替换表情包
+                            return cleanText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
                                 const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type.toLowerCase());
                                 if (item) {
                                     if (type.toLowerCase() === 'emoji') {
-                                        // Emoji 保持行内小尺寸，跟随文字高度
                                         return `<img src="${item.url}" alt="${name}" class="inline-emoji" style="height:1.2em; vertical-align:middle; margin:0 2px;">`;
                                     } else {
-                                        // 表情包 (Sticker) 使用大尺寸，且强制换行显示，更符合论坛表情包习惯
                                         return `<img src="${item.url}" alt="${name}" style="max-width: 120px; max-height: 120px; display: block; margin: 8px 0; border-radius: 8px;">`;
                                     }
                                 }
@@ -13828,7 +13893,7 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                     setTimeout(() => {
                                         tuquIframe.contentWindow.postMessage({ 
                                             type: 'AI_POST_COMMENT', 
-                                            board: data.board, // 核心修复：带上板块名
+                                            board: data.board,
                                             postId: newPostId, 
                                             content: parseTuquMedia(c.content), 
                                             author: c.author, 
@@ -13840,7 +13905,6 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                         } else if (data.type === 'comment') {
                             if (forbiddenNames.includes(data.author)) data.author = "匿名网友";
                             
-                            // 【核心修复】：如果 AI 没提供版块名，自动从全局数据中检索该帖子所属版块
                             if (!data.board) {
                                 for (const boardName in globalTuquData) {
                                     if (Array.isArray(globalTuquData[boardName]) && globalTuquData[boardName].some(p => p.id === data.postId)) {
@@ -13852,7 +13916,7 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
 
                             tuquIframe.contentWindow.postMessage({ 
                                 type: 'AI_POST_COMMENT', 
-                                board: data.board, // 核心修复：带上确定的板块名
+                                board: data.board,
                                 postId: data.postId, 
                                 content: parseTuquMedia(data.content), 
                                 author: data.author, 
@@ -13866,34 +13930,9 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                     setTimeout(() => {
                                         tuquIframe.contentWindow.postMessage({ 
                                             type: 'AI_POST_COMMENT', 
-                                            board: data.board, // 水军评论同步带上板块名
+                                            board: data.board,
                                             postId: data.postId, 
                                             content: parseTuquMedia(c.content), 
-                                            author: c.author, 
-                                            location: c.location 
-                                        }, '*');
-                                    }, 500 * (index + 1));
-                                });
-                            }
-                        } else if (data.type === 'comment') {
-                            if (forbiddenNames.includes(data.author)) data.author = "匿名网友";
-                            tuquIframe.contentWindow.postMessage({ 
-                                type: 'AI_POST_COMMENT', 
-                                postId: data.postId, 
-                                content: parseTuquMedia(data.content), // 解析评论中的表情
-                                author: data.author, 
-                                location: data.location,
-                                quote: data.quote 
-                            }, '*');
-
-                            if (data.water_army && Array.isArray(data.water_army)) {
-                                data.water_army.forEach((c, index) => {
-                                    if (forbiddenNames.includes(c.author)) c.author = "吃瓜群众";
-                                    setTimeout(() => {
-                                        tuquIframe.contentWindow.postMessage({ 
-                                            type: 'AI_POST_COMMENT', 
-                                            postId: data.postId, 
-                                            content: parseTuquMedia(c.content), // 解析水军评论中的表情
                                             author: c.author, 
                                             location: c.location 
                                         }, '*');
