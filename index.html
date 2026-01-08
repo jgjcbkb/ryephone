@@ -13732,116 +13732,121 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                         try {
                             data = JSON.parse(jsonStr);
                         } catch (e) {
-                            // JSON 解析失败，进入暴力切片模式
+                            // JSON 解析失败，进入全字段边界解析模式
                         }
 
-                        // 【步骤 2：字符串暴力切片提取 (放弃正则，纯物理定位)】
+                        // 【步骤 2：全字段边界锚点解析 (修复标题/内容中未转义引号的问题)】
                         if (!data) {
-                            // 辅助函数：通过 indexOf 查找字段值
-                            const extractFieldRaw = (fullStr, key) => {
-                                // 1. 定位 key 的开始，例如 "type": "
-                                const keyStr = `"${key}"`;
-                                let keyIndex = fullStr.indexOf(keyStr);
-                                if (keyIndex === -1) return "";
+                            // 定义所有可能的字段名，用于定位边界
+                            const allKeys = ["type", "board", "postId", "author", "location", "subject", "content", "water_army", "quote"];
 
-                                // 2. 找到冒号后的第一个引号
-                                let startQuoteIndex = fullStr.indexOf('"', keyIndex + keyStr.length);
-                                while (startQuoteIndex !== -1 && fullStr[startQuoteIndex - 1] === '\\') {
-                                    // 如果引号前面有转义符，找下一个
-                                    startQuoteIndex = fullStr.indexOf('"', startQuoteIndex + 1);
-                                }
-                                if (startQuoteIndex === -1) return "";
+                            // --- 核心工具：基于下一个字段名的边界提取器 ---
+                            const extractByBoundary = (fullStr, targetKey) => {
+                                // 1. 找到目标字段的开始： "key": "
+                                // 注意：这里我们允许冒号周围有空格
+                                const startPattern = new RegExp(`"${targetKey}"\\s*:\\s*"`);
+                                const startMatch = fullStr.match(startPattern);
+                                if (!startMatch) return "";
 
-                                // 3. 寻找结束位置：下一个字段的特征 ", "key":
-                                // 我们遍历所有可能的字段名，找到最近的一个
-                                const allKeys = ["type", "board", "postId", "author", "location", "subject", "content", "water_army", "quote"];
-                                let minEndIndex = fullStr.length; // 默认取到最后
-                                let foundNextKey = false;
+                                const valueStartIndex = startMatch.index + startMatch[0].length;
+                                const textAfterStart = fullStr.substring(valueStartIndex);
+
+                                // 2. 寻找最近的“下一个字段”作为结束锚点
+                                let minEndIndex = -1;
 
                                 allKeys.forEach(nextKey => {
-                                    // 特征：逗号+空格+引号+key+引号+冒号
-                                    const nextKeyMarker = `, "${nextKey}":`;
-                                    const nextKeyIndex = fullStr.indexOf(nextKeyMarker, startQuoteIndex + 1);
-                                    if (nextKeyIndex !== -1 && nextKeyIndex < minEndIndex) {
-                                        minEndIndex = nextKeyIndex;
-                                        foundNextKey = true;
+                                    // 排除自己
+                                    if (nextKey === targetKey) return;
+
+                                    // 特征：", "key":  (逗号+空格+引号+key)
+                                    // 或者 ","key": (逗号+引号+key)
+                                    const nextKeyRegex = new RegExp(`",\\s*"${nextKey}"\\s*:`);
+                                    const match = textAfterStart.match(nextKeyRegex);
+                                    
+                                    if (match) {
+                                        if (minEndIndex === -1 || match.index < minEndIndex) {
+                                            minEndIndex = match.index;
+                                        }
                                     }
                                 });
 
-                                // 4. 如果没找到下一个字段，尝试找 JSON 结尾的 "} 或 "}]
-                                if (!foundNextKey) {
-                                    // 倒序查找最后一个引号（忽略末尾的括号）
-                                    // 这里简单粗暴一点：假设它是最后一个字段，取到倒数第二个字符
-                                    // 为了保险，我们直接截取到字符串末尾，稍后由清理函数去掉多余的符号
-                                    minEndIndex = fullStr.length;
-                                }
-
-                                // 5. 截取并返回
-                                let rawValue = fullStr.substring(startQuoteIndex + 1, minEndIndex);
-                                
-                                // 如果是因为没找到下一个key而取到了末尾，需要把末尾的 } ] 去了
-                                // 简单的去尾逻辑：从后往前找最后一个非转义的引号
-                                if (!foundNextKey) {
-                                    let lastQuote = rawValue.lastIndexOf('"');
-                                    while (lastQuote !== -1 && rawValue[lastQuote - 1] === '\\') {
-                                        lastQuote = rawValue.lastIndexOf('"', lastQuote - 1);
-                                    }
-                                    if (lastQuote !== -1) {
-                                        rawValue = rawValue.substring(0, lastQuote);
+                                // 3. 如果没找到下一个字段，说明可能是最后一项，寻找 JSON 结束符
+                                if (minEndIndex === -1) {
+                                    // 匹配结尾的 "} 或 "}] 或 "]
+                                    // 这里的逻辑是：找到字符串末尾倒数几个字符里的引号
+                                    const endRegex = /"\s*\}\s*\]?$/; 
+                                    const endMatch = textAfterStart.match(endRegex);
+                                    if (endMatch) {
+                                        minEndIndex = endMatch.index;
+                                    } else {
+                                        // 保底：如果没有明显的结束符，就取到最后，然后手动切掉末尾的引号
+                                        minEndIndex = textAfterStart.lastIndexOf('"');
                                     }
                                 }
 
-                                return rawValue;
+                                // 4. 截取
+                                if (minEndIndex !== -1) {
+                                    return textAfterStart.substring(0, minEndIndex);
+                                }
+                                return "";
                             };
 
-                            // 清理函数：处理转义字符和换行
+                            // 清理函数
                             const clean = (str) => {
                                 if (!str) return "";
                                 return str
                                     .replace(/\\"/g, '"')      // 还原双引号
                                     .replace(/\\\\/g, '\\')    // 还原反斜杠
-                                    .replace(/\\n/g, '<br>')   // 【重点】将 \n 转义符变成换行标签
-                                    .replace(/\n/g, '<br>')    // 【重点】将真实换行符变成换行标签
+                                    .replace(/\\n/g, '<br>')   // 转义换行
+                                    .replace(/\n/g, '<br>')    // 真实换行
                                     .trim();
                             };
 
-                            // 开始暴力提取
-                            // 注意：water_army 是数组，这里我们先不管它，只提取主贴内容，防止卡死
-                            // 如果需要水军，可以用正则单独提 water_army 部分，因为它结构相对固定
+                            // --- 开始提取 ---
+                            // 针对 subject 和 content 使用高级提取，其他字段使用简单提取即可
+                            // 但为了保险，全部使用高级提取
                             
                             data = {
-                                type: clean(extractFieldRaw(jsonStr, 'type')),
-                                board: clean(extractFieldRaw(jsonStr, 'board')),
-                                postId: clean(extractFieldRaw(jsonStr, 'postId')),
-                                author: clean(extractFieldRaw(jsonStr, 'author')),
-                                location: clean(extractFieldRaw(jsonStr, 'location')),
-                                subject: clean(extractFieldRaw(jsonStr, 'subject')),
-                                content: clean(extractFieldRaw(jsonStr, 'content')), // 这里的 content 绝对不会被中间的引号截断
+                                type: clean(extractByBoundary(jsonStr, 'type')),
+                                board: clean(extractByBoundary(jsonStr, 'board')),
+                                postId: clean(extractByBoundary(jsonStr, 'postId')),
+                                author: clean(extractByBoundary(jsonStr, 'author')),
+                                location: clean(extractByBoundary(jsonStr, 'location')),
+                                subject: clean(extractByBoundary(jsonStr, 'subject')), // 修复点：标题现在也能抗干扰了
+                                content: clean(extractByBoundary(jsonStr, 'content')), 
                                 water_army: []
                             };
 
-                            // 单独处理水军 (正则提取数组部分，然后循环提取)
-                            const armyMatch = jsonStr.match(/"water_army"\s*:\s*\[([\s\S]*)\]/);
-                            if (armyMatch) {
-                                const armyBlock = armyMatch[1];
-                                // 简单的 {} 分割
-                                const items = armyBlock.split('},');
-                                items.forEach(item => {
-                                    // 补全被 split 吃掉的 }
-                                    if (!item.trim().endsWith('}')) item += '}';
+                            // 手动提取水军列表 (数组形式)
+                            // 水军部分通常比较规范，我们先提取出数组字符串，再分割
+                            const armyStartMatch = jsonStr.match(/"water_army"\s*:\s*\[/);
+                            if (armyStartMatch) {
+                                const armyStartIndex = armyStartMatch.index + armyStartMatch[0].length;
+                                // 找到数组结束的 ]
+                                const armyEndIndex = jsonStr.lastIndexOf(']');
+                                if (armyEndIndex > armyStartIndex) {
+                                    const armyBlock = jsonStr.substring(armyStartIndex, armyEndIndex);
                                     
-                                    const aAuthor = clean(extractFieldRaw(item, 'author'));
-                                    const aContent = clean(extractFieldRaw(item, 'content'));
-                                    const aLoc = clean(extractFieldRaw(item, 'location'));
-                                    
-                                    if (aAuthor || aContent) {
-                                        data.water_army.push({
-                                            author: aAuthor,
-                                            content: aContent,
-                                            location: aLoc
-                                        });
+                                    // 简单的 {} 分割，因为水军内部通常不含复杂嵌套
+                                    // 使用正则匹配每一项 { ... }
+                                    const itemRegex = /\{[\s\S]*?\}/g;
+                                    let itemMatch;
+                                    while ((itemMatch = itemRegex.exec(armyBlock)) !== null) {
+                                        const itemStr = itemMatch[0];
+                                        // 对水军内部也使用边界提取，防止水军评论里有引号
+                                        const aAuthor = clean(extractByBoundary(itemStr, 'author'));
+                                        const aContent = clean(extractByBoundary(itemStr, 'content'));
+                                        const aLoc = clean(extractByBoundary(itemStr, 'location'));
+                                        
+                                        if (aAuthor || aContent) {
+                                            data.water_army.push({
+                                                author: aAuthor,
+                                                content: aContent,
+                                                location: aLoc
+                                            });
+                                        }
                                     }
-                                });
+                                }
                             }
                         }
 
@@ -13855,8 +13860,8 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                             // 1. 移除 <snippet> 标签
                             let cleanText = text.replace(/<snippet>/g, '').replace(/<\/snippet>/g, '');
                             
-                            // 2. 【双重保险】再次确保换行符被转换 (防止 JSON.parse 出来的 \n 没变)
-                            cleanText = cleanText.replace(/\n/g, '<br>');
+                            // 2. 再次确保换行符被转换
+                            cleanText = cleanText.replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
 
                             // 3. 替换表情包
                             return cleanText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
