@@ -13233,17 +13233,18 @@ You MUST output using this EXACT JSON structure.
 
 \`[tuqu_complex_action: {"type":"comment", "postId":"${targetPost.id}", "content":"[Your Story Continuation / Major Update Here]", "author":"LZ", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}, {"author":"ReplyName2", "location":"City2", "content":"Reply2"}]}]\`
 
-**[MEDIA & EXPRESSION LAW]**
-You are ENCOURAGED to use emojis and stickers in your "content" and "water_army" replies.
-- Use \`[emoji:Name]\` for small inline expressions. Available: [${emojiNames}]
-- Use \`[sticker:Name]\` for large image reactions. Available: [${stickerNames}]
-- **CRITICAL:** Only use names from the provided lists. Do not invent names.
+**[MEDIA & EXPRESSION LAW - MANDATORY PREFIX]**
+You are ENCOURAGED to use emojis/stickers, but you **MUST** use the correct prefix.
+1. **Emoji:** \`[emoji:Name]\` (Available: [${emojiNames}])
+2. **Sticker:** \`[sticker:Name]\` (Available: [${stickerNames}])
+3. **ABSOLUTE PROHIBITION:** **NEVER** output a tag without a prefix (e.g., \`[跪了]\` is **FORBIDDEN** and will fail). It MUST be \`[emoji:跪了]\` or \`[sticker:跪了]\`.
 
 \${TUQU_MEDIA_PROTOCOL}
 
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 `;
+
             
             // 4. 发送 (注入了 lifeContext)
             finalMessages = [
