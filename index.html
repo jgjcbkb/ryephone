@@ -10438,23 +10438,28 @@ if ('serviceWorker' in navigator) {
         const stickerNames = stickers.filter(s => s.type === 'sticker').map(s => `"${s.name}"`).join(', ') || 'None';
         const emojiNames = stickers.filter(s => s.type === 'emoji').map(s => `"${s.name}"`).join(', ') || 'None';
 
-        // --- 核心新增：兔区专属媒体防幻觉协议 ---
+        // --- 核心新增：兔区专属媒体防幻觉协议 (终极严厉版) ---
         const TUQU_MEDIA_PROTOCOL = `
 ---
-### **[STRICT MEDIA & EXPRESSION PROTOCOL - ANTI-HALLUCINATION]**
+### **[STRICT MEDIA & EXPRESSION PROTOCOL - THE LAW OF PREFIX]**
 
-You are ENCOURAGED to use emojis and stickers in your "content" and "water_army" replies, but you MUST follow these absolute laws:
+You are ENCOURAGED to use emojis and stickers in your "content" and "water_army" replies, but you MUST follow these absolute, unbreakable laws:
 
-1.  **THE LIST IS LAW:** You are ONLY allowed to use names from the specific lists provided below.
-2.  **ABSOLUTE PROHIBITION:** You are **STRICTLY FORBIDDEN** from inventing names, using English names for Chinese stickers, or guessing.
+1.  **THE PREFIX IS THE KEY:** You are **STRICTLY FORBIDDEN** from outputting a tag without its type prefix.
+    *   ❌ **WRONG (IMMEDIATE FAILURE):** \`[发抖]\`, \`[震惊]\`
+    *   ✅ **RIGHT:** \`[emoji:发抖]\`, \`[sticker:震惊]\`
+
+2.  **THE LIST IS LAW:** You are ONLY allowed to use names from the specific lists provided below. Do NOT invent names.
+
 3.  **STRICT MATCHING:**
-    - For small inline expressions: \`[emoji:ExactNameFromList]\`
-    - For large image reactions: \`[sticker:ExactNameFromList]\`
-4.  **FALLBACK (MANDATORY):** If you cannot find an exact match in the lists for the emotion you want to express, you **MUST NOT** use a tag. Instead, use plain text in parentheses.
-    - *Example:* If you want to show "awkward" but it's not in the list, write \`(尴尬)\` instead of \`[emoji:awkward]\`.
+    - For small inline expressions (emoticons): You MUST use \`[emoji:ExactName]\`.
+    - For large image reactions (stickers): You MUST use \`[sticker:ExactName]\`.
+
+4.  **FALLBACK (MANDATORY):** If you cannot find an exact match in the lists, you **MUST NOT** use a tag. Use plain text in parentheses instead, like \`(发抖)\`.
 
 **Available Emoji Names:** [${emojiNames}]
 **Available Sticker Names:** [${stickerNames}]
+
 
 ---
 `;
@@ -10494,8 +10499,16 @@ You are ENCOURAGED to use emojis and stickers in your "content" and "water_army"
         const isGroupPersona = isProtagonist || isEnsemble;
 
         // 只要符合其中之一，就允许执行主动行为并使用全局 API
-        // 核心新增：增加了 senderName === 'Anonymous_System' 判定，确保路人模式能加载全局配置
-        if (isNpc || isProtagonist || isEnsemble || senderName === 'Anonymous_System' || actionType === 'post_moment' || actionType === 'browse_moments' || actionType === 'tuqu_interaction' || actionType === 'pure_tuqu_interaction' || actionType === 'specific_post_interaction') {
+        // 核心新增：增加了 'themed_tuqu_interaction' 和 'specific_post_interaction'
+        // 确保无论是不是单聊角色，只要是在兔区搞事，都强制走全局 API
+        if (isNpc || isProtagonist || isEnsemble || senderName === 'Anonymous_System' || 
+            actionType === 'post_moment' || 
+            actionType === 'browse_moments' || 
+            actionType === 'tuqu_interaction' || 
+            actionType === 'pure_tuqu_interaction' ||
+            actionType === 'themed_tuqu_interaction' ||      // <--- 新增
+            actionType === 'specific_post_interaction') {    // <--- 新增
+
             // 【核心修正】: 朋友圈、兔区、NPC、群聊主角、手动触发，全部强制使用全局激活的API配置
             profileIndex = activeProfileIndex;
             if (profileIndex === null) {
@@ -12627,11 +12640,20 @@ You can choose to create a **"Lively Thread"** (Main post + 5-15 follow-up comme
 ${TUQU_MEDIA_PROTOCOL}
 
 
-**[MEDIA & EXPRESSION LAW]**
-You are ENCOURAGED to use emojis and stickers in your "content" to make the forum feel alive.
-- Use \`[emoji:Name]\` for small inline expressions. Available: [${emojiNames}]
-- Use \`[sticker:Name]\` for large image reactions. Available: [${stickerNames}]
-- **CRITICAL:** Only use names from the provided lists. Do not invent names.
+**[MEDIA & EXPRESSION LAW - MANDATORY FORMAT]**
+You are ENCOURAGED to use emojis and stickers in your "content" to make the forum feel alive, but you MUST use the correct code format.
+
+**ABSOLUTE FORMATTING RULE:**
+- To show a small emoji: You MUST write \`[emoji:Name]\`.
+- To show a large sticker: You MUST write \`[sticker:Name]\`.
+- **FORBIDDEN:** Never write \`[Name]\` alone. If you omit the "emoji:" or "sticker:" prefix, the image will NOT display.
+
+**EXAMPLES:**
+- ✅ CORRECT: "太好笑了[emoji:笑哭]"
+- ❌ WRONG: "太好笑了[笑哭]" (This is a system error)
+
+**Available Emojis:** [${emojiNames}]
+**Available Stickers:** [${stickerNames}]
 `;
             // 拼接所有要求的人设上下文和聊天记录
             const fullIdentityContext = `
