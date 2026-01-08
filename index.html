@@ -12512,7 +12512,10 @@ ${timeContext}
                 tuquContext += `Title: "${post.subject}" (ID: ${post.id})\n`;
                 tuquContext += `Author: ${authorTag} (${post.location || 'Unknown'})\n`;
                 tuquContext += `Time: ${post.timestamp} ${postStatus}\n`;
-                tuquContext += `Main Content: ${post.content}\n`;
+                
+                // 【核心修复】剥离主贴 HTML 标签
+                const cleanMainContent = post.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                tuquContext += `Main Content: ${cleanMainContent}\n`;
 
                 if (post.comments && post.comments.length > 0) {
                     tuquContext += `--- All Replies (${post.comments.length}) ---\n`;
@@ -12520,7 +12523,6 @@ ${timeContext}
                         const floorNum = idx + 1;
                         const commentStatus = c.isReported ? `[REPORTED: ${c.reportReason}]` : "";
                         
-                        // 核心判定：这是不是用户发的评论？
                         const isUserComment = (c.author === userNameForPrompt || c.author === '{{user}}');
                         const commenterTag = isUserComment ? `${c.author} (!!! THE REAL USER - DO NOT ROLEPLAY AS THIS PERSON !!!)` : c.author;
 
@@ -12532,7 +12534,9 @@ ${timeContext}
                             quoteInfo = ` (Replying to: "${quoteText}...")`;
                         }
                         
-                        tuquContext += `  [Floor ${floorNum}] ${commenterTag} (${c.location || 'Unknown'}): "${c.content}"${quoteInfo} ${commentStatus}\n`;
+                        // 【核心修复】剥离评论 HTML 标签
+                        const cleanCommentContent = c.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                        tuquContext += `  [Floor ${floorNum}] ${commenterTag} (${c.location || 'Unknown'}): "${cleanCommentContent}"${quoteInfo} ${commentStatus}\n`;
                     });
                 } else {
                     tuquContext += `--- No Replies Yet ---\n`;
@@ -12749,7 +12753,9 @@ Constraint: Output ONLY the [tuqu_complex_action] command. No chat text.`
                 const isUserPost = (post.author === userNameForPrompt || post.author === '{{user}}');
                 const authorTag = isUserPost ? `${post.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : post.author;
 
-                tuquContext += `\n=== Thread #${i + 1} [Board: ${post._boardName}] ===\nTitle: "${post.subject}" (ID: ${post.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${post.content}\n`;
+                // 【核心修复】剥离主贴 HTML
+                const cleanMainContent = post.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                tuquContext += `\n=== Thread #${i + 1} [Board: ${post._boardName}] ===\nTitle: "${post.subject}" (ID: ${post.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${cleanMainContent}\n`;
                 
                 if (post.comments && post.comments.length > 0) {
                     tuquContext += `--- All Replies ---\n`;
@@ -12758,7 +12764,9 @@ Constraint: Output ONLY the [tuqu_complex_action] command. No chat text.`
                         const isUserComment = (c.author === userNameForPrompt || c.author === '{{user}}');
                         const commenterTag = isUserComment ? `${c.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : c.author;
                         
-                        tuquContext += `  [Floor ${idx + 1}] ${commenterTag}: "${c.content}" ${cStatus}\n`;
+                        // 【核心修复】剥离评论 HTML
+                        const cleanCommentContent = c.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                        tuquContext += `  [Floor ${idx + 1}] ${commenterTag}: "${cleanCommentContent}" ${cStatus}\n`;
                     });
                 }
             });
@@ -12950,11 +12958,17 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                 const isUserPost = (post.author === userNameForPrompt || post.author === '{{user}}');
                 const authorTag = isUserPost ? `${post.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : post.author;
 
-                tuquContext += `\n=== Thread #${i + 1} [Board: ${post._boardName}] ===\nTitle: "${post.subject}" (ID: ${post.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${post.content}\n`;
+                // 【核心修复】剥离主贴 HTML
+                const cleanMainContent = post.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                tuquContext += `\n=== Thread #${i + 1} [Board: ${post._boardName}] ===\nTitle: "${post.subject}" (ID: ${post.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${cleanMainContent}\n`;
+                
                 if (post.comments) post.comments.forEach((c, idx) => { 
                     const isUserComment = (c.author === userNameForPrompt || c.author === '{{user}}');
                     const commenterTag = isUserComment ? `${c.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : c.author;
-                    tuquContext += `  [Floor ${idx + 1}] ${commenterTag}: "${c.content}"\n`; 
+                    
+                    // 【核心修复】剥离评论 HTML
+                    const cleanCommentContent = c.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                    tuquContext += `  [Floor ${idx + 1}] ${commenterTag}: "${cleanCommentContent}"\n`; 
                 });
             });
 
@@ -13043,11 +13057,16 @@ ${TUQU_MEDIA_PROTOCOL}
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 `;
-            // 获取缓存的版规
+                        // 获取缓存的版规 (仅提取当前锁定的版块规则)
             const cachedRules = JSON.parse(localStorage.getItem('tuqu_cached_board_rules') || '{}');
-            let boardsRulesText = "\n[FORUM BOARD RULES & DESCRIPTIONS]\n";
-            for (const [bName, bDesc] of Object.entries(cachedRules)) {
-                boardsRulesText += `- **${bName}**: ${bDesc}\n`;
+            let boardsRulesText = `\n[FORUM BOARD RULES: ${lockedBoard}]\n`;
+            
+            if (cachedRules[lockedBoard]) {
+                // 只添加当前版块的描述和规则
+                boardsRulesText += `- ${cachedRules[lockedBoard]}\n`;
+            } else {
+                // 如果没找到缓存规则，提供一个通用提示
+                boardsRulesText += `- Follow the established social norms and atmosphere of the "${lockedBoard}" board.\n`;
             }
 
             // 【核心修复】确保 API 系统提示被正确发送，并加入版规
@@ -13065,7 +13084,6 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 
             // 1. 构建关联 NPC 人设 (如果 senderName 是特定角色)
             let associatedNpcsPrompt = '';
-            // (复用 themed_tuqu_interaction 中的关联人设逻辑，如果 senderName 不是 'Anonymous_System')
             if (senderName !== 'Anonymous_System') {
                 let associatedCharNames = [];
                 const currentNpcSettings = loadFromLocalStorage('app-npc-settings', { associations: {}, personas: {} });
@@ -13095,10 +13113,46 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                              const rawData = currentNpcSettings.personas[charName];
                              personaText = (typeof rawData === 'object' && rawData !== null) ? rawData.description : rawData;
                         }
-                        if (personaText) associatedNpcsPrompt += `- **${charName}**: ${personaText}\n`;
+                        if (personaText) {
+                            // 核心修复：局部替换占位符，确保每个关联角色的人设正确
+                            let processedPersona = personaText.replace(/{{char}}/g, charName).replace(/{{user}}/g, userNameForPrompt);
+                            associatedNpcsPrompt += `- **${charName}**: ${processedPersona}\n`;
+                        }
                     });
                 }
             }
+
+            // 【【【 核心新增：获取该角色的前情提要与聊天记录上下文 】】】
+            let chatHistoryForTuqu = '';
+            let preambleForTuqu = '';
+            if (contextChatId) {
+                const contextChatInfo = loadFromLocalStorage(`chat_info_${contextChatId}`, {});
+                preambleForTuqu = contextChatInfo.preamble || '';
+                
+                const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
+                const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
+                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, contextChatId);
+                chatHistoryForTuqu = apiPayloadMessages.map(msg => {
+                    const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || senderName);
+                    let content = '';
+                    if (Array.isArray(msg.content)) {
+                        content = msg.content.find(part => part.type === 'text')?.text || '[多媒体内容]';
+                    } else {
+                        content = msg.content;
+                    }
+                    return `${role}: ${content}`;
+                }).join('\n');
+            }
+
+            const lifeContext = `
+[LIFE CONTEXT - SOURCE MATERIAL]
+Preamble (Background): ${preambleForTuqu || 'None'}
+
+[RECENT CHAT HISTORY]
+${chatHistoryForTuqu || 'No recent history.'}
+`;
+            // 【【【 插入结束 】】】
 
             // 2. 构建仅包含当前帖子的上下文
             let singlePostContext = `\n[TARGET THREAD CONTEXT]\nYou are viewing ONLY this specific thread.\n`;
@@ -13107,7 +13161,9 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
             const isUserPost = (targetPost.author === userNameForPrompt || targetPost.author === '{{user}}');
             const authorTag = isUserPost ? `${targetPost.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : targetPost.author;
 
-            singlePostContext += `\n=== Thread [Board: ${targetPost._boardName}] ===\nTitle: "${targetPost.subject}" (ID: ${targetPost.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${targetPost.content}\n`;
+            // 【核心修复】剥离主贴 HTML
+            const cleanMainContent = targetPost.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            singlePostContext += `\n=== Thread [Board: ${targetPost._boardName}] ===\nTitle: "${targetPost.subject}" (ID: ${targetPost.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${cleanMainContent}\n`;
             
             if (targetPost.comments && targetPost.comments.length > 0) {
                 singlePostContext += `--- Existing Replies ---\n`;
@@ -13116,7 +13172,9 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                     const isUserComment = (c.author === userNameForPrompt || c.author === '{{user}}');
                     const commenterTag = isUserComment ? `${c.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : c.author;
                     
-                    singlePostContext += `  [Floor ${idx + 1}] ${commenterTag}: "${c.content}" ${cStatus}\n`;
+                    // 【核心修复】剥离评论 HTML
+                    const cleanCommentContent = c.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                    singlePostContext += `  [Floor ${idx + 1}] ${commenterTag}: "${cleanCommentContent}" ${cStatus}\n`;
                 });
             } else {
                 singlePostContext += `--- No Replies Yet ---\n`;
@@ -13182,10 +13240,9 @@ You are ENCOURAGED to use emojis and stickers in your "content" and "water_army"
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 `;
             
-            // 4. 发送
-            // 注意：这里不包含 chatHistoryForTuqu (最近聊天记录)，只包含人设和帖子内容
+            // 4. 发送 (注入了 lifeContext)
             finalMessages = [
-                { role: "system", content: (profile.prompt || "") + tuquWorldBookContent + singlePostContext + specificInstruction.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName) },
+                { role: "system", content: (profile.prompt || "") + lifeContext + tuquWorldBookContent + associatedNpcsPrompt + singlePostContext + specificInstruction.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName) },
                 { role: "user", content: `Update the thread "${targetPost.subject}" based on the "${extraOptions.worldview || 'current'}" worldview.` }
             ];
         }
