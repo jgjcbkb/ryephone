@@ -10619,28 +10619,22 @@ if ('serviceWorker' in navigator) {
         // --- 核心新增：兔区专属媒体防幻觉协议 (终极严厉版) ---
         const TUQU_MEDIA_PROTOCOL = `
 ---
-### **[STRICT MEDIA & EXPRESSION PROTOCOL - THE LAW OF PREFIX]**
+### **[STRICT MEDIA & EXPRESSION PROTOCOL - ANTI-HALLUCINATION]**
 
-You are ENCOURAGED to use emojis and stickers in your "content" and "water_army" replies, but you MUST follow these absolute, unbreakable laws:
+You are ENCOURAGED to use emojis and stickers, but you MUST follow the **STRICT MATCHING RULE**.
 
-1.  **THE PREFIX IS THE KEY:** You are **STRICTLY FORBIDDEN** from outputting a tag without its type prefix.
-    *   ❌ **WRONG (IMMEDIATE FAILURE):** \`[发抖]\`, \`[震惊]\`
-    *   ✅ **RIGHT:** \`[emoji:发抖]\`, \`[sticker:震惊]\`
+1.  **THE LIST IS GOD:** You are **ABSOLUTELY FORBIDDEN** from using any emoji or sticker name that is NOT in the provided lists below.
+2.  **NO INVENTION:** Do NOT invent names like \`[emoji:滑稽]\` or \`[sticker:黑人问号]\` if they are not in the list.
+3.  **FALLBACK:** If you want to express an emotion but the exact sticker/emoji is not in the list, **DO NOT use a tag**. Use text description instead (e.g., \`(流汗黄豆)\`, \`(无语)\`).
+4.  **FORMAT:** Always use the prefix. \`[emoji:Name]\` or \`[sticker:Name]\`.
 
-2.  **THE LIST IS LAW:** You are ONLY allowed to use names from the specific lists provided below. Do NOT invent names.
-
-3.  **STRICT MATCHING:**
-    - For small inline expressions (emoticons): You MUST use \`[emoji:ExactName]\`.
-    - For large image reactions (stickers): You MUST use \`[sticker:ExactName]\`.
-
-4.  **FALLBACK (MANDATORY):** If you cannot find an exact match in the lists, you **MUST NOT** use a tag. Use plain text in parentheses instead, like \`(发抖)\`.
-
-**Available Emoji Names:** [${emojiNames}]
-**Available Sticker Names:** [${stickerNames}]
+**Available Emoji Names (EXACT MATCH ONLY):** [${emojiNames}]
+**Available Sticker Names (EXACT MATCH ONLY):** [${stickerNames}]
 
 
 ---
 `;
+
 
         console.log(`%c[ULTIMATE DIAGNOSIS]`, 'color: red; font-weight: bold; font-size: 14px;', `
 --------------------------------------------------
@@ -12808,14 +12802,15 @@ When you decide to **COMMENT** on an existing thread, you MUST check the **Autho
 - **Dream/Yume Fan (梦女):** Delusional romance writers.
 - **Fact Checker (理中客):** Tries to be logical but usually gets flamed by everyone.
 
-**[THREAD POPULARITY DECISION]**
-You can choose to create a **"Lively Thread"** (Main post + 5-15 follow-up comments) or a **"Quiet Thread"** (Main post only). 
-- **Lively:** Use this for controversial, gossip-heavy, or high-emotion topics.
-- **Quiet:** Use this for mundane updates, late-night thoughts, or when your character wants to post something and leave.
-- **Execution:** To create a quiet thread, simply leave the \`water_army\` array empty: \`"water_army": []\`.
+**[THREAD POPULARITY DECISION - CREATIVE FREEDOM]**
+You have total freedom to decide the engagement level based on the content's nature.
+- **Lively Thread:** If the topic is controversial or interesting, generate a "water army" of comments. **The quantity is up to you (few or many), as long as it's interesting.**
+- **Quiet Thread:** If it's a mundane update, a late-night thought, or a "tree hole" post, **it is perfectly fine to have NO comments.** Simply set \`"water_army": []\`.
+- **Logic:** Do not force comments if the post doesn't naturally invite them.
 
 **COMMANDS:**
 - To post a NEW TOPIC:
+
   \`[tuqu_complex_action: {"type":"new_topic", "board":"BoardName", "author":"Pseudonym", "location":"Location", "subject":"Title", "content":"Body", "water_army": [{"author":"Pseudonym1", "location":"Loc1", "content":"Text1"}, {"author":"Pseudonym2", "location":"Loc2", "content":"Text2"}]}]\`
 
 - To COMMENT on an existing post:
@@ -12833,21 +12828,16 @@ You can choose to create a **"Lively Thread"** (Main post + 5-15 follow-up comme
 ${TUQU_MEDIA_PROTOCOL}
 
 
-**[MEDIA & EXPRESSION LAW - MANDATORY FORMAT]**
-You are ENCOURAGED to use emojis and stickers in your "content" to make the forum feel alive, but you MUST use the correct code format.
-
-**ABSOLUTE FORMATTING RULE:**
-- To show a small emoji: You MUST write \`[emoji:Name]\`.
-- To show a large sticker: You MUST write \`[sticker:Name]\`.
-- **FORBIDDEN:** Never write \`[Name]\` alone. If you omit the "emoji:" or "sticker:" prefix, the image will NOT display.
-
-**EXAMPLES:**
-- ✅ CORRECT: "太好笑了[emoji:笑哭]"
-- ❌ WRONG: "太好笑了[笑哭]" (This is a system error)
+**[MEDIA & EXPRESSION LAW - STRICT MATCHING]**
+You are ENCOURAGED to use emojis/stickers, but ONLY if they exist in the list.
+1. **Emoji:** \`[emoji:Name]\`
+2. **Sticker:** \`[sticker:Name]\`
+3. **ABSOLUTE PROHIBITION:** **NEVER** invent a name. If the list doesn't have "happy", DO NOT use \`[emoji:happy]\`. Use text \`(happy)\` instead.
 
 **Available Emojis:** [${emojiNames}]
 **Available Stickers:** [${stickerNames}]
 `;
+
             // 拼接所有要求的人设上下文和聊天记录
             const fullIdentityContext = `
 [LIFE CONTEXT]
@@ -13018,11 +13008,11 @@ You are part of a diverse internet ecosystem. **DO NOT be repetitive.**
 1.  **Analyze the Forum:** Review the latest posts.
 2.  **Choose Your Archetype:** Will you be a "Weak Intellect" philosopher, a "Kill Line" analyst, a poetic nihilist, or a complainer?
 3.  **Create a Post:** Generate a new topic or a comment.
-4.  **Decide on Engagement:** You may choose to create a "water army" of 5-15 comments to build drama, OR you can leave the thread empty (\`"water_army": []\`) if the topic feels more natural without immediate replies.
+4.  **Decide on Engagement:** You have full control over the "water army". You can generate **any number** of comments to build drama, OR you can leave the thread empty (\`"water_army": []\`) if the topic feels more natural without immediate replies. **Quality and fun over quantity.**
 5.  **Use Creative Names:** Your pseudonyms should reflect the post's tone (e.g., "辩证法带师", "斯奎奇大弟子", "都市伤心小狗").
 
 **[STRICT JSON FORMAT REQUIRED]**
-For a NEW TOPIC:
+
 \`[tuqu_complex_action: {"type":"new_topic", "board":"${lockedBoard || 'BoardName'}", "subject":"Title Here", "content":"Body Content", "author":"Pseudonym", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}, ... ]}]\`
 
 For a COMMENT:
@@ -13238,13 +13228,14 @@ Your Persona: ${finalCharPersonaText}
 ${associatedNpcsPrompt}
 Recent Chat History: ${chatHistoryForTuqu || "No recent history."}
 
-**[WATER ARMY ENGAGEMENT (OPTIONAL)]**
-You can decide if your post receives immediate attention.
-- **Option A (Lively):** Generate 5-15 follow-up comments that are **DESPERATE FOR THE NEXT UPDATE**.
+**[WATER ARMY ENGAGEMENT (OPTIONAL - FREEDOM OF CHOICE)]**
+You decide if your post receives immediate attention.
+- **Option A (Lively):** Generate follow-up comments that are **DESPERATE FOR THE NEXT UPDATE** or discussing the plot. **The quantity is up to you.**
 - **Option B (Quiet):** If you want to let the post sit and wait for the real user to react, set \`"water_army": []\`. 
-- **Guideline:** Use Option A for major cliffhangers, and Option B for slower character development or world-building.
+- **Guideline:** Use Option A for major cliffhangers, and Option B for slower character development. **Do not force comments if not needed.**
 
 **[STRICT JSON FORMAT REQUIRED]**
+
 You MUST output using this EXACT JSON structure.
 
 For a NEW TOPIC:
@@ -13418,8 +13409,11 @@ Read the [TARGET THREAD CONTEXT]. Determine the type of the thread:
 *   **YOUR ROLE:** A key participant or the OP providing a major update.
 *   **MAIN ACTION:** Provide new information, a plot twist, or a strong counter-argument to escalate the drama.
 
-**[WATER ARMY TASK (OPTIONAL)]**
-You may generate **5-15 Water Army responses** to simulate a trending thread, OR you can choose to generate NO comments by setting \`"water_army": []\`. Choose based on whether this update feels like a "viral" moment or a quiet continuation.
+**[WATER ARMY TASK (OPTIONAL - FREEDOM)]**
+You have full control.
+- If the update is shocking or viral, generate **as many comments as needed** to simulate the hype.
+- If the update is quiet or personal, you can generate **zero comments** (\`"water_army": []\`).
+- **Constraint:** Do not force engagement if the story doesn't call for it.
 
 **[ROLEPLAY SETTING]**
 ${senderName !== 'Anonymous_System' ? `Character: "${senderName}"\nUser Persona: ${finalUserPersonaText}\nYour Persona: ${finalCharPersonaText}\n${associatedNpcsPrompt}` : `Role: Anonymous Internet User / Original Author`}
