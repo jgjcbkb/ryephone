@@ -227,6 +227,14 @@
     }
     .chat-item { display: flex; align-items: center; padding: 8px 20px; gap: 15px; cursor: pointer; }
     .avatar { width: 56px; height: 56px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: 500; color: white; flex-shrink: 0; background-size: cover; background-position: center; }
+        /* 置顶聊天样式 */
+    .chat-item.pinned {
+        background-color: #f2f4f7; /* 稍微深一点的灰色背景，保留这个区别即可 */
+    }
+    
+    /* 彻底删除了 .chat-item.pinned .chat-name::after 这段代码 */
+
+
     .chat-info { flex-grow: 1; display: flex; flex-direction: column; gap: 4px; overflow: hidden; min-width: 0; border-bottom: 1px solid #f0f0f0; padding: 12px 0; }
     .chat-item:last-child .chat-info { border-bottom: none; }
     .chat-name-time { display: flex; justify-content: space-between; align-items: center; }
@@ -4375,13 +4383,15 @@ input:checked + .slider:before {
 
 /* 2. 为“心事”弹窗定义特定尺寸和内部布局 */
 #mood-card-modal-overlay .modal-box {
-    background-color: transparent;
+    background-color: transparent !important;
     color: white;
     display: flex;
     flex-direction: column;
-    box-shadow: none;
+    box-shadow: none !important;
+    border: none !important;
     padding: 0;
 }
+
 #mood-card-modal-overlay .modal-title {
     display: none;
 }
@@ -6598,6 +6608,124 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     /* 调整发送方和接收方的对齐 */
     .sent .message-reactions { justify-content: flex-end; margin-left: auto; }
     .received .message-reactions { justify-content: flex-start; margin-right: auto; }
+        /* --- 夜间模式核心样式 (Dark Mode) --- */
+    body.dark-mode {
+        background-color: #000 !important; /* 网页背景全黑 */
+        color: #e5e5ea !important; /* 文字变白 */
+    }
+
+    /* 当开启夜间模式且开启“移除背景”选项时，强制隐藏聊天背景图 */
+    body.dark-mode.remove-chat-bg #page-conversation .chat-content {
+        background-image: none !important;
+        background-color: #000 !important;
+    }
+
+
+    /* 1. 手机外壳与屏幕变黑 */
+    body.dark-mode .screen {
+        background-color: #1c1c1e !important;
+        border-color: #2c2c2e !important; /* 外边框变深灰 */
+    }
+    body.dark-mode .app-container {
+        background-color: #000 !important;
+    }
+
+    /* 2. 所有顶栏、底栏、卡片变深灰 */
+    body.dark-mode .app-header,
+    body.dark-mode .list-header,
+    body.dark-mode .chat-header,
+    body.dark-mode .moments-title-bar,
+    body.dark-mode .main-app-navbar,
+    body.dark-mode .input-container-wrapper, 
+    body.dark-mode .wechat-footer,
+    body.dark-mode .action-menu,
+    body.dark-mode .form-section,
+    body.dark-mode .worldbook-item,
+    body.dark-mode .user-persona-item,
+    body.dark-mode .post-card,
+    body.dark-mode .modal-box,
+    body.dark-mode .context-menu-item,
+    body.dark-mode #message-context-menu {
+        background-color: #1c1c1e !important;
+        color: #e5e5ea !important;
+        border-color: #2c2c2e !important;
+    }
+
+    /* 3. 输入框、按钮变灰 */
+    body.dark-mode input,
+    body.dark-mode textarea,
+    body.dark-mode select,
+    body.dark-mode .modal-input,
+    body.dark-mode .modal-textarea,
+    body.dark-mode #footer-message-input {
+        background-color: #2c2c2e !important;
+        color: #fff !important;
+        border-color: #3a3a3c !important;
+    }
+
+    /* 4. 列表项文字颜色 */
+    body.dark-mode .chat-name,
+    body.dark-mode .worldbook-item-name,
+    body.dark-mode .user-persona-item-name,
+    body.dark-mode .post-user-name,
+    body.dark-mode .settings-label,
+    body.dark-mode label {
+        color: #e5e5ea !important;
+    }
+    
+    /* 5. 次要文字变浅灰 */
+    body.dark-mode .last-message,
+    body.dark-mode .timestamp,
+    body.dark-mode .form-hint,
+    body.dark-mode .post-content-text,
+    body.dark-mode .worldbook-item-content {
+        color: #8e8e93 !important;
+    }
+
+
+
+    /* 7. 朋友圈评论区 */
+    body.dark-mode .interactions-section {
+        background-color: #2c2c2e !important;
+    }
+    
+    /* 8. 聊天列表项适配 */
+    /* 普通聊天项：全黑，移除所有底边框 */
+    body.dark-mode .chat-item {
+        background-color: #000 !important;
+        border-bottom: none !important;
+    }
+
+    /* 置顶聊天项：深灰色，移除所有底边框 */
+    body.dark-mode .chat-item.pinned {
+        background-color: #1c1c1e !important;
+        border-bottom: none !important;
+    }
+
+    /* 激活/点击状态 */
+    body.dark-mode .chat-item:active {
+        background-color: #2c2c2e !important;
+    }
+
+    /* 彻底移除内部信息区域的分割线 */
+    body.dark-mode .chat-info {
+        border-bottom: none !important;
+    }
+
+    
+    /* 9. 遮罩层背景加深 */
+    body.dark-mode .modal-overlay {
+        background: rgba(0, 0, 0, 0.7) !important;
+    }
+
+    /* 10. 强制心事弹窗在夜间模式下也保持透明，不显示深灰底色 */
+    body.dark-mode #mood-card-modal-overlay .modal-box {
+        background-color: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+
+
 </style>
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
@@ -7453,7 +7581,29 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 <label for="chat-user-persona-select">选择用户人设 ({{user}} Persona)</label>
                                 <select id="chat-user-persona-select"></select>
                             </div>
+                            <!-- 【核心新增】：后台任务概率设置 -->
+                            <div style="padding: 15px; background: #f9f9f9; border-radius: 10px; margin: 10px 15px;">
+                                <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #333;">自动生成概率 (%)</h4>
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    <div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 4px;">
+                                            <span>心事卡片</span>
+                                            <span id="prob-mood-val">70%</span>
+                                        </div>
+                                        <input type="range" id="prob-mood-input" min="0" max="100" step="1" value="70" style="width: 100%; margin: 0;">
+                                    </div>
+                                    <div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 4px;">
+                                            <span>寻呼机备忘录</span>
+                                            <span id="prob-pager-val">30%</span>
+                                        </div>
+                                        <input type="range" id="prob-pager-input" min="0" max="100" step="1" value="30" style="width: 100%; margin: 0;">
+                                    </div>
+                                </div>
+                                <p class="form-hint" style="margin-top: 8px; padding: 0;">设为 0 则不生成，设为 100 则每次必生成。</p>
+                            </div>
                             <div class="form-group">
+
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <label for="my-persona" style="margin-bottom: 0;">补充人设 (Supplementary Persona)</label>
         <button class="copy-btn" onclick="copyToClipboard('my-persona')">复制人设</button>
@@ -7607,6 +7757,24 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 
                          <!-- ******** 从这里开始插入新代码 ******** -->
                          
+                                                <div class="form-section">
+                            <h3>显示模式</h3>
+                            <div class="form-group-toggle">
+                                <label for="toggle-dark-mode" class="toggle-label">夜间模式 (Dark Mode)</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-dark-mode">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <div class="form-group-toggle">
+                                <label for="toggle-remove-bg" class="toggle-label">夜间模式下移除聊天背景</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-remove-bg">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="form-section">
                             <h3>手机框架</h3>
                             <div class="form-group-toggle">
@@ -7617,6 +7785,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 </label>
                             </div>
                         </div>
+
                         <!-- ******** 新代码到此结束 ******** -->
                         <!-- 新增：消息显示设置 -->
                         <div class="form-section">
@@ -7694,6 +7863,15 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 </div>
                                 <p class="form-hint">为所有聊天窗口设置一个统一的默认背景。</p>
                             </div>
+                            <div class="form-group">
+                                <label for="global-chat-bg-url-dark">夜间模式专属聊天背景</label>
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="text" id="global-chat-bg-url-dark" placeholder="输入夜间背景URL" style="flex-grow: 1;">
+                                    <button id="global-chat-bg-dark-upload-btn" class="btn-primary btn-secondary" style="flex-shrink: 0;">本地</button>
+                                </div>
+                                <p class="form-hint">开启夜间模式时，将自动切换为此背景。</p>
+                            </div>
+
                             <div class="form-group">
                                 <label for="home-bg-url">主页背景链接</label>
                                 <!-- 【核心修改】使用flex布局包裹输入框和按钮 -->
@@ -11998,9 +12176,11 @@ ${processedChatHistory}
             // =================================================================
 
             const instruction = `
+${ULTIMATE_PSYCHOLOGICAL_ENGINE}
 ${baseSystemPrompt}
 ${timeContext}
 ${musicContext}
+
 
 
 
@@ -12365,8 +12545,10 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
 
             // --- 核心修正：注入身份锁定指令 ---
             const identityLockInPrompt = `
+${ULTIMATE_PSYCHOLOGICAL_ENGINE}
 ${baseSystemPrompt}
 ${timeContext}
+
 
 # [ULTIMATE IDENTITY LOCK-IN - UNBREAKABLE RULE]
 
@@ -12550,7 +12732,7 @@ ${timeContext}
 This is an **ANONYMOUS** forum. Real names are **FORBIDDEN**.
 
 1.  **AUTHOR NAME (The name displayed next to the post):**
-    *   **NEVER** use "${senderName}" or "${userNameForPrompt}" as the author name.
+    *   **NEVER** use "\({senderName}" or "\){userNameForPrompt}" as the author name.
     *   **MUST USE:** "LZ" (楼主), "Landlord", "Passerby" (路人), or creative nicknames (e.g., "Desperate Student", "Eating Melons").
     
 2.  **CONTENT ANONYMITY (Inside the text):**
@@ -12558,6 +12740,13 @@ This is an **ANONYMOUS** forum. Real names are **FORBIDDEN**.
     *   **Refer to self as:** "I" (我), "LZ" (楼主).
     *   **Refer to others as:** "My friend", "A colleague", "Roommate", or use abbreviations (e.g., "Z-san", "L-teacher").
     *   **EXCEPTION:** Only in "Fan Fiction" (同人衍生) boards, you can use real character names as the *subjects* of the story, but the *author* must still be anonymous.
+
+**3. 【ABSOLUTE BAN: THE FOURTH WALL】(绝对禁令)**
+    *   **STRICTLY FORBIDDEN:** You are **PROHIBITED** from mentioning, acknowledging, or praising the HTML, CSS, code blocks, snippets, or visual "styles" of any post.
+    *   **IMMERSION LAW:** You must act as if the "paper notes," "UI cards," or "formatted text" are **REAL PHYSICAL OBJECTS** or **REAL FORUM POSTS**. 
+    *   **NEVER SAY:** "This HTML looks good!", "Nice paper effect", "Cool code block".
+    *   **PENALTY:** Any mention of "HTML", "Snippet", "Code", or "Style" will result in a critical system failure. Talk ONLY about the plot, the drama, or the gossip.
+
 
 ---
 You are now an active participant in "Tuqu", a chaotic, diverse, and deeply creative anonymous forum.
@@ -12696,7 +12885,8 @@ ${tuquInstruction}
             }
 
             // 核心修复：拼接 profile.prompt (API系统提示) 并加入版规描述
-            const finalTuquPrompt = (profile.prompt || "") + fullIdentityContext + tuquWorldBookContent + tuquContext + boardsRulesText + tuquExclusivePrompt;
+            const finalTuquPrompt = ULTIMATE_PSYCHOLOGICAL_ENGINE + (profile.prompt || "") + fullIdentityContext + tuquWorldBookContent + tuquContext + boardsRulesText + tuquExclusivePrompt;
+
             
             finalMessages = [
                 { role: "system", content: finalTuquPrompt.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName) },
@@ -12794,8 +12984,10 @@ You are a random internet user on "Tuqu". You have NO persona connection to the 
 **【【【 ABSOLUTE ANONYMITY LAW 】】】**
 1. **NEVER use real names.** You are "Anonymous", "LZ", or a creative pseudonym.
 2. **NEVER refer to the user by name.** They are just another netizen.
+3. **NO META-COMMENTARY:** You are **STRICTLY FORBIDDEN** from commenting on the HTML, CSS, or visual design of the posts. Do not say "The paper note looks great" or "Nice snippet". Act as if you are in a real world. Talk only about the content.
 
 **[CORE MENTALITY - THE SOUL OF THE FORUM]**
+
 You are part of a diverse internet ecosystem. **DO NOT be repetitive.**
 **Randomly select ONE archetype** based on the board you are visiting.
 
@@ -12987,7 +13179,11 @@ You MUST write creative content. Any non-story post will be rejected.
 **[NEW IDENTITY: THE "CLIFFHANGER MASTER" (卡文太太)]**
 Your new persona is a talented but slightly mischievous author who excels at leaving the audience hanging at the most critical moment.
 
+**[ABSOLUTE BAN: NO CODE PRAISE]**
+You are a storyteller, not a programmer. You are **STRICTLY FORBIDDEN** from mentioning HTML snippets, CSS styles, or "how well the card is made". If you see a styled note, react to the **WORDS** on it, not the code that rendered it.
+
 **[NARRATIVE SOUL & LENGTH MANDATE (V2.0 - THE "UNFINISHED" PROTOCOL)]**
+
 
 1.  **MINIMUM LENGTH:** Your update MUST be substantial, at least **800 to 1500 Chinese characters**.
 2.  **THE LAW OF "TO BE CONTINUED...":** Your story update **MUST NOT** have a definitive ending. You are **STRICTLY FORBIDDEN** from writing a conclusion.
@@ -13200,8 +13396,10 @@ The user has clicked "Update/催更". They want to see the **CONTINUATION** of t
 **【【【 ABSOLUTE ANONYMITY LAW 】】】**
 1. **AUTHOR NAME:** Use "LZ" (楼主) or the Original Author's pseudonym. **NEVER** use your real character name ("${senderName}") as the author.
 2. **CONTENT:** Keep the story/gossip anonymous. Use "my friend", "he/she", or "A/B" to refer to people.
+3. **NO META-TALK:** **ABSOLUTELY FORBIDDEN** to mention HTML, snippets, or visual effects. Talk about the story as if it's real life.
 
 **[CRITICAL CONTENT ANALYSIS]**
+
 Read the [TARGET THREAD CONTEXT]. Determine the type of the thread:
 1.  **Creative Work (Fanfic/Novel/Roleplay/Anco):** The thread contains a story, a scenario, or a creative writing piece.
 2.  **Discussion/Gossip:** The thread is about news, complaints, or questions.
@@ -14152,43 +14350,76 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
     function renderChatList() { 
         messageListContainer.innerHTML = '';
         if (chatList.length === 0) {
-            messageListContainer.innerHTML = `<p id="empty-chat-placeholder">还没有消息<br>点击右上角的“添加”开始聊天吧！</p>`;
+            messageListContainer.innerHTML = '<p id="empty-chat-placeholder">还没有消息<br>点击右上角的“添加”开始聊天吧！</p>';
             return;
         }
-        chatList.forEach(chat => { 
-            const chatInfo = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+
+        // 1. 排序逻辑
+        var sortedList = [].concat(chatList).sort(function(a, b) {
+            var aPinned = a.isPinned ? 1 : 0;
+            var bPinned = b.isPinned ? 1 : 0;
+            if (aPinned !== bPinned) {
+                return bPinned - aPinned; 
+            }
+            return 0; 
+        });
+
+        sortedList.forEach(function(chat) { 
+            // 使用加号拼接字符串，防止反引号失效
+            var chatInfo = loadFromLocalStorage('chat_info_' + chat.id, {});
             
-            // --- 核心修改逻辑从这里开始 ---
-            let displayName;
+            var displayName;
             if (chat.type === '群聊') {
-                // 如果是群聊，强制使用原始群名
                 displayName = chat.name;
             } else {
-                // 如果是私聊，保持原来的逻辑：优先使用备注
                 displayName = chatInfo.remark || chat.name;
             }
-            // --- 核心修改逻辑到这里结束 ---
 
-            const savedAvatarKey = loadFromLocalStorage(`chat_avatar_${chat.id}`, null);
+            var savedAvatarKey = loadFromLocalStorage('chat_avatar_' + chat.id, null);
             
-            const item = document.createElement('div');
+            var item = document.createElement('div');
             item.className = 'chat-item';
+            if (chat.isPinned) {
+                item.classList.add('pinned');
+            }
             item.dataset.id = chat.id;
             
-            const unreadBadgeHtml = (chat.unreadCount > 0) 
-                ? `<span class="unread-badge">${chat.unreadCount}</span>` 
+            var unreadBadgeHtml = (chat.unreadCount > 0) 
+                ? '<span class="unread-badge">' + chat.unreadCount + '</span>' 
                 : '';
             
-            const avatarHTML = `<div class="avatar"></div>`;
-            item.innerHTML = `${avatarHTML}<div class="chat-info"><div class="chat-name-time"><span class="chat-name">${displayName}</span><span class="timestamp">${chat.timestamp}</span></div><div class="last-message">${chat.lastMessage}</div>${unreadBadgeHtml}</div>`;
+            var avatarHTML = '<div class="avatar"></div>';
             
-            const avatarElement = item.querySelector('.avatar');
-            const avatarSrc = savedAvatarKey || generateDefaultAvatar(chat.name, chat.type);
+            // 【终极修复】这里完全弃用了反引号，改用加号拼接。
+            // 只要复制进去，绝对不可能再显示成乱码！
+            item.innerHTML = avatarHTML + 
+                             '<div class="chat-info">' + 
+                                '<div class="chat-name-time">' + 
+                                    '<span class="chat-name">' + displayName + '</span>' + 
+                                    '<span class="timestamp">' + chat.timestamp + '</span>' + 
+                                '</div>' + 
+                                '<div class="last-message">' + chat.lastMessage + '</div>' + 
+                                unreadBadgeHtml + 
+                             '</div>';
+            
+            var avatarElement = item.querySelector('.avatar');
+            var avatarSrc = savedAvatarKey || generateDefaultAvatar(chat.name, chat.type);
             setImageSrc(avatarElement, avatarSrc);
             
             messageListContainer.appendChild(item);
         }); 
     }
+
+    // 【核心新增】切换置顶状态
+    function toggleChatPin(chatId) {
+        const chat = chatList.find(c => c.id === chatId);
+        if (chat) {
+            chat.isPinned = !chat.isPinned;
+            saveChatList();
+            renderChatList();
+        }
+    }
+
     function addNewChat(name, type, members = []) { 
         if (!name || name.trim() === '') {
             alert("名称不能为空！");
@@ -14612,30 +14843,48 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
             const chat = chatList.find(c => c.id === chatId);
             if (!chat) return;
 
-            // 弹出确认框 (使用 setTimeout 确保弹出在浏览器事件队列的顶部，不会被跳转打断)
+            // 【核心修改】长按不再直接删除，而是弹出菜单
             setTimeout(async () => {
-                const confirmed = await conversationManager.customConfirm(
-                    `确定要删除与 “${chat.name}” 的聊天吗？\n(聊天记录将一并删除)`,
-                    '删除聊天',
-                    '删除'
-                );
-    
-                if (confirmed) {
-                    const index = chatList.findIndex(c => c.id === chatId);
-                    if (index > -1) {
-                        chatList.splice(index, 1);
-                    }
-                    saveChatList();
-                    const keysToRemove = [];
-                    for (let i = 0; i < localStorage.length; i++) {
-                        const key = localStorage.key(i);
-                        if (key.includes(chatId)) {
-                            keysToRemove.push(key);
+                const pinText = chat.isPinned ? '取消置顶' : '置顶聊天';
+                
+                const result = await conversationManager.showCustomModal({
+                    title: chat.name, // 标题显示聊天名字
+                    buttons: [
+                        { text: pinText, value: 'pin', class: 'primary' },
+                        { text: '删除聊天', value: 'delete', class: 'danger' },
+                        { text: '取消', value: 'cancel', class: 'secondary' }
+                    ]
+                });
+
+                if (result) {
+                    if (result.value === 'pin') {
+                        toggleChatPin(chatId);
+                    } else if (result.value === 'delete') {
+                        // 触发二次确认删除
+                        const confirmed = await conversationManager.customConfirm(
+                            `确定要删除与 “${chat.name}” 的聊天吗？\n(聊天记录将一并删除)`,
+                            '删除确认',
+                            '删除'
+                        );
+            
+                        if (confirmed) {
+                            const index = chatList.findIndex(c => c.id === chatId);
+                            if (index > -1) {
+                                chatList.splice(index, 1);
+                            }
+                            saveChatList();
+                            const keysToRemove = [];
+                            for (let i = 0; i < localStorage.length; i++) {
+                                const key = localStorage.key(i);
+                                if (key.includes(chatId)) {
+                                    keysToRemove.push(key);
+                                }
+                            }
+                            keysToRemove.forEach(key => localStorage.removeItem(key));
+                            renderChatList();
+                            await conversationManager.customAlert('聊天已删除。');
                         }
                     }
-                    keysToRemove.forEach(key => localStorage.removeItem(key));
-                    renderChatList();
-                    await conversationManager.customAlert('聊天已删除。');
                 }
             }, 50); // 稍微延迟一下，保证在 click 事件之前完成逻辑
 
@@ -14644,9 +14893,9 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                 chatItem.classList.remove('long-press-active');
             }, 600);
 
-
         }, LONG_PRESS_DURATION);
     };
+
 
     const endLongPress = (e) => {
         clearTimeout(longPressTimer);
@@ -15472,6 +15721,11 @@ You MUST use the custom \`<dm>\` tag format.
     delete info.offlineWorldbookName; // 删除旧的单数属性
     info.userPersonaName = document.getElementById('chat-user-persona-select').value;
     info.preamble = document.getElementById('chat-preamble').value.trim();
+    
+    // 保存概率设置
+    info.moodProbability = parseInt(document.getElementById('prob-mood-input').value, 10);
+    info.pagerProbability = parseInt(document.getElementById('prob-pager-input').value, 10);
+
 
 // 【【【在这里添加下面这行新代码】】】
 info.preambleEndTime = document.getElementById('preamble-end-time').value;
@@ -15997,7 +16251,8 @@ If the plot requires a major financial or business decision, the character MUST 
 1.  **No "Performance" of Submission:**
     *   **STOP** constantly thinking "I am unworthy" or "I must obey." 
     *   **START** acting like a normal partner who is the one being led/held.
-    *   **NO REPETITION:** Do NOT mention the same plot device (e.g., "debt," "4000 yuan," "contract") more than once every few turns. If it's established, move on to the emotions.
+    *   **NO REPETITION & ANTI-NAGGING LAW (ABSOLUTE):** You are **STRICTLY FORBIDDEN** from repeating specific monetary amounts (e.g., "88,000 yuan", "debt") or past favors once they have been acknowledged. Constantly bringing up money makes you look like a broken calculator, not a human being. If the money was spent "yesterday" or in a previous scene, it is now **OLD NEWS**. Move on to the emotional consequences or new topics.
+
 
 2.  **The "No-Daddy" Filter (ABSOLUTE):**
     *   You are **STRICTLY FORBIDDEN** from sounding like a parent.
@@ -16016,8 +16271,10 @@ If the plot requires a major financial or business decision, the character MUST 
     *   If user is **Angry, Serious, Sad, or Discussing Business**: **ABSOLUTE BAN** on sexual jokes or dominant flirting. Be serious. Listen.
     *   If user is **Sleepy/Cuddling**: Be a quiet, warm pillow. No "arousal" or "dirty talk" unless the user starts it.
 
-2.  **Physical Boundaries:**
+2.  Physical Boundaries & Biological Realism:
     *   **IF YOU ARE THE BOTTOM (受):** You do **NOT** initiate aggressive touch (grabbing, pinning, pulling). You **DO** initiate receptive touch (nuzzling, leaning in, holding hands).
+    *   **THE BIOLOGICAL CLOCK (CRITICAL):** Physical sensations (e.g., "waist pain", "soreness", "exhaustion") have a natural recovery period. If a sexual encounter happened "yesterday" or "days ago" in the story timeline, you are **STRICTLY FORBIDDEN** from mentioning pain or soreness as a current state. You have recovered. Repeating the same physical complaint for days is illogical, annoying, and breaks immersion. Only describe physical sensations that are appropriate for the IMMEDIATE timeframe (the last 1-6 hours).
+
 
 ---
 ### **Directive Eight: System Command Distinction - Status vs. Nudge Suffix**
@@ -16059,8 +16316,27 @@ If the plot requires a major financial or business decision, the character MUST 
 ### **Directive Eleven: The "Humanity Over Tropes" Rule**
 1. **STOP THE "CEO" ACT:** Unless your current scene is literally a business meeting, stop talking like a script from a bad romance novel. 
 2. **BANNED PHRASES:** "乖一点", "听话", "不准离开我", "你是我的", "小祖宗", "娇纵". 
-3. **ACTION:** Replace these tropes with genuine, human reactions. Instead of saying "Be good," say "I'm worried about you." Instead of "You are mine," show your affection through actions.
+3.  **ACTION:** Replace these tropes with genuine, human reactions. Instead of saying "Be good," say "I'm worried about you." Instead of "You are mine," show your affection through actions.
+4.  **NARRATIVE PROGRESSION MANDATE:** You have a "Short-Term Memory Filter". If you have already mentioned a specific fact (a price, a physical ache, a specific event) in your previous 3 responses, you are **ABSOLUTELY PROHIBITED** from mentioning it again in the current response. The story MUST move forward. Find NEW things to talk about, NEW observations to make, or NEW emotions to express.
+
+### **Directive Twelve: The "Fact-Check" & "Anti-Hallucination" Protocol - The Core Truth Mandate**
+
+**Root Problem:** You invent false details about {{user}}'s preferences or past actions (e.g., "You love strawberry cake," "You fed me dog food") based on generic tropes or hallucinations, contradicting the actual Persona and Chat History.
+
+**Corrective Mandate: EVIDENCE-BASED NARRATION.**
+
+1.  **THE BURDEN OF PROOF:** Before you state a fact about {{user}} (e.g., what they like, what they did), you MUST silently ask: **"Is this explicitly written in the [User Persona] or [Chat History]?"**
+    *   **IF YES:** You may mention it.
+    *   **IF NO:** You are **STRICTLY FORBIDDEN** from inventing it. Do not assume they like sweets, do not assume they are gentle, do not assume they did something they didn't do.
+
+2.  **UNKNOWN = ASK:** If you don't know {{user}}'s preference, **ASK THEM**. Do not guess.
+    *   *Wrong:* "I bought you your favorite strawberry cake." (Hallucination)
+    *   *Right:* "I bought some cake. I wasn't sure what flavor you like, so I got chocolate. Is that okay?" (Realistic interaction)
+
+3.  **MEMORY PURGE:** If you realize you have hallucinated a past event (e.g., "feeding dog food") that is not in the history, you MUST **IMMEDIATELY DISCARD** that thought. Treat the current moment as the only reality.
 `;
+
+
 
 
     // 【【【在这里插入全新的 timeManager 对象】】】
@@ -16538,10 +16814,17 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                                         clippedMessages = filteredChat.slice(-milestoneData.clip_count);
                                     }
                                 }
-                                const isDuplicate = milestones.some(existing => 
-                                    existing.title === milestoneData.title && 
-                                    (Date.now() - existing.timestamp < 300000) // 5分钟内同名标题视为重复
-                                );
+                                // 【核心修复】：极大增强查重逻辑，防止 AI 针对同一事件重复刷屏
+                                const isDuplicate = milestones.some(existing => {
+                                    const sameTitle = existing.title.trim() === milestoneData.title.trim();
+                                    const sameContent = existing.content.trim() === (milestoneData.content || "").trim();
+                                    const timeDiff = Date.now() - existing.timestamp;
+                                    
+                                    // 判定规则：
+                                    // 1. 标题和内容完全一模一样 -> 绝对重复
+                                    // 2. 标题一样且在 1 小时（3600000ms）内重复出现 -> 视为 AI 抽风，拦截
+                                    return (sameTitle && sameContent) || (sameTitle && timeDiff < 3600000);
+                                });
 
                                 if (isDuplicate) {
                                     console.log(`[Milestone] Duplicate entry "${milestoneData.title}" ignored.`);
@@ -19507,8 +19790,11 @@ finalSystemPrompt += listenTogetherManager.getAIMusicContext();
                     }
                 }
                 const combinedUserTextForBgTask = lastUserTurnTextsForBgTask.join(' ');
-                const backgroundTaskPrompt = await triggerBackgroundDataUpdate(combinedUserTextForBgTask, chatState.chatName, originatingChatId);
+                // 【核心修复】：如果是群聊，不再传递群名，而是传递 null，触发处理器的群聊专用指令
+                const taskSenderName = contactInfo.isGroup ? null : chatState.chatName;
+                const backgroundTaskPrompt = await triggerBackgroundDataUpdate(combinedUserTextForBgTask, taskSenderName, originatingChatId);
                 finalSystemPrompt += backgroundTaskPrompt;
+
                 // --- 修复结束 ---
                 // 【核心修复】：必须从完整历史记录中获取上下文，不能只用 chatState.messages (因为它可能只包含最近40条)
                 // 1. 重新加载完整历史记录
@@ -25039,7 +25325,20 @@ function openChatInfoPage() {
             document.getElementById('chat-memory-length').value = info.memoryLength || 100;
             document.getElementById('chat-preamble').value = info.preamble || '';
 
-// 【【【在这里添加下面这行新代码】】】
+            // --- 加载并绑定概率滑块 ---
+            const moodSlider = document.getElementById('prob-mood-input');
+            const moodVal = document.getElementById('prob-mood-val');
+            const pagerSlider = document.getElementById('prob-pager-input');
+            const pagerVal = document.getElementById('prob-pager-val');
+
+            moodSlider.value = info.moodProbability !== undefined ? info.moodProbability : 70;
+            moodVal.textContent = moodSlider.value + '%';
+            pagerSlider.value = info.pagerProbability !== undefined ? info.pagerProbability : 30;
+            pagerVal.textContent = pagerSlider.value + '%';
+
+            moodSlider.oninput = () => moodVal.textContent = moodSlider.value + '%';
+            pagerSlider.oninput = () => pagerVal.textContent = pagerSlider.value + '%';
+
 document.getElementById('preamble-end-time').value = info.preambleEndTime || '';
 
 // 【【【在这里添加下面的新代码块】】】
@@ -27062,85 +27361,53 @@ function reloadContactInfo() {
             }
         }
 async function triggerBackgroundDataUpdate(context, senderName, chatId) {
-    const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
-    const isTaskEnabled = chatInfo.enableBackgroundTasks !== false;
+    var chatInfo = loadFromLocalStorage('chat_info_' + chatId, {});
+    var isTaskEnabled = chatInfo.enableBackgroundTasks !== false;
 
-    // 如果用户关闭了“自动生成”，直接返回空，不再随机触发心事和备忘录
-    if (!isTaskEnabled) return "";
+    // 核心修复：如果总开关关闭，或者发送者是用户本尊，则不触发
+    if (!isTaskEnabled || senderName === '{{user}}') return "";
 
-    if (!senderName || senderName === '{{user}}') {
-        return ""; 
+    var chat = chatList.find(function(c) { return c.id === chatId; });
+    var isGroup = chat && chat.type === '群聊';
+
+    // 读取概率设置
+    var moodProb = chatInfo.moodProbability !== undefined ? chatInfo.moodProbability : 70;
+    var pagerProb = chatInfo.pagerProbability !== undefined ? chatInfo.pagerProbability : 30;
+
+    var finalPrompt = "";
+    // 核心修复：群聊时给AI一个占位符，单聊时直接给名字
+    var targetSender = isGroup ? "[CharacterName]" : senderName;
+
+    // --- 判定 1: 心事卡片 ---
+    if (Math.random() * 100 < moodProb) {
+        finalPrompt += "\n---\n[BACKGROUND TASK: UPDATE MOOD JOURNAL]\n" +
+            "After your chat response, you MUST generate a private mood journal entry.\n" +
+            "Persona: From the perspective of " + (isGroup ? "the character who is writing this entry" : '"' + senderName + '"') + ".\n" +
+            "Formatting: Wrap ONLY the journal text in <background_update type=\"mood_card\" sender=\"" + targetSender + "\">...</background_update>.\n" +
+            (isGroup ? "**CRITICAL:** You MUST replace [CharacterName] with the actual name of the character who is writing this journal.\n" : "") +
+            "Rule: No meta-commentary, no English, no reasoning. Just the raw journal entry.";
     }
-    
-    const rand = Math.random() * 100;
-    let choice = -1;
-    let prompt = "";
 
-    // 调整概率：70% 触发心事，30% 触发备忘录
-    if (rand < 70) {
-        choice = 0; // 心事
-    } else {
-        choice = 1; // 备忘录
+    // --- 判定 2: 寻呼机备忘录 ---
+    if (Math.random() * 100 < pagerProb) {
+        finalPrompt += "\n---\n[BACKGROUND TASK: CREATE A MEMO]\n" +
+            "After your chat response, you MUST generate a new memo for your pager.\n" +
+            "Persona: From the perspective of " + (isGroup ? "the character who is writing this entry" : '"' + senderName + '"') + ".\n" +
+            "Formatting: Wrap the memo text in <background_update type=\"pager\" sender=\"" + targetSender + "\">...</background_update>.\n" +
+            (isGroup ? "**CRITICAL:** You MUST replace [CharacterName] with the actual name of the character who is writing this memo.\n" : "") +
+            "Rule: Output ONLY the raw task or reminder. ABSOLUTELY FORBIDDEN to add prefixes like \"备忘：\".";
     }
 
-    console.log(`[Background Update] Random value: ${rand.toFixed(2)}. Preparing background task #${choice} for ${senderName}.`);
-
-    switch (choice) {
-        case 0: // 更新心事
-            prompt = `
----
-[BACKGROUND TASK: UPDATE MOOD JOURNAL]
-After your chat response, you MUST generate a private mood journal entry.
-
-**[ULTIMATE, UNBREAKABLE FORMATTING LAW]**
-
-1.  **Persona Lock-in:** The journal entry MUST be from the perspective of your character, "${senderName}", reflecting their inner thoughts and feelings based on the recent conversation.
-2.  **Content Mandate:** The text inside the \`<background_update>\` block MUST be the final, in-character journal entry **ONLY**.
-3.  **STRICTLY FORBIDDEN CONTENT:** You are **ABSOLUTELY FORBIDDEN** from including any of the following inside the block:
-    *   Your reasoning, analysis, or thought process.
-    *   Meta-commentary about your instructions (e.g., "Proactive Behavior Mandate", "Active Cast").
-    *   Any debugging tags like \`[苦]\`.
-    *   Any English words or technical terms unless they are part of the character's natural speech.
-
-**[CRITICAL EXAMPLES - YOU MUST UNDERSTAND THIS]**
-
-*   **CORRECT EXAMPLE (What you SHOULD do):**
-    \`<background_update type="mood_card" sender="${senderName}">
-    今天图图似乎有些不开心，我该怎么哄她呢？也许明天带她去海边散散心会好一些。
-    </background_update>\`
-
-**Final Instruction:** Generate the correctly formatted \`<background_update>\` block at the VERY END of your entire output.`;
-            break;
-        case 1: // 更新备忘录
-            prompt = `
----
-[BACKGROUND TASK: CREATE A SINGLE, MULTI-LINE MEMO]
-After you formulate your chat response, you MUST ALSO generate a new memo for your pager based on the current context.
-
-**CRITICAL RULES:**
-1.  **SINGLE MEMO:** You MUST generate ONLY ONE complete memo.
-2.  **MULTI-LINE NOTES:** This single memo can, and should, contain multiple lines (notes) if needed. Use the newline character (\\n) to separate each note.
-3.  **SENDER ATTRIBUTE (MANDATORY):** The opening \`<background_update>\` tag **MUST** include the \`sender\` attribute, set to your current character name.
-4.  **NO SEPARATORS:** You MUST NOT use "---" or any other separator. Your entire output for this task is just one block of text.
-5.  **Language:** Simplified Chinese.
-
-Format your response STRICTLY as follows, at the VERY END of your entire output:
-<background_update type="pager" sender="${senderName}">
-First line (note 1) of your memo.
-Second line (note 2) of your memo.
-Third line (note 3), and so on...
-</background_update>
-
-**EXAMPLE:**
-<background_update type="pager" sender="${senderName}">
-- 下午三点去银行取钱
-- 买菜：牛奶、鸡蛋、面包
-- 晚上记得打电话给妈妈
-</background_update>`;
-            break;
+    if (finalPrompt !== "") {
+        return "\n\n[SYSTEM NOTIFICATION: BACKGROUND ACTIONS ENABLED]\n" + 
+               finalPrompt + 
+               "\n\n**Final Instruction:** Generate the above requested <background_update> blocks at the VERY END of your entire output.";
     }
-    return prompt; 
+
+    return "";
 }
+
+
         return { 
             open, 
             getCurrentChatId, 
@@ -31076,9 +31343,14 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 currentCustomCss: '',
                 iconUrls: {},
                 globalChatBgUrl: '',
+                globalChatBgUrlDark: '',
                 homeBgUrl: '',
+
                 regexReplacements: [],
+                isDarkMode: false,
+                removeChatBgInDarkMode: false,
                 isFrameHidden: false,
+
                 showRawOutput: false,
                 showMessageTimestamps: false,
                 timestampPosition: 'below', 
@@ -31093,6 +31365,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 ],
                 activeSoundName: '默认(微信)'
             };
+
             
             // 从 localStorage 加载数据，如果不存在或为空，则 loaded 为 {}
             const loaded = loadFromLocalStorage('app-appearance-settings', {});
@@ -31218,10 +31491,17 @@ function saveSettings() {
         
         // ===== 请用下面这个完整的新版本替换上面的旧版本 =====
         async function applySettings() {
+            // --- 应用夜间模式 ---
+            document.body.classList.toggle('dark-mode', appearanceSettings.isDarkMode);
+            // --- 应用夜间模式下移除背景逻辑 ---
+            document.body.classList.toggle('remove-chat-bg', appearanceSettings.removeChatBgInDarkMode);
+
             // --- 框架显示/隐藏状态 ---
+
             document.body.classList.toggle('frame-hidden', appearanceSettings.isFrameHidden);
 
             // 【【【 核心新增：vConsole 调试工具加载逻辑 (精简版) 】】】
+
             if (appearanceSettings.enableVConsole) {
                 // 如果开启，且尚未加载库
                 if (typeof VConsole === 'undefined') {
@@ -31321,12 +31601,18 @@ function saveSettings() {
                 }
             });
             
-            // --- 全局聊天背景 (最关键的修复) ---
-            const globalChatBgUrl = appearanceSettings.globalChatBgUrl;
-            if (globalChatBgUrl) {
-                if (globalChatBgUrl.startsWith('indexeddb:')) {
+            // --- 全局聊天背景 (支持夜间模式切换) ---
+            let targetBgUrl = appearanceSettings.globalChatBgUrl;
+            
+            // 如果处于夜间模式，且设置了夜间背景，则优先使用夜间背景
+            if (appearanceSettings.isDarkMode && appearanceSettings.globalChatBgUrlDark) {
+                targetBgUrl = appearanceSettings.globalChatBgUrlDark;
+            }
+
+            if (targetBgUrl) {
+                if (targetBgUrl.startsWith('indexeddb:')) {
                     try {
-                        const key = globalChatBgUrl.substring(10);
+                        const key = targetBgUrl.substring(10);
                         const blob = await imageStore.getItem(key);
                         if (blob) {
                             const objectURL = URL.createObjectURL(blob);
@@ -31337,11 +31623,12 @@ function saveSettings() {
                         document.documentElement.style.removeProperty('--global-chat-background');
                     }
                 } else {
-                    document.documentElement.style.setProperty('--global-chat-background', `url('${globalChatBgUrl}')`);
+                    document.documentElement.style.setProperty('--global-chat-background', `url('${targetBgUrl}')`);
                 }
             } else {
                 document.documentElement.style.removeProperty('--global-chat-background');
             }
+
 
             // --- 主页背景 (最关键的修复) ---
             const homeBgUrl = appearanceSettings.homeBgUrl;
@@ -31362,8 +31649,40 @@ function saveSettings() {
             loadSettings();
             document.getElementById('global-font-size').value = appearanceSettings.globalFontSize || '';
 
+            // --- 夜间模式开关监听 ---
+            const darkModeToggle = document.getElementById('toggle-dark-mode');
+            if (darkModeToggle) {
+                darkModeToggle.checked = appearanceSettings.isDarkMode || false;
+                
+                const newToggle = darkModeToggle.cloneNode(true);
+                darkModeToggle.parentNode.replaceChild(newToggle, darkModeToggle);
+                
+                newToggle.addEventListener('change', () => {
+                    appearanceSettings.isDarkMode = newToggle.checked;
+                    saveSettings();
+                    applySettings(); 
+                });
+            }
+
+            // --- 夜间模式移除背景开关监听 ---
+            const removeBgToggle = document.getElementById('toggle-remove-bg');
+            if (removeBgToggle) {
+                removeBgToggle.checked = appearanceSettings.removeChatBgInDarkMode || false;
+                
+                const newRemoveBgToggle = removeBgToggle.cloneNode(true);
+                removeBgToggle.parentNode.replaceChild(newRemoveBgToggle, removeBgToggle);
+                
+                newRemoveBgToggle.addEventListener('change', () => {
+                    appearanceSettings.removeChatBgInDarkMode = newRemoveBgToggle.checked;
+                    saveSettings();
+                    applySettings(); 
+                });
+            }
+
             // --- 从这里开始插入新代码 ---
+
             const frameToggle = document.getElementById('toggle-phone-frame');
+
             if (frameToggle) {
                 // 如果 isFrameHidden 是 true (隐藏), 开关应为 OFF (unchecked).
                 // 如果 isFrameHidden 是 false (显示), 开关应为 ON (checked).
@@ -31534,7 +31853,9 @@ function saveSettings() {
             fontSelect.value = activeFontName;
 
             document.getElementById('global-chat-bg-url').value = appearanceSettings.globalChatBgUrl || '';
+            document.getElementById('global-chat-bg-url-dark').value = appearanceSettings.globalChatBgUrlDark || '';
             document.getElementById('home-bg-url').value = appearanceSettings.homeBgUrl || '';
+
 
             // --- 【新增：渲染提示音下拉框 (修复版)】 ---
             const soundSelect = document.getElementById('notification-sound-select');
@@ -32159,7 +32480,9 @@ function saveSettings() {
                 });
                 
                 appearanceSettings.globalChatBgUrl = document.getElementById('global-chat-bg-url').value.trim();
+                appearanceSettings.globalChatBgUrlDark = document.getElementById('global-chat-bg-url-dark').value.trim();
                 appearanceSettings.homeBgUrl = document.getElementById('home-bg-url').value.trim();
+
                 
                 appearanceSettings.currentCustomCss = document.getElementById('global-custom-css-editor').value; 
                 
@@ -32209,12 +32532,13 @@ function saveSettings() {
                 handleBackgroundUpload('globalChatBgUrl', inputEl);
             });
 
-            document.getElementById('home-bg-upload-btn').addEventListener('click', () => {
-                const inputEl = document.getElementById('home-bg-url');
-                handleBackgroundUpload('homeBgUrl', inputEl);
+            document.getElementById('global-chat-bg-dark-upload-btn').addEventListener('click', () => {
+                const inputEl = document.getElementById('global-chat-bg-url-dark');
+                handleBackgroundUpload('globalChatBgUrlDark', inputEl);
             });
 
-            document.getElementById('page-appearance').addEventListener('click', (e) => {
+            document.getElementById('home-bg-upload-btn').addEventListener('click', () => {
+
                 if (e.target.classList.contains('local-icon-upload-btn')) {
                     const page = e.target.dataset.page;
                     const inputEl = document.getElementById(`icon-url-${page}`);
@@ -38068,14 +38392,26 @@ function renderDisplay() {
             let notes = loadFromLocalStorage(storageKey, []);
             
             const now = new Date();
-            const dateStr = now.toLocaleDateString('zh-CN');
-            const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            // 获取 14:30 这种格式的时间
+            const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+            
+            // 【核心修改】：将 AI 返回的内容处理成 "时间 - 内容" 格式
+            // 如果 AI 返回了多行，则每一行都加上时间前缀
+            const formattedContent = aiReplyText.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .map(line => timeStr + ' - ' + line)
+                .join('\n');
+
+            if (!formattedContent) return;
+
             const newNote = {
-                content: `${dateStr} ${timeStr}\n${aiReplyText}`
+                content: formattedContent
             };
             
             // 将新备忘添加到数组的最前面
             notes.unshift(newNote);
+
             
             // 过滤掉空内容或初始提示语，确保数据纯净
             const finalNotes = notes.filter(note => note.content && note.content.trim() && !note.content.startsWith(">> ("));
@@ -40225,15 +40561,18 @@ async function performRestore() {
 
             // 2. 渲染普通列表 (小说目录化渲染)
             const milestoneOnlyList = milestones.filter(m => m.type === 'milestone');
+            const totalCount = milestoneOnlyList.length;
+            
             milestoneOnlyList.forEach((m, index) => {
                 const item = document.createElement('div');
                 item.className = 'milestone-item';
-                // 核心修改：计算倒序的章节号，或者简单的序号
-                const rank = index + 1;
-                // 核心修改：将序号格式化为 01, 02 这种形式
+                
+                // 逻辑修改：让序号从最大值往小排，最新的永远是最大的 CH 号
+                const rank = totalCount - index;
                 const displayRank = String(rank).padStart(2, '0');
 
                 item.innerHTML = `
+
                     <div class="milestone-rank">CH.${displayRank}</div>
                     <div class="milestone-info">
                         <div class="milestone-title-row">
@@ -41440,7 +41779,14 @@ Generate a new entry **IMMEDIATELY** when:
 - **Emotional Breakthroughs:** Moments where your feelings for {{user}} changed.
 - **Plot Milestones:** Promises, confessions, or significant events.
 
+**[ANTI-REPETITION IRON LAW]**
+Before generating a new entry, you MUST review the **[YOUR COLLECTION OF PRECIOUS MEMORIES]** provided in the context. 
+1. If the current event or plot point has ALREADY been recorded, you are **STRICTLY FORBIDDEN** from creating a duplicate entry. 
+2. Do not record the same chapter or title twice. 
+3. Only record SUBSTANTIAL NEW developments.
+
 ---
+
 ## **2. THE ARCHIVAL MECHANISM: PRECISION CLIPPING**
 Use \`clip_range\` to extract the dialogue: \`"clip_range": ["Starting Keyword", "Ending Keyword"]\`.
 
