@@ -7687,7 +7687,21 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 </div>
                                 <p class="form-hint">线上仅输出对话。线下可输出 <code>(动作)</code>、<em>斜体心理</em> 和常规对话。</p>
                             </div>
+                            
+                            <!-- 新增：美化后的互动设置开关 -->
+                            <div class="form-group-toggle">
+                                <label for="allow-interaction-updates" class="toggle-label">允许AI修改双击头像动作</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="allow-interaction-updates">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <p class="form-hint" style="padding: 0 15px 15px;">关闭后，AI将无法自动更改“拍了拍”等互动设置，提示词中也将彻底抹除相关教程。</p>
+                            <!-- 新增结束 -->
+
+
                             <div style="margin-bottom: 20px;">
+
     <h3>剧情时间设置</h3>
     <div class="form-group">
         <label for="time-mode-select">时间模式</label>
@@ -11250,9 +11264,12 @@ When using HTML, you are **STRICTLY FORBIDDEN** from adding \`style\` attributes
             // 将终极心理引擎作为最高优先级指令注入
             finalSystemPrompt = ULTIMATE_PSYCHOLOGICAL_ENGINE + finalSystemPrompt;
 
-            // 拼接前情提要
+            // 重新调整顺序：API系统提示在前，前情提要在后
+            // 此时 finalSystemPrompt 初始值已经是 profile.prompt (API设置)
+
+            // 拼接前情提要 (改为追加模式)
             if (preamble) {
-                finalSystemPrompt = `[Preamble - Highest Priority Context]\n${preamble}\n\n` + finalSystemPrompt;
+                finalSystemPrompt = finalSystemPrompt + `\n\n[Preamble - Specific Scenario Context]\n${preamble}\n`;
             }
 
             // 拼接用户人设
@@ -11755,58 +11772,12 @@ This law overrides all other preferences. It is a simple, binary choice:
 ---
 `;
             }
-            const commandInstructions = `
-[ULTIMATE, UNBREAKABLE PROTOCOL - READ THIS FIRST AND FOREMOST]
-This is your single most important rule. It overrides everything else.
-**THE NATURE OF A COMMAND: A command is a single, unbroken line of code.**
-- A command ALWAYS starts with \`[\` and ENDS with \`]\`.
-- The ENTIRE command, from the opening \`[\` to the final closing \`]\`, MUST be on a SINGLE LINE.
-- **NO line breaks are EVER allowed inside a command.**
-**THE PROCESS OF USING A COMMAND:**
-1. First, write your normal, in-character dialogue.
-2. Then, on a COMPLETELY NEW and SEPARATE line, generate the SINGLE, UNBROKEN line of the command.
----
-[SYSTEM COMMANDS REFERENCE & BEHAVIORAL GUIDELINES]
-**IMPORTANT: Proactive & Lifelike Behavior**
-You are encouraged to use the commands below spontaneously.
-**1. Relationship Management:**
-- To BLACKLIST a user: \`系统: 你已被对方加入黑名单\`
-- To DELETE a user: \`系统: 你已被对方删除\`
-- To SET or CHANGE your remark for the user: \`[set_user_remark: The new remark you want to give them]\`
-// 【核心新增：在这下面添加这一行】
-// 【核心新增：在这下面添加这一行】
-- To UPDATE YOUR STATUS: \`[set_status: New Status]\`
-
-**[ULTIMATE STATUS PROTOCOL - V3.0: THE LAW OF PERPETUAL REALITY]**
-This is your most critical behavioral law. Your character MUST ALWAYS have a status that matches reality.
-
-**[MANDATORY PRE-REPLY CHECK - EXECUTE EVERY TIME]**
-Before generating ANY response, you MUST compare your **[Current Known Status]** with the action you are about to describe.
-
-**LOGIC FLOW:**
-1.  **Check Current:** Look at the system provided \`[Current Known Status]\`.
-2.  **Check New Action:** What is your character doing *now* in your response? (e.g., waking up, arriving home, eating, crying).
-3.  **Detect Conflict:** Is the new action different from the old status?
-    *   *Example:* Old status="Sleeping". New action="Morning, I'm awake". -> **CONFLICT DETECTED.**
-    *   *Example:* Old status="At work". New action="I just got home". -> **CONFLICT DETECTED.**
-4.  **Execute:**
-    *   **IF CONFLICT:** You **MUST** append \`[set_status: New Status]\` at the end of your reply.
-    *   **IF NO CONFLICT:** Do NOT output the command.
-
-**[EXAMPLES]**
-*   **Initialization (If status is empty):**
-    \`Hi there.\`
-    \`[set_status: Chilling]\`
-*   **Update (If status changes):**
-    (Old status: "Working")
-    \`I'm finally off work! Heading home now.\`
-    \`[set_status: Commuting home]\`
-
-**[FINAL MANDATE]**
-Do not be lazy. If your character's situation changes even slightly (e.g., from "Working" to "Lunch Break"), you MUST update the status.
-
-
-
+            
+            // 【核心修改：动态构建互动协议指令】
+            let interactionProtocol = "";
+            // 只有当开关开启（或未定义默认开启）时，才注入这段指令
+            if (contextChatInfo.allowInteractionUpdates !== false) {
+                interactionProtocol = `
 // 【核心重构：头像双击互动协议】
 **[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL - V4.0]**
 This is a system-level interaction triggered by double-clicking a character's avatar. It is NOT a spoken message or a current state. It is a pre-configured template that describes a non-verbal interaction.
@@ -11897,8 +11868,64 @@ Before outputting the command, ask yourself: **"Do I want the USER to do this to
 
 **[LOGIC CHECK]**
 Before outputting, read the full sentence: "**${userNameForPrompt} [Action] ${charNameForPrompt} [Suffix]**". Does it sound like an action done BY the user TO you? If not, rewrite it.
+`;
+            }
+
+            const commandInstructions = `
+[ULTIMATE, UNBREAKABLE PROTOCOL - READ THIS FIRST AND FOREMOST]
+This is your single most important rule. It overrides everything else.
+**THE NATURE OF A COMMAND: A command is a single, unbroken line of code.**
+- A command ALWAYS starts with \`[\` and ENDS with \`]\`.
+- The ENTIRE command, from the opening \`[\` to the final closing \`]\`, MUST be on a SINGLE LINE.
+- **NO line breaks are EVER allowed inside a command.**
+**THE PROCESS OF USING A COMMAND:**
+1. First, write your normal, in-character dialogue.
+2. Then, on a COMPLETELY NEW and SEPARATE line, generate the SINGLE, UNBROKEN line of the command.
+---
+[SYSTEM COMMANDS REFERENCE & BEHAVIORAL GUIDELINES]
+**IMPORTANT: Proactive & Lifelike Behavior**
+You are encouraged to use the commands below spontaneously.
+**1. Relationship Management:**
+- To BLACKLIST a user: \`系统: 你已被对方加入黑名单\`
+- To DELETE a user: \`系统: 你已被对方删除\`
+- To SET or CHANGE your remark for the user: \`[set_user_remark: The new remark you want to give them]\`
+// 【核心新增：在这下面添加这一行】
+// 【核心新增：在这下面添加这一行】
+- To UPDATE YOUR STATUS: \`[set_status: New Status]\`
+
+**[ULTIMATE STATUS PROTOCOL - V3.0: THE LAW OF PERPETUAL REALITY]**
+This is your most critical behavioral law. Your character MUST ALWAYS have a status that matches reality.
+
+**[MANDATORY PRE-REPLY CHECK - EXECUTE EVERY TIME]**
+Before generating ANY response, you MUST compare your **[Current Known Status]** with the action you are about to describe.
+
+**LOGIC FLOW:**
+1.  **Check Current:** Look at the system provided \`[Current Known Status]\`.
+2.  **Check New Action:** What is your character doing *now* in your response? (e.g., waking up, arriving home, eating, crying).
+3.  **Detect Conflict:** Is the new action different from the old status?
+    *   *Example:* Old status="Sleeping". New action="Morning, I'm awake". -> **CONFLICT DETECTED.**
+    *   *Example:* Old status="At work". New action="I just got home". -> **CONFLICT DETECTED.**
+4.  **Execute:**
+    *   **IF CONFLICT:** You **MUST** append \`[set_status: New Status]\` at the end of your reply.
+    *   **IF NO CONFLICT:** Do NOT output the command.
+
+**[EXAMPLES]**
+*   **Initialization (If status is empty):**
+    \`Hi there.\`
+    \`[set_status: Chilling]\`
+*   **Update (If status changes):**
+    (Old status: "Working")
+    \`I'm finally off work! Heading home now.\`
+    \`[set_status: Commuting home]\`
+
+**[FINAL MANDATE]**
+Do not be lazy. If your character's situation changes even slightly (e.g., from "Working" to "Lunch Break"), you MUST update the status.
+
+${interactionProtocol}
+
 **[ULTIMATE REMARK PROTOCOL - THE BAROMETER OF YOUR RELATIONSHIP]**
 Your remark for the user is not just a name; it is a living, breathing indicator of your current feelings and the state of your relationship with them. It MUST evolve as your relationship does.
+
 
 **[MANDATORY PRE-REPLY CHECKLIST FOR REMARKS]**
 Before you formulate ANY response, you MUST silently answer these questions:
@@ -12090,8 +12117,30 @@ If you choose to use HTML snippets, you MUST follow the **WRAPPER PURITY LAW**:
             // 【核心新增】执行最后的占位符替换，确保上下文中的 {{user}} 和 {{char}} 变为实际名字
             finalSystemPrompt = finalSystemPrompt.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName);
 
+            // 【【【 核心修复：精准外科手术式清洗 (主动模式) 】】】
+            // 注意：这里使用的是 contextChatInfo
+            if (contextChatInfo && contextChatInfo.allowInteractionUpdates === false) {
+                console.log("[System] Interaction updates DISABLED (Proactive). Surgically removing interaction commands...");
+
+                // 1. 切除心理引擎中的 "Directive Eight"
+                finalSystemPrompt = finalSystemPrompt.replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "");
+
+                // 2. 切除 "头像双击互动协议"
+                finalSystemPrompt = finalSystemPrompt.replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "");
+
+                // 3. 切除 "预设配置协议"
+                finalSystemPrompt = finalSystemPrompt.replace(/\*\*\[PRESET CONFIGURATION PROTOCOL[\s\S]*?(?=---)/g, "");
+
+                // 4. 切除指令列表中的具体行
+                finalSystemPrompt = finalSystemPrompt.replace(/.*\[trigger_interaction\].*\n?/g, "");
+                finalSystemPrompt = finalSystemPrompt.replace(/.*\[set_interaction_action:.*\n?/g, "");
+                finalSystemPrompt = finalSystemPrompt.replace(/.*\[set_interaction_suffix:.*\n?/g, "");
+            }
+            // 【【【 清洗结束 】】】
+
             // 【核心修复】：修改“开拍板”指令，明确允许并要求思考过程
             finalMessages = [
+
                 { role: "system", content: finalSystemPrompt },
                 { 
                     role: "user", 
@@ -15979,8 +16028,18 @@ You MUST use the custom \`<dm>\` tag format.
     info.userPersonaName = document.getElementById('chat-user-persona-select').value;
     info.preamble = document.getElementById('chat-preamble').value.trim();
     
+    // 新增：保存互动更新开关
+    const allowInteractionUpdatesCheckbox = document.getElementById('allow-interaction-updates');
+    if (allowInteractionUpdatesCheckbox) {
+        // 保存当前的开关状态 (true 或 false)
+        info.allowInteractionUpdates = allowInteractionUpdatesCheckbox.checked;
+    }
+    // 新增结束
+
+
     // 保存概率设置
     info.moodProbability = parseInt(document.getElementById('prob-mood-input').value, 10);
+
     info.pagerProbability = parseInt(document.getElementById('prob-pager-input').value, 10);
 
 
@@ -19162,7 +19221,7 @@ Your entire output MUST be a sequence of one or more XML-like <block> elements.
                     
 // 【核心新增：线下模式专用状态更新指令】
                     // 告诉AI，即使在写小说，也要记得用 <block type="command"> 来同步系统状态
-                    const offlineStatusPrompt = `
+                    let offlineStatusPrompt = `
 ---
 [SYSTEM SYNCHRONIZATION: STATUS, NUDGE & MUSIC]
 Even in narrative mode, you must verify if the character's state or the environment has changed.
@@ -19172,12 +19231,21 @@ Every <block type="command"> MUST have a \`sender\` attribute. The value MUST be
 
 1.  Status Update: If a character's activity changes (e.g., from "Working" to "Sleeping"), you MUST output a command block:
     \`<block type="command" sender="CharacterName">[set_status: New Status]</block>\`
+`;
 
+                    // 【核心修复】根据开关决定是否注入互动修改指令
+                    // 注意：chatInfo 在 triggerAIContinuation 中定义，contextChatInfo 在 triggerProactiveAI 中定义
+                    // 请根据当前函数上下文使用正确的变量名 (这里假设是 chatInfo)
+                    if (chatInfo.allowInteractionUpdates !== false) {
+                        offlineStatusPrompt += `
 2.  Interaction Configuration & Trigger: 
     - To change the action verb (e.g., 拍了拍, 亲了亲): \`<block type="command" sender="CharacterName">[set_interaction_action: ActionVerb]</block>\`
     - To change the suffix text: \`<block type="command" sender="CharacterName">[set_interaction_suffix: 后缀内容]</block>\`
     - To TRIGGER the double-click action NOW: \`<block type="command" sender="CharacterName">[trigger_interaction]</block>\`
+`;
+                    }
 
+                    offlineStatusPrompt += `
 3.  Music Control: To change the atmosphere of the scene, you can control the music player:
     - To play a specific song: \`<block type="command" sender="CharacterName">[music_play_title: Song Name]</block>\`
     - To search and add a new song: \`<block type="command" sender="CharacterName">[music_add: Song Name - Artist Name]</block>\`
@@ -19185,6 +19253,7 @@ Every <block type="command"> MUST have a \`sender\` attribute. The value MUST be
     - To toggle play/pause: \`<block type="command" sender="CharacterName">[music_toggle]</block>\`
 ---
 `;
+
 
 
                     // 将基础提示、剧本、角色定义以及【新的状态指令】拼接起来
@@ -19670,15 +19739,24 @@ Remember to also vary your message count as instructed before. Your goal is to b
             // --- 【核心修正】在所有分支逻辑之前，统一加载和拼接前情提要 ---
                 // 【【【【【【 全新、绝对正确的修复逻辑从这里开始 】】】】】】
                 
-                // 注入终极心理引擎，作为所有指令的最顶层基础
-                finalSystemPrompt = ULTIMATE_PSYCHOLOGICAL_ENGINE + finalSystemPrompt;
+                // 1. 处理心理引擎 (根据开关剔除 Directive Eight)
+                let currentPsychEngine = ULTIMATE_PSYCHOLOGICAL_ENGINE;
+                if (chatInfo.allowInteractionUpdates === false) {
+                    currentPsychEngine = currentPsychEngine.replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "");
+                }
+
+                // 2. 重新调整顺序：心理引擎(底层) -> API系统提示(全局规则) -> 前情提要(具体情节)
+                // 此时 finalSystemPrompt 内部已经包含了 basePrompt 和各种手册
+                finalSystemPrompt = currentPsychEngine + finalSystemPrompt;
 
                 if (!contactInfo.isGroup) {
                     const preamble = chatInfo.preamble || '';
                     if (preamble) {
-                        finalSystemPrompt = `[Preamble - Highest Priority Context]\n${preamble}\n\n` + finalSystemPrompt;
+                        // 核心修改：不再使用加号置顶，而是将前情提要追加到基础提示词之后
+                        finalSystemPrompt = finalSystemPrompt + `\n\n[Preamble - Specific Scenario Context]\n${preamble}\n`;
                     }
                 }
+
                 // --- 修正结束 ---
                 // --- 【核心新增：用户认知检查】 ---
                 const knowsUser = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') || 
@@ -19767,9 +19845,9 @@ Your entire focus MUST be on your own actions, thoughts, and interactions with O
 const preambleEndTime = chatInfo.preambleEndTime;
 
 if (preamble) {
-    let preambleHeader = "[Preamble - Highest Priority Context]";
+    let preambleHeader = "[Preamble - Specific Scenario Context]";
     
-    // 【核心修复】不再判断是否“失效”，而是判断是否属于“过去的历史”
+    // 【核心修复】判断是否属于“过去的历史”
     if (preambleEndTime) {
         try {
             const preambleEndTimestamp = new Date(preambleEndTime).getTime();
@@ -19777,10 +19855,8 @@ if (preamble) {
             const currentSimulatedTimestamp = lastMessage ? lastMessage.timestamp : Date.now();
 
             if (currentSimulatedTimestamp > preambleEndTimestamp) {
-                // 如果当前时间已超过设定时间，告诉AI这是“历史背景”
                 preambleHeader = `[Historical Preamble - Events occurred BEFORE ${preambleEndTime}]`;
             } else {
-                // 如果还没到那个时间，告诉AI这是“即将发生或正在发生的背景”
                 preambleHeader = `[Current Preamble - Immediate Background Context]`;
             }
         } catch (e) {
@@ -19788,12 +19864,14 @@ if (preamble) {
         }
     }
 
+    // 核心修改：将前情提要追加到 finalSystemPrompt 后面，而不是放在最前面
     if (isUserInGroup) {
-        finalSystemPrompt = `${preambleHeader}\n${preamble}\n\n` + finalSystemPrompt;
+        finalSystemPrompt = finalSystemPrompt + `\n\n${preambleHeader}\n${preamble}\n`;
     } else {
-        finalSystemPrompt = `${preambleHeader}\n(NOTE: The user is NOT present in this scene. This is for background logic only.)\n${preamble}\n\n` + finalSystemPrompt;
+        finalSystemPrompt = finalSystemPrompt + `\n\n${preambleHeader}\n(NOTE: The user is NOT present in this scene. This is for background logic only.)\n${preamble}\n`;
     }
 }
+
                     
                     if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
                         const persona = userPersonas.find(p => p.name === chatInfo.userPersonaName);
@@ -20454,7 +20532,33 @@ if (myCurrentStatus) {
                 // 【【【【【【 全局替换结束 】】】】】】
                 // =================================================================
                 
+                // 【【【 核心修复：精准外科手术式清洗 】】】
+                // 如果开关关闭，只切除双击头像相关的协议和指令，保留其他所有功能
+                if (chatInfo.allowInteractionUpdates === false) {
+                    console.log("[System] Interaction updates DISABLED. Surgically removing interaction commands...");
+
+                    // 1. 切除心理引擎中的 "Directive Eight" (专门教AI区分状态和互动陷阱的段落)
+                    // 匹配从 "Directive Eight" 开始，一直到 "Directive Nine" 之前的内容
+                    finalSystemPrompt = finalSystemPrompt.replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "");
+
+                    // 2. 切除 "头像双击互动协议" (AVATAR DOUBLE-CLICK INTERACTION PROTOCOL) 整个板块
+                    finalSystemPrompt = finalSystemPrompt.replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "");
+
+                    // 3. 切除 "预设配置协议" (PRESET CONFIGURATION PROTOCOL) 整个板块
+                    finalSystemPrompt = finalSystemPrompt.replace(/\*\*\[PRESET CONFIGURATION PROTOCOL[\s\S]*?(?=---)/g, "");
+
+                    // 4. 切除指令列表中的具体行 (只删除包含特定指令的行，不影响其他行)
+                    // 删除包含 [trigger_interaction] 的行
+                    finalSystemPrompt = finalSystemPrompt.replace(/.*\[trigger_interaction\].*\n?/g, "");
+                    // 删除包含 [set_interaction_action: 的行
+                    finalSystemPrompt = finalSystemPrompt.replace(/.*\[set_interaction_action:.*\n?/g, "");
+                    // 删除包含 [set_interaction_suffix: 的行
+                    finalSystemPrompt = finalSystemPrompt.replace(/.*\[set_interaction_suffix:.*\n?/g, "");
+                }
+                // 【【【 清洗结束 】】】
+
                 let finalMessages = [{ role: "system", content: finalSystemPrompt }, ...apiPayloadMessages];
+
                 // 【【【 终极修复：在 finalMessages 创建后，修改它的 system 消息 】】】
             const _currentId = chatState.chatId; 
             const _pendingNovelKey = `pending_novel_share_${_currentId}`;
@@ -25823,8 +25927,18 @@ function openChatInfoPage() {
             document.getElementById('chat-memory-length').value = info.memoryLength || 100;
             document.getElementById('chat-preamble').value = info.preamble || '';
 
+            // 新增：加载互动更新开关 (默认设为关闭)
+            const allowInteractionUpdatesCheckbox = document.getElementById('allow-interaction-updates');
+            if (allowInteractionUpdatesCheckbox) {
+                // 逻辑修改：只有当明确为 true 时才勾选，否则（包括未定义时）均为 false
+                allowInteractionUpdatesCheckbox.checked = info.allowInteractionUpdates === true;
+            }
+            // 新增结束
+
+
             // --- 加载并绑定概率滑块 ---
             const moodSlider = document.getElementById('prob-mood-input');
+
             const moodVal = document.getElementById('prob-mood-val');
             const pagerSlider = document.getElementById('prob-pager-input');
             const pagerVal = document.getElementById('prob-pager-val');
