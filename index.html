@@ -28046,8 +28046,14 @@ async function triggerBackgroundDataUpdate(context, senderName, chatId) {
             "Persona: From the perspective of " + (isGroup ? "the character who is writing this entry" : '"' + senderName + '"') + ".\n" +
             "Formatting: Wrap ONLY the journal text in <background_update type=\"mood_card\" sender=\"" + targetSender + "\">...</background_update>.\n" +
             (isGroup ? "**CRITICAL:** You MUST replace [CharacterName] with the actual name of the character who is writing this journal.\n" : "") +
+            // 【核心修复】增加纯文本强制指令
+            "**ABSOLUTE CONTENT LAW:**\n" +
+            "1. **PURE TEXT ONLY:** You are STRICTLY FORBIDDEN from using any HTML tags (<snippet>, <div>), Markdown code blocks (```), or JSON inside the journal.\n" +
+            "2. **STYLE:** Write like a diary or a social media status. Use emojis if you want. Be emotional, raw, and personal.\n" +
+            "3. **Example:** '今天天气真好，突然想起了上次和他一起去的海边。有点想吃冰淇淋了。🌻'\n" +
             "Rule: No meta-commentary, no English, no reasoning. Just the raw journal entry.";
     }
+
 
     // --- 判定 2: 寻呼机备忘录 ---
     if (Math.random() * 100 < pagerProb) {
@@ -38605,12 +38611,59 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             contentEl.classList.remove('anim-next', 'anim-prev');
             void contentEl.offsetWidth; 
 
-            // 2. 更新文字内容
+            // 2. 更新文字内容 (核心修复：支持 HTML 代码块 + Emoji 混合渲染)
             const contentText = moods[index].content || "";
-            contentEl.innerHTML = escapeHtml(contentText).replace(/\n/g, '<br>');
+            
+            // 定义一个处理函数，用于处理普通文本部分（转义 + Emoji 替换）
+            const processPlainText = (text) => {
+                let safe = escapeHtml(text);
+                safe = safe.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                    const item = stickers.find(s => s.name === name && s.type === 'emoji');
+                    if (item) {
+                        return `<img src="${item.url}" alt="${name}" class="inline-emoji" style="height: 1.2em; vertical-align: middle; margin: 0 2px;">`;
+                    }
+                    return match;
+                });
+                return safe.replace(/\n/g, '<br>');
+            };
+
+            // 如果内容包含 HTML 标签，进行分段处理
+            if (contentText.includes('<snippet>') || contentText.includes('<div')) {
+                // 使用正则分割：HTML 块 vs 普通文本
+                // 匹配 <snippet>...</snippet> 或者 <div...>...</div>
+                const parts = contentText.split(/(<snippet>[\s\S]*?<\/snippet>|<div[\s\S]*?>[\s\S]*?<\/div>)/g);
+                
+                let finalHtml = '';
+                parts.forEach(part => {
+                    if (!part) return;
+                    
+                    // 如果是 HTML 块
+                    if (part.startsWith('<snippet>') || part.startsWith('<div')) {
+                        // 移除 <snippet> 包装，保留内部 HTML
+                        let htmlBlock = part.replace(/<snippet>/g, '').replace(/<\/snippet>/g, '');
+                        // 【核心】在 HTML 块内部也支持 Emoji 替换！
+                        htmlBlock = htmlBlock.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                            const item = stickers.find(s => s.name === name && s.type === 'emoji');
+                            if (item) return `<img src="${item.url}" alt="${name}" class="inline-emoji" style="height: 1.2em; vertical-align: middle;">`;
+                            return match;
+                        });
+                        finalHtml += htmlBlock;
+                    } 
+                    // 如果是普通文本
+                    else {
+                        finalHtml += processPlainText(part);
+                    }
+                });
+                contentEl.innerHTML = finalHtml;
+            } else {
+                // 如果没有 HTML，直接处理全文
+                contentEl.innerHTML = processPlainText(contentText);
+            }
+
             
             // 3. 滚动条复位到顶部
             contentEl.scrollTop = 0;
+
 
             // 4. 更新页码指示器
             if (indicatorEl) {
