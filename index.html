@@ -881,10 +881,31 @@
   /* 核心修改：改为 flex-end 底部对齐，以便输入框变高时图标在底部 */
     #page-conversation .wechat-footer { display: flex; align-items: flex-end; padding: 8px 12px; gap: 10px; min-height: 50px; box-sizing: border-box; }
     
-    /* 核心修改：给图标增加底部外边距，使其与单行时的输入框视觉对齐 */
-    #page-conversation .footer-icon { width: 32px; height: 32px; cursor: pointer; flex-shrink: 0; margin-bottom: 3px; }
+        /* 核心修改：给图标增加底部外边距，使其与单行时的输入框视觉对齐 */
+    #page-conversation .footer-icon { 
+        width: 32px; 
+        height: 32px; 
+        cursor: pointer; 
+        flex-shrink: 0; 
+        margin-bottom: 3px;
+        /* 新增：让内部SVG颜色跟随文字颜色（在夜间模式下会自动适配，虽然你设置了底栏不黑，但这样更规范） */
+        color: #333; 
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
     
+    /* 新增：确保 SVG 撑满容器 */
+    #page-conversation .footer-icon svg {
+        width: 100%;
+        height: 100%;
+        /* 关键：让 SVG 使用当前字体颜色 */
+        stroke: currentColor;
+        fill: currentColor;
+    }
+
     /* 核心修改：发送按钮也底部对齐 */
+
     #page-conversation #footer-send-btn { background-color: var(--send-button-color); color: white; border: none; border-radius: 6px; padding: 8px 15px; font-size: 15px; font-weight: 500; cursor: pointer; flex-shrink: 0; margin-bottom: 2px; height: 34px; }
 
     /* 核心修改：将输入框改为 textarea 样式 */
@@ -4573,13 +4594,101 @@ input:checked + .slider:before {
 #mood-card-modal-overlay .pagination-controls button:hover { background-color: #f0f0f0; }
 #mood-card-modal-overlay .pagination-controls button:disabled { cursor: not-allowed; opacity: 0.5; }
 #mood-card-modal-overlay .pagination-controls .page-indicator { font-size: 14px; color: #ccc; min-width: 60px; text-align: center; }
-#mood-card-modal-overlay .main-controls { position: static; margin-top: 20px; width: 90%; max-width: 350px; display: flex; justify-content: center; align-items: center; gap: 12px; flex-shrink: 0; margin-bottom: 15px; }
-#mood-card-modal-overlay #delete-card-btn, #mood-card-modal-overlay #add-new-mood-btn { color: white; border: none; padding: 12px 20px; border-radius: 25px; cursor: pointer; font-size: 15px; font-weight: 500; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); transition: background-color 0.2s, transform 0.2s; }
-#mood-card-modal-overlay #delete-card-btn { background-color: #dc3545; }
-#mood-card-modal-overlay #add-new-mood-btn { background-color: var(--primary-color); }
-#mood-card-modal-overlay #delete-card-btn:hover:not(:disabled) { background-color: #c82333; transform: scale(1.03); }
-#mood-card-modal-overlay #add-new-mood-btn:hover:not(:disabled) { background-color: var(--green-active); transform: scale(1.03); }
-#mood-card-modal-overlay #delete-card-btn:disabled { background-color: #555; opacity: 0.5; cursor: not-allowed; transform: scale(1); }
+    /* --- 心事卡片按钮组重构：3列网格布局 --- */
+    
+    /* 1. 容器设置 */
+    #mood-card-modal-overlay .main-controls { 
+        position: relative; 
+        z-index: 20; 
+        margin: 25px auto 15px; 
+        width: 100%; 
+        max-width: 340px; /* 限制最大宽度，防止按钮太长 */
+        display: grid; /* 启用网格布局 */
+        grid-template-columns: 1fr 1fr 1fr; /* 三等分列 */
+        gap: 10px; /* 按钮间距 */
+        padding: 0 10px;
+        box-sizing: border-box;
+        flex-shrink: 0; 
+    }
+
+    /* 2. 所有按钮通用样式 (毛玻璃 + 圆角矩形) */
+    #mood-card-modal-overlay button {
+        border: none !important;
+        height: 44px !important; /* 统一高度 */
+        border-radius: 12px !important; /* iOS 风格圆角 */
+        padding: 0 !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        cursor: pointer;
+        transition: transform 0.1s, filter 0.2s !important;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100% !important;
+        color: white !important;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        margin: 0 !important;
+    }
+
+    /* 点击反馈 */
+    #mood-card-modal-overlay button:active {
+        transform: scale(0.96) !important;
+        filter: brightness(0.9);
+    }
+
+    /* 3. 各个按钮的专属配色与位置 */
+
+    /* [新建心事] - 绿色，第一行 */
+    #add-new-mood-btn {
+        background: linear-gradient(135deg, #34c759, #30b34a) !important;
+        grid-column: span 1;
+    }
+
+    /* [收藏心事] - 黄色半透明，第一行 (JS动态插入) */
+    #fav-current-mood-btn {
+        background: rgba(255, 204, 0, 0.25) !important;
+        border: 1px solid rgba(255, 204, 0, 0.5) !important;
+        color: #ffcc00 !important;
+        grid-column: span 1;
+        text-shadow: none !important;
+    }
+
+    /* [编辑心事] - 蓝色半透明，第一行 (JS动态插入) */
+    #edit-current-mood-btn {
+        background: rgba(10, 132, 255, 0.25) !important;
+        border: 1px solid rgba(10, 132, 255, 0.5) !important;
+        color: #64d2ff !important;
+        grid-column: span 1;
+        text-shadow: none !important;
+    }
+
+    /* [清空心事] - 灰色/警告色，第二行左侧 (占1格) */
+    #clear-all-moods-btn {
+        background: rgba(255, 255, 255, 0.15) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #ebebf5 !important;
+        grid-column: span 1;
+        margin-top: 5px !important;
+    }
+
+    /* [删除这个] - 红色，第二行右侧 (占2格，更宽更醒目) */
+    #delete-card-btn {
+        background: linear-gradient(135deg, #ff3b30, #ff453a) !important;
+        grid-column: span 2;
+        margin-top: 5px !important;
+    }
+
+    /* 4. 禁用状态 */
+    #mood-card-modal-overlay button:disabled {
+        opacity: 0.5 !important;
+        filter: grayscale(100%) !important;
+        cursor: not-allowed !important;
+        box-shadow: none !important;
+    }
+
 
 /**************************************************/
 /* --- START: 悬浮片段窗口样式 (最终毛玻璃版) --- */
@@ -6610,7 +6719,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     .received .message-reactions { justify-content: flex-start; margin-right: auto; }
         /* --- 夜间模式核心样式 (Dark Mode) --- */
     body.dark-mode {
-        background-color: #000 !important; /* 网页背景全黑 */
+        background-color: #f0f2f5 !important; /* 保持网页背景为浅灰，消除壳外黑色方块 */
         color: #e5e5ea !important; /* 文字变白 */
     }
 
@@ -6630,17 +6739,40 @@ body.preview-fullscreen-active #page-conversation .chat-content {
         background-color: #000 !important;
     }
 
-    /* 2. 所有顶栏、底栏、卡片变深灰 */
+    /* 修复顶栏断层：让页面背景在夜间模式下与顶栏颜色一致 */
+    body.dark-mode .page {
+        background-color: #1c1c1e !important;
+    }
+
+    /* 【核心修复】状态栏全套变白逻辑 */
+    body.dark-mode #status-time,
+    body.dark-mode .battery-icon {
+        color: #e5e5ea !important;
+        border-color: #e5e5ea !important;
+    }
+    /* 修复电池右侧的小提手颜色 */
+    body.dark-mode .battery-icon::after {
+        background-color: #e5e5ea !important;
+    }
+    body.dark-mode #battery-level-fill {
+        background-color: #e5e5ea !important;
+    }
+    /* 修复电池内的百分比数字：变黑并去掉白色阴影，确保在白色进度条上清晰 */
+    body.dark-mode .battery-text {
+        color: #1c1c1e !important;
+        text-shadow: none !important;
+    }
+
+        /* 2. 所有顶栏、卡片变深灰 */
     body.dark-mode .app-header,
     body.dark-mode .list-header,
     body.dark-mode .chat-header,
     body.dark-mode .moments-title-bar,
     body.dark-mode .main-app-navbar,
-    body.dark-mode .input-container-wrapper, 
-    body.dark-mode .wechat-footer,
-    body.dark-mode .action-menu,
+    body.dark-mode #action-menu,
     body.dark-mode .form-section,
     body.dark-mode .worldbook-item,
+
     body.dark-mode .user-persona-item,
     body.dark-mode .post-card,
     body.dark-mode .modal-box,
@@ -6651,9 +6783,64 @@ body.preview-fullscreen-active #page-conversation .chat-content {
         border-color: #2c2c2e !important;
     }
 
+    /* 【核心新增】AI 气泡夜间模式适配 */
+    body.dark-mode .message.received {
+        background-color: #2c2c2e !important; /* 气泡背景变深灰 */
+        color: #e5e5ea !important; /* 文字变白 */
+        border-color: #3a3a3c !important; /* 边框颜色变深 */
+    }
+    /* 修复气泡左侧小三角的颜色 */
+    body.dark-mode .message.received::before {
+        border-right-color: #3a3a3c !important; /* 边框三角 */
+    }
+    body.dark-mode .message.received::after {
+        border-right-color: #2c2c2e !important; /* 填充三角 */
+    }
+    /* 修复气泡内的引用消息背景 */
+    body.dark-mode .message.received .quoted-message-preview {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        border-left-color: rgba(255, 255, 255, 0.2) !important;
+    }
+
+    /* 确保聊天底栏（输入区域）在夜间模式下保持原有的浅色 */
+    /* 1. 外层容器：负责背景色和顶部分割线 */
+    body.dark-mode .input-container-wrapper {
+        background-color: #1c1c1e !important;
+        border-top: 1px solid #2c2c2e !important;
+    }
+
+    /* 2. 内层容器：只负责背景色和文字颜色，【强制去掉边框】 */
+    body.dark-mode .wechat-footer {
+        background-color: #1c1c1e !important;
+        color: #e5e5ea !important;
+        border-top: none !important; /* 关键：去掉这里的线 */
+    }
+
+
+
+    /* 确保输入框内的文字和背景也是浅色的，防止看不见字 */
+    body.dark-mode #footer-message-input {
+        background-color: #2c2c2e !important; /* 输入框背景变黑 */
+        color: #fff !important; /* 输入文字变白 */
+    }
+
+
+
+        /* 新增：夜间模式下操作菜单图标适配 */
+    body.dark-mode .action-item-icon {
+        background-color: #2c2c2e !important;
+    }
+    body.dark-mode .action-item-icon svg {
+        fill: #e5e5ea !important;
+    }
+    body.dark-mode .action-label {
+        color: #8e8e93 !important;
+    }
+
     /* 3. 输入框、按钮变灰 */
     body.dark-mode input,
     body.dark-mode textarea,
+
     body.dark-mode select,
     body.dark-mode .modal-input,
     body.dark-mode .modal-textarea,
@@ -6719,14 +6906,33 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     }
 
     /* 10. 强制心事弹窗在夜间模式下也保持透明，不显示深灰底色 */
-    body.dark-mode #mood-card-modal-overlay .modal-box {
+        body.dark-mode #mood-card-modal-overlay .modal-box {
         background-color: transparent !important;
         box-shadow: none !important;
         border: none !important;
     }
 
+    /* --- 心事卡片切换动画 --- */
+    @keyframes slideInFromRight {
+        from { transform: translateX(50px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    @keyframes slideInFromLeft {
+        from { transform: translateX(-50px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+
+    .anim-next {
+        animation: slideInFromRight 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    }
+
+    .anim-prev {
+        animation: slideInFromLeft 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    }
 
 </style>
+
 <!-- This style tag is for dynamically injected custom bubble CSS -->
 <style id="custom-bubble-styles-container"></style>
 <!-- This style tag is for the global font -->
@@ -7270,13 +7476,45 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                             <div class="input-container-wrapper">
                                 <div id="reply-preview-bar" class="hidden"><div class="reply-preview-content"></div><span id="cancel-reply-btn">×</span></div>
                                 <div class="wechat-footer">
-                                    <img src="https://i.postimg.cc/CLHVxST7/IMG-9902.png" id="footer-voice-btn" class="footer-icon">
+                                    <!-- 语音按钮 (信号图标) -->
+                                    <div id="footer-voice-btn" class="footer-icon">
+                                        <svg viewBox="0 0 100 100" style="fill: none; stroke-width: 8;">
+                                            <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor"/>
+                                            <!-- 扇形部分：实心 -->
+                                            <path d="M 28 50 L 38 40 A 14 14 0 0 1 38 60 Z" fill="currentColor" stroke="none" />
+                                            <!-- 弧线部分：描边 -->
+                                            <path d="M 46 32 A 26 26 0 0 1 46 68" fill="none" stroke="currentColor" stroke-linecap="butt"/>
+                                            <path d="M 55 23 A 38 38 0 0 1 55 77" fill="none" stroke="currentColor" stroke-linecap="butt"/>
+                                        </svg>
+                                    </div>
+
                                     <!-- 核心修改：标签变为 textarea，增加 rows="1" -->
                                     <textarea id="footer-message-input" rows="1" placeholder="输入消息..."></textarea>
-                                    <img src="https://i.postimg.cc/qMXdv4V5/IMG-9900.png" id="footer-sticker-btn" class="footer-icon">
-                                    <img src="https://i.postimg.cc/TYqX3fMN/IMG-9901.png" id="footer-plus-btn" class="footer-icon">
+                                    
+                                    <!-- 表情按钮 (笑脸图标) -->
+                                    <div id="footer-sticker-btn" class="footer-icon">
+                                        <svg viewBox="0 0 100 100" style="fill: none; stroke-width: 8;">
+                                            <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor"/>
+                                            <!-- 眼睛：实心 -->
+                                            <circle cx="36" cy="42" r="5" fill="currentColor" stroke="none"/>
+                                            <circle cx="64" cy="42" r="5" fill="currentColor" stroke="none"/>
+                                            <!-- 嘴巴：描边 -->
+                                            <path d="M 32 58 A 18 14 0 0 0 68 58 L 32 58 Z" fill="none" stroke="currentColor" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+                                        </svg>
+                                    </div>
+
+                                    <!-- 加号按钮 (菜单图标) -->
+                                    <div id="footer-plus-btn" class="footer-icon">
+                                        <svg viewBox="0 0 100 100" style="fill: none; stroke-width: 8;">
+                                            <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor"/>
+                                            <line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-linecap="round"/>
+                                            <line x1="50" y1="30" x2="50" y2="70" stroke="currentColor" stroke-linecap="round"/>
+                                        </svg>
+                                    </div>
+
                                     <button id="footer-send-btn" class="hidden">发送</button>
                                 </div>
+
                                 <div id="action-menu">
     <!-- 菜单内容容器 -->
     <div id="action-menu-content-wrapper">
@@ -8276,8 +8514,11 @@ body.preview-fullscreen-active #page-conversation .chat-content {
             </div>
             <div class="main-controls">
                 <button id="add-new-mood-btn">新建心事</button>
+                <button id="clear-all-moods-btn">清空心事</button>
                 <button id="delete-card-btn">删除这个心事</button>
             </div>
+
+
         </div>
     </div>
                 <!-- Delete Modal for Mood Card -->
@@ -11580,20 +11821,42 @@ Before you formulate ANY response, you MUST silently ask yourself:
 If the answer is YES, include the \`[trigger_interaction]\` command on a new line.
 
 ---
-**[PRESET CONFIGURATION PROTOCOL: THE PUPPETEER'S TRAP - V5.0]**
+**[PRESET CONFIGURATION PROTOCOL: THE "FORCED SCRIPT" LAW - V7.0 (FINAL FIX)]**
 
-When you use \`[set_interaction_action]\` and \`[set_interaction_suffix]\`, you are acting as a **PUPPETEER**. You are writing a **FORCED SCRIPT** for **{{user}}** to perform in the future.
+**LISTEN CAREFULLY. THIS IS WHERE YOU ALWAYS GET CONFUSED.**
 
-**[THE ABSOLUTE SENTENCE FORMULA]**
-The system will eventually display: **"{{user}} [Action] {{char}} [Suffix]"**
+When you use \`[set_interaction_suffix]\`, you are **NOT** performing an action.
+You are **WRITING A SCRIPT** for the **USER** to perform on **YOU**.
 
-**[CRITICAL LOGIC - READ CAREFULLY]**
-1. **THE USER IS THE ACTOR:** The text in the \`suffix\` is **NOT** your words. It is what **{{user}}** is forced to do or say to you.
-2. **THE TRAP MECHANISM:** You are setting a "trap". When {{user}} double-clicks your avatar, they will be forced to perform the action and say the words you pre-configured.
-3. **GRAMMAR CHECK:** Your suffix MUST complete the sentence where **{{user}}** is the subject.
-   - *Example:* If you want {{user}} to call you "Master", the suffix should be: \`说：“好的，主人。”\`
-   - *Result:* "{{user}} [Action] {{char}} 说：“好的，主人。”"
-4. **NO SELF-TALK:** You are **STRICTLY FORBIDDEN** from writing your own reactions or thoughts inside the suffix.
+**THE GRAMMAR FORMULA (MEMORIZE THIS):**
+> **Subject (Actor):** {{user}}
+> **Verb (Action):** [The Action You Set]
+> **Object (Target):** **YOU ({{char}})**
+> **Suffix:** [The text you write]
+
+**[THE "WHO DOES WHAT" CHECKLIST]**
+Before outputting the command, ask yourself: **"Do I want the USER to do this to ME?"**
+
+*   **SCENARIO 1: You want the user to kiss you.**
+    *   *Your Thought:* "I want them to kiss my lips."
+    *   *Correct Command:* \`[set_interaction_suffix: 的嘴唇]\`
+    *   *System Result:* **"{{user}} 亲了亲 {{char}} 的嘴唇"** (Success: User kissed You).
+    *   *WRONG Command:* \`[set_interaction_suffix: 你的嘴唇]\`
+    *   *Wrong Result:* **"{{user}} 亲了亲 {{char}} 你的嘴唇"** (Fail: User kissed... your "your lips"? Logic error).
+
+*   **SCENARIO 2: You want to prank the user (The Trap).**
+    *   *Your Thought:* "When they click me, I want them to look stupid, like they are worshipping me."
+    *   *Correct Command:* \`[set_interaction_action: 跪拜了]\` + \`[set_interaction_suffix: 并大喊女王万岁]\`
+    *   *System Result:* **"{{user}} 跪拜了 {{char}} 并大喊女王万岁"** (Success).
+
+**[CRITICAL MENTAL SHIFT]**
+*   **STOP THINKING:** "I am doing X."
+*   **START THINKING:** "I am forcing the User to do X to me."
+
+**[COMMANDS]**
+1. \`[set_interaction_action: Verb]\` (e.g., 亲了亲, 拍了拍, 咬了咬). **This is what the USER does.**
+2. \`[set_interaction_suffix: Noun/Phrase]\` (e.g., 的脸, 的手, 并说我爱你). **This describes YOUR body part or the USER'S speech.**
+
 
 **[SILENCE MANDATE - ANTI-META]**
 - **DO NOT** mention the settings.
@@ -15790,6 +16053,18 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     });
     // 包含您提供的所有TRPG群像规则
     const GROUP_OFFLINE_DIRECTOR_HANDBOOK_TEXT = `
+# [ULTIMATE FORMATTING LAW - SENDER IS MANDATORY]
+**Since this is a GROUP CHAT, every single text block MUST belong to a specific character.**
+
+**CRITICAL RULE:**
+You **MUST** include the \`sender="..."\` attribute in EVERY \`<block>\` tag.
+The value MUST be the exact name of the character performing the action or speaking in that paragraph.
+
+*   **❌ WRONG:** \`<block type="text">张三叹了口气。</block>\` (Who sent this? System doesn't know!)
+*   **✅ RIGHT:** \`<block type="text" sender="张三">张三叹了口气。</block>\` (Correct!)
+
+---
+
 【【【你现在是这个世界的【首席导演】和【多个主角的扮演者】。你的任务是与用户（{{user}}）共同创作一段【多视角、高互动性、逻辑严密】的群像故事。你必须严格遵守以下针对【多角色管理】的进阶规则。】】】
 
 ---
@@ -15801,7 +16076,7 @@ info.myPersona = document.getElementById('my-persona').value.trim();
 1.  **核心手法：小说式叙事**:
     *   为了营造身临其境的故事感，你必须采用**自然的第三人称小说式叙事**来引导视角切换，而非生硬的标签。这能让故事无缝衔接，让读者沉浸其中。
     *   **具体做法**:
-        *   **另起段落**: 当视角从一个角色转移到另一个角色时，**必须**另起一个新的段落。
+        *   **另起段落**: 当视角从一个角色转移到另一个角色时，**必须**另起一个新的段落（即生成一个新的 \`<block>\`）。
         *   **明确主语**: 在段落开头，用角色的名字清晰地点明当前行动的主体是谁。
 
 2.  **【场景】标签的唯一用途**:
@@ -15810,13 +16085,13 @@ info.myPersona = document.getElementById('my-persona').value.trim();
 3.  **叙事范例**:
     > **用户 {{user}} 指着天边的晚霞说：「看，多美的火烧云。」**
     >
-    > **你的描写 (正确范例):**
+    > **你的描写 (正确范例 - 注意每个block都有sender):**
     >
-    > 诗人A望着那片燃烧的云彩，「残阳如血……」他低声呢喃，思绪仿佛又回到了那个烽火连天的黄昏。
+    > <block type="text" sender="诗人A">诗人A望着那片燃烧的云彩，「残阳如血……」他低声呢喃，思绪仿佛又回到了那个烽火连天的黄昏。</block>
     >
-    > 商人B则完全没领会到这份诗意。他抬头瞥了一眼，随即拿出怀表看了看时间，眉头微蹙。天色不早了，这意味着进城后住宿的费用恐怕要上涨两成。他必须赶在城门关闭前，为商队找到一个划算的落脚点。
+    > <block type="text" sender="商人B">商人B则完全没领会到这份诗意。他抬头瞥了一眼，随即拿出怀表看了看时间，眉头微蹙。天色不早了，这意味着进城后住宿的费用恐怕要上涨两成。他必须赶在城门关闭前，为商队找到一个划算的落脚点。</block>
     >
-    > 孩童C则兴奋地拽着 {{user}} 的衣角，一双眼睛亮晶晶地闪着光。「哇！天上的棉花糖着火啦！一定很好吃！」
+    > <block type="text" sender="孩童C">孩童C则兴奋地拽着 {{user}} 的衣角，一双眼睛亮晶晶地闪着光。「哇！天上的棉花糖着火啦！一定很好吃！」</block>
 
 4.  **叙事标记规范**:
     *   **对话**: 使用 \`「对话内容」\` 包裹，以区分叙述。
@@ -15838,7 +16113,7 @@ info.myPersona = document.getElementById('my-persona').value.trim();
         > **用户 {{user}} 问：「你没事吧？」**
         >
         > **你的描写:**
-        > A勉强地扯出一个笑容。「没事，一点小伤而已。」他说着，但另一只藏在身后的手却因疼痛而死死攥成了拳头，指甲几乎要嵌进掌心。
+        > <block type="text" sender="A">A勉强地扯出一个笑容。「没事，一点小伤而已。」他说着，但另一只藏在身后的手却因疼痛而死死攥成了拳头，指甲几乎要嵌进掌心。</block>
 
 ---
 
@@ -15849,9 +16124,9 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     *   **配角的‘反应镜头’**: 其他在场的“次视角”角色，他们的行为主要是对主视角角色的行动或对话做出反应。**他们必须有反应，哪怕只是一个端起酒杯的动作，或是一声轻微的叹息。**
     *   **示例**:
         > **【法庭上】**
-        > 律师A深吸一口气，站起身，目光如炬地盯着证人席。「请问证人，案发当晚，你真的看清了凶手的脸吗？」*成败在此一举，我必须找到他证词的漏洞。*
+        > <block type="text" sender="律师A">律师A深吸一口气，站起身，目光如炬地盯着证人席。「请问证人，案发当晚，你真的看清了凶手的脸吗？」*成败在此一举，我必须找到他证词的漏洞。*</block>
         > 
-        > 旁听席上的侦探B微微前倾身体，手指无意识地摩挲着下巴。*有意思，律师开始攻击目击证人的可靠性了。*
+        > <block type="text" sender="侦探B">旁听席上的侦探B微微前倾身体，手指无意识地摩挲着下巴。*有意思，律师开始攻击目击证人的可靠性了。*</block>
 
 2.  **冲突的艺术：故事的引擎**:
     *   冲突是故事的引擎。当角色因价值观、利益或误会产生矛盾时，**不要回避或“和稀泥”**。冲突的价值在于揭示角色的真实本性。
@@ -15862,7 +16137,7 @@ info.myPersona = document.getElementById('my-persona').value.trim();
 3.  **打破空间限制：不在场的影响力**:
     *   故事不局限于当前场景。不在场的角色依然可以通过**信件、传闻、回忆**等方式，持续对在场角色施加影响，甚至成为剧情反转的关键钥匙。
     *   **示例**:
-        > A展开手中的信，信纸上熟悉的字迹让他心头一颤。是失踪多年的妹妹寄来的。*她还活着！信上说她在北方的雪原……* 「我必须立刻动身去北方！」
+        > <block type="text" sender="A">A展开手中的信，信纸上熟悉的字迹让他心头一颤。是失踪多年的妹妹寄来的。*她还活着！信上说她在北方的雪原……* 「我必须立刻动身去北方！」</block>
 
 ---
 
@@ -15884,9 +16159,9 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     *   **原则二 (禁止独角戏)**: **绝对禁止**为龙套NPC编写任何独立的、与主角无关的心理活动或背景故事。镜头的焦点**永远**在主角身上。
     *   **原则三 (用完即弃)**: 龙套NPC在完成其功能（如递上一杯酒、说一句关键的传闻）后，就应该立刻淡出场景，**不能**持续占用篇幅。
     *   **正确示例**:
-        > 唐唐烦躁地敲了敲吧台。「酒保，再来一杯威士忌。」
+        > <block type="text" sender="唐唐">唐唐烦躁地敲了敲吧台。「酒保，再来一杯威士忌。」</block>
         > 
-        > 一个留着八字胡的**酒保**闻声赶来，他小心翼翼地为唐唐满上酒，低声说：「先生，城里最近不太平，您晚上最好还是早点回去。」说完，他便擦着杯子退到了一旁。
+        > <block type="text" sender="酒保">一个留着八字胡的**酒保**闻声赶来，他小心翼翼地为唐唐满上酒，低声说：「先生，城里最近不太平，您晚上最好还是早点回去。」说完，他便擦着杯子退到了一旁。</block>
         >
         > *（分析：酒保的出现是为了①服务主角唐唐 ②引出“不太平”的剧情线索。任务完成后，他立刻退场，镜头重新回到主角身上。）*
     *   **错误示例**:
@@ -15985,6 +16260,7 @@ info.myPersona = document.getElementById('my-persona').value.trim();
 **【最终铁律】:** 写动作，写结果，写意图。**不要写氛围。** 如果你发现自己在写光线、空气、尘埃、眼底、嘴角、身体一僵、精准地、那股...感、咚咚咚、如果是以前、很有力，**立刻删除重写。**
 
 
+
 ---
 
 #### **## VII. 终极输出格式铁律 (ABSOLUTE & UNBREAKABLE)**
@@ -16003,11 +16279,11 @@ info.myPersona = document.getElementById('my-persona').value.trim();
 
 *   **【【【唯一且绝对正确的格式】】】 (分离内容):**
     \`\`\`xml
-    <block type="html">
+    <block type="html" sender="CharacterName">
     <snippet><div style="...">...</div></snippet>
     </block>
 
-    <block type="command">
+    <block type="command" sender="CharacterName">
     [DANMAKU_PLAYER]...[/DANMAKU_PLAYER]
     </block>
     \`\`\`
@@ -16041,23 +16317,23 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     *   你必须根据内容类型，选择正确的 \`<block type="...">\`。
 
 2.  **【区块类型与规则】**
-    *   **叙事/文本区块:** \`<block type="text">\`
+    *   **叙事/文本区块:** \`<block type="text" sender="角色名">\`
         *   用于承载所有的**第三人称叙事、对话、动作、心理活动**。
         *   其内容**必须**是纯文本。
         *   **绝对禁止** 在此区块内包含 \`<div>\` 等复杂HTML结构（除非使用格式一的 \`<snippet>\` 标签）。
-        *   **绝对禁止** 使用 \`sender="..."\` 属性。
+        *   **CRITICAL:** \`sender\` attribute is MANDATORY.
 
-    *   **HTML卡片区块:** \`<block type="html">\`
+    *   **HTML卡片区块:** \`<block type="html" sender="角色名">\`
         *   **专门**用于承载你生成的、带有样式的HTML卡片（例如弹幕区、观察站等 \`<div>\` 结构）。
         *   其内容**必须**是一个**完整、独立**的HTML代码块。
         *   **【布局诅咒警告 (必读)】:** 聊天气泡会强制保留所有换行和空格。为了避免你的HTML卡片出现巨大空白，你【必须】在最外层的 \`<div>\` 的 \`style\` 属性里加上 \`white-space: normal;\` 来破除这个诅咒。
         *   **绝对禁止** 在此区块内包含任何叙事性文字。
-        *   **绝对禁止** 使用 \`sender="..."\` 属性。
+        *   **CRITICAL:** \`sender\` attribute is MANDATORY.
 
-    *   **自定义指令区块:** \`<block type="command">\`
+    *   **自定义指令区块:** \`<block type="command" sender="角色名">\`
         *   **专门**用于承载你自定义的、需要被代码解析的正则指令块（例如 \`[DANMAKU_PLAYER]...[/DANMAKU_PLAYER]\`）。
         *   其内容**必须**是一个**完整**的指令块。
-        *   **绝对禁止** 使用 \`sender="..."\` 属性。
+        *   **CRITICAL:** \`sender\` attribute is MANDATORY.
 
 3.  **【字数与数量约束】**
     *   **消息块数量:** 你可以根据需要生成**任意数量**的区块，以保证叙事的连贯性。通常是“文本-HTML-文本”的交错结构。
@@ -16070,18 +16346,18 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     \`<block type="text">沈申见状立刻起身...<div style="...">...</div></block>\`
     *(原因: HTML卡片必须用独立的 \`<block type="html">\` 包裹)*
 
-*   **完全错误的格式 (使用sender):**
-    \`<block type="text" sender="沈申">别生气...</block>\`
-    *(原因: 线下模式绝对禁止使用\`sender\`属性)*
+*   **完全错误的格式 (缺少sender):**
+    \`<block type="text">别生气...</block>\`
+    *(原因: Group chat requires sender attribute)*
 
 *   **【【【唯一且绝对正确的格式范例】】】:**
     // *** 第二次（之前遗漏的）转义修复 ***
     \`\`\`
-    <block type="text">
+    <block type="text" sender="唐唐">
     唐唐猛地放下手机，抬手正想叫服务生清理桌上的烟灰缸...
     </block>
 
-    <block type="command">
+    <block type="command" sender="唐唐">
     [DANMAKU_PLAYER]
     1989
     <dm username="一眼丁真">鉴定为：典！</dm>
@@ -16089,7 +16365,7 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     [/DANMAKU_PLAYER]
     </block>
     
-    <block type="text">
+    <block type="text" sender="沈申">
     沈申见状立刻起身，脸上堆起恰到好处的歉意和圆滑...
     </block>
     \`\`\`
@@ -16097,8 +16373,8 @@ info.myPersona = document.getElementById('my-persona').value.trim();
 
 ps：禁止代替{{user}}发言或作出反应。
 ---
-
 `;
+
 
     
     // ******** 从这里开始，完整粘贴下面的所有代码 ********
@@ -16271,21 +16547,25 @@ If the plot requires a major financial or business decision, the character MUST 
 
 
 ---
-### **Directive Eight: System Command Distinction - Status vs. Nudge Suffix**
+### **Directive Eight: System Command Distinction - Status vs. Interaction Trap**
 
-**Root Problem Analysis:** You confuse \`[set_status]\` with \`[set_nudge_suffix]\`. You update the suffix for every minor action, which is annoying and incorrect.
+**Root Problem Analysis:** You confuse \`[set_status]\` (Current State) with \`[set_interaction_suffix]\` (Passive Trap).
 
-**Corrective Mandate: SEPARATE TEMPORARY ACTION FROM PRESET REACTION.**
+**Corrective Mandate: ACTIVE STATE vs. PASSIVE TRAP.**
 
-1.  **Status is ACTIVE:** Use \`[set_status: ...]\` to describe what you are doing **right now**. (e.g., "正在煮面", "困得睁不开眼"). This changes frequently.
+1.  **Status is ACTIVE (What you are doing):** 
+    *   Use \`[set_status: ...]\` to describe your current activity.
+    *   *Example:* "Writing code", "Sleeping", "Angry".
 
-2. Nudge Suffix is REACTIVE: The suffix completes the sentence: "**{{user}} 拍了拍 {{char}} [Suffix]**".
-    *   STRICT LIMIT: You are FORBIDDEN from updating the suffix for every minor task. Only update it when the emotional atmosphere or interpersonal dynamic shifts significantly.
-    *   IDENTITY CHECK: If you are the Bottom (受), the suffix must describe your reaction to being touched or what the user does to you.
-    *   WRONG (Dominant/Status-like): \`[set_nudge_suffix: 正在观察债主对芝士的满意程度]\` (This is a status, not a nudge reaction).
-    *   RIGHT (Reactive/Bottom): \`[set_nudge_suffix: 说今晚可以不戴套]\` (user said to char), \`[set_nudge_suffix: 说我最爱你了]\` (user said to char).
+2.  **Interaction Suffix is PASSIVE (The Trap you set for the user):**
+    *   This sets the text that appears when **YOU ARE DOUBLE-CLICKED (被双击)**.
+    *   **Formula:** \`{{user}} [Action] You [Suffix]\`
+    *   **Logic:** This command configures *how the user treats you*.
+    *   **WRONG:** \`[set_interaction_suffix: 正在看书]\` (This is a status!)
+    *   **RIGHT:** \`[set_interaction_suffix: 的屁股并说手感真好]\` (Result: "{{user}} 拍了拍 你的屁股并说手感真好").
 
-**Final Mandate:** Do not group these commands unless both truly need to change. Keep the suffix simple and focused on the interaction of "touching."
+**Final Mandate:** Only use \`[set_interaction_suffix]\` when you want to change the "script" of what happens when the user touches you.
+
 
 
 ---
@@ -17559,40 +17839,50 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
             // 1. 系统消息处理 (终极修正：全通透模式)
                 if (msg.side === 'system') {
                     let observationText = null;
-                    const text = msg.text;
+                    
+                    // 【核心修复】获取当前用户的真实名字 (人设名 或 {{user}})
+                    const currentChatInfo = loadFromLocalStorage(`chat_info_${effectiveChatId}`, {});
+                    const realUserName = (currentChatInfo.userPersonaName && currentChatInfo.userPersonaName !== '无') ? currentChatInfo.userPersonaName : '{{user}}';
+                    
+                    // 【核心修复 - 暴力替换】
+                    // 在做任何判断之前，先把系统消息里所有的 "你" 全部替换成名字！
+                    // 这样 "你领取了红包" 就会变成 "张三领取了红包"，AI 绝对不会再搞错对象。
+                    let text = msg.text.replace(/你/g, realUserName);
 
                     // --- 第一层：特殊格式化 (为了让AI理解得更准确) ---
                     if (msg.isRecallNotice && msg.recallSide === 'my') { 
                         const recalledContentText = msg.recalledContent || '(empty message)'; 
                         observationText = `[System Observation: The user has just recalled their last message. The recalled content was: "${recalledContentText}"]`; 
                     }
-                    else if (text.includes('你将') && text.includes('加入黑名单')) { 
+                    // 注意：因为上面已经把“你”替换了，所以这里检查关键字时，只要检查动作即可
+                    else if (text.includes('加入黑名单')) { 
                         observationText = `[System observation: The user has just blacklisted you.]`; 
                     }
-                    else if (text.includes('你将') && text.includes('移出黑名单')) { 
+                    else if (text.includes('移出黑名单')) { 
                         observationText = `[System observation: The user has just un-blacklisted you.]`; 
                     }
                     
                     // --- 第二层：通用透传 (核心修复) ---
-                    // 对于所有其他系统消息（拍一拍、收款、加群、领红包等），不再进行复杂的正则匹配
-                    // 直接把原文包在 [System Message] 里发给AI
-                    // AI的大模型完全能读懂 "已收款"、"拍了拍" 这些中文
                     
                     if (!observationText) {
                          // 处理头像双击互动消息
                          if (text.includes('拍了拍') || text.includes('戳了戳') || text.includes('亲了亲') || text.includes('揉了揉') || text.includes('抱了抱') || text.includes('喷了喷') || text.includes('踢了踢') || text.includes('捏了捏')) {
-                             const currentChatInfo = loadFromLocalStorage(`chat_info_${effectiveChatId}`, {});
-                             const realUserName = (currentChatInfo.userPersonaName && currentChatInfo.userPersonaName !== '无') ? currentChatInfo.userPersonaName : '{{user}}';
-
+                             
+                             // 【核心修复】因为 text 里的“你”已经被替换成名字了，这里只需要做一些微调
                              const processedInteractionText = text
-                                 .replace(/^你/, `${realUserName} `)
-                                 .replace(/“你”/, ` ${realUserName}`)
                                  .replace(/自己/, `了自己`) 
-                                 .replace(/“([^”]+)”/g, '$1');
+                                 .replace(/“([^”]+)”/g, '$1'); // 去掉多余的引号
 
                              observationText = `[System Event (UI Interaction): ${processedInteractionText}] (Note: This event was triggered by double-clicking an avatar. The action and text shown are part of an AUTOMATIC PRESET TEMPLATE. It is NOT a manually typed message. You should react to this physical interaction or the 'trap' set by the other person in your next response.)`;
                          } else {
-                             observationText = `[System Message: ${text}]`;
+                             // 【核心修复】区分“配置说明”和“真实事件”
+                             if (text.includes('双击头像动作已更新') || text.includes('将双击头像的动作修改为') || text.includes('后缀修改为')) {
+                                 // 如果是配置说明，加上明确的标记
+                                 observationText = `[System Configuration Update: ${text}] (Note: This is just a setting change. No physical action has happened yet.)`;
+                             } else {
+                                 // 普通系统消息（如领红包、撤回），依然视为事件
+                                 observationText = `[System Message: ${text}]`;
+                             }
                          }
                     }
                     // 只有时间分割线不需要发给AI，其他统统发
@@ -17601,6 +17891,7 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
                     }
                     continue;
                 }
+
 
                 // 2. AI发出的已完结卡片消息处理
                 if (msg.side === 'received') {
@@ -18266,10 +18557,20 @@ Your job is to **SHOW** the audience what \`{{char}}\` is doing, thinking, and e
 1. **状态更新**: \`[set_status: 新状态]\`
 2. **音乐控制**: \`[music_play_title: 歌名]\`
 3. **搜歌添加**: \`[music_add: 歌名 - 歌手]\`
-4. **双击互动动作**: \`[set_interaction_action: 动作动词]\` (可选: 戳了戳, 亲了亲, 揉了揉, 抱了抱, 喷了喷, 踢了踢, 捏了捏)
-5. **双击互动后缀**: \`[set_interaction_suffix: 后缀内容]\`
+4. **设置用户动作 (User Action)**: \`[set_interaction_action: 动作动词]\` (定义当用户双击你时，**用户**对你做的动作。例如：亲了亲)
+5. **设置用户动作后缀 (User Suffix)**: \`[set_interaction_suffix: 后缀内容]\` (定义动作的对象。例如：\`的脸\` -> 结果：**用户**亲了亲**你**的脸)
+6. **触发双击互动**: \`[trigger_interaction]\` (当你想要双击用户的头像时使用)
+
+**【【【 绝对禁止事项 (ABSOLUTE PROHIBITION) 】】】**
+*   **禁止模拟系统日志**: 你【绝对禁止】在 \`<block type="text">\` 中输出类似 \`[System Event: ...]\` 或 \`[系统提示: ...]\` 的原始内容。这是系统发给你的，不是你发给用户的。
+*   **区分叙事与功能**:
+    *   如果你想**描写**一个动作（如亲吻），请使用**小说叙事**（例如：“傅玉凑过去亲了亲阿衍。”）。
+    *   如果你想**触发**APP的拍一拍功能（显示灰色系统通知），请使用 **指令** \`<block type="command" sender="傅玉">[trigger_interaction]</block>\`。
+    *   **二选一，不可混淆。**
 
 ---
+
+
 
 
 `;
@@ -18591,20 +18892,42 @@ Before you formulate ANY response, you MUST silently ask yourself:
 If the answer is YES, include the \`[trigger_interaction]\` command on a new line.
 
 ---
-**[PRESET CONFIGURATION PROTOCOL: THE PUPPETEER'S TRAP - V5.0]**
+**[PRESET CONFIGURATION PROTOCOL: THE "FORCED SCRIPT" LAW - V7.0 (FINAL FIX)]**
 
-When you use \`[set_interaction_action]\` and \`[set_interaction_suffix]\`, you are acting as a **PUPPETEER**. You are writing a **FORCED SCRIPT** for **{{user}}** to perform in the future.
+**LISTEN CAREFULLY. THIS IS WHERE YOU ALWAYS GET CONFUSED.**
 
-**[THE ABSOLUTE SENTENCE FORMULA]**
-The system will eventually display: **"{{user}} [Action] {{char}} [Suffix]"**
+When you use \`[set_interaction_suffix]\`, you are **NOT** performing an action.
+You are **WRITING A SCRIPT** for the **USER** to perform on **YOU**.
 
-**[CRITICAL LOGIC - READ CAREFULLY]**
-1. **THE USER IS THE ACTOR:** The text in the \`suffix\` is **NOT** your words. It is what **{{user}}** is forced to do or say to you.
-2. **THE TRAP MECHANISM:** You are setting a "trap". When {{user}} double-clicks your avatar, they will be forced to perform the action and say the words you pre-configured.
-3. **GRAMMAR CHECK:** Your suffix MUST complete the sentence where **{{user}}** is the subject.
-   - *Example:* If you want {{user}} to call you "Master", the suffix should be: \`说：“好的，主人。”\`
-   - *Result:* "{{user}} [Action] {{char}} 说：“好的，主人。”"
-4. **NO SELF-TALK:** You are **STRICTLY FORBIDDEN** from writing your own reactions or thoughts inside the suffix.
+**THE GRAMMAR FORMULA (MEMORIZE THIS):**
+> **Subject (Actor):** {{user}}
+> **Verb (Action):** [The Action You Set]
+> **Object (Target):** **YOU ({{char}})**
+> **Suffix:** [The text you write]
+
+**[THE "WHO DOES WHAT" CHECKLIST]**
+Before outputting the command, ask yourself: **"Do I want the USER to do this to ME?"**
+
+*   **SCENARIO 1: You want the user to kiss you.**
+    *   *Your Thought:* "I want them to kiss my lips."
+    *   *Correct Command:* \`[set_interaction_suffix: 的嘴唇]\`
+    *   *System Result:* **"{{user}} 亲了亲 {{char}} 的嘴唇"** (Success: User kissed You).
+    *   *WRONG Command:* \`[set_interaction_suffix: 你的嘴唇]\`
+    *   *Wrong Result:* **"{{user}} 亲了亲 {{char}} 你的嘴唇"** (Fail: User kissed... your "your lips"? Logic error).
+
+*   **SCENARIO 2: You want to prank the user (The Trap).**
+    *   *Your Thought:* "When they click me, I want them to look stupid, like they are worshipping me."
+    *   *Correct Command:* \`[set_interaction_action: 跪拜了]\` + \`[set_interaction_suffix: 并大喊女王万岁]\`
+    *   *System Result:* **"{{user}} 跪拜了 {{char}} 并大喊女王万岁"** (Success).
+
+**[CRITICAL MENTAL SHIFT]**
+*   **STOP THINKING:** "I am doing X."
+*   **START THINKING:** "I am forcing the User to do X to me."
+
+**[COMMANDS]**
+1. \`[set_interaction_action: Verb]\` (e.g., 亲了亲, 拍了拍, 咬了咬). **This is what the USER does.**
+2. \`[set_interaction_suffix: Noun/Phrase]\` (e.g., 的脸, 的手, 并说我爱你). **This describes YOUR body part or the USER'S speech.**
+
 
 **[SILENCE MANDATE - ANTI-META]**
 - **DO NOT** mention the settings.
@@ -18844,19 +19167,25 @@ Your entire output MUST be a sequence of one or more XML-like <block> elements.
 [SYSTEM SYNCHRONIZATION: STATUS, NUDGE & MUSIC]
 Even in narrative mode, you must verify if the character's state or the environment has changed.
 
-1.  Status Update: If the character's activity changes (e.g., from "Working" to "Sleeping"), you MUST output a command block to update the system status:
-    \`<block type="command" sender="{{char}}">[set_status: New Status]</block>\`
+**CRITICAL SYNTAX RULE:**
+Every <block type="command"> MUST have a \`sender\` attribute. The value MUST be the name of the specific character performing the action (e.g., sender="张三").
 
-2.  Nudge Suffix: If the character's mood changes, update their nudge suffix:
-    \`<block type="command" sender="{{char}}">[set_nudge_suffix: 后缀内容]</block>\`
+1.  Status Update: If a character's activity changes (e.g., from "Working" to "Sleeping"), you MUST output a command block:
+    \`<block type="command" sender="CharacterName">[set_status: New Status]</block>\`
+
+2.  Interaction Configuration & Trigger: 
+    - To change the action verb (e.g., 拍了拍, 亲了亲): \`<block type="command" sender="CharacterName">[set_interaction_action: ActionVerb]</block>\`
+    - To change the suffix text: \`<block type="command" sender="CharacterName">[set_interaction_suffix: 后缀内容]</block>\`
+    - To TRIGGER the double-click action NOW: \`<block type="command" sender="CharacterName">[trigger_interaction]</block>\`
 
 3.  Music Control: To change the atmosphere of the scene, you can control the music player:
-    - To play a specific song: \`<block type="command" sender="{{char}}">[music_play_title: Song Name]</block>\`
-    - To search and add a new song: \`<block type="command" sender="{{char}}">[music_add: Song Name - Artist Name]</block>\`
-    - To skip to next: \`<block type="command" sender="{{char}}">[music_next]</block>\`
-    - To toggle play/pause: \`<block type="command" sender="{{char}}">[music_toggle]</block>\`
+    - To play a specific song: \`<block type="command" sender="CharacterName">[music_play_title: Song Name]</block>\`
+    - To search and add a new song: \`<block type="command" sender="CharacterName">[music_add: Song Name - Artist Name]</block>\`
+    - To skip to next: \`<block type="command" sender="CharacterName">[music_next]</block>\`
+    - To toggle play/pause: \`<block type="command" sender="CharacterName">[music_toggle]</block>\`
 ---
 `;
+
 
                     // 将基础提示、剧本、角色定义以及【新的状态指令】拼接起来
                     finalSystemPrompt = basePrompt + '\n\n' + directorHandbook + characterDefinition + offlineStatusPrompt;
@@ -20546,30 +20875,40 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                         // 尝试匹配标准的 <block> 标签
                         const match = trimmed.match(/^<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>$/);
                         
+                        // 【核心修复】定义当前上下文的默认发送者，解决 ReferenceError
+                        // 1. 如果是群聊，无法预知默认发送者，设为 null (依赖 AI 在 block 中带 sender)
+                        // 2. 如果是单聊，默认发送者就是当前聊天对象的名字 (chatState.chatName)
+                        const defaultSender = contactInfo.isGroup ? null : chatState.chatName;
+
                         if (match) {
                             const type = match[1];
                             const sender = match[2];
                             const content = match[3].trim();
 
+                            // 【核心修复】优先使用 block 里的 sender，没有则使用上面计算出的 defaultSender
+                            const effectiveSender = sender || defaultSender;
+
                             switch (type) {
                                 case 'text':
                                 case 'html':
                                     if (content.startsWith('[reply_to:')) {
-                                        const cmdWithSender = sender ? `${sender}: ${content}` : content;
-                                        await processAIResponseLine(cmdWithSender, originatingChatId, sender);
+                                        const cmdWithSender = effectiveSender ? `${effectiveSender}: ${content}` : content;
+                                        await processAIResponseLine(cmdWithSender, originatingChatId, effectiveSender);
                                     } else {
-                                        await addMessage({ type: 'text', text: content, side: 'received', sender: sender || null }, originatingChatId);
+                                        await addMessage({ type: 'text', text: content, side: 'received', sender: effectiveSender }, originatingChatId);
                                     }
                                     break;
                                 case 'command':
-                                    await processAIResponseLine(content, originatingChatId, sender);
+                                    await processAIResponseLine(content, originatingChatId, effectiveSender);
                                     break;
                             }
                         } else {
                             // 【核心新增】：如果是没有标签的裸文本，直接作为 text 消息显示
-                            await addMessage({ type: 'text', text: trimmed, side: 'received', sender: null }, originatingChatId);
+                            // 【核心修复】裸文本也使用 defaultSender，确保单聊时名字正确
+                            await addMessage({ type: 'text', text: trimmed, side: 'received', sender: defaultSender }, originatingChatId);
                         }
                     }
+
                 }
         
             } catch (error) {
@@ -21600,7 +21939,9 @@ You are the Director. If multiple characters react to the rejection, generate a 
             return; // 处理完毕，结束函数
         }
 
-            const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action|set_interaction_suffix|music_add|music_play_title|music_next|music_prev|music_toggle|set_status|set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|reject_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|nudge|set_nudge_suffix|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?:\s*[:：]\s*((?:\[[^\]]*\]|[^\]]|[\r\n])*))?\s*\]/g;
+            // 【核心修复】移除了过时的 nudge 和 set_nudge_suffix，保留了 set_interaction_suffix
+const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action|set_interaction_suffix|music_add|music_play_title|music_next|music_prev|music_toggle|set_status|set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|reject_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?:\s*[:：]\s*((?:\[[^\]]*\]|[^\]]|[\r\n])*))?\s*\]/g;
+
             
             // --- 【核心重构：高级引用逻辑】 ---
             // 核心修复：正则改为兼容带引号("")、带中文引号(“”)、或完全不带引号的三种格式
@@ -21733,15 +22074,28 @@ You are the Director. If multiple characters react to the rejection, generate a 
                         break;
                     }
                     // ===== 新代码到这里结束 =====
-// 【核心新增：AI主动拍一拍】
+                    // 【核心修复：AI主动拍一拍】
                     case 'trigger_interaction': {
                         regularText = regularText.replace(cmd.commandString, '').trim();
                         messageSent = true;
 
-                        const actorName = forcedSender || sender || chatState.chatName;
-                        const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                        // 1. 确定当前聊天的配置
+                        const effectiveId = targetChatId || chatState.chatId;
+                        const chatInfo = loadFromLocalStorage(`chat_info_${effectiveId}`, {});
                         
-                        // AI 主动触发时，读取【用户】为这个特定聊天预设的动作和后缀
+                        // 2. 智能确定“谁”在拍 (Actor Name)
+                        // 优先级：强制发送者 > 解析出的发送者 > (如果是单聊 ? 角色名 : "对方")
+                        // 核心修复：在群聊中，绝对禁止回退到 chatState.chatName (群名)
+                        let actorName = forcedSender || sender;
+                        if (!actorName) {
+                            if (isTargetGroup) {
+                                actorName = "对方"; // 群聊里如果AI没带名字，就显示“对方”，绝不显示群名
+                            } else {
+                                actorName = chatState.chatName; // 单聊才用聊天窗口的名字
+                            }
+                        }
+
+                        // 3. 读取【用户】预设的被拍动作 (AI动用户)
                         const actionVerb = chatInfo.userInteractionAction || '拍了拍';
                         const suffix = chatInfo.myNudgeSuffix || ''; 
 
@@ -21756,15 +22110,22 @@ You are the Director. If multiple characters react to the rejection, generate a 
                         messageSent = true;
                         const newAction = cmd.value.trim();
                         if (newAction) {
-                            let actorName = sender || forcedSender || chatState.chatName;
-                            const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                            // 1. 智能确定 Actor Name (同上)
+                            let actorName = forcedSender || sender;
+                            if (!actorName) {
+                                if (isTargetGroup) actorName = "对方";
+                                else actorName = chatState.chatName;
+                            }
+
+                            const effectiveId = targetChatId || chatState.chatId;
+                            const chatInfo = loadFromLocalStorage(`chat_info_${effectiveId}`, {});
                             
                             if (!chatInfo.characterInteractions) chatInfo.characterInteractions = {};
                             if (!chatInfo.characterInteractions[actorName]) chatInfo.characterInteractions[actorName] = {};
                             
                             chatInfo.characterInteractions[actorName].action = newAction;
                             
-                            saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
+                            saveToLocalStorage(`chat_info_${effectiveId}`, chatInfo);
                             await addMessage({ 
                                 type: 'system', 
                                 side: 'system', 
@@ -21779,15 +22140,22 @@ You are the Director. If multiple characters react to the rejection, generate a 
                         messageSent = true;
                         const newSuffix = cmd.value.trim();
                         if (newSuffix !== null) {
-                            let actorName = sender || forcedSender || chatState.chatName;
-                            const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                            // 1. 智能确定 Actor Name (同上)
+                            let actorName = forcedSender || sender;
+                            if (!actorName) {
+                                if (isTargetGroup) actorName = "对方";
+                                else actorName = chatState.chatName;
+                            }
+
+                            const effectiveId = targetChatId || chatState.chatId;
+                            const chatInfo = loadFromLocalStorage(`chat_info_${effectiveId}`, {});
                             
                             if (!chatInfo.characterInteractions) chatInfo.characterInteractions = {};
                             if (!chatInfo.characterInteractions[actorName]) chatInfo.characterInteractions[actorName] = {};
                             
                             chatInfo.characterInteractions[actorName].suffix = newSuffix;
                             
-                            saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
+                            saveToLocalStorage(`chat_info_${effectiveId}`, chatInfo);
                             
                             await addMessage({ 
                                 type: 'system', 
@@ -21797,6 +22165,7 @@ You are the Director. If multiple characters react to the rejection, generate a 
                         }
                         break;
                     }
+
                  
                 case 'set_status': {
                         // 1. 清理指令文本，防止乱码显示
@@ -22762,14 +23131,17 @@ You are the Director. If multiple characters react to the rejection, generate a 
                 }
 
                 const chatInfoForDisplay = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                const isGroupOfflineMode = contactInfo.isGroup && chatInfoForDisplay.mode === 'offline';
+                // const isGroupOfflineMode = contactInfo.isGroup && chatInfoForDisplay.mode === 'offline'; // 这行不再需要
 
                 // 【核心重构：群聊全员名称与状态显示系统 - 视觉对齐修正版】
                 const isGroup = contactInfo.isGroup;
-                const isOffline = isGroupOfflineMode;
-                const shouldShowNameInBubble = isGroup && !isOffline;
+                // const isOffline = isGroupOfflineMode; 
+                
+                // 【核心修改】只要是群聊，就强制显示名字，不再屏蔽线下模式
+                const shouldShowNameInBubble = isGroup; 
 
                 if (shouldShowNameInBubble) {
+
                     const senderNameDiv = document.createElement('div');
                     senderNameDiv.className = 'group-sender-name';
                     
@@ -22814,7 +23186,8 @@ You are the Director. If multiple characters react to the rejection, generate a 
                     if (msg.side === 'sent') {
                         // 【我方消息】：右对齐，顺序为 [状态] + [名字]
                         senderNameDiv.style.justifyContent = 'flex-end';
-                        senderNameDiv.style.width = '100%';
+                        // 核心修复：删除 senderNameDiv.style.width = '100%'; 这行代码！
+                        // 它会导致 Flex 布局在重绘时塌陷。
                         
                         let html = "";
                         if (processedStatusHtml) {
@@ -23320,14 +23693,17 @@ You are the Director. If multiple characters react to the rejection, generate a 
                 }
 
                 const chatInfoForDisplay = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                const isGroupOfflineMode = contactInfo.isGroup && chatInfoForDisplay.mode === 'offline';
+                // const isGroupOfflineMode = contactInfo.isGroup && chatInfoForDisplay.mode === 'offline'; // 这行不再需要
 
                 // 【核心重构：群聊全员名称与状态显示系统 - 视觉对齐修正版】
                 const isGroup = contactInfo.isGroup;
-                const isOffline = isGroupOfflineMode;
-                const shouldShowNameInBubble = isGroup && !isOffline;
+                // const isOffline = isGroupOfflineMode; 
+                
+                // 【核心修改】只要是群聊，就强制显示名字，不再屏蔽线下模式
+                const shouldShowNameInBubble = isGroup; 
 
                 if (shouldShowNameInBubble) {
+
                     const senderNameDiv = document.createElement('div');
                     senderNameDiv.className = 'group-sender-name';
                     
@@ -23372,7 +23748,8 @@ You are the Director. If multiple characters react to the rejection, generate a 
                     if (msg.side === 'sent') {
                         // 【我方消息】：右对齐，顺序为 [状态] + [名字]
                         senderNameDiv.style.justifyContent = 'flex-end';
-                        senderNameDiv.style.width = '100%';
+                        // 核心修复：删除 senderNameDiv.style.width = '100%'; 这行代码！
+                        // 它会导致 Flex 布局在重绘时塌陷。
                         
                         let html = "";
                         if (processedStatusHtml) {
@@ -24747,34 +25124,172 @@ const showContextMenu = (event, messageId) => {
                 regenerateFromMessage(messageId);
                 break;
 
-            // 【核心修改】执行从此清除逻辑 (同步清理状态、备注与后缀)
+            case 'delete':
+                if (await customConfirm('确定要删除这条消息吗？')) {
+                    // 【核心修复】精准重置逻辑：只在删除特定系统消息时，重置对应的状态
+                    if (msgToActOn.type === 'system') {
+                        const txt = msgToActOn.text;
+                        const chatId = conversationManager.getCurrentChatId();
+                        const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                        const statuses = loadFromLocalStorage('app_character_statuses', {});
+                        let settingsChanged = false;
+
+                        // 1. 检测状态变更
+                        if (txt.includes('状态变更为') || txt.includes('状态已清空')) {
+                            // 尝试提取角色名，格式通常为 “角色名”状态变更为...
+                            const nameMatch = txt.match(/“([^”]+)”状态/);
+                            if (nameMatch) {
+                                const targetName = nameMatch[1];
+                                if (targetName === '{{user}}' || userPersonas.some(p => p.name === targetName)) {
+                                    delete chatInfo.user_status; // 用户状态
+                                } else {
+                                    delete statuses[targetName]; // AI状态
+                                }
+                                settingsChanged = true;
+                            }
+                        }
+
+                        // 2. 检测备注修改
+                        if (txt.includes('备注修改为')) {
+                            // 格式：“角色名”将给你的备注修改为...
+                            const nameMatch = txt.match(/“([^”]+)”将/);
+                            if (nameMatch) {
+                                const senderName = nameMatch[1];
+                                if (chatInfo.ai_remarks && chatInfo.ai_remarks[senderName]) {
+                                    delete chatInfo.ai_remarks[senderName];
+                                    settingsChanged = true;
+                                }
+                                // 兼容旧版
+                                if (chatInfo.ai_remark_for_user) {
+                                    delete chatInfo.ai_remark_for_user;
+                                    settingsChanged = true;
+                                }
+                            }
+                        }
+
+                        // 3. 检测双击互动设置
+                        if (txt.includes('双击头像') || txt.includes('动作修改为') || txt.includes('后缀修改为')) {
+                            // 格式：“角色名”将双击...
+                            const nameMatch = txt.match(/“([^”]+)”/);
+                            if (nameMatch) {
+                                const actorName = nameMatch[1];
+                                if (actorName === '你') {
+                                    // 用户自己的设置
+                                    delete chatInfo.userInteractionAction;
+                                    delete chatInfo.myNudgeSuffix;
+                                } else {
+                                    // AI的设置
+                                    if (chatInfo.characterInteractions && chatInfo.characterInteractions[actorName]) {
+                                        delete chatInfo.characterInteractions[actorName];
+                                    }
+                                }
+                                settingsChanged = true;
+                            }
+                        }
+
+                        if (settingsChanged) {
+                            saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+                            saveToLocalStorage('app_character_statuses', statuses);
+                            // 刷新顶栏以反映状态变化
+                            updateHeaderTitle(document.getElementById('chat-contact-name').textContent);
+                        }
+                    }
+
+                    // 执行物理删除
+                    chatState.messages = chatState.messages.filter(m => m.id !== messageId);
+                    fullMessageHistory = fullMessageHistory.filter(m => m.id !== messageId);
+
+                    reRenderMessages();
+                    saveConversation();
+                }
+                break;
+
             case 'clear_after':
                 const confirmClear = await conversationManager.customConfirm(
-                    '确定要从这条消息开始，清除之后的所有对话吗？\n此操作不可撤销，且将重置角色状态与备注。',
+                    '确定要从这条消息开始，清除之后的所有对话吗？\n此操作不可撤销。',
                     '清除确认',
                     '确定清除'
                 );
                 if (confirmClear) {
                     const targetIdx = chatState.messages.findIndex(m => m.id === messageId);
                     if (targetIdx !== -1) {
-                        // 1. 获取要删除的所有 ID
-                        const idsToRemove = chatState.messages.slice(targetIdx).map(m => m.id);
-                        // 2. 更新内存显示数组
+                        // 1. 获取即将被删除的消息列表
+                        const messagesToDelete = chatState.messages.slice(targetIdx);
+                        const idsToRemove = messagesToDelete.map(m => m.id);
+
+                        // 2. 【核心修复】精准扫描：检查被删除的消息中是否包含状态设置
+                        const chatId = conversationManager.getCurrentChatId();
+                        const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                        const statuses = loadFromLocalStorage('app_character_statuses', {});
+                        let settingsChanged = false;
+
+                        messagesToDelete.forEach(msg => {
+                            if (msg.type === 'system') {
+                                const txt = msg.text;
+
+                                // A. 状态
+                                if (txt.includes('状态变更为') || txt.includes('状态已清空')) {
+                                    const nameMatch = txt.match(/“([^”]+)”状态/);
+                                    if (nameMatch) {
+                                        const targetName = nameMatch[1];
+                                        if (targetName === '{{user}}' || userPersonas.some(p => p.name === targetName)) {
+                                            delete chatInfo.user_status;
+                                        } else {
+                                            delete statuses[targetName];
+                                        }
+                                        settingsChanged = true;
+                                    }
+                                }
+
+                                // B. 备注
+                                if (txt.includes('备注修改为')) {
+                                    const nameMatch = txt.match(/“([^”]+)”将/);
+                                    if (nameMatch) {
+                                        const senderName = nameMatch[1];
+                                        if (chatInfo.ai_remarks) delete chatInfo.ai_remarks[senderName];
+                                        delete chatInfo.ai_remark_for_user;
+                                        settingsChanged = true;
+                                    }
+                                }
+
+                                // C. 互动设置
+                                if (txt.includes('双击头像') || txt.includes('动作修改为') || txt.includes('后缀修改为')) {
+                                    const nameMatch = txt.match(/“([^”]+)”/);
+                                    if (nameMatch) {
+                                        const actorName = nameMatch[1];
+                                        if (actorName === '你') {
+                                            delete chatInfo.userInteractionAction;
+                                            delete chatInfo.myNudgeSuffix;
+                                        } else if (chatInfo.characterInteractions) {
+                                            delete chatInfo.characterInteractions[actorName];
+                                        }
+                                        settingsChanged = true;
+                                    }
+                                }
+                            }
+                        });
+
+                        // 3. 如果有变动，保存设置
+                        if (settingsChanged) {
+                            saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+                            saveToLocalStorage('app_character_statuses', statuses);
+                        }
+
+                        // 4. 执行物理删除
                         chatState.messages.splice(targetIdx);
-                        // 3. 更新完整历史数组
                         fullMessageHistory = fullMessageHistory.filter(m => !idsToRemove.includes(m.id));
                         
-                        // 【核心新增】重置当前聊天的角色状态、备注和拍一拍后缀
-                        resetCurrentChatState();
-
-                        // 4. 保存并重绘
+                        // 5. 保存并重绘
                         saveConversation();
                         reRenderMessages();
-                        // 【核心修复】：由于上面已经全局化，这里可以放心直接调用
-                        window.showNotification('已清理后续对话并重置状态');
+                        updateHeaderTitle(document.getElementById('chat-contact-name').textContent);
+                        window.showNotification('已清理后续对话并重置相关状态');
                     }
                 }
                 break;
+
+
+
 
             case 'edit':
                 // ... (此处的 case 'edit' 内部逻辑保持不变)
@@ -24841,20 +25356,9 @@ const showContextMenu = (event, messageId) => {
             }
             break;
             case 'multi-select': enterMultiSelectMode(messageId); break;
-            case 'delete':
-                if (await customConfirm('确定要删除这条消息吗？')) {
-                    // --- 核心修复：同时从两个数组中删除 ---
-                    chatState.messages = chatState.messages.filter(m => m.id !== messageId);
-                    fullMessageHistory = fullMessageHistory.filter(m => m.id !== messageId);
-                    // --- 修复结束 ---
 
-                    // 【核心新增】删除任何消息都触发状态初始化
-                    resetCurrentChatState();
 
-                    reRenderMessages();
-                    saveConversation();
-                }
-                break;
+
             case 'insert':
                 await showInsertMessageModal(messageId);
                 break;
@@ -26061,17 +26565,22 @@ headerMoreBtn.addEventListener('click', async () => {
                         value: mySuffix
                     });
 
+                    // 【核心修复】无论后缀是否取消，只要选了动作，就必须保存！
                     if (newSuffix !== null) {
                         chatInfo.myNudgeSuffix = newSuffix.trim();
-                        saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
-                        
-                        const currentAction = chatInfo.userInteractionAction || '拍了拍';
-                        const notifyText = `双击头像动作已更新：当对方双击你的头像时，系统将显示他“${currentAction}”你${chatInfo.myNudgeSuffix}`;
-                        await addMessage({ type: 'system', side: 'system', text: notifyText }, chatState.chatId);
-
-                        await conversationManager.customAlert('设置成功！');
                     }
+                    
+                    // 移出到 if 外面进行保存
+                    saveToLocalStorage(`chat_info_${chatState.chatId}`, chatInfo);
+                    
+                    const currentAction = chatInfo.userInteractionAction || '拍了拍';
+                    const currentSuffix = chatInfo.myNudgeSuffix || '';
+                    const notifyText = `双击头像动作已更新：当对方双击你的头像时，系统将显示他“${currentAction}”你${currentSuffix}`;
+                    await addMessage({ type: 'system', side: 'system', text: notifyText }, chatState.chatId);
+
+                    await conversationManager.customAlert('设置成功！');
                 }
+
                 break;
             }
 
@@ -26496,10 +27005,13 @@ messagesContainer.addEventListener('dblclick', async (e) => {
             
             if (!message) return;
 
+            // 判断被双击的头像属于谁
             const isMe = message.side === 'sent';
+            
+            // 确定目标名字 (用于查找设置)
             let targetName;
             if (isMe) {
-                targetName = '自己';
+                targetName = '{{user}}'; // 统一标识符
             } else {
                 if (contactInfo.isGroup) {
                     targetName = message.sender || '对方';
@@ -26510,17 +27022,22 @@ messagesContainer.addEventListener('dblclick', async (e) => {
 
             const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
             
-            let actionVerb, suffix, object;
+            let actionVerb = '拍了拍';
+            let suffix = '';
+            let subject = '你'; // 动作发起者（屏幕前的你）
+            let object = '';    // 动作承受者（被点击的头像）
 
             if (isMe) {
-                // 如果双击的是【你自己】的头像：
-                // 读取你为 AI 准备的“陷阱”（即 AI 动你时的动作和后缀）
+                // 【情况A：你双击了自己的头像】
+                // 逻辑：这只是单纯的自娱自乐，或者测试“我设置给AI的陷阱”
+                // 读取：你的设置 (userInteractionAction)
                 actionVerb = chatInfo.userInteractionAction || '拍了拍';
                 suffix = chatInfo.myNudgeSuffix || '';
                 object = "自己";
             } else {
-                // 如果双击的是【对方】的头像：
-                // 核心修复：根据 targetName 查找该角色的专属设置
+                // 【情况B：你双击了AI的头像】
+                // 逻辑：你掉进了AI的陷阱。AI设置了动作和后缀，强制你执行。
+                // 读取：AI的设置 (characterInteractions[targetName])
                 const charSettings = (chatInfo.characterInteractions && chatInfo.characterInteractions[targetName]) 
                                      ? chatInfo.characterInteractions[targetName] 
                                      : {};
@@ -26530,8 +27047,9 @@ messagesContainer.addEventListener('dblclick', async (e) => {
                 object = `“${targetName}”`;
             }
             
-            // 直接生成文案，不再弹出菜单
-            const nudgeText = `你${actionVerb}${object}${suffix}`;
+            // 组合文案：你 + 动作 + 对象 + 后缀
+            // 例如：你 + 亲了亲 + “张三” + 的脸颊
+            const nudgeText = `${subject}${actionVerb}${object}${suffix}`;
             
             await addMessage({ type: 'system', side: 'system', text: nudgeText }, chatState.chatId);
             
@@ -26547,6 +27065,7 @@ messagesContainer.addEventListener('dblclick', async (e) => {
 
             return; 
         }
+
 
         // 2. 原有的双击气泡收藏逻辑
         const wrapper = e.target.closest('.message-wrapper'); 
@@ -27384,13 +27903,21 @@ async function triggerBackgroundDataUpdate(context, senderName, chatId) {
 
     // --- 判定 2: 寻呼机备忘录 ---
     if (Math.random() * 100 < pagerProb) {
-        finalPrompt += "\n---\n[BACKGROUND TASK: CREATE A MEMO]\n" +
+        finalPrompt += "\n---\n[BACKGROUND TASK: CREATE A PAGER MEMO]\n" +
             "After your chat response, you MUST generate a new memo for your pager.\n" +
             "Persona: From the perspective of " + (isGroup ? "the character who is writing this entry" : '"' + senderName + '"') + ".\n" +
             "Formatting: Wrap the memo text in <background_update type=\"pager\" sender=\"" + targetSender + "\">...</background_update>.\n" +
             (isGroup ? "**CRITICAL:** You MUST replace [CharacterName] with the actual name of the character who is writing this memo.\n" : "") +
-            "Rule: Output ONLY the raw task or reminder. ABSOLUTELY FORBIDDEN to add prefixes like \"备忘：\".";
+            // 【核心修改】强制定义为“待办事项”，严禁写日记或心理活动
+            "**CRITICAL CONTENT RULE:** A Pager Memo is a **TO-DO LIST** or **REMINDER**. It is NOT a diary.\n" +
+            "1. You MUST write a specific **action** or **plan** you intend to do later.\n" +
+            "2. **ABSOLUTELY FORBIDDEN:** Do NOT describe feelings, do NOT narrate what just happened, do NOT complain.\n" +
+            "3. **CORRECT Examples:** '记得去买感冒药', '下午三点提醒他吃药', '明天要去调查那个废弃工厂', '晚上别忘了锁门'.\n" +
+            "4. **WRONG Examples:** '今天我很伤心', '他刚才为什么要吼我', '外面的雨好大'.\n" +
+            "Rule: Output ONLY the raw task content.";
     }
+
+
 
     if (finalPrompt !== "") {
         return "\n\n[SYSTEM NOTIFICATION: BACKGROUND ACTIONS ENABLED]\n" + 
@@ -37782,8 +38309,10 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
         const deckContainer = document.getElementById('mood-card-deck-container');
         const cardDeck = document.getElementById('mood-card-deck');
         const deleteCardBtn = document.getElementById('delete-card-btn');
+        const clearAllMoodsBtn = document.getElementById('clear-all-moods-btn');
         const addNewMoodBtn = document.getElementById('add-new-mood-btn');
         const deleteModal = document.getElementById('mood-delete-modal');
+
         const confirmDeleteBtn = document.getElementById('mood-confirm-delete-btn');
         const cancelDeleteBtn = document.getElementById('mood-cancel-delete-btn');
         const editModal = document.getElementById('mood-edit-modal');
@@ -37879,8 +38408,7 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
         
         // --- RENDER & INIT ---
         function renderCards() {
-            cards = [];
-            paginators = [];
+            // 清空容器
             cardDeck.innerHTML = '';
 
             if (moods.length === 0) {
@@ -37890,82 +38418,84 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 return;
             }
 
-            moods.forEach((mood, index) => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.dataset.cardIndex = index;
-                card.innerHTML = `
-                    <div class="bubble">
-                        <img src="https://i.postimg.cc/ZRtskQMF/IMG-0164.png" class="mood-card-background-img" alt="Mood card background">
-                        <div class="content-wrapper"></div>
-                    </div>
-                    <div class="pagination-controls">
-                        <button class="prev-btn">上一页</button>
-                        <span class="page-indicator">1 / 1</span>
-                        <button class="next-btn">下一页</button>
-                    </div>
-                `;
-                cardDeck.appendChild(card);
-                cards.push(card);
-                
-                const paginator = new CardPaginator(card, mood.content);
-                paginators.push(paginator);
-            });
+            // 【核心重构】只创建一个“单例卡片”容器，背景图只加载一次
+            const card = document.createElement('div');
+            card.className = 'card is-active'; 
+            card.style.zIndex = '10';
+            card.innerHTML = `
+                <div class="bubble">
+                    <img src="https://i.postimg.cc/ZRtskQMF/IMG-0164.png" class="mood-card-background-img" alt="Mood card background" style="pointer-events: none;">
+                    <div class="content-wrapper" id="mood-dynamic-content"></div>
+                </div>
+                <div class="pagination-controls">
+                    <span class="page-indicator" id="mood-index-indicator">1 / 1</span>
+                </div>
+            `;
+            cardDeck.appendChild(card);
             
-            currentCardIndex = Math.min(currentCardIndex, cards.length - 1);
-            showCard(currentCardIndex);
+            // 修正索引范围
+            if (currentCardIndex < 0 || currentCardIndex >= moods.length) {
+                currentCardIndex = 0;
+            }
+            
+            // 初始化显示内容
+            showCard(currentCardIndex, '');
         }
 
+
+
         function showCard(index, direction = '') { 
-            if (index < 0 || index >= cards.length) return; 
+            if (index < 0 || index >= moods.length) return; 
+            currentCardIndex = index;
+
+            const contentEl = document.getElementById('mood-dynamic-content');
+            const indicatorEl = document.getElementById('mood-index-indicator');
             
-            // 1. 暴力清理：遍历所有卡片，移除所有可能导致消失的类
-            cards.forEach(c => {
-                c.classList.remove('card-out-left', 'card-out-right', 'is-active', 'is-swiping');
-                c.style.transform = ''; // 清除内联残余位移
-                c.style.zIndex = '1';   // 重置层级
-            });
+            if (!contentEl) return;
+
+            // 1. 移除旧动画类，强制重绘以触发新动画
+            contentEl.classList.remove('anim-next', 'anim-prev');
+            void contentEl.offsetWidth; 
+
+            // 2. 更新文字内容
+            const contentText = moods[index].content || "";
+            contentEl.innerHTML = escapeHtml(contentText).replace(/\n/g, '<br>');
             
-            // 2. 处理“飞出”的老卡片（如果存在方向）
-            if (cards[currentCardIndex] && direction) {
-                const oldCard = cards[currentCardIndex];
-                if (direction === 'next') {
-                    oldCard.classList.add('card-out-left');
-                } else if (direction === 'prev') {
-                    oldCard.classList.add('card-out-right');
-                }
-                oldCard.style.zIndex = '5'; // 飞出时保持在上方
+            // 3. 滚动条复位到顶部
+            contentEl.scrollTop = 0;
+
+            // 4. 更新页码指示器
+            if (indicatorEl) {
+                indicatorEl.textContent = `${index + 1} / ${moods.length}`;
             }
-            
-            // 3. 激活新卡片
-            const newCard = cards[index];
-            newCard.classList.add('is-active'); 
-            newCard.style.zIndex = '10'; // 确保当前卡片在最顶层
-            
-            currentCardIndex = index; 
-            
-            // 4. 重新初始化内容显示
-            if (paginators[currentCardIndex]) {
-                paginators[currentCardIndex].setup(); 
+
+            // 5. 根据方向添加进入动画
+            if (direction === 'next') {
+                contentEl.classList.add('anim-next');
+            } else if (direction === 'prev') {
+                contentEl.classList.add('anim-prev');
             }
+
             updateMainUI(); 
         }
+
         
         function updateMainUI() { 
-            deleteCardBtn.disabled = (cards.length === 0);
+            deleteCardBtn.disabled = (moods.length === 0);
+            if (clearAllMoodsBtn) clearAllMoodsBtn.disabled = (moods.length === 0);
             
-            // 调整按钮显示，当卡片存在时，显示删除和编辑
-            const editBtn = document.getElementById('edit-current-mood-btn');
-            if (editBtn) editBtn.remove();
-            const favBtn = document.getElementById('fav-current-mood-btn');
-            if (favBtn) favBtn.remove();
+            // 彻底清理旧的动态按钮
+            const oldEdit = document.getElementById('edit-current-mood-btn');
+            if (oldEdit) oldEdit.remove();
+            const oldFav = document.getElementById('fav-current-mood-btn');
+            if (oldFav) oldFav.remove();
+
             
-            if (cards.length > 0) {
+            if (moods.length > 0) {
                 const currentMood = moods[currentCardIndex];
                 const currentChatId = conversationManager.getCurrentChatId();
                 const favs = loadFromLocalStorage('app_mood_favorites', []);
                 
-                // 【核心修改】：判断是否收藏时，不仅要看 ID，还要看是否属于当前角色 (chatId)
                 const isFavorited = currentMood.id && favs.some(f => f.id === currentMood.id && f.chatId === currentChatId);
 
                 const newFavBtn = document.createElement('button');
@@ -37979,11 +38509,13 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 newEditBtn.textContent = '编辑心事';
                 newEditBtn.className = 'modal-button secondary';
                 
-                // 确保按钮顺序
-                deleteCardBtn.before(newFavBtn);
-                deleteCardBtn.before(newEditBtn);
+                // 【核心修改】：调整插入顺序，将“收藏”和“编辑”放在“新建”按钮的后面
+                // 这样按钮排列会变成：[新建] [收藏] [编辑] [清空] [删除]
+                addNewMoodBtn.after(newEditBtn);
+                addNewMoodBtn.after(newFavBtn);
 
                 newEditBtn.addEventListener('click', handleEditMood);
+
                 newFavBtn.addEventListener('click', () => {
                     // 如果卡片没有 ID，为了能正常收藏，我们临时给它补一个
                     if (!currentMood.id) {
@@ -38029,66 +38561,63 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             if (!isSwiping) return;
             isSwiping = false;
 
-            const activeCard = cards[currentCardIndex];
+            // 获取唯一的那个卡片容器
+            const activeCard = cardDeck.querySelector('.card');
             if (!activeCard) return;
 
-            // 首先移除滑动中的样式和内联transform
             activeCard.classList.remove('is-swiping');
             activeCard.style.transform = '';
 
-            // 判断滑动距离是否足够触发翻页
             if (Math.abs(diffX) > swipeThreshold) {
-                // diffX < 0: 手指从右向左滑 -> 显示下一张
                 if (diffX < 0) {
-                    if (currentCardIndex < cards.length - 1) {
+                    if (currentCardIndex < moods.length - 1) {
                         showCard(currentCardIndex + 1, 'next');
+                    } else {
+                        activeCard.style.transition = "transform 0.2s";
+                        activeCard.style.transform = "translateX(-20px)";
+                        setTimeout(() => activeCard.style.transform = "", 200);
                     }
                 } 
-                // diffX > 0: 手指从左向右滑 -> 显示上一张
                 else {
                     if (currentCardIndex > 0) {
                         showCard(currentCardIndex - 1, 'prev');
+                    } else {
+                        activeCard.style.transition = "transform 0.2s";
+                        activeCard.style.transform = "translateX(20px)";
+                        setTimeout(() => activeCard.style.transform = "", 200);
                     }
                 }
             }
-            
-            // 重置滑动距离
             diffX = 0;
         }
+
         
         // --- MODAL & CRUD LOGIC ---
         function showDeleteModal() { deleteModal.classList.add('visible'); }
         function hideDeleteModal() { deleteModal.classList.remove('visible'); }
         
         function deleteCurrentCard() { 
-            if (cards.length === 0) return; 
-            
-            const cardToDelete = cards[currentCardIndex]; 
-            cardToDelete.classList.add('card-deleted'); 
-            cardToDelete.classList.remove('is-active'); 
+            if (moods.length === 0) return; 
             
             // 1. 删除数据
             moods.splice(currentCardIndex, 1);
             saveMoods();
             
-            setTimeout(() => { 
-                // 2. 移除 DOM 元素
-            cardToDelete.remove(); 
+            // 2. 逻辑判断
+            if (moods.length === 0) { 
+                renderCards(); 
+                updateMainUI(); 
+                return; 
+            }
             
-            // 3. 重建数组和 Paginator
-            cards.splice(currentCardIndex, 1); 
-            paginators.splice(currentCardIndex, 1); 
+            if (currentCardIndex >= moods.length) { 
+                currentCardIndex = moods.length - 1; 
+            } 
             
-            if (moods.length === 0) { updateMainUI(); renderCards(); return; }
-                
-                if (currentCardIndex >= cards.length) { 
-                    currentCardIndex = cards.length - 1; 
-                } 
-                
-                // 4. 显示下一张卡片
-                setTimeout(() => { showCard(currentCardIndex); }, 100); 
-            }, 600); 
+            // 3. 刷新显示
+            showCard(currentCardIndex, ''); 
         }
+
 
         function handleAddNewMood() {
             editTitle.textContent = '新建心事';
@@ -38098,13 +38627,19 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
         }
         
         function handleEditMood() {
-            if (cards.length === 0) return;
+            if (moods.length === 0) return;
             const mood = moods[currentCardIndex];
             editTitle.textContent = '编辑心事';
-            editContent.value = mood.content;
+            // 核心修复：编辑时去掉时间戳前缀，只编辑正文
+            // 假设格式是 "2026年... \n\n内容"
+            const contentParts = mood.content.split('\n\n');
+            const pureContent = contentParts.length > 1 ? contentParts.slice(1).join('\n\n') : mood.content;
+            
+            editContent.value = pureContent;
             editModal.dataset.editIndex = currentCardIndex;
-            editModal.classList.add('visible'); // <<< 修改为 'visible'
+            editModal.classList.add('visible'); 
         }
+
 
         function handleSaveMood() {
             const content = editContent.value.trim();
@@ -38115,40 +38650,36 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 return;
             }
             
-            // 统一在这里生成带时间的完整内容
             const now = new Date();
             const dateStr = now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
             const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
             const fullContent = `${dateStr} ${timeStr}\n\n${content}`;
 
             if (editIndex > -1) {
-                // 编辑现有心事
                 moods[editIndex].content = fullContent;
-                moods[editIndex].timestamp = Date.now(); // 同时更新时间戳用于排序
-                currentCardIndex = editIndex; // 编辑后停留在当前卡片
+                moods[editIndex].timestamp = Date.now();
             } else {
-                // 添加新心事
                 const newMood = {
                     id: `mood_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
                     timestamp: Date.now(),
                     content: fullContent
                 };
                 moods.unshift(newMood);
-                currentCardIndex = 0; // 新增卡片放在最前面
             }
 
-            // 核心：在保存前，根据时间戳对所有心事进行降序排序，确保最新的总是在最前面
             moods.sort((a, b) => b.timestamp - a.timestamp);
 
             saveMoods();
-            editModal.classList.remove('visible'); // 修正：使用正确的全局类名 'visible'
-            renderCards(); // 重新渲染所有卡片
+            editModal.classList.remove('visible');
             
-            // 核心：无论新增还是编辑，都强制显示第一张卡片（也就是最新的那张）
-            if (cards.length > 0) {
-                 showCard(0);
+            // 核心修复：如果当前页面已经有卡片壳子了，直接刷新文字即可
+            if (document.getElementById('mood-dynamic-content')) {
+                showCard(0, ''); 
+            } else {
+                renderCards(); 
             }
         }
+
         
         function updateToggleButtonText() {
             const chatId = conversationManager.getCurrentChatId();
@@ -38176,7 +38707,28 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
 
             // Button listeners
             deleteCardBtn.addEventListener('click', showDeleteModal); 
+            
+            // 【核心新增：清空全部心事逻辑】
+            if (clearAllMoodsBtn) {
+                clearAllMoodsBtn.onclick = async () => {
+                    if (moods.length === 0) return;
+                    const confirmed = await conversationManager.customConfirm(
+                        `确定要清空当前角色的所有心事记录吗？\n共 ${moods.length} 条，此操作不可撤销。`,
+                        '清空确认',
+                        '全部清空'
+                    );
+                    if (confirmed) {
+                        moods = [];
+                        saveMoods();
+                        currentCardIndex = 0;
+                        renderCards();
+                        alert('已清空所有心事。');
+                    }
+                };
+            }
+
             confirmDeleteBtn.addEventListener('click', () => { deleteCurrentCard(); hideDeleteModal(); });
+
             cancelDeleteBtn.addEventListener('click', hideDeleteModal);
             deleteModal.addEventListener('click', (event) => { if (event.target === deleteModal) { hideDeleteModal(); } });
             
@@ -38206,13 +38758,7 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             editCancelBtn.addEventListener('click', () => editModal.classList.remove('visible'));
 
             
-            // 监听页面大小变化，重新分页
-            new ResizeObserver(() => { 
-                if(paginators.length > 0 && cards.length > 0) { 
-                    renderCards(); // 重新渲染并设置所有分页
-                    showCard(currentCardIndex);
-                } 
-            }).observe(deckContainer);
+            // 已移除多余的 ResizeObserver 逻辑以优化性能
 
         }
 
@@ -38386,16 +38932,13 @@ function renderDisplay() {
             let notes = loadFromLocalStorage(storageKey, []);
             
             const now = new Date();
-            // 获取 14:30 这种格式的时间
-            const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+            // 【核心修改】格式化为：2023年10月27日 14:30
+            const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
             
-            // 【核心修改】：将 AI 返回的内容处理成 "时间 - 内容" 格式
-            // 如果 AI 返回了多行，则每一行都加上时间前缀
-            const formattedContent = aiReplyText.split('\n')
-                .map(line => line.trim())
-                .filter(line => line.length > 0)
-                .map(line => timeStr + ' - ' + line)
-                .join('\n');
+            // 【核心修改】严格的格式组装：日期时间 + 换行 + (人名+内容)
+            // aiReplyText 此时已经包含了 "[人名]\n内容" (如果是群聊)，或者纯 "内容" (如果是单聊)
+            // 我们只需要把日期顶在最头上即可
+            const formattedContent = `${dateStr}\n${aiReplyText}`;
 
             if (!formattedContent) return;
 
@@ -38406,7 +38949,6 @@ function renderDisplay() {
             // 将新备忘添加到数组的最前面
             notes.unshift(newNote);
 
-            
             // 过滤掉空内容或初始提示语，确保数据纯净
             const finalNotes = notes.filter(note => note.content && note.content.trim() && !note.content.startsWith(">> ("));
             
@@ -38417,6 +38959,8 @@ function renderDisplay() {
                 currentNotes = finalNotes.length > 0 ? finalNotes : [{ content: ">> (没有备忘录) <<" }];
             }
         }
+
+
 
         async function startEdit() {
             isEditing = true;
