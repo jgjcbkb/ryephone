@@ -13332,9 +13332,18 @@ For a COMMENT:
 
 ${TUQU_MEDIA_PROTOCOL}
 
+**[MEDIA PREFIX LAW - ABSOLUTE & UNBREAKABLE]**
+1.  **NO NAKED TAGS:** You are **STRICTLY FORBIDDEN** from outputting tags like \`[抓狂]\`, \`[笑哭]\`. This is a critical syntax error.
+2.  **MANDATORY PREFIX:** You **MUST** use the correct prefix:
+    *   **Emoji:** \`[emoji:抓狂]\`
+    *   **Sticker:** \`[sticker:抓狂]\`
+3.  **FALLBACK PROTOCOL:** If you want to use an expression but are unsure of the prefix or if it exists in the list, you **MUST** use the universal fallback image:
+    *   **Command:** \`[sticker:地铁老人看手机]\` (Use this for confusion, shock, or speechlessness).
+
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 `;
+
             // 获取缓存的版规
             const cachedRules = JSON.parse(localStorage.getItem('tuqu_cached_board_rules') || '{}');
             let boardsRulesText = "\n[FORUM BOARD RULES & DESCRIPTIONS]\n";
@@ -13564,6 +13573,15 @@ Check the **"Setting"** provided above.
     *   **ERASE THE USER:** In this specific fiction/thread, \`{{user}}\` DOES NOT EXIST. Do not make them a jealous ex, a friend, or a passerby.
     *   **FOCUS:** The spotlight must be 100% on the specified couple.
     *   **IGNORE USER PERSONA:** For the content of this story, ignore the "User Persona" provided in the context. It is irrelevant.
+    
+    **[MEDIA & EXPRESSION LAW - STRICT MATCHING]**
+You are ENCOURAGED to use emojis/stickers, but ONLY if they exist in the list.
+1. **Emoji:** \`[emoji:Name]\`
+2. **Sticker:** \`[sticker:Name]\`
+3. **ABSOLUTE PROHIBITION:** **NEVER** invent a name. If the list doesn't have "happy", DO NOT use \`[emoji:happy]\`. Use text \`(happy)\` instead.
+
+**Available Emojis:** [${emojiNames}]
+**Available Stickers:** [${stickerNames}]
 
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
@@ -13758,6 +13776,15 @@ Check the **"Setting"** provided above.
     *   **ERASE THE USER:** In this specific fiction/thread, \`{{user}}\` DOES NOT EXIST. Do not make them a jealous ex, a friend, or a passerby.
     *   **FOCUS:** The spotlight must be 100% on the specified couple.
     *   **IGNORE USER PERSONA:** For the content of this story, ignore the "User Persona" provided in the context. It is irrelevant.
+    
+    **[MEDIA & EXPRESSION LAW - STRICT MATCHING]**
+You are ENCOURAGED to use emojis/stickers, but ONLY if they exist in the list.
+1. **Emoji:** \`[emoji:Name]\`
+2. **Sticker:** \`[sticker:Name]\`
+3. **ABSOLUTE PROHIBITION:** **NEVER** invent a name. If the list doesn't have "happy", DO NOT use \`[emoji:happy]\`. Use text \`(happy)\` instead.
+
+**Available Emojis:** [${emojiNames}]
+**Available Stickers:** [${stickerNames}]
 
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
