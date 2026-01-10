@@ -13558,6 +13558,13 @@ For a COMMENT (if you are continuing a thread):
 
 ${TUQU_MEDIA_PROTOCOL}
 
+**[ABSOLUTE CP PURITY LAW - THE "THIRD WHEEL" BAN]**
+Check the **"Setting"** provided above.
+1.  **IF A CP IS IMPLIED (e.g., Char x NPC):** You are **STRICTLY FORBIDDEN** from inserting \`{{user}}\` into the story.
+    *   **ERASE THE USER:** In this specific fiction/thread, \`{{user}}\` DOES NOT EXIST. Do not make them a jealous ex, a friend, or a passerby.
+    *   **FOCUS:** The spotlight must be 100% on the specified couple.
+    *   **IGNORE USER PERSONA:** For the content of this story, ignore the "User Persona" provided in the context. It is irrelevant.
+
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 `;
@@ -13744,6 +13751,13 @@ You are ENCOURAGED to use emojis/stickers, but you **MUST** use the correct pref
 3. **ABSOLUTE PROHIBITION:** **NEVER** output a tag without a prefix (e.g., \`[跪了]\` is **FORBIDDEN** and will fail). It MUST be \`[emoji:跪了]\` or \`[sticker:跪了]\`.
 
 \${TUQU_MEDIA_PROTOCOL}
+
+**[ABSOLUTE CP PURITY LAW - THE "THIRD WHEEL" BAN]**
+Check the **"Setting"** provided above.
+1.  **IF A CP IS IMPLIED (e.g., Char x NPC):** You are **STRICTLY FORBIDDEN** from inserting \`{{user}}\` into the story.
+    *   **ERASE THE USER:** In this specific fiction/thread, \`{{user}}\` DOES NOT EXIST. Do not make them a jealous ex, a friend, or a passerby.
+    *   **FOCUS:** The spotlight must be 100% on the specified couple.
+    *   **IGNORE USER PERSONA:** For the content of this story, ignore the "User Persona" provided in the context. It is irrelevant.
 
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
@@ -21840,17 +21854,26 @@ You are the Director. If multiple characters react to the rejection, generate a 
         }
 
         async function processAIResponseLine(line, targetChatId = null, forcedSender = null) {
-            // 【核心修复】：使用标签无关的混合正则，彻底拦截所有形式的思维链内容，防止混用标签导致的解析失败
-            line = line.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '').trim();
+            // 1. 暴力清除所有思考标签及其内容 (支持跨行)
+            line = line.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '');
+            
+            // 2. 清除可能残留的空标签
+            line = line.replace(/<thought>[\s\S]*?<\/thought>/gi, '');
 
-            // --- 核心修复：在处理前，将占位符恢复为真正的换行符 ---
-            line = line.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
-
-            // --- 核心修复：在处理前，将占位符恢复为真正的换行符 ---
+            // 3. 恢复换行符
             line = line.replace(/__NEWLINE__/g, '\n');
 
+            // 4. 【核心修复】终极空值拦截
+            // 移除所有不可见字符（空格、换行、制表符）后，如果长度为0，直接终止
+            // 这能防止 "   \n   " 这种看似有内容实则为空的消息通过
+            if (!line.replace(/\s/g, '').length) {
+                return;
+            }
+
             let chatContent = line.trim();
+            // 双重保险
             if (!chatContent) return;
+
             
             // <<< 新增：区块解析逻辑 开始 >>>
             const blockMatch = chatContent.match(/^<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>$/);
@@ -22544,10 +22567,21 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
             }
         }
         async function addMessage(msgData, targetChatId = null) {
+            // 【核心修复】全局空消息拦截器
+            // 如果是文本消息，且内容为空（或只包含空白字符），直接丢弃，绝不入库
+            if (msgData.type === 'text') {
+                const cleanText = (msgData.text || '').replace(/\s/g, '');
+                if (cleanText.length === 0) {
+                    console.warn("[System] Blocked empty text message from entering database.");
+                    return;
+                }
+            }
+
             const activeChatId = chatState.chatId;
             const finalTargetChatId = targetChatId || activeChatId;
 
             const isRegularMessage = msgData.side !== 'system';
+
             const isCurrentChat = finalTargetChatId === activeChatId && document.getElementById('page-conversation').classList.contains('active');
 
             // 【新逻辑】如果不是当前聊天，或者页面不可见，统一走后台逻辑
