@@ -7891,8 +7891,19 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                             </div>
                             <ul id="chat-info-member-list" class="member-list"></ul>
                             
+                            <!-- 新增：私聊记录共享设置 -->
+                            <div id="private-history-sharing-section" style="padding: 15px; border-top: 1px solid var(--light-gray); display:none;">
+                                <h3 style="font-size: 16px; margin-bottom: 10px; color: var(--text-color);">共享私聊记忆</h3>
+                                <div id="shared-history-member-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px; background: #fafafa;">
+                                    <!-- 动态渲染成员勾选列表 -->
+                                </div>
+                                <p class="form-hint" style="margin-top: 8px;">勾选后，AI 在此群聊中将能“回想起”与你在私聊中的最后 25 轮对话内容。</p>
+                            </div>
+
                             <!-- 【【【核心新增代码从这里开始】】】 -->
                             <div class="form-group" style="padding: 15px;">
+
+
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
         <label for="group-ensemble-persona" style="margin-bottom: 0;">群演人设 (Ensemble Persona)</label>
         <div style="display: flex; gap: 5px;">
@@ -16168,7 +16179,12 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     const mountedWbNames = Array.from(mountedWbCheckboxes).map(cb => cb.value);
     saveToLocalStorage(`chat_mounted_wb_${currentChatId}`, mountedWbNames);
 
+    // 新增：保存共享私聊记录的成员名单
+    const sharedHistoryCheckboxes = document.querySelectorAll('.shared-history-checkbox:checked');
+    info.sharedPrivateHistoryMembers = Array.from(sharedHistoryCheckboxes).map(cb => cb.value);
+
     // START: 新增保存挂载的正则规则
+
     const mountedRegexCheckboxes = document.querySelectorAll('#mounted-regex-list input[type="checkbox"]:checked');
     info.enabledRegexes = Array.from(mountedRegexCheckboxes).map(cb => cb.value);
     // END: 新增保存挂载的正则规则
@@ -20075,11 +20091,64 @@ if (preamble) {
                         });
                     finalSystemPrompt += worldBookContent;
 
+                    // 【核心新增：注入选定成员的 25 轮私聊记忆（严格遵循净化规则）】
+                    const sharedHistoryMembers = chatInfo.sharedPrivateHistoryMembers || [];
+                    if (sharedHistoryMembers.length > 0) {
+                        let sharedHistoryPrompt = `\n\n[CRITICAL CONTEXT: SHARED PRIVATE MEMORIES]`;
+                        sharedHistoryPrompt += `\nYou have access to the following private conversations. Use them to maintain continuity with "${userNameForPrompt}".\n`;
+                        
+                        sharedHistoryMembers.forEach(memberName => {
+                            const privateChat = chatList.find(c => c.name === memberName && c.type === '私聊');
+                            if (privateChat) {
+                                const privateMsgs = loadFromLocalStorage(`conversation_${privateChat.id}`, []);
+                                const filteredPrivate = [];
+                                let userMsgCount = 0;
+
+                                // 倒序扫描，收集 25 轮（以用户发送的消息为准）
+                                for (let i = privateMsgs.length - 1; i >= 0; i--) {
+                                    const m = privateMsgs[i];
+                                    if (m.side === 'system' || m.type !== 'text') continue;
+
+                                    // 使用与主聊天一致的净化规则
+                                    let rawText = m.text || '';
+                                    // 此正则匹配：成对的HTML标签，或 [TAG]...[/TAG] 结构的成对指令
+                                    const blockRegex = /(<div[\s\S]*?>[\s\S]*?<\/div>|<details[\s\S]*?>[\s\S]*?<\/details>|<snippet[\s\S]*?>[\s\S]*?<\/snippet>|\[[A-Z_]+\][\s\S]*?\[\/[A-Z_]+\])/g;
+                                    
+                                    let cleanedText = rawText.replace(blockRegex, (matchedBlock) => {
+                                        // 仅保留带有 data-ai-log-as-text="true" 标记的卡片内容
+                                        if (matchedBlock.includes('data-ai-log-as-text="true"')) {
+                                            const tempDiv = document.createElement('div');
+                                            tempDiv.innerHTML = matchedBlock;
+                                            return tempDiv.textContent.trim();
+                                        }
+                                        return ''; // 剔除弹幕块和普通HTML块
+                                    }).trim();
+
+                                    // 如果净化后还有内容（包括单条指令 [transfer: 100] 会被保留）
+                                    if (cleanedText) {
+                                        filteredPrivate.unshift({
+                                            role: m.side === 'sent' ? userNameForPrompt : memberName,
+                                            content: cleanedText
+                                        });
+                                        if (m.side === 'sent') userMsgCount++;
+                                    }
+                                    
+                                    if (userMsgCount >= 25) break;
+                                }
+
+                                if (filteredPrivate.length > 0) {
+                                    sharedHistoryPrompt += `\n--- Private Logs: ${memberName} & ${userNameForPrompt} (Last 25 Rounds) ---\n`;
+                                    filteredPrivate.forEach(item => {
+                                        sharedHistoryPrompt += `${item.role}: ${item.content}\n`;
+                                    });
+                                }
+                            }
+                        });
+                        finalSystemPrompt += sharedHistoryPrompt + `\n[END OF PRIVATE MEMORIES]\n`;
+                    }
+
 // 【【【在这里添加下面这行新代码】】】
-finalSystemPrompt += timeManager.getAITimeContext();
-finalSystemPrompt += weatherManager.getAIWeatherContext();
-finalSystemPrompt += periodTrackerManager.getAIPeriodContext();
-finalSystemPrompt += listenTogetherManager.getAIMusicContext();
+
 
 
 
@@ -21118,50 +21187,50 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                         return;
                     }
 
-                    // 将清理后的正文切成块
-                    const blocks = parseResponseIntoBlocks(cleanedText);
+                    // 【核心修复】定义当前上下文的默认发送者
+                    const defaultSender = contactInfo.isGroup ? null : chatState.chatName;
+
+                    // 【终极切割方案】不再依赖 parseResponseIntoBlocks (它依赖换行)，改用正则强制提取所有 block
+                    // 这个正则会匹配所有 <block>...</block>，无论它们是否挤在一行
+                    const blockRegex = /<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>/gi;
                     
-                    for (const block of blocks) {
-                        const trimmed = block.trim();
-                        // 【二次防御】：确保每一个子块也不是空的
-                        if (!trimmed) continue;
+                    let match;
+                    let hasFoundBlocks = false;
 
-                        // 尝试匹配标准的 <block> 标签
-                        const match = trimmed.match(/^<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>$/);
-                        
-                        // 【核心修复】定义当前上下文的默认发送者，解决 ReferenceError
-                        // 1. 如果是群聊，无法预知默认发送者，设为 null (依赖 AI 在 block 中带 sender)
-                        // 2. 如果是单聊，默认发送者就是当前聊天对象的名字 (chatState.chatName)
-                        const defaultSender = contactInfo.isGroup ? null : chatState.chatName;
+                    // 使用 while 循环提取所有匹配到的块
+                    while ((match = blockRegex.exec(cleanedText)) !== null) {
+                        hasFoundBlocks = true;
+                        const type = match[1];
+                        const sender = match[2];
+                        const content = match[3].trim();
 
-                        if (match) {
-                            const type = match[1];
-                            const sender = match[2];
-                            const content = match[3].trim();
+                        // 优先使用 block 里的 sender，没有则使用 defaultSender
+                        const effectiveSender = sender || defaultSender;
 
-                            // 【核心修复】优先使用 block 里的 sender，没有则使用上面计算出的 defaultSender
-                            const effectiveSender = sender || defaultSender;
-
-                            switch (type) {
-                                case 'text':
-                                case 'html':
-                                    if (content.startsWith('[reply_to:')) {
-                                        const cmdWithSender = effectiveSender ? `${effectiveSender}: ${content}` : content;
-                                        await processAIResponseLine(cmdWithSender, originatingChatId, effectiveSender);
-                                    } else {
-                                        await addMessage({ type: 'text', text: content, side: 'received', sender: effectiveSender }, originatingChatId);
-                                    }
-                                    break;
-                                case 'command':
-                                    await processAIResponseLine(content, originatingChatId, effectiveSender);
-                                    break;
-                            }
-                        } else {
-                            // 【核心新增】：如果是没有标签的裸文本，直接作为 text 消息显示
-                            // 【核心修复】裸文本也使用 defaultSender，确保单聊时名字正确
-                            await addMessage({ type: 'text', text: trimmed, side: 'received', sender: defaultSender }, originatingChatId);
+                        switch (type) {
+                            case 'text':
+                            case 'html':
+                                if (content.startsWith('[reply_to:')) {
+                                    const cmdWithSender = effectiveSender ? `${effectiveSender}: ${content}` : content;
+                                    await processAIResponseLine(cmdWithSender, originatingChatId, effectiveSender);
+                                } else {
+                                    // 这里的 content 已经是纯净的内容了，直接发送
+                                    await addMessage({ type: 'text', text: content, side: 'received', sender: effectiveSender }, originatingChatId);
+                                }
+                                break;
+                            case 'command':
+                                // 指令块的内容直接交给处理器
+                                await processAIResponseLine(content, originatingChatId, effectiveSender);
+                                break;
                         }
                     }
+
+                    // 【保底逻辑】如果整个文本里一个 <block> 标签都没找到（AI 没按格式输出），
+                    // 就把整个 cleanedText 当作一条普通的文本消息发送，防止吞消息。
+                    if (!hasFoundBlocks && cleanedText.trim()) {
+                        await addMessage({ type: 'text', text: cleanedText.trim(), side: 'received', sender: defaultSender }, originatingChatId);
+                    }
+
 
                 }
         
@@ -26215,7 +26284,31 @@ elements.userPersonaSelect.innerHTML = '<option value="无">无</option>';
                 elements.chatInfoGroupDiv.classList.remove('hidden');
                 renderGroupMemberList(chatState.chatId);
 
+                // 新增：渲染私聊记录共享勾选列表
+                const sharedSection = document.getElementById('private-history-sharing-section');
+                const sharedListContainer = document.getElementById('shared-history-member-list');
+                const groupMembersForShare = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
+                const sharedMembers = info.sharedPrivateHistoryMembers || [];
+                
+                const aiMembersWithPrivateChat = groupMembersForShare.filter(name => {
+                    return name !== '{{user}}' && chatList.some(c => c.name === name && c.type === '私聊');
+                });
+
+                if (aiMembersWithPrivateChat.length > 0) {
+                    sharedSection.style.display = 'block';
+                    sharedListContainer.innerHTML = aiMembersWithPrivateChat.map(name => `
+                        <label class="inline-label" style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" class="shared-history-checkbox" value="${name}" ${sharedMembers.includes(name) ? 'checked' : ''} style="width: 18px; height: 18px; margin:0;">
+                            <span style="font-size: 14px; color: #333;">${name}</span>
+                        </label>
+                    `).join('');
+                } else {
+                    sharedSection.style.display = 'none';
+                }
+
                 // 【【【核心新增代码从这里开始】】】
+
+
                 // 填充“群演人设”文本框
                 document.getElementById('group-ensemble-persona').value = info.ensemblePersona || '';
                 // 【【【核心新增代码到这里结束】】】
@@ -31685,11 +31778,12 @@ checkMomentsUpdates(); // <--- 新增这一行
                                     // =================================================================
                                     // 【【【【【【 全新的、绝对核心的上下文注入逻辑 】】】】】】
                                     // =================================================================
-                                    let fullContextPrompt = profile.prompt || ''; // 1. 基础系统指令
+                                    // 1. 基础系统指令 (API设置)
+                                    let fullContextPrompt = profile.prompt || ''; 
 
-                                    // 2. 注入前情提要
+                                    // 2. 注入前情提要 (紧随其后)
                                     if (info.preamble) {
-                                        fullContextPrompt = `[Preamble - Highest Priority Context]\n${info.preamble}\n\n` + fullContextPrompt;
+                                        fullContextPrompt = fullContextPrompt + `\n\n[Preamble - Highest Priority Context]\n${info.preamble}\n`;
                                     }
 
                                     // 3. 注入用户人设
@@ -31756,28 +31850,100 @@ You are responsible for playing every AI character in the "Active Cast" list.`;
                                         });
                                     }
 
-                                    // 6. 注入时间
+                                     // 6. 注入时间
                                     timeManager.updateSettingsForChat(group.id);
                                     fullContextPrompt += timeManager.getAITimeContext();
-                                    
-                                                        // 7. 注入主聊天记录上下文
-                    const memoryLength = parseInt(info.memoryLength || 20, 10);
-                    const sourceMessages = loadFromLocalStorage(`conversation_${group.id}`, []);
-                    const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
-                    // 【核心修改】传入 group.id，确保后台运行时也能正确识别名字
-                    const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, group.id);
-                    const chatHistoryForPrompt = apiPayloadMessages.map(msg => {
-        const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || '角色');
-        const content = Array.isArray(msg.content) ? msg.content.find(p => p.type === 'text')?.text || '[多媒体]' : msg.content;
-        // 【核心修复】利用 prepareApiPayload 已经生成的带时间戳内容
-        return `${role}: ${content}`;
-    }).join('\n');
 
-                    if (chatHistoryForPrompt) {
-                        fullContextPrompt += `\n\n[RECENT CHAT HISTORY]\n${chatHistoryForPrompt}`;
-                    }
-                    
-                    // =================================================================
+                                    // 【核心修复】补全缺失的环境与记忆上下文 (天气、经期、音乐、里程碑)
+                                    // 注入天气
+                                    fullContextPrompt += weatherManager.getAIWeatherContext();
+                                    // 注入经期
+                                    fullContextPrompt += periodTrackerManager.getAIPeriodContext();
+                                    // 注入音乐 (一起听)
+                                    fullContextPrompt += listenTogetherManager.getAIMusicContext();
+
+                                    // 注入里程碑 (群聊专属记忆)
+                                    const groupMilestones = loadFromLocalStorage(`app-milestones_${group.id}`, []);
+                                    if (groupMilestones.length > 0) {
+                                        let milestonesContext = "\n\n[RELATIONSHIP MILESTONES & SHARED MEMORIES]\n";
+                                        groupMilestones.forEach((m, i) => {
+                                            milestonesContext += `Entry #${i+1} (${m.type}): "${m.title}" on ${m.date}.`;
+                                            if (m.content) milestonesContext += ` Description: ${m.content}`;
+                                            if (m.annotations && m.annotations.length > 0) {
+                                                m.annotations.forEach(ann => {
+                                                    milestonesContext += `\n  - Note by ${ann.author}: Regarding "${ann.original}", ${ann.comment}`;
+                                                });
+                                            }
+                                            if (m.aiCorrection) milestonesContext += `\n  - AI Memory Correction: ${m.aiCorrection}`;
+                                            milestonesContext += "\n";
+                                        });
+                                        fullContextPrompt += milestonesContext;
+                                    }
+
+                                    // --- 【核心修改】调整顺序：先注入私聊记忆 (单聊消息在前) ---
+
+                                    // 注入选定成员的私聊记忆 (已修复：增加弹幕和代码块过滤)
+                                    const sharedHistoryMembers = info.sharedPrivateHistoryMembers || [];
+                                    if (sharedHistoryMembers.length > 0) {
+                                        let sharedHistoryPrompt = `\n\n[SHARED PRIVATE MEMORIES - FOR YOUR REFERENCE]`;
+                                        sharedHistoryMembers.forEach(memberName => {
+                                            // 查找该角色的私聊窗口
+                                            const privateChat = chatList.find(c => c.name === memberName && c.type === '私聊');
+                                            if (privateChat) {
+                                                const privateMsgs = loadFromLocalStorage(`conversation_${privateChat.id}`, []);
+                                                // 只取最近的 10 条私聊记录，防止 Token 爆炸
+                                                const recentPrivate = privateMsgs.slice(-10).filter(m => m.type === 'text');
+                                                if (recentPrivate.length > 0) {
+                                                    sharedHistoryPrompt += `\n--- Private Logs between "${memberName}" and "${userNameForPrompt}" ---\n`;
+                                                    recentPrivate.forEach(pm => {
+                                                        const pRole = pm.side === 'sent' ? userNameForPrompt : memberName;
+                                                        
+                                                        // 【核心修复】增加过滤逻辑，清洗弹幕和HTML代码块
+                                                        let rawText = pm.text || '';
+                                                        const blockRegex = /(<div[\s\S]*?>[\s\S]*?<\/div>|<details[\s\S]*?>[\s\S]*?<\/details>|<snippet[\s\S]*?>[\s\S]*?<\/snippet>|\[[A-Z_]+\][\s\S]*?\[\/[A-Z_]+\])/g;
+                                                        
+                                                        let cleanedText = rawText.replace(blockRegex, (matchedBlock) => {
+                                                            // 仅保留带有 data-ai-log-as-text="true" 标记的卡片内容 (如账单)
+                                                            if (matchedBlock.includes('data-ai-log-as-text="true"')) {
+                                                                const tempDiv = document.createElement('div');
+                                                                tempDiv.innerHTML = matchedBlock;
+                                                                return tempDiv.textContent.trim();
+                                                            }
+                                                            return ''; // 剔除弹幕块和普通HTML块
+                                                        }).trim();
+
+                                                        if (cleanedText) {
+                                                            sharedHistoryPrompt += `${pRole}: ${cleanedText}\n`;
+                                                        }
+                                                    });
+                                                }
+                                            }
+                                        });
+                                        fullContextPrompt += sharedHistoryPrompt + `\n[END OF SHARED MEMORIES]`;
+                                    }
+
+                                    // --- 【核心修改】调整顺序：后注入群聊主历史 (群聊消息在后) ---
+                                    // 7. 注入主聊天记录上下文
+                                    const memoryLength = parseInt(info.memoryLength || 20, 10);
+                                    const sourceMessages = loadFromLocalStorage(`conversation_${group.id}`, []);
+                                    const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
+                                    // 【核心修改】传入 group.id，确保后台运行时也能正确识别名字
+                                    const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, group.id);
+                                    const chatHistoryForPrompt = apiPayloadMessages.map(msg => {
+                                        const role = msg.role === 'user' ? userNameForPrompt : (msg.sender || '角色');
+                                        const content = Array.isArray(msg.content) ? msg.content.find(p => p.type === 'text')?.text || '[多媒体]' : msg.content;
+                                        // 【核心修复】利用 prepareApiPayload 已经生成的带时间戳内容
+                                        return `${role}: ${content}`;
+                                    }).join('\n');
+
+                                    if (chatHistoryForPrompt) {
+                                        fullContextPrompt += `\n\n[RECENT CHAT HISTORY]\n${chatHistoryForPrompt}`;
+                                    }
+                                    
+                                    // =================================================================
+
+
+
                     // 【【【 核心新增：注入朋友圈上下文 (群组场景版) 】】】
                     // =================================================================
                     const aiCharacterNameForMoments = 'assistant'; 
