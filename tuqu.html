@@ -509,10 +509,17 @@ html, body {
             </select>
             <label style="font-size: 12px; color: #888; display: block; margin-bottom: 5px;">输入世界观/设定 (可选)：</label>
             <textarea id="trigger-worldview" placeholder="例如：假如角色是皇上 / 假如这是末世背景..." rows="3"></textarea>
+            
+            <!-- 新增：上下文发送开关 -->
+            <label style="display:flex; align-items:center; margin-bottom:15px; font-size:12px; color:#333; cursor:pointer;">
+                <input type="checkbox" id="trigger-include-context" checked style="margin-right:5px;"> 参考其他帖子内容 (不勾选则只看设定)
+            </label>
+
             <div class="btns">
                 <button class="btn-cancel" onclick="closeTriggerModal()">取消</button>
                 <button class="btn-confirm" onclick="confirmBoardTrigger()">确认召唤</button>
             </div>
+
         </div>
     </div>
 
@@ -578,9 +585,16 @@ html, body {
 
         // 新增：手动触发全站随机动态
         function triggerRandomTuqu() {
-            window.parent.postMessage({ type: 'MANUAL_TRIGGER_TUQU', mode: 'random' }, '*');
-            alert('指令已发出，匿名网友正在赶来...');
+            currentTriggerMode = 'random'; // 标记为随机模式
+            const modal = document.getElementById('board-trigger-modal');
+            document.getElementById('trigger-modal-title').innerText = "全站随机更新";
+            
+            // 向父窗口请求角色列表
+            window.parent.postMessage({ type: 'REQUEST_CHARACTER_LIST' }, '*');
+            
+            modal.style.display = 'flex';
         }
+
 
         // 新增：切换右上角菜单显示
         function toggleHeaderMenu() {
@@ -669,7 +683,11 @@ html, body {
         function confirmBoardTrigger() {
             const charName = document.getElementById('trigger-char-select').value;
             const worldview = document.getElementById('trigger-worldview').value.trim();
-            const rules = getBoardRules(currentBoardTitle);
+            // 获取是否发送上下文的勾选状态
+            const includeContext = document.getElementById('trigger-include-context').checked;
+            
+            // 获取版规 (如果是随机模式，使用通用规则或空)
+            const rules = currentTriggerMode === 'random' ? "General Forum Rules" : getBoardRules(currentBoardTitle);
 
             if (currentTriggerMode === 'post') {
                 // 发送单贴更新指令
@@ -679,7 +697,17 @@ html, body {
                     postId: currentPostId, // 传递当前帖子ID
                     charName: charName,
                     worldview: worldview,
-                    boardRules: rules
+                    boardRules: rules,
+                    includeContext: includeContext // 新增参数
+                }, '*');
+            } else if (currentTriggerMode === 'random') {
+                // 新增：发送随机更新指令
+                window.parent.postMessage({ 
+                    type: 'MANUAL_TRIGGER_TUQU', 
+                    mode: 'random', 
+                    charName: charName,
+                    worldview: worldview,
+                    includeContext: includeContext // 新增参数
                 }, '*');
             } else {
                 // 发送版块催更指令 (原有逻辑)
@@ -689,13 +717,15 @@ html, body {
                     board: currentBoardTitle,
                     charName: charName,
                     worldview: worldview,
-                    boardRules: rules
+                    boardRules: rules,
+                    includeContext: includeContext // 新增参数
                 }, '*');
             }
 
             closeTriggerModal();
             alert('指令已发出，太太们正在提笔...');
         }
+
 
         function saveForumData() { 
             // 每次数据变动，更新最后活跃时间

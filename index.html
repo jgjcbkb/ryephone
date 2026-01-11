@@ -10678,15 +10678,18 @@ if ('serviceWorker' in navigator) {
                     if (event.data.charName) {
                         triggerProactiveAI(null, event.data.charName, 'themed_tuqu_interaction', board, {
                             worldview: event.data.worldview,
-                            boardRules: event.data.boardRules
+                            boardRules: event.data.boardRules,
+                            includeContext: event.data.includeContext // <--- 核心新增：透传勾选状态
                         });
                     } else {
                         // 随机模式下，传递抓取到的全站版块数据
                         triggerProactiveAI(null, 'Anonymous_System', 'pure_tuqu_interaction', board, {
-                            allBoards: event.data.allBoards
+                            allBoards: event.data.allBoards,
+                            includeContext: event.data.includeContext // <--- 核心新增：透传勾选状态
                         });
                     }
                 }
+
             } else if (event.data && event.data.type === 'REQUEST_CHARACTER_LIST') {
             // 响应角色列表请求
             const list = getAllUniqueCharacters().filter(n => n !== '{{user}}');
@@ -13166,16 +13169,6 @@ You have total freedom to decide the engagement level based on the content's nat
 **LANGUAGE:** Simplified Chinese.
 
 ${TUQU_MEDIA_PROTOCOL}
-
-
-**[MEDIA & EXPRESSION LAW - STRICT MATCHING]**
-You are ENCOURAGED to use emojis/stickers, but ONLY if they exist in the list.
-1. **Emoji:** \`[emoji:Name]\`
-2. **Sticker:** \`[sticker:Name]\`
-3. **ABSOLUTE PROHIBITION:** **NEVER** invent a name. If the list doesn't have "happy", DO NOT use \`[emoji:happy]\`. Use text \`(happy)\` instead.
-
-**Available Emojis:** [${emojiNames}]
-**Available Stickers:** [${stickerNames}]
 `;
 
             // 拼接所有要求的人设上下文和聊天记录
@@ -13250,46 +13243,50 @@ Constraint: Output ONLY the [tuqu_complex_action] command. No chat text.`
             }
 
             // 全局排序，获取最新10贴
-            allPosts.sort((a, b) => {
-                const getTs = (p) => {
-                    if (!p) return 0;
-                    if (p.timestamp && typeof p.timestamp === 'string') {
-                        try { return new Date(p.timestamp.replace(/-/g, '/')).getTime(); } catch(e) { return 0; }
-                    }
-                    if (p.id) {
-                        const idStr = String(p.id);
-                        const idMatch = idStr.match(/\d+/);
-                        return idMatch ? parseInt(idMatch[0]) : 0;
-                    }
-                    return 0;
-                };
-                return getTs(b) - getTs(a);
-            });
-            const recent10 = allPosts.slice(0, 10);
+            let tuquContext = "";
 
-            let tuquContext = "\n[TUQU FORUM CONTEXT - LATEST 10 THREADS]\n";
-            recent10.forEach((post, i) => {
-                const pStatus = post.isReported ? `[BANNED: ${post.reportReason}]` : "[ACTIVE]";
-                const isUserPost = (post.author === userNameForPrompt || post.author === '{{user}}');
-                const authorTag = isUserPost ? `${post.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : post.author;
+            // 【核心修改】检查 includeContext 选项
+            if (extraOptions.includeContext !== false) {
+                allPosts.sort((a, b) => {
+                    const getTs = (p) => {
+                        if (!p) return 0;
+                        if (p.timestamp && typeof p.timestamp === 'string') {
+                            try { return new Date(p.timestamp.replace(/-/g, '/')).getTime(); } catch(e) { return 0; }
+                        }
+                        if (p.id) {
+                            const idStr = String(p.id);
+                            const idMatch = idStr.match(/\d+/);
+                            return idMatch ? parseInt(idMatch[0]) : 0;
+                        }
+                        return 0;
+                    };
+                    return getTs(b) - getTs(a);
+                });
+                const recent10 = allPosts.slice(0, 10);
+                tuquContext = "\n[TUQU FORUM CONTEXT - LATEST 10 THREADS]\n";
+                recent10.forEach((post, i) => {
+                    const pStatus = post.isReported ? `[BANNED: ${post.reportReason}]` : "[ACTIVE]";
+                    const isUserPost = (post.author === userNameForPrompt || post.author === '{{user}}');
+                    const authorTag = isUserPost ? `${post.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : post.author;
 
-                // 【核心修复】剥离主贴 HTML
-                const cleanMainContent = post.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-                tuquContext += `\n=== Thread #${i + 1} [Board: ${post._boardName}] ===\nTitle: "${post.subject}" (ID: ${post.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${cleanMainContent}\n`;
-                
-                if (post.comments && post.comments.length > 0) {
-                    tuquContext += `--- All Replies ---\n`;
-                    post.comments.forEach((c, idx) => {
-                        const cStatus = c.isReported ? `[REPORTED: ${c.reportReason}]` : "";
+                    // 【核心修复】剥离主贴 HTML
+                    const cleanMainContent = post.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                    tuquContext += `\n=== Thread #${i + 1} [Board: ${post._boardName}] ===\nTitle: "${post.subject}" (ID: ${post.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${cleanMainContent}\n`;
+                    
+                    if (post.comments) post.comments.forEach((c, idx) => { 
                         const isUserComment = (c.author === userNameForPrompt || c.author === '{{user}}');
                         const commenterTag = isUserComment ? `${c.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : c.author;
                         
                         // 【核心修复】剥离评论 HTML
                         const cleanCommentContent = c.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-                        tuquContext += `  [Floor ${idx + 1}] ${commenterTag}: "${cleanCommentContent}" ${cStatus}\n`;
+                        tuquContext += `  [Floor ${idx + 1}] ${commenterTag}: "${cleanCommentContent}"\n`; 
                     });
-                }
-            });
+                });
+            } else {
+                tuquContext = "\n[TUQU FORUM CONTEXT]\n(User chose to hide recent threads. Please generate completely new content based on the rules and your persona.)\n";
+            }
+
+
 
             // 构造版块列表字符串
             let boardsContext = "";
@@ -13472,41 +13469,48 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                 }
             });
 
-            allPosts.sort((a, b) => {
-                const getTs = (p) => {
-                    if (!p) return 0;
-                    if (p.timestamp && typeof p.timestamp === 'string') {
-                        try { return new Date(p.timestamp.replace(/-/g, '/')).getTime(); } catch(e) { return 0; }
-                    }
-                    if (p.id) {
-                        const idStr = String(p.id);
-                        const idMatch = idStr.match(/\d+/);
-                        return idMatch ? parseInt(idMatch[0]) : 0;
-                    }
-                    return 0;
-                };
-                return getTs(b) - getTs(a);
-            });
-            const recent10 = allPosts.slice(0, 10);
-            let tuquContext = "\n[TUQU FORUM CONTEXT - LATEST 10 THREADS]\n";
-            recent10.forEach((post, i) => {
-                const pStatus = post.isReported ? `[BANNED: ${post.reportReason}]` : "[ACTIVE]";
-                const isUserPost = (post.author === userNameForPrompt || post.author === '{{user}}');
-                const authorTag = isUserPost ? `${post.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : post.author;
+            let tuquContext = "";
 
-                // 【核心修复】剥离主贴 HTML
-                const cleanMainContent = post.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-                tuquContext += `\n=== Thread #${i + 1} [Board: ${post._boardName}] ===\nTitle: "${post.subject}" (ID: ${post.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${cleanMainContent}\n`;
-                
-                if (post.comments) post.comments.forEach((c, idx) => { 
-                    const isUserComment = (c.author === userNameForPrompt || c.author === '{{user}}');
-                    const commenterTag = isUserComment ? `${c.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : c.author;
-                    
-                    // 【核心修复】剥离评论 HTML
-                    const cleanCommentContent = c.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-                    tuquContext += `  [Floor ${idx + 1}] ${commenterTag}: "${cleanCommentContent}"\n`; 
+            // 【核心修复】检查 includeContext 选项
+            if (extraOptions.includeContext !== false) {
+                allPosts.sort((a, b) => {
+                    const getTs = (p) => {
+                        if (!p) return 0;
+                        if (p.timestamp && typeof p.timestamp === 'string') {
+                            try { return new Date(p.timestamp.replace(/-/g, '/')).getTime(); } catch(e) { return 0; }
+                        }
+                        if (p.id) {
+                            const idStr = String(p.id);
+                            const idMatch = idStr.match(/\d+/);
+                            return idMatch ? parseInt(idMatch[0]) : 0;
+                        }
+                        return 0;
+                    };
+                    return getTs(b) - getTs(a);
                 });
-            });
+                const recent10 = allPosts.slice(0, 10);
+                tuquContext = "\n[TUQU FORUM CONTEXT - LATEST 10 THREADS]\n";
+                recent10.forEach((post, i) => {
+                    const pStatus = post.isReported ? `[BANNED: ${post.reportReason}]` : "[ACTIVE]";
+                    const isUserPost = (post.author === userNameForPrompt || post.author === '{{user}}');
+                    const authorTag = isUserPost ? `${post.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : post.author;
+
+                    // 【核心修复】剥离主贴 HTML
+                    const cleanMainContent = post.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                    tuquContext += `\n=== Thread #${i + 1} [Board: ${post._boardName}] ===\nTitle: "${post.subject}" (ID: ${post.id}) ${pStatus}\nAuthor: ${authorTag}\nContent: ${cleanMainContent}\n`;
+                    
+                    if (post.comments) post.comments.forEach((c, idx) => { 
+                        const isUserComment = (c.author === userNameForPrompt || c.author === '{{user}}');
+                        const commenterTag = isUserComment ? `${c.author} (!!! THE REAL USER - DO NOT ROLEPLAY !!!)` : c.author;
+                        
+                        // 【核心修复】剥离评论 HTML
+                        const cleanCommentContent = c.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                        tuquContext += `  [Floor ${idx + 1}] ${commenterTag}: "${cleanCommentContent}"\n`; 
+                    });
+                });
+            } else {
+                tuquContext = "\n[TUQU FORUM CONTEXT]\n(User chose to hide recent threads. Please generate completely new content based on the rules and your persona.)\n";
+            }
 
             // 核心：构建基于特定角色的深度指令
             const themedInstruction = `
@@ -13610,34 +13614,15 @@ Check the **"Setting"** provided above.
     *   **ERASE THE USER:** In this specific fiction/thread, \`{{user}}\` DOES NOT EXIST. Do not make them a jealous ex, a friend, or a passerby.
     *   **FOCUS:** The spotlight must be 100% on the specified couple.
     *   **IGNORE USER PERSONA:** For the content of this story, ignore the "User Persona" provided in the context. It is irrelevant.
-    
-    **[MEDIA & EXPRESSION LAW - STRICT MATCHING]**
-You are ENCOURAGED to use emojis/stickers, but ONLY if they exist in the list.
-1. **Emoji:** \`[emoji:Name]\`
-2. **Sticker:** \`[sticker:Name]\`
-3. **ABSOLUTE PROHIBITION:** **NEVER** invent a name. If the list doesn't have "happy", DO NOT use \`[emoji:happy]\`. Use text \`(happy)\` instead.
-
-**Available Emojis:** [${emojiNames}]
-**Available Stickers:** [${stickerNames}]
 
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 `;
-                        // 获取缓存的版规 (仅提取当前锁定的版块规则)
-            const cachedRules = JSON.parse(localStorage.getItem('tuqu_cached_board_rules') || '{}');
-            let boardsRulesText = `\n[FORUM BOARD RULES: ${lockedBoard}]\n`;
             
-            if (cachedRules[lockedBoard]) {
-                // 只添加当前版块的描述和规则
-                boardsRulesText += `- ${cachedRules[lockedBoard]}\n`;
-            } else {
-                // 如果没找到缓存规则，提供一个通用提示
-                boardsRulesText += `- Follow the established social norms and atmosphere of the "${lockedBoard}" board.\n`;
-            }
-
-            // 【核心修复】确保 API 系统提示被正确发送，并加入版规
+            // 【核心修复】确保 API 系统提示被正确发送
+            // 注意：删除了 boardsRulesText，因为 themedInstruction 内部已经包含了 Board Rules 的占位符
             finalMessages = [
-                { role: "system", content: (profile.prompt || "") + boardsRulesText + tuquWorldBookContent + tuquContext + themedInstruction.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName) },
+                { role: "system", content: (profile.prompt || "") + tuquWorldBookContent + tuquContext + themedInstruction.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName) },
                 { role: "user", content: `Create a themed thread for "${lockedBoard}" based on the "${extraOptions.worldview}" setting.` }
             ];
         } else if (actionType === 'specific_post_interaction') {
@@ -13803,13 +13788,7 @@ You MUST output using this EXACT JSON structure.
 
 \`[tuqu_complex_action: {"type":"comment", "postId":"${targetPost.id}", "content":"[Your Story Continuation / Major Update Here]", "author":"LZ", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}, {"author":"ReplyName2", "location":"City2", "content":"Reply2"}]}]\`
 
-**[MEDIA & EXPRESSION LAW - MANDATORY PREFIX]**
-You are ENCOURAGED to use emojis/stickers, but you **MUST** use the correct prefix.
-1. **Emoji:** \`[emoji:Name]\` (Available: [${emojiNames}])
-2. **Sticker:** \`[sticker:Name]\` (Available: [${stickerNames}])
-3. **ABSOLUTE PROHIBITION:** **NEVER** output a tag without a prefix (e.g., \`[跪了]\` is **FORBIDDEN** and will fail). It MUST be \`[emoji:跪了]\` or \`[sticker:跪了]\`.
-
-\${TUQU_MEDIA_PROTOCOL}
+${TUQU_MEDIA_PROTOCOL}
 
 **[ABSOLUTE CP PURITY LAW - THE "THIRD WHEEL" BAN]**
 Check the **"Setting"** provided above.
@@ -13817,15 +13796,6 @@ Check the **"Setting"** provided above.
     *   **ERASE THE USER:** In this specific fiction/thread, \`{{user}}\` DOES NOT EXIST. Do not make them a jealous ex, a friend, or a passerby.
     *   **FOCUS:** The spotlight must be 100% on the specified couple.
     *   **IGNORE USER PERSONA:** For the content of this story, ignore the "User Persona" provided in the context. It is irrelevant.
-    
-    **[MEDIA & EXPRESSION LAW - STRICT MATCHING]**
-You are ENCOURAGED to use emojis/stickers, but ONLY if they exist in the list.
-1. **Emoji:** \`[emoji:Name]\`
-2. **Sticker:** \`[sticker:Name]\`
-3. **ABSOLUTE PROHIBITION:** **NEVER** invent a name. If the list doesn't have "happy", DO NOT use \`[emoji:happy]\`. Use text \`(happy)\` instead.
-
-**Available Emojis:** [${emojiNames}]
-**Available Stickers:** [${stickerNames}]
 
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
