@@ -21190,46 +21190,51 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                     // 【核心修复】定义当前上下文的默认发送者
                     const defaultSender = contactInfo.isGroup ? null : chatState.chatName;
 
-                    // 【终极切割方案】不再依赖 parseResponseIntoBlocks (它依赖换行)，改用正则强制提取所有 block
-                    // 这个正则会匹配所有 <block>...</block>，无论它们是否挤在一行
-                    const blockRegex = /<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>/gi;
+                    // 【混合切割方案】使用 split 将文本按 <block>...</block> 切割
+                    // 正则说明：
+                    // (<block\s+type="[^"]+"(?:\s+sender="[^"]+")?>[\s\S]*?<\/block>)
+                    // 使用捕获组 () 包裹整个正则，这样 split 会把分隔符本身（即 block）也保留在数组里
+                    const splitRegex = /(<block\s+type="[^"]+"(?:\s+sender="[^"]+")?>[\s\S]*?<\/block>)/gi;
                     
-                    let match;
-                    let hasFoundBlocks = false;
+                    const parts = cleanedText.split(splitRegex);
 
-                    // 使用 while 循环提取所有匹配到的块
-                    while ((match = blockRegex.exec(cleanedText)) !== null) {
-                        hasFoundBlocks = true;
-                        const type = match[1];
-                        const sender = match[2];
-                        const content = match[3].trim();
+                    for (const part of parts) {
+                        if (!part || !part.trim()) continue;
 
-                        // 优先使用 block 里的 sender，没有则使用 defaultSender
-                        const effectiveSender = sender || defaultSender;
+                        // 检查这一部分是不是一个 <block>
+                        const blockMatch = part.match(/^<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>$/i);
 
-                        switch (type) {
-                            case 'text':
-                            case 'html':
-                                if (content.startsWith('[reply_to:')) {
-                                    const cmdWithSender = effectiveSender ? `${effectiveSender}: ${content}` : content;
-                                    await processAIResponseLine(cmdWithSender, originatingChatId, effectiveSender);
-                                } else {
-                                    // 这里的 content 已经是纯净的内容了，直接发送
-                                    await addMessage({ type: 'text', text: content, side: 'received', sender: effectiveSender }, originatingChatId);
-                                }
-                                break;
-                            case 'command':
-                                // 指令块的内容直接交给处理器
-                                await processAIResponseLine(content, originatingChatId, effectiveSender);
-                                break;
+                        if (blockMatch) {
+                            // --- 情况 A: 这是一个 Block ---
+                            const type = blockMatch[1];
+                            const sender = blockMatch[2];
+                            const content = blockMatch[3].trim();
+
+                            // 优先使用 block 里的 sender，没有则使用 defaultSender
+                            const effectiveSender = sender || defaultSender;
+
+                            switch (type) {
+                                case 'text':
+                                case 'html':
+                                    if (content.startsWith('[reply_to:')) {
+                                        const cmdWithSender = effectiveSender ? `${effectiveSender}: ${content}` : content;
+                                        await processAIResponseLine(cmdWithSender, originatingChatId, effectiveSender);
+                                    } else {
+                                        await addMessage({ type: 'text', text: content, side: 'received', sender: effectiveSender }, originatingChatId);
+                                    }
+                                    break;
+                                case 'command':
+                                    // 指令块的内容直接交给处理器
+                                    await processAIResponseLine(content, originatingChatId, effectiveSender);
+                                    break;
+                            }
+                        } else {
+                            // --- 情况 B: 这是普通的纯文本 (例如你例子中的描写部分) ---
+                            // 直接作为文本消息发送
+                            await addMessage({ type: 'text', text: part.trim(), side: 'received', sender: defaultSender }, originatingChatId);
                         }
                     }
 
-                    // 【保底逻辑】如果整个文本里一个 <block> 标签都没找到（AI 没按格式输出），
-                    // 就把整个 cleanedText 当作一条普通的文本消息发送，防止吞消息。
-                    if (!hasFoundBlocks && cleanedText.trim()) {
-                        await addMessage({ type: 'text', text: cleanedText.trim(), side: 'received', sender: defaultSender }, originatingChatId);
-                    }
 
 
                 }
