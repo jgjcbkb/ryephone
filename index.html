@@ -31401,7 +31401,8 @@ checkMomentsUpdates(); // <--- 新增这一行
                                     </div>
                                 </div>
                                 <div class="form-group" style="margin:0;">
-                                    <textarea id="import-content-area" class="modal-textarea" placeholder="每行一个，格式：名字 链接"></textarea>
+                                    <textarea id="import-content-area" class="modal-textarea" placeholder="支持格式：&#10;1. 名字 链接&#10;2. 链接 名字&#10;3. 名字:链接 (支持中英文冒号)"></textarea>
+                                    <p class="form-hint" style="padding: 5px 0 0 0;">每行输入一条数据，系统将自动识别链接并提取剩余文字作为名称。</p>
                                 </div>
                             </div>`,
                         buttons: [{ text: '确认链接导入', value: 'confirm_text_import', class: 'secondary' }],
@@ -31605,7 +31606,7 @@ checkMomentsUpdates(); // <--- 新增这一行
                         }
                     });
 
-                    // --- 逻辑 C: 链接导入 (原有逻辑) ---
+                    // --- 逻辑 C: 链接导入 (增强解析版) ---
                     if (importResult && importResult.value === 'confirm_text_import') {
                         const modalBox = importResult.target.closest('.modal-box');
                         const importType = modalBox.querySelector('input[name="import-type"]:checked').value;
@@ -31617,13 +31618,21 @@ checkMomentsUpdates(); // <--- 新增这一行
                             lines.forEach(line => {
                                 const trimmedLine = line.trim();
                                 if (!trimmedLine) return;
+                                
+                                // 1. 提取链接 (支持 http/https)
                                 const urlRegex = /(https?:\/\/[^\s]+)/;
                                 const urlMatch = trimmedLine.match(urlRegex);
                                 if (!urlMatch) return;
+                                
                                 const url = urlMatch[0];
-                                const name = trimmedLine.replace(url, '').replace(/[:：]/g, '').trim();
+                                
+                                // 2. 提取名称：移除链接本身，然后移除首尾的中英文冒号及空格
+                                let name = trimmedLine.replace(url, '').trim();
+                                // 移除开头或结尾的冒号（作为分隔符的情况）
+                                name = name.replace(/^[:：]+|[:：]+$/g, '').trim();
 
                                 if (url && name) {
+                                    // 检查重名或重链接
                                     if (!stickers.some(s => s.url === url)) {
                                         stickers.push({ url, name, type: importType });
                                         newStickersCount++;
@@ -31632,10 +31641,11 @@ checkMomentsUpdates(); // <--- 新增这一行
                             });
                             if (newStickersCount > 0) {
                                 saveStickers();
-                                alert(`成功导入 ${newStickersCount} 个新的内容！`);
+                                alert(`批量导入完成，成功添加 ${newStickersCount} 项内容。`);
                             }
                         }
                     }
+
                     continue; 
                 }
                 
@@ -32785,41 +32795,65 @@ function saveSettings() {
             // 【【【 核心新增：vConsole 调试工具加载逻辑 (精简版) 】】】
 
             if (appearanceSettings.enableVConsole) {
-                // 如果开启，且尚未加载库
+                // --- 新增：时间格式转换辅助函数 ---
+                const formatVCNetworkTime = () => {
+                    const timeCells = document.querySelectorAll('.vc-table-row .vc-table-col:nth-child(4)');
+                    timeCells.forEach(cell => {
+                        const rawVal = cell.innerText.trim();
+                        const ms = parseInt(rawVal);
+                        if (!isNaN(ms) && ms > 0 && !cell.dataset.formatted) {
+                            let finalTime = '';
+                            if (ms < 1000) {
+                                finalTime = ms + 'ms';
+                            } else if (ms < 60000) {
+                                finalTime = (ms / 1000).toFixed(1) + 's';
+                            } else {
+                                finalTime = Math.floor(ms / 60000) + 'm' + ((ms % 60000) / 1000).toFixed(0) + 's';
+                            }
+                            cell.innerText = finalTime;
+                            cell.dataset.formatted = "true"; // 标记已处理，防止重复计算
+                        }
+                    });
+                };
+
                 if (typeof VConsole === 'undefined') {
                     const script = document.createElement('script');
                     script.src = 'https://unpkg.com/vconsole@latest/dist/vconsole.min.js';
                     script.onload = () => {
-                        // 脚本加载完毕后初始化
                         if (!window.vConsoleInstance) {
-                            // 【核心修复】同时调高请求和响应的长度限制，确保完整显示世界书和人设
                             window.vConsoleInstance = new VConsole({
-                                defaultPlugins: ['system', 'network', 'element', 'storage'], // 先加载所有，然后手动移除不需要的
+                                defaultPlugins: ['system', 'network', 'element', 'storage'],
                                 disableLogScrolling: true,
                                 theme: 'dark',
-                                // 【关键新增】设置请求数据（提示词）上限为 50MB
                                 maxNetworkRequestLen: 52428800, 
-                                // 【关键新增】设置响应数据（AI回复）上限为 50MB
                                 maxNetworkResponseLen: 52428800
                             });
-                            
-                            // 手动移除不需要的插件，只留 Log(default)标 和 Network
-                            // 注意：'default' 是 Log 面板的内部名称，不能移除
                             const pluginsToRemove = ['system', 'element', 'storage'];
                             pluginsToRemove.forEach(id => window.vConsoleInstance.removePlugin(id));
                             
-                            console.log('vConsole 已启动 (全量抓取模式)');
+                            // 启动定时转换器
+                            window.vConsoleTimer = setInterval(formatVCNetworkTime, 1000);
+                            console.log('vConsole 已启动 (耗时自动转换模式)');
                         }
                     };
                     document.head.appendChild(script);
                 } else if (!window.vConsoleInstance) {
-                    // 如果库已加载但实例未创建
                     window.vConsoleInstance = new VConsole({ theme: 'dark' });
-                    // 同样执行移除逻辑
                     const pluginsToRemove = ['system', 'element', 'storage'];
                     pluginsToRemove.forEach(id => window.vConsoleInstance.removePlugin(id));
+                    window.vConsoleTimer = setInterval(formatVCNetworkTime, 1000);
                 }
             } else {
+                // 关闭时清除定时器
+                if (window.vConsoleTimer) {
+                    clearInterval(window.vConsoleTimer);
+                    window.vConsoleTimer = null;
+                }
+                if (window.vConsoleInstance) {
+                    window.vConsoleInstance.destroy();
+                    window.vConsoleInstance = null;
+                }
+            }
                 // 如果关闭，销毁实例
                 if (window.vConsoleInstance) {
                     window.vConsoleInstance.destroy();
