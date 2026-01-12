@@ -14457,10 +14457,7 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                             // ... (后续的回退逻辑保持不变) ...
                             
                             // 【终极正则修复】这个正则可以匹配双引号内包含转义双引号的任意内容
-                            // 解释: "text" \s* : \s* " ( (?: [^"\\] | \\. )* ) "
-                            // [^"\\] 匹配非引号且非反斜杠的字符
-                            // \\. 匹配转义字符 (如 \" 或 \\)
-                            // * 重复任意次
+                            const typeMatch = cleanJsonString.match(/"type"\s*:\s*"([^"]*)"/);
                             const textMatch = cleanJsonString.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/);
                             const contentMatch = cleanJsonString.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
                             const signerMatch = cleanJsonString.match(/"signer"\s*:\s*"([^"]*)"/);
@@ -14468,6 +14465,7 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 
                             if (typeMatch) {
                                 const unescape = (str) => str ? str.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\') : '';
+
                                 postData = {
                                     type: typeMatch[1],
                                     text: textMatch ? unescape(textMatch[1]) : '',
@@ -14515,15 +14513,16 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                 let commandsFound = 0;
 
                 while ((match = momentInteractionRegex.exec(cleanedResponse)) !== null) {
-                    commandsFound++;
-                    const command = match[1];
-                    const value = match[2];
+                commandsFound++;
+                const command = match[1];
+                const value = match[2];
 
-                    console.log(`[诊断日志] 角色 "${senderName}": 找到指令 #${commandsFound}: ${command}`);
+                console.log(`[诊断日志] 角色 "${senderName}": 找到指令 #${commandsFound}: ${command}`);
 
-                    if (command === 'like_moment') {
-                        let targetPostId = value.trim();
-                        // 尝试解析，万一AI发神经有时候用JSON有时候用纯文本
+                if (command === 'like_moment') {
+                    let targetPostId = value.trim();
+                    // 尝试解析，万一AI发神经有时候用JSON有时候用纯文本
+
                         if (targetPostId.startsWith('{')) {
                             try {
                                 const parsed = JSON.parse(targetPostId);
