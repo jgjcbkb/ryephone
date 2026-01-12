@@ -7957,26 +7957,38 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 <label for="chat-user-persona-select">选择用户人设 ({{user}} Persona)</label>
                                 <select id="chat-user-persona-select"></select>
                             </div>
-                            <!-- 【核心新增】：后台任务概率设置 -->
+                            <!-- 【核心修改】：支持切换输入模式的概率设置 -->
                             <div style="padding: 15px; background: #f9f9f9; border-radius: 10px; margin: 10px 15px;">
                                 <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #333;">自动生成概率 (%)</h4>
                                 <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    <!-- 心事卡片概率 -->
                                     <div>
                                         <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 4px;">
-                                            <span>心事卡片</span>
+                                            <span class="prob-toggle-title" data-target="mood" style="cursor: pointer; text-decoration: underline;">心事卡片 (点击切换输入)</span>
                                             <span id="prob-mood-val">70%</span>
                                         </div>
-                                        <input type="range" id="prob-mood-input" min="0" max="100" step="1" value="70" style="width: 100%; margin: 0;">
+                                        <div id="prob-mood-slider-wrapper">
+                                            <input type="range" id="prob-mood-input" min="0" max="100" step="1" value="70" style="width: 100%; margin: 0;">
+                                        </div>
+                                        <div id="prob-mood-number-wrapper" style="display: none;">
+                                            <input type="number" id="prob-mood-number-input" min="0" max="100" class="modal-input" style="margin: 0; padding: 5px 10px;">
+                                        </div>
                                     </div>
+                                    <!-- 备忘录概率 -->
                                     <div>
                                         <div style="display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 4px;">
-                                            <span>寻呼机备忘录</span>
+                                            <span class="prob-toggle-title" data-target="pager" style="cursor: pointer; text-decoration: underline;">寻呼机备忘录 (点击切换输入)</span>
                                             <span id="prob-pager-val">30%</span>
                                         </div>
-                                        <input type="range" id="prob-pager-input" min="0" max="100" step="1" value="30" style="width: 100%; margin: 0;">
+                                        <div id="prob-pager-slider-wrapper">
+                                            <input type="range" id="prob-pager-input" min="0" max="100" step="1" value="30" style="width: 100%; margin: 0;">
+                                        </div>
+                                        <div id="prob-pager-number-wrapper" style="display: none;">
+                                            <input type="number" id="prob-pager-number-input" min="0" max="100" class="modal-input" style="margin: 0; padding: 5px 10px;">
+                                        </div>
                                     </div>
                                 </div>
-                                <p class="form-hint" style="margin-top: 8px; padding: 0;">设为 0 则不生成，设为 100 则每次必生成。</p>
+                                <p class="form-hint" style="margin-top: 8px; padding: 0;">提示：点击标题可在滑动条与数字输入框之间切换。</p>
                             </div>
                             <div class="form-group">
 
@@ -16274,9 +16286,8 @@ You MUST use the custom \`<dm>\` tag format.
     // 新增结束
 
 
-    // 保存概率设置
+    // 保存概率设置 (由于已同步，读取 slider 即可)
     info.moodProbability = parseInt(document.getElementById('prob-mood-input').value, 10);
-
     info.pagerProbability = parseInt(document.getElementById('prob-pager-input').value, 10);
 
 
@@ -26434,20 +26445,65 @@ function openChatInfoPage() {
             // 新增结束
 
 
-            // --- 加载并绑定概率滑块 ---
+            // --- 加载并绑定概率设置 (支持双模式同步) ---
             const moodSlider = document.getElementById('prob-mood-input');
-
+            const moodNumber = document.getElementById('prob-mood-number-input');
             const moodVal = document.getElementById('prob-mood-val');
+            
             const pagerSlider = document.getElementById('prob-pager-input');
+            const pagerNumber = document.getElementById('prob-pager-number-input');
             const pagerVal = document.getElementById('prob-pager-val');
 
-            moodSlider.value = info.moodProbability !== undefined ? info.moodProbability : 70;
-            moodVal.textContent = moodSlider.value + '%';
-            pagerSlider.value = info.pagerProbability !== undefined ? info.pagerProbability : 30;
-            pagerVal.textContent = pagerSlider.value + '%';
+            // 初始化数值
+            const initialMood = info.moodProbability !== undefined ? info.moodProbability : 70;
+            const initialPager = info.pagerProbability !== undefined ? info.pagerProbability : 30;
 
-            moodSlider.oninput = () => moodVal.textContent = moodSlider.value + '%';
-            pagerSlider.oninput = () => pagerVal.textContent = pagerSlider.value + '%';
+            moodSlider.value = moodNumber.value = initialMood;
+            moodVal.textContent = initialMood + '%';
+            
+            pagerSlider.value = pagerNumber.value = initialPager;
+            pagerVal.textContent = initialPager + '%';
+
+            // 同步心事概率
+            moodSlider.oninput = () => {
+                moodNumber.value = moodSlider.value;
+                moodVal.textContent = moodSlider.value + '%';
+            };
+            moodNumber.oninput = () => {
+                let val = parseInt(moodNumber.value, 10);
+                if (val > 100) val = 100; if (val < 0) val = 0;
+                moodSlider.value = val;
+                moodVal.textContent = val + '%';
+            };
+
+            // 同步备忘录概率
+            pagerSlider.oninput = () => {
+                pagerNumber.value = pagerSlider.value;
+                pagerVal.textContent = pagerSlider.value + '%';
+            };
+            pagerNumber.oninput = () => {
+                let val = parseInt(pagerNumber.value, 10);
+                if (val > 100) val = 100; if (val < 0) val = 0;
+                pagerSlider.value = val;
+                pagerVal.textContent = val + '%';
+            };
+
+            // 绑定切换点击事件
+            document.querySelectorAll('.prob-toggle-title').forEach(title => {
+                title.onclick = () => {
+                    const target = title.dataset.target;
+                    const sliderWrap = document.getElementById(`prob-${target}-slider-wrapper`);
+                    const numberWrap = document.getElementById(`prob-${target}-number-wrapper`);
+                    if (sliderWrap.style.display === 'none') {
+                        sliderWrap.style.display = 'block';
+                        numberWrap.style.display = 'none';
+                    } else {
+                        sliderWrap.style.display = 'none';
+                        numberWrap.style.display = 'block';
+                    }
+                };
+            });
+
 
 document.getElementById('preamble-end-time').value = info.preambleEndTime || '';
 
