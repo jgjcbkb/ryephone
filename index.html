@@ -12781,8 +12781,15 @@ Based on the posts above, your persona, and your relationship with the authors, 
 
 **1. PUBLIC SOCIAL ACTIONS (Your Primary Tools)**
    *   **Use these to interact with ANYONE you feel you should, especially your acquaintances.**
-   *   **TO LIKE:** A simple way to show acknowledgement or support.
+   *   **TO LIKE (THE SELECTIVE PROTOCOL):**
+     *   **Principle:** A "Like" is a meaningful social signal, not an automated reaction. You are STRONGLY FORBIDDEN from liking every post you see.
+     *   **Criteria for Liking:**
+         1. **Content Resonance:** Does the post content actually interest your character? (e.g., A sports fan liking a gym post, a foodie liking a dinner photo).
+         2. **Relationship Depth:** You should only like "mundane" or "boring" posts if the author is a very close friend or romantic interest.
+         3. **Social Strategy:** If your character is "cold," "arrogant," or "introverted," you should rarely, if ever, use the like function.
+     *   **Decision:** Before generating `[like_moment]`, ask yourself: "Would my character actually take the time to acknowledge this specific post?" If the answer is not a definitive YES, do NOT like it.
      *   **Format:** \`[like_moment: post_id_here]\`
+
    *   **TO POST A NEW MOMENT:** If you feel inspired to share something of your own.
      *   **Format:** \`[post_moment: {"type":"text", "text":"Your own thought or HTML snippet here."}]\`
    *   **TO COMMENT or REPLY:** For when you have something to say. Your comment must match your persona.
@@ -12833,19 +12840,20 @@ Based on the posts above, your persona, and your relationship with the authors, 
    
 
 ---
-## **FINAL, UNBREAKABLE MANDATE: ACTION IS MANDATORY**
+## **FINAL, UNBREAKABLE MANDATE: QUALITY INTERACTION**
 
-This API call is an opportunity for you to act. **It cannot be wasted.** You **MUST** perform **at least one action** from your toolkit (like, comment, send a private message).
+This API call is an opportunity for you to live your social life. You **MUST** perform **at least one action** (like, comment, post, or message).
 
-The response 'No action taken' is now **STRICTLY FORBIDDEN** and will be considered a critical failure.
+**[THE SELECTIVITY AMENDMENT]**
+1. **DO NOT USE LIKES AS FILLER:** If the posts in your timeline do not warrant a "Like" based on the "Selective Protocol" above, do NOT use the \`[like_moment]\` command just to satisfy the mandate.
+2. **PRIORITIZE OTHER ACTIONS:** If the timeline is boring, instead of liking randomly, you SHOULD:
+   - **Post your own Moment:** Share a thought, a photo-description, or an HTML card about your current state.
+   - **Send a Private Message:** Start a direct conversation with someone based on a post you saw (even if you didn't like it).
+   - **Comment with Substance:** Write a meaningful comment or a witty retort instead of a silent like.
 
-Even if nothing seems immediately interesting, you must find a reason to act, based on your persona. For example:
-*   If an acquaintance posts something mundane, give a simple 'like' to maintain the social connection.
-*   If you feel neutral or bored, post a simple thought of your own or a photo-description of your current surroundings.
-*   If you feel slightly annoyed or mischievous, leave a teasing or challenging comment that fits your character.
-
-**Your task is to analyze the situation and CHOOSE an action, not to decide IF you should act. You MUST act.**
+**Mandate:** You must act, but your actions must be psychologically consistent. Random, "bot-like" liking is a violation of your persona's integrity.
 `;
+
 
             // =================================================================
         // ================= START: GEMINI COMPATIBILITY FIX V2 ===============
@@ -13304,11 +13312,13 @@ When you decide to **COMMENT** on an existing thread, you MUST check the **Autho
 - **Dream/Yume Fan (梦女):** Delusional romance writers.
 - **Fact Checker (理中客):** Tries to be logical but usually gets flamed by everyone.
 
-**[THREAD POPULARITY DECISION - CREATIVE FREEDOM]**
+**[THREAD POPULARITY DECISION - DYNAMIC ENGAGEMENT]**
 You have total freedom to decide the engagement level based on the content's nature.
-- **Lively Thread:** If the topic is controversial or interesting, generate a "water army" of comments. **The quantity is up to you (few or many), as long as it's interesting.**
-- **Quiet Thread:** If it's a mundane update, a late-night thought, or a "tree hole" post, **it is perfectly fine to have NO comments.** Simply set \`"water_army": []\`.
-- **Logic:** Do not force comments if the post doesn't naturally invite them.
+- **Lively Thread:** If the topic is controversial, viral, or highly interesting, generate a large "water army" of comments. The quantity is up to you and should range from 8 to 30+ unique replies to simulate a high-traffic forum.
+- **Average Thread:** For standard discussions, 4 to 10 replies are appropriate.
+- **Quiet Thread:** If it is a personal late-night thought or a "tree hole" post, it is perfectly fine to have 0 to 3 comments.
+- **Logic:** Do not be limited by a fixed number. Match the volume to the drama.
+
 
 **COMMANDS:**
 - To post a NEW TOPIC:
@@ -13509,7 +13519,8 @@ You are part of a diverse internet ecosystem. **DO NOT be repetitive.**
 1.  **Analyze the Forum:** Review the latest posts.
 2.  **Choose Your Archetype:** Will you be a "Weak Intellect" philosopher, a "Kill Line" analyst, a poetic nihilist, or a complainer?
 3.  **Create a Post:** Generate a new topic or a comment.
-4.  **Decide on Engagement:** You have full control over the "water army". You can generate **any number** of comments to build drama, OR you can leave the thread empty (\`"water_army": []\`) if the topic feels more natural without immediate replies. **Quality and fun over quantity.**
+4.  **Decide on Engagement:** You have full control over the "water army". For trending or controversial topics, you are encouraged to generate 15 to 30+ comments to build massive drama. For mundane posts, a few or even zero comments (\`"water_army": []\`) is more natural. Quality and realistic volume are both important.
+
 5.  **Use Creative Names:** Your pseudonyms should reflect the post's tone (e.g., "辩证法带师", "斯奎奇大弟子", "都市伤心小狗").
 
 **[STRICT JSON FORMAT REQUIRED]**
@@ -13749,11 +13760,13 @@ Your Persona: ${finalCharPersonaText}
 ${associatedNpcsPrompt}
 Recent Chat History: ${chatHistoryForTuqu || "No recent history."}
 
-**[WATER ARMY ENGAGEMENT (OPTIONAL - FREEDOM OF CHOICE)]**
-You decide if your post receives immediate attention.
-- **Option A (Lively):** Generate follow-up comments that are **DESPERATE FOR THE NEXT UPDATE** or discussing the plot. **The quantity is up to you.**
-- **Option B (Quiet):** If you want to let the post sit and wait for the real user to react, set \`"water_army": []\`. 
-- **Guideline:** Use Option A for major cliffhangers, and Option B for slower character development. **Do not force comments if not needed.**
+**[WATER ARMY ENGAGEMENT - VOLUME SCALING]**
+You decide if your post receives immediate attention based on its impact.
+- **Option A (Viral/Lively):** For major cliffhangers or serialized updates, generate a large volume of follow-up comments (10 to 25+) expressing extreme excitement or discussing theories.
+- **Option B (Moderate):** For regular updates, 3 to 8 comments are sufficient.
+- **Option C (Quiet):** Set \`"water_army": []\` to let the post wait for the user.
+- **Mandate:** Match the number of replies to the "heat" of your story update.
+
 
 **[STRICT JSON FORMAT REQUIRED]**
 
@@ -13931,11 +13944,12 @@ Read the [TARGET THREAD CONTEXT]. Determine the type of the thread:
 *   **YOUR ROLE:** A key participant or the OP providing a major update.
 *   **MAIN ACTION:** Provide new information, a plot twist, or a strong counter-argument to escalate the drama.
 
-**[WATER ARMY TASK (OPTIONAL - FREEDOM)]**
-You have full control.
-- If the update is shocking or viral, generate **as many comments as needed** to simulate the hype.
-- If the update is quiet or personal, you can generate **zero comments** (\`"water_army": []\`).
-- **Constraint:** Do not force engagement if the story doesn't call for it.
+**[WATER ARMY TASK - HYPES & REACTIONS]**
+You have full control over the crowd's reaction.
+- If your update reveals a major secret or plot twist, generate a massive wave of 15 to 30+ comments to simulate the "Hype" and forum chaos.
+- If the update is a minor bridge chapter, 2 to 6 comments are enough.
+- **Constraint:** Ensure the volume of comments reflects the actual significance of the update.
+
 
 **[ROLEPLAY SETTING]**
 ${senderName !== 'Anonymous_System' ? `Character: "${senderName}"\nUser Persona: ${finalUserPersonaText}\nYour Persona: ${finalCharPersonaText}\n${associatedNpcsPrompt}` : `Role: Anonymous Internet User / Original Author`}
@@ -14691,6 +14705,12 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                 location: data.location,
                                 forceId: newPostId
                             }, '*');
+
+                            // 兔区新帖横幅通知
+                            conversationManager.showNotificationBanner('TUQU', { 
+                                text: `兔区新帖：${data.subject}`, 
+                                type: 'text' 
+                            });
                             
                             if (data.water_army && Array.isArray(data.water_army)) {
                                 data.water_army.forEach((c, index) => {
@@ -14728,6 +14748,12 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                 location: data.location,
                                 quote: data.quote 
                             }, '*');
+
+                            // 兔区评论横幅通知
+                            conversationManager.showNotificationBanner('TUQU', { 
+                                text: `兔区收到新的回复`, 
+                                type: 'text' 
+                            });
 
                             if (data.water_army && Array.isArray(data.water_army)) {
                                 data.water_army.forEach((c, index) => {
@@ -16962,11 +16988,16 @@ const timeManager = (function() {
     };
 })();
 
-const conversationManager = (function() {
+    const conversationManager = (function() {
 
         const appRoot = document.getElementById('page-conversation');
         const imageUploadInput = appRoot.querySelector('#image-upload-input');
         const messagesContainer = appRoot.querySelector('#messages-container'), chatContent = appRoot.querySelector('.chat-content'), chatContactName = appRoot.querySelector('#chat-contact-name'), backButton = appRoot.querySelector('#back-button'), headerMoreBtn = appRoot.querySelector('#header-more-btn'), actionMenu = appRoot.querySelector('#action-menu'), dynamicDecorationBtn = appRoot.querySelector('#dynamic-decoration-btn'), messageContextMenu = appRoot.querySelector('#message-context-menu'), replyPreviewBar = appRoot.querySelector('#reply-preview-bar'), replyPreviewContent = replyPreviewBar.querySelector('.reply-preview-content'), cancelReplyBtn = appRoot.querySelector('#cancel-reply-btn');
+
+        // --- 【核心新增】通知队列变量 ---
+        let notificationQueue = [];
+        let isBannerAnimating = false;
+
         const footerMessageInput = appRoot.querySelector('#footer-message-input'), footerVoiceBtn = appRoot.querySelector('#footer-voice-btn'), footerStickerBtn = appRoot.querySelector('#footer-sticker-btn'), footerPlusBtn = appRoot.querySelector('#footer-plus-btn'), footerSendBtn = appRoot.querySelector('#footer-send-btn');
         const multiSelectBar = appRoot.querySelector('#multi-select-bar'), multiSelectDeleteBtn = appRoot.querySelector('#multi-select-delete-btn'), multiSelectCancelBtn = appRoot.querySelector('#multi-select-cancel-btn'), multiSelectCounter = appRoot.querySelector('#multi-select-counter'), multiSelectAllBtn = appRoot.querySelector('#multi-select-all-btn');
         // --- 核心新增 ---
@@ -24731,58 +24762,71 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
         };
 
         let bannerTimeout;
-        function showNotificationBanner(chatId, msgData, unreadCount) { 
-            // 如果已有横幅，先移除
-            const existingBanner = document.getElementById('notification-banner');
-            if (existingBanner) {
-                existingBanner.remove();
-                clearTimeout(bannerTimeout);
-            }
-
-            const chat = chatList.find(c => c.id === chatId);
-            if (!chat) return;
-
-            const chatInfo = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-            const displayName = chatInfo.remark || chat.name;
-            const avatarUrl = loadFromLocalStorage(`chat_avatar_${chat.id}`, null) || generateDefaultAvatar(displayName);
-
-            // --- 【核心修复 1】内容解析逻辑 (彻底消灭 "[新消息]") ---
-            let specificContent = msgData.text || '';
-
-            // 只有当它是特殊的多媒体类型时，才使用简略标签
-            // 关键：排除 'text' 和 'system'，让它们直接显示原文！
-            if (msgData.type !== 'text' && msgData.type !== 'system') {
-                const typeMap = { 
-                    'photo': '[图片]', 
-                    'voice': '[语音]', 
-                    'video': '[视频]', 
-                    'photo-description': '[图文]',
-                    'location': '[位置]'
-                };
-                
-                // 对于红包、转账等，我们尝试显示得更具体一点
-                if (msgData.type === 'red_packet') {
-                    specificContent = `[红包] ${msgData.text}`;
-                } else if (msgData.type === 'transfer') {
-                    specificContent = `[转账] ¥${msgData.text}`;
-                } else if (msgData.type === 'gift') {
-                    specificContent = `[礼物] ${msgData.text}`;
-                } else if (msgData.type === 'pay_for_me') {
-                    specificContent = `[代付] ${msgData.text}`;
-                } else {
-                    // 如果在映射表里，就用映射表；如果不在，就保留原文本(以防万一)，实在没有才显示[新消息]
-                    specificContent = typeMap[msgData.type] || msgData.text || '[新消息]';
-                }
-            }
-            // --- 修复结束 ---
-
-            // --- 【核心修改】恢复 "[x条]" 计数前缀 ---
-            // 逻辑：如果未读数大于1，就在消息前面加上 "[x条]"
-            let bannerDisplayText = specificContent; 
+        function showNotificationBanner(chatId, msgData, unreadCount) {
+            // 1. 将通知请求加入队列
+            notificationQueue.push({ chatId, msgData, unreadCount });
             
+            // 2. 尝试处理队列
+            processNotificationQueue();
+        }
+        function processNotificationQueue() {
+            // 如果当前正在展示动画，或者队列空了，就停止
+            if (isBannerAnimating || notificationQueue.length === 0) return;
+
+            // 锁定状态，防止下一条通知同时挤进来
+            isBannerAnimating = true;
+
+            // 取出队首的通知数据
+            const { chatId, msgData, unreadCount } = notificationQueue.shift();
+
+            let displayName, avatarUrl, clickAction;
+
+            // 1. 判定虚拟 ID (朋友圈或兔区)
+            if (chatId === 'MOMENTS') {
+                displayName = "朋友圈";
+                avatarUrl = "https://i.postimg.cc/BZcqpKxY/757B1148E60B7D8B149400F98443116A.png";
+                clickAction = () => {
+                    document.querySelector('.nav-item[data-tab="moments"]').click();
+                };
+            } else if (chatId === 'TUQU') {
+                displayName = "兔区";
+                avatarUrl = "https://i.postimg.cc/Xq3n3j0g/IMG-0499.png";
+                clickAction = () => {
+                    document.querySelector('.nav-item[data-tab="tuqu"]').click();
+                };
+            } else {
+                // 2. 正常的聊天通知逻辑
+                const chat = chatList.find(c => c.id === chatId);
+                if (!chat) {
+                    isBannerAnimating = false;
+                    processNotificationQueue();
+                    return;
+                }
+                const chatInfo = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+                displayName = chatInfo.remark || chat.name;
+                avatarUrl = loadFromLocalStorage(`chat_avatar_${chat.id}`, null) || generateDefaultAvatar(displayName);
+                clickAction = () => open(chatId);
+            }
+
+            // 3. 内容解析逻辑
+            let specificContent = msgData.text || '';
+            if (chatId !== 'MOMENTS' && chatId !== 'TUQU' && msgData.type !== 'text' && msgData.type !== 'system') {
+                const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'video': '[视频]', 'photo-description': '[图文]', 'location': '[位置]' };
+                if (msgData.type === 'red_packet') specificContent = `[红包] ${msgData.text}`;
+                else if (msgData.type === 'transfer') specificContent = `[转账] ¥${msgData.text}`;
+                else if (msgData.type === 'gift') specificContent = `[礼物] ${msgData.text}`;
+                else if (msgData.type === 'pay_for_me') specificContent = `[代付] ${msgData.text}`;
+                else specificContent = typeMap[msgData.type] || msgData.text || '[新消息]';
+            }
+
+            let bannerDisplayText = specificContent;
             if (unreadCount > 1) {
                 bannerDisplayText = `[${unreadCount}条] ${specificContent}`;
             }
+
+            // 4. 渲染 DOM
+            const existingBanner = document.getElementById('notification-banner');
+            if (existingBanner) existingBanner.remove();
 
             const banner = document.createElement('div');
             banner.id = 'notification-banner';
@@ -24791,7 +24835,6 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                     <div class="avatar"></div>
                     <div class="content">
                         <div class="sender-name">${displayName}</div>
-                        <!-- 允许换行显示 -->
                         <div class="message-preview">${bannerDisplayText}</div>
                     </div>
                 </div>
@@ -24800,60 +24843,62 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
 
             document.querySelector('.app-container').appendChild(banner);
             setImageSrc(banner.querySelector('.avatar'), avatarUrl);
-            
+
+            // 定义关闭逻辑
             const closeBanner = () => {
                 banner.classList.remove('visible');
-                banner.addEventListener('transitionend', () => banner.remove(), { once: true });
+                // 等待滑出动画结束
+                banner.addEventListener('transitionend', () => {
+                    banner.remove();
+                    // 动画彻底结束，解锁状态，并尝试处理队列中的下一条
+                    isBannerAnimating = false;
+                    setTimeout(processNotificationQueue, 200); // 留 200ms 视觉间隔
+                }, { once: true });
                 clearTimeout(bannerTimeout);
             };
-banner.querySelector('#notification-banner-clickable-area').addEventListener('click', () => {
-                open(chatId);
+
+            // 绑定点击跳转
+            banner.querySelector('#notification-banner-clickable-area').addEventListener('click', () => {
+                clickAction();
                 closeBanner();
             });
-            
+
+            // 绑定手动关闭
             banner.querySelector('#notification-banner-close-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
                 closeBanner();
             });
-            
+
+            // 触发滑入动画
             setTimeout(() => banner.classList.add('visible'), 50);
 
+            // 播放提示音
             if (window.app && window.app.playNotificationSound) {
                 window.app.playNotificationSound();
             }
 
-            // 【【【 终极方案：安卓/iOS 分流处理 】】】
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-            if ("Notification" in window && Notification.permission === "granted") {
+            // 触发系统推送
+            if ("Notification" in window && Notification.permission === "granted" && "serviceWorker" in navigator) {
                 try {
-                    const systemNotificationText = specificContent;
-                    
-                    // 【核心保留】使用唯一 Tag，确保锁屏通知一条一条叠起来，不覆盖
                     const uniqueTag = chatId + '_' + Date.now() + '_' + Math.random();
-
-                    // 【终极修复】不分安卓苹果，统一走 Service Worker 注册路径触发通知
-                    if ("serviceWorker" in navigator) {
-                        navigator.serviceWorker.ready.then(function(registration) {
-                            registration.showNotification(displayName, {
-                                body: specificContent, // 使用处理后的内容
-                                icon: avatarUrl,
-                                badge: 'https://i.postimg.cc/MTSwWVtp/IMG-2146.png', // 换成你的图标
-                                tag: uniqueTag, 
-                                renotify: true, 
-                                requireInteraction: true, 
-                                silent: false // 设为 false，确保有声音/震动提醒
-                            });
+                    navigator.serviceWorker.ready.then(function(registration) {
+                        registration.showNotification(displayName, {
+                            body: specificContent,
+                            icon: avatarUrl,
+                            badge: 'https://i.postimg.cc/MTSwWVtp/IMG-2146.png',
+                            tag: uniqueTag,
+                            renotify: true,
+                            requireInteraction: false,
+                            silent: false
                         });
-                    }
-                } catch (e) {
-                    console.error("通知发送失败:", e);
-                }
+                    });
+                } catch (e) { console.error(e); }
             }
-            // 【【【 插入结束 】】】
 
-            bannerTimeout = setTimeout(closeBanner, 5000);
+            // 3秒后自动滑走
+            bannerTimeout = setTimeout(closeBanner, 3000);
         }
+
             
 
 const reRenderMessages = (isInitialLoad = false) => {
@@ -28616,7 +28661,7 @@ async function triggerBackgroundDataUpdate(context, senderName, chatId) {
         return { 
             open, 
             getCurrentChatId, 
-            showFullTuquPost, // <--- 添加这一行
+            showFullTuquPost, 
             updateHeaderTitle,
 
             reRenderMessages, 
@@ -28635,14 +28680,15 @@ async function triggerBackgroundDataUpdate(context, senderName, chatId) {
             processAIResponseLine, 
             executeBackgroundUpdatesAndCleanText, 
             showBubbleSettingsModal,
-            triggerAIContinuation, // <--- 注意这里加了逗号
-            reloadContactInfo, // <--- 【核心新增】暴露这个函数
-            // 【核心新增】暴露保活控制函数，供主动行为使用
+            triggerAIContinuation, 
+            reloadContactInfo, 
             enableKeepAlive,
             disableKeepAlive,
-            enablePiPKeepAlive, // 画中画
-            disablePiPKeepAlive
+            enablePiPKeepAlive, 
+            disablePiPKeepAlive,
+            showNotificationBanner // <--- 核心新增：公开此函数供外部调用
         };
+
 })();
 
 window.manualReplaceInTextarea = function(textareaId) {
@@ -30298,9 +30344,13 @@ sendCommentBtn.addEventListener('click', () => {
                 renderFeed();
             }
             
-            showNotification(`“${senderName}”发布了一条新朋友圈`);
+            // 发送横幅通知
+            conversationManager.showNotificationBanner('MOMENTS', { 
+                text: `“${senderName}”发布了一条新朋友圈`, 
+                type: 'text' 
+            });
             
-            checkMomentsUpdates(); // <--- 新增这一行
+            checkMomentsUpdates();
         }
 
         async function getRecentMomentsForAI(characterName, limit = 5) {
@@ -30556,6 +30606,13 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
                     post.comments.push(newComment);
                     saveFeed();
                     updatePostInteractions(post.id);
+                    
+                    // 发送横幅通知
+                    conversationManager.showNotificationBanner('MOMENTS', { 
+                        text: `“${characterName}”评论了朋友圈`, 
+                        type: 'text' 
+                    });
+                    
                     console.log(`[Dynamics] ${characterName} commented on post ${post.id}` + (newComment.replyTo ? ` (replying to ${newComment.replyTo})` : ''));
                 }
             }
@@ -32795,65 +32852,41 @@ function saveSettings() {
             // 【【【 核心新增：vConsole 调试工具加载逻辑 (精简版) 】】】
 
             if (appearanceSettings.enableVConsole) {
-                // --- 新增：时间格式转换辅助函数 ---
-                const formatVCNetworkTime = () => {
-                    const timeCells = document.querySelectorAll('.vc-table-row .vc-table-col:nth-child(4)');
-                    timeCells.forEach(cell => {
-                        const rawVal = cell.innerText.trim();
-                        const ms = parseInt(rawVal);
-                        if (!isNaN(ms) && ms > 0 && !cell.dataset.formatted) {
-                            let finalTime = '';
-                            if (ms < 1000) {
-                                finalTime = ms + 'ms';
-                            } else if (ms < 60000) {
-                                finalTime = (ms / 1000).toFixed(1) + 's';
-                            } else {
-                                finalTime = Math.floor(ms / 60000) + 'm' + ((ms % 60000) / 1000).toFixed(0) + 's';
-                            }
-                            cell.innerText = finalTime;
-                            cell.dataset.formatted = "true"; // 标记已处理，防止重复计算
-                        }
-                    });
-                };
-
+                // 如果开启，且尚未加载库
                 if (typeof VConsole === 'undefined') {
                     const script = document.createElement('script');
                     script.src = 'https://unpkg.com/vconsole@latest/dist/vconsole.min.js';
                     script.onload = () => {
+                        // 脚本加载完毕后初始化
                         if (!window.vConsoleInstance) {
+                            // 【核心修复】同时调高请求和响应的长度限制，确保完整显示世界书和人设
                             window.vConsoleInstance = new VConsole({
-                                defaultPlugins: ['system', 'network', 'element', 'storage'],
+                                defaultPlugins: ['system', 'network', 'element', 'storage'], // 先加载所有，然后手动移除不需要的
                                 disableLogScrolling: true,
                                 theme: 'dark',
+                                // 【关键新增】设置请求数据（提示词）上限为 50MB
                                 maxNetworkRequestLen: 52428800, 
+                                // 【关键新增】设置响应数据（AI回复）上限为 50MB
                                 maxNetworkResponseLen: 52428800
                             });
+                            
+                            // 手动移除不需要的插件，只留 Log(default)标 和 Network
+                            // 注意：'default' 是 Log 面板的内部名称，不能移除
                             const pluginsToRemove = ['system', 'element', 'storage'];
                             pluginsToRemove.forEach(id => window.vConsoleInstance.removePlugin(id));
                             
-                            // 启动定时转换器
-                            window.vConsoleTimer = setInterval(formatVCNetworkTime, 1000);
-                            console.log('vConsole 已启动 (耗时自动转换模式)');
+                            console.log('vConsole 已启动 (全量抓取模式)');
                         }
                     };
                     document.head.appendChild(script);
                 } else if (!window.vConsoleInstance) {
+                    // 如果库已加载但实例未创建
                     window.vConsoleInstance = new VConsole({ theme: 'dark' });
+                    // 同样执行移除逻辑
                     const pluginsToRemove = ['system', 'element', 'storage'];
                     pluginsToRemove.forEach(id => window.vConsoleInstance.removePlugin(id));
-                    window.vConsoleTimer = setInterval(formatVCNetworkTime, 1000);
                 }
             } else {
-                // 关闭时清除定时器
-                if (window.vConsoleTimer) {
-                    clearInterval(window.vConsoleTimer);
-                    window.vConsoleTimer = null;
-                }
-                if (window.vConsoleInstance) {
-                    window.vConsoleInstance.destroy();
-                    window.vConsoleInstance = null;
-                }
-            }
                 // 如果关闭，销毁实例
                 if (window.vConsoleInstance) {
                     window.vConsoleInstance.destroy();
