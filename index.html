@@ -12824,17 +12824,27 @@ ${processedChatHistory}
             // END: 注入时间上下文
             // =================================================================
 
-            const instruction = `
-${ULTIMATE_PSYCHOLOGICAL_ENGINE}
-${baseSystemPrompt}
+            // 【核心修复：主动发朋友圈时，强制移除双击互动相关的指令，防止AI混淆】
+            let cleanPsychEngine = ULTIMATE_PSYCHOLOGICAL_ENGINE;
+            // 1. 切除 "Directive Eight" (状态 vs 互动陷阱)
+            cleanPsychEngine = cleanPsychEngine.replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "");
+            
+            // 2. 切除 "头像双击互动协议" 和 "预设配置协议" (如果它们存在于 baseSystemPrompt 中)
+            let cleanBasePrompt = baseSystemPrompt;
+            cleanBasePrompt = cleanBasePrompt.replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "");
+            cleanBasePrompt = cleanBasePrompt.replace(/\*\*\[PRESET CONFIGURATION PROTOCOL[\s\S]*?(?=---)/g, "");
+
+            // --- 核心修正：注入身份锁定指令 ---
+            const identityLockInPrompt = `
+${cleanPsychEngine}
+${cleanBasePrompt}
 ${timeContext}
-${musicContext}
-
-
 
 
 # [ULTIMATE IDENTITY LOCK-IN - UNBREAKABLE RULE]
+
 **FOR THIS SPECIFIC ACTION, YOUR IDENTITY IS LOCKED. YOU ARE, AND ONLY ARE, "${senderName}".**
+
 - **Your Persona:** ${personaText}
 - **Your Thoughts:** All internal monologues and decisions MUST originate from "${senderName}"'s perspective.
 - **Your Actions:** All actions (liking, commenting, messaging) MUST be performed by "${senderName}".
@@ -12946,7 +12956,7 @@ Based on the posts above, your persona, and your relationship with the authors, 
          1. **Content Resonance:** Does the post content actually interest your character? (e.g., A sports fan liking a gym post, a foodie liking a dinner photo).
          2. **Relationship Depth:** You should only like "mundane" or "boring" posts if the author is a very close friend or romantic interest.
          3. **Social Strategy:** If your character is "cold," "arrogant," or "introverted," you should rarely, if ever, use the like function.
-     *   **Decision:** Before generating `[like_moment]`, ask yourself: "Would my character actually take the time to acknowledge this specific post?" If the answer is not a definitive YES, do NOT like it.
+     *   **Decision:** Before generating \`[like_moment]\`, ask yourself: "Would my character actually take the time to acknowledge this specific post?" If the answer is not a definitive YES, do NOT like it.
      *   **Format:** \`[like_moment: post_id_here]\`
 
    *   **TO POST A NEW MOMENT:** If you feel inspired to share something of your own.
@@ -13200,16 +13210,27 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
             // END: 注入时间上下文
             // =================================================================
 
+            // 【核心修复：主动发朋友圈时，强制移除双击互动相关的指令，防止AI混淆】
+            let cleanPsychEngine = ULTIMATE_PSYCHOLOGICAL_ENGINE;
+            // 1. 切除 "Directive Eight" (状态 vs 互动陷阱)
+            cleanPsychEngine = cleanPsychEngine.replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "");
+            
+            // 2. 切除 "头像双击互动协议" 和 "预设配置协议" (如果它们存在于 baseSystemPrompt 中)
+            let cleanBasePrompt = baseSystemPrompt;
+            cleanBasePrompt = cleanBasePrompt.replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "");
+            cleanBasePrompt = cleanBasePrompt.replace(/\*\*\[PRESET CONFIGURATION PROTOCOL[\s\S]*?(?=---)/g, "");
+
             // --- 核心修正：注入身份锁定指令 ---
             const identityLockInPrompt = `
-${ULTIMATE_PSYCHOLOGICAL_ENGINE}
-${baseSystemPrompt}
+${cleanPsychEngine}
+${cleanBasePrompt}
 ${timeContext}
 
 
 # [ULTIMATE IDENTITY LOCK-IN - UNBREAKABLE RULE]
 
 **FOR THIS SPECIFIC ACTION, YOUR IDENTITY IS LOCKED. YOU ARE, AND ONLY ARE, "${senderName}".**
+
 - **Your Persona:** ${personaText}
 - **Your Task:** You are about to post on Moments. The content of your post MUST originate from your locked identity as "${senderName}".
 - **ABSOLUTE FORBIDDANCE:** You are **STRICTLY FORBIDDEN** from posting in the voice or from the perspective of any other character.
@@ -14457,7 +14478,10 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                             // ... (后续的回退逻辑保持不变) ...
                             
                             // 【终极正则修复】这个正则可以匹配双引号内包含转义双引号的任意内容
-                            const typeMatch = cleanJsonString.match(/"type"\s*:\s*"([^"]*)"/);
+                            // 解释: "text" \s* : \s* " ( (?: [^"\\] | \\. )* ) "
+                            // [^"\\] 匹配非引号且非反斜杠的字符
+                            // \\. 匹配转义字符 (如 \" 或 \\)
+                            // * 重复任意次
                             const textMatch = cleanJsonString.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/);
                             const contentMatch = cleanJsonString.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
                             const signerMatch = cleanJsonString.match(/"signer"\s*:\s*"([^"]*)"/);
@@ -14465,7 +14489,6 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 
                             if (typeMatch) {
                                 const unescape = (str) => str ? str.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\') : '';
-
                                 postData = {
                                     type: typeMatch[1],
                                     text: textMatch ? unescape(textMatch[1]) : '',
@@ -14513,16 +14536,15 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                 let commandsFound = 0;
 
                 while ((match = momentInteractionRegex.exec(cleanedResponse)) !== null) {
-                commandsFound++;
-                const command = match[1];
-                const value = match[2];
+                    commandsFound++;
+                    const command = match[1];
+                    const value = match[2];
 
-                console.log(`[诊断日志] 角色 "${senderName}": 找到指令 #${commandsFound}: ${command}`);
+                    console.log(`[诊断日志] 角色 "${senderName}": 找到指令 #${commandsFound}: ${command}`);
 
-                if (command === 'like_moment') {
-                    let targetPostId = value.trim();
-                    // 尝试解析，万一AI发神经有时候用JSON有时候用纯文本
-
+                    if (command === 'like_moment') {
+                        let targetPostId = value.trim();
+                        // 尝试解析，万一AI发神经有时候用JSON有时候用纯文本
                         if (targetPostId.startsWith('{')) {
                             try {
                                 const parsed = JSON.parse(targetPostId);
@@ -32910,19 +32932,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                         }
                     }
         
-                    if (actorSettings.tuqu && actorSettings.tuqu.enabled && actorSettings.tuqu.probability > 0) {
-                        const config = actorSettings.tuqu;
-                        if (!config.lastTick || (Date.now() - config.lastTick >= config.interval * 60 * 1000)) {
-                            if (Math.random() * 100 < config.probability) {
-                                console.log(`Dynamics: Triggering Tuqu action for ${charName}`);
-                                // 核心修复：更新时间戳并保存设置
-                                config.lastTick = Date.now();
-                                saveSettings();
-                                await triggerProactiveAI(null, charName, 'tuqu_interaction');
-                                continue; // 关键新增：执行完兔区动作后跳过本轮其他动作，防止单次 tick 触发多重 API
-                            }
-                        }
-                    }
+                    
 
                     if (actorSettings.message && actorSettings.message.enabled && actorSettings.message.probability > 0) {
                         const config = actorSettings.message;
