@@ -243,7 +243,7 @@ html, body {
         display: none;
     }
 
-    /* --- 新增：兔区多选与预览模式样式 (终极滚动修复版) --- */
+    /* --- 新增：兔区多选与预览模式样式 (保留按钮+无缝版) --- */
 
     /* 1. 多选模式：楼层变为可点击 */
     body.tuqu-select-mode .reply-item {
@@ -256,54 +256,55 @@ html, body {
         outline: 2px solid var(--jj-green-text);
     }
 
-    /* 2. 预览模式：核心隐藏逻辑 */
+    /* 2. 预览模式：核心隐藏逻辑 (修正版) */
+    /* 只隐藏未选中的楼层 */
     body.tuqu-preview-mode .reply-item:not(.selected) {
         display: none !important;
     }
-    body.tuqu-preview-mode .page-header .back-button,
-    body.tuqu-preview-mode .page-header .header-menu,
+    
+    /* 【核心修改】只隐藏底部的回复框和多选操作栏，保留顶部按钮和楼层按钮 */
     body.tuqu-preview-mode #reply-form-container,
-    body.tuqu-preview-mode #tuqu-preview-bar,
-    body.tuqu-preview-mode .reply-actions-menu {
+    body.tuqu-preview-mode #tuqu-preview-bar {
         display: none !important;
     }
 
-    /* 3. 预览模式：强制滚动与高度自适应 (核心修复) */
-    
-    /* A. 根节点：必须允许滚动，且高度由内容决定 */
+    /* 3. 预览模式：高度撑开逻辑 (去留白版) */
     body.tuqu-preview-mode,
     body.tuqu-preview-mode html {
-        height: auto !important;       /* 解除高度锁定 */
-        min-height: 100% !important;   /* 至少占满屏幕 */
-        overflow-y: visible !important; /* 让内容溢出 iframe */
+        height: auto !important;
+        min-height: 0 !important; /* 【关键】设为0，防止强制撑出空白 */
+        overflow: hidden !important;
         background-color: #fff !important;
         margin: 0 !important;
         padding: 0 !important;
     }
 
-    /* B. 中间容器：必须变为块级元素，解除 Flex 限制 */
     body.tuqu-preview-mode .phone-screen,
     body.tuqu-preview-mode .page.active,
     body.tuqu-preview-mode .page-content,
     body.tuqu-preview-mode #post-detail-container,
     body.tuqu-preview-mode .reply-list {
-        display: block !important;     /* 【关键】杀死 Flex 布局 */
-        height: auto !important;       /* 高度随内容撑开 */
-        min-height: 0 !important;
+        display: block !important;
+        height: auto !important;
+        min-height: 0 !important; /* 【关键】设为0 */
         max-height: none !important;
-        overflow: visible !important;  /* 允许溢出 */
+        overflow: visible !important;
         width: 100% !important;
-        position: static !important;   /* 解除定位 */
+        position: static !important;
         box-shadow: none !important;
+        padding-bottom: 0 !important; /* 【关键】移除底部内边距 */
+        margin-bottom: 0 !important;  /* 【关键】移除底部外边距 */
     }
 
-    /* C. 选中项样式优化 */
+    /* 选中项样式：无边框 */
     body.tuqu-preview-mode .reply-item.selected {
         outline: none !important;
         background-color: transparent !important;
         border-bottom: 1px solid #eee !important;
     }
     </style>
+
+
 
 
 </head>
@@ -1643,9 +1644,10 @@ html, body {
              }, 3000);
         });
 
-        // --- 新增：多选预览逻辑 ---
+        // --- 新增：多选预览逻辑 (JS高度同步版) ---
         let isTuquSelectMode = false;
         let isTuquPreviewMode = false;
+        let heightObserver = null;
 
         // 1. 开启多选模式
         function toggleTuquSelectMode() {
@@ -1666,36 +1668,30 @@ html, body {
             // 清除所有选中状态
             document.querySelectorAll('.reply-item.selected').forEach(el => el.classList.remove('selected'));
             
-            // 【核心新增】通知父窗口退出全屏
+            // 停止监听高度
+            stopSyncHeight();
+            // 通知父窗口恢复原状
             window.parent.postMessage({ type: 'EXIT_FULLSCREEN_PREVIEW' }, '*');
         }
 
-        
-
-
-        // 3. 楼层点击事件 (使用事件委托绑定到 page-post)
+        // 3. 楼层点击事件
         document.getElementById('page-post').addEventListener('click', function(e) {
             if (!isTuquSelectMode) return;
-
-            // 查找点击的是否是楼层
             const item = e.target.closest('.reply-item');
             if (item) {
-                // 阻止触发其他点击事件（如图片放大、菜单等）
                 e.preventDefault();
                 e.stopPropagation();
-                
                 item.classList.toggle('selected');
                 updateTuquSelectCount();
             }
-        }, true); // 使用捕获阶段确保优先处理
+        }, true);
 
-        // 更新选中计数
         function updateTuquSelectCount() {
             const count = document.querySelectorAll('.reply-item.selected').length;
             document.getElementById('tuqu-select-count').innerText = `已选 ${count} 楼`;
         }
 
-        // 4. 进入预览模式 (自适应高度)
+        // 4. 进入预览模式
         function enterTuquPreview() {
             const count = document.querySelectorAll('.reply-item.selected').length;
             if (count === 0) {
@@ -1705,24 +1701,58 @@ html, body {
             isTuquPreviewMode = true;
             document.body.classList.add('tuqu-preview-mode');
             
-            // 【核心新增】通知父窗口进入全屏
+            // 通知父窗口进入全屏
             window.parent.postMessage({ type: 'ENTER_FULLSCREEN_PREVIEW' }, '*');
+            
+            // 【关键】开始同步高度
+            startSyncHeight();
         }
 
         // 5. 双击顶栏退出预览
         document.getElementById('post-page-header').addEventListener('dblclick', function() {
             if (isTuquPreviewMode) {
-                // 退出预览，回到多选模式
                 isTuquPreviewMode = false;
                 document.body.classList.remove('tuqu-preview-mode');
                 
-                // 【核心新增】通知父窗口退出全屏
+                // 停止同步
+                stopSyncHeight();
+                // 通知父窗口退出
                 window.parent.postMessage({ type: 'EXIT_FULLSCREEN_PREVIEW' }, '*');
             }
         });
 
+        // --- 高度同步核心逻辑 ---
+        function startSyncHeight() {
+            if (heightObserver) return;
+            
+            const sendHeight = () => {
+                if (!isTuquPreviewMode) return;
+                // 获取整个文档的实际高度
+                const height = document.documentElement.scrollHeight;
+                // 发送给父窗口
+                window.parent.postMessage({ type: 'UPDATE_IFRAME_HEIGHT', height: height }, '*');
+            };
+
+            // 立即发送一次
+            setTimeout(sendHeight, 50);
+
+            // 监听 body 高度变化
+            heightObserver = new ResizeObserver(sendHeight);
+            heightObserver.observe(document.body);
+            heightObserver.observe(document.documentElement);
+        }
+
+        function stopSyncHeight() {
+            if (heightObserver) {
+                heightObserver.disconnect();
+                heightObserver = null;
+            }
+            // 通知父窗口重置高度
+            window.parent.postMessage({ type: 'RESET_IFRAME_HEIGHT' }, '*');
+        }
 
     </script>
+
 
 
 </body>
