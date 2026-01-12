@@ -8014,8 +8014,22 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                     <button id="save-summary-btn" class="modal-button primary" style="margin: 0; display: none;">保存</button>
                                     <button id="delete-summary-btn" class="modal-button danger" style="margin: 0;">删除</button>
                                 </div>
+                                
+                                <!-- 【核心新增】自动总结间隔设置 -->
+                                <div class="form-group">
+                                    <label for="auto-summary-interval" style="font-size: 14px; color: #555;">自动总结间隔 (对话轮数)</label>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <input type="number" id="auto-summary-interval" class="modal-input" min="0" placeholder="0 为关闭" style="margin-bottom: 0;">
+                                        <span style="font-size: 12px; color: #888; flex-shrink: 0;">轮</span>
+                                    </div>
+                                    <p class="form-hint">每当您发送的消息达到此数量时（即经过N轮对话），自动在后台调用API追加总结。建议设置 20-50 轮。</p>
+                                </div>
+
+
+
                             </div>
                             <!-- ******** 新增的聊天总结模块到这里结束 ******** -->
+
                             
                             <div class="form-group">
                                 <label for="chat-user-persona-select">选择用户人设 ({{user}} Persona)</label>
@@ -16423,9 +16437,18 @@ You MUST use the custom \`<dm>\` tag format.
     info.moodProbability = parseInt(document.getElementById('prob-mood-input').value, 10);
     info.pagerProbability = parseInt(document.getElementById('prob-pager-input').value, 10);
 
+    // 【核心修复】保存自动总结间隔 (必须加这几行，否则存不上)
+    const autoSummaryInput = document.getElementById('auto-summary-interval');
+    // 只有当输入框存在时才保存，防止报错
+    if (autoSummaryInput) {
+        const autoSummaryVal = parseInt(autoSummaryInput.value, 10);
+        info.autoSummaryInterval = isNaN(autoSummaryVal) ? 0 : autoSummaryVal;
+    }
 
 // 【【【在这里添加下面这行新代码】】】
 info.preambleEndTime = document.getElementById('preamble-end-time').value;
+
+
 
 // 【【【在这里添加下面的新代码块】】】
 info.timeMode = document.getElementById('time-mode-select').value;
@@ -17160,7 +17183,9 @@ const timeManager = (function() {
         let fullMessageHistory = []; // <-- 新增：这个数组将永远持有全部的聊天记录
 // 【【【新增代码从这里开始】】】
 let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
-// 【【【新增代码到这里结束】】】        
+let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一秒钟调用6次
+// 【【【新增代码到这里结束】】】
+
         let isMultiSelectMode = false, selectedMessageIds = [];
         let isPreviewMode = false; // --- 核心新增 ---
         let callAttemptState = { callId: null, closeUI: null }; // <--- 新增这一行
@@ -21462,12 +21487,19 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
 
                         if (!streamingMessageId) {
                             // 只有当有真正的正文时，才创建气泡
+                            
+                            // 【核心修复】根据 originatingChatId 查找原始聊天的信息，而不是读取当前 UI 的全局变量
+                            // 这样即使切换了窗口，也能正确获取最初发起请求的那个角色的名字
+                            const originChat = chatList.find(c => c.id === originatingChatId);
+                            const originName = originChat ? originChat.name : chatState.chatName;
+                            const isOriginGroup = originChat ? originChat.type === '群聊' : contactInfo.isGroup;
+
                             const placeholderMsg = {
                                 id: `streaming-${Date.now()}`,
                                 type: 'text',
                                 text: '',
                                 side: 'received',
-                                sender: contactInfo.isGroup ? null : chatState.chatName,
+                                sender: isOriginGroup ? null : originName,
                             };
                             await addMessage(placeholderMsg, originatingChatId);
                             streamingMessageId = placeholderMsg.id;
@@ -21612,8 +21644,14 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                     // --- 核心修改：在这里解析并提取图片描述 ---
                     // ... (此处保持你之前的图片描述解析代码不变) ...
 
+                    // 【核心修复】根据 originatingChatId 获取正确的发送者信息，防止切窗口导致名字错误
+                    const originChatForFinal = chatList.find(c => c.id === originatingChatId);
+                    const originNameForFinal = originChatForFinal ? originChatForFinal.name : chatState.chatName;
+                    const isOriginGroupForFinal = originChatForFinal ? originChatForFinal.type === '群聊' : contactInfo.isGroup;
+
                     // 执行后台更新（如心事、备忘录）并获取剩余的正文
-                    const cleanedText = await executeBackgroundUpdatesAndCleanText(responseToProcess, originatingChatId, chatState.chatName);
+                    // 注意：这里传给 executeBackgroundUpdatesAndCleanText 的名字也修正为 originNameForFinal
+                    const cleanedText = await executeBackgroundUpdatesAndCleanText(responseToProcess, originatingChatId, originNameForFinal);
                     
                     // 【关键修复】：如果经过后台任务清理后，正文只剩下空格或为空，坚决不进入后续渲染
                     if (!cleanedText || cleanedText.trim() === "") {
@@ -21625,7 +21663,7 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                     }
 
                     // 【核心修复】定义当前上下文的默认发送者
-                    const defaultSender = contactInfo.isGroup ? null : chatState.chatName;
+                    const defaultSender = isOriginGroupForFinal ? null : originNameForFinal;
 
                     // 【混合切割方案】使用 split 将文本按 <block>...</block> 切割
                     // 正则说明：
@@ -21896,25 +21934,46 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
                     const newFullSummary = (existingSummary === '(这是第一份总结)' ? '' : existingSummary + '\n\n') + appendedSummaryText;
                     
                     chatInfo.chatSummary = newFullSummary;
-                    // 【核心设计修正 5】: 更新“已总结点”到当前最新消息的位置
+                    
+                    // 【核心修正】: 记录本次总结时的消息条数 (用于切片)
                     chatInfo.lastSummaryMessageCount = conversationHistory.length; 
                     
+                    // 【核心修正】: 记录本次总结时的对话轮数 (用于下次触发判断)
+                    // 必须重新计算一遍，确保数据一致
+                    const currentTotalRounds = conversationHistory.filter(m => m.side === 'sent' && m.type !== 'system').length;
+                    chatInfo.lastSummaryRoundCount = currentTotalRounds;
+
+                    console.log(`[自动总结成功] 总结已保存。更新基准轮数至: ${currentTotalRounds}`);
+
                     saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+                    
+                    // 只有当文本框存在（即用户正在看信息页）时才更新 UI
+
+
                     document.getElementById('chat-summary-content').value = newFullSummary;
                     await conversationManager.customAlert('总结已更新！');
                 } else {
                     throw new Error("API did not return a summary.");
                 }
 
-            } catch (error) {
-                await conversationManager.customAlert('总结生成失败: ' + error.message);
+                                    } catch (error) {
+                console.error("Summary generation error:", error);
+                if (!isAuto) await conversationManager.customAlert('总结生成失败: ' + error.message);
             } finally {
-                if (summaryBtn) {
+                // 【核心修复】无论成功失败，必须解锁，否则下次永远不会触发
+                if (isAuto) {
+                    summaryLocks[chatId] = false;
+                    console.log(`[自动总结] 锁已释放 (ChatID: ${chatId})`);
+                }
+
+                if (!isAuto && summaryBtn) {
                     summaryBtn.disabled = false;
                     summaryBtn.textContent = '生成/更新总结';
                 }
             }
         }
+
+
 
     async function regenerateLastResponse() {
         // 从后往前找到第一条不是由 AI 发送的消息的位置
@@ -23361,7 +23420,70 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
             
           // 【关键】不再调用 reRenderMessages()项，而是直接保存
             saveConversation();
+
+            // 【核心修复：直接调用版】
+            try {
+                // 1. 重新读取最新的配置
+                const chatInfo = loadFromLocalStorage(`chat_info_${finalTargetChatId}`, {});
+                const interval = parseInt(chatInfo.autoSummaryInterval || 0, 10);
+                
+                // 2. 强制打印日志
+                console.log(`[自动总结检查] 聊天ID: ${finalTargetChatId}, 设定间隔: ${interval}`);
+
+                // 只有设置了间隔且大于0时才执行检查
+                if (interval > 0) {
+                    // 3. 获取上次总结时的轮数
+                    const lastSummaryRounds = parseInt(chatInfo.lastSummaryRoundCount || 0, 10);
+                    
+                    // 4. 获取当前聊天记录
+                    let currentHistory = [];
+                    if (isCurrentChat) {
+                        currentHistory = fullMessageHistory;
+                    } else {
+                        currentHistory = loadFromLocalStorage(`conversation_${finalTargetChatId}`, []);
+                    }
+
+                    // 5. 计算当前总轮数 (只计算用户发送的消息，且排除系统指令)
+                    const currentTotalRounds = currentHistory.filter(m => 
+                        m.side === 'sent' && 
+                        m.type !== 'system'
+                    ).length;
+
+                    // 6. 计算差值
+                    const diff = currentTotalRounds - lastSummaryRounds;
+
+                    console.log(`[自动总结详情] 当前轮数: ${currentTotalRounds}, 上次基准: ${lastSummaryRounds}, 差值: ${diff}`);
+
+                    // 7. 检查是否达到阈值
+                                        // 检查轮数差值是否达到阈值
+                    if ((currentTotalRounds - lastSummaryRounds) >= interval) {
+                        // 【核心修复】检查锁状态：如果正在总结中，直接跳过！
+                        if (summaryLocks[finalTargetChatId]) {
+                            console.log(`[自动总结] 拦截重复触发：当前已有总结任务正在运行。`);
+                            return;
+                        }
+
+                        console.log(`[Auto Summary] Triggering summary for chat ${finalTargetChatId}. Round Diff: ${currentTotalRounds - lastSummaryRounds} >= ${interval}`);
+                        
+                        // 【核心修复】立即上锁！
+                        summaryLocks[finalTargetChatId] = true;
+
+                        // 调用函数
+                        generateSummary(finalTargetChatId, true);
+                    }
+                }
+            } catch (e) {
+                console.error("[Auto Summary Check Failed]", e);
+                // 如果出错，也要防止死锁
+                summaryLocks[finalTargetChatId] = false;
+            }
         }
+
+
+
+
+
+
 
         // 【核心新增】删除消息时触发：直接初始化（清空）当前聊天的角色状态、后缀以及 AI 对你的备注
         function resetCurrentChatState() {
@@ -26977,15 +27099,21 @@ elements.userPersonaSelect.innerHTML = '<option value="无">无</option>';
             const newDeleteBtn = deleteBtn.cloneNode(true);
             deleteBtn.parentNode.replaceChild(newDeleteBtn, deleteBtn);
             newDeleteBtn.addEventListener('click', async () => {
-                if (await conversationManager.customConfirm('确定要删除这条总结吗？')) {
+                if (await conversationManager.customConfirm('确定要删除这条总结并重置计数器吗？')) {
                     summaryContentEl.value = '';
                     const updatedInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                    
                     delete updatedInfo.chatSummary;
-                    delete updatedInfo.lastSummaryMessageCount; // 【核心修改】把记忆点也一起删除
+                    delete updatedInfo.lastSummaryMessageCount; 
+                    
+                    // 【核心修复】必须把“轮数基准”也删掉，归零！
+                    delete updatedInfo.lastSummaryRoundCount; 
+
                     saveToLocalStorage(`chat_info_${chatState.chatId}`, updatedInfo);
-                    alert('总结已删除！下次将从头开始总结。');
+                    alert('总结已删除！计数器已归零，发下一条消息时将立即触发自动总结。');
                 }
             });
+
             // ******** 新增代码结束 ********
             
             // 解散/恢复群聊按钮状态
@@ -27003,8 +27131,16 @@ elements.userPersonaSelect.innerHTML = '<option value="无">无</option>';
             newBtn.addEventListener('click', () => {
                 showBranchHistoryModal(chatState.chatId);
             });
+
+            // 【核心新增】回填自动总结间隔
+            const autoSummaryInput = document.getElementById('auto-summary-interval');
+            if (autoSummaryInput) {
+                autoSummaryInput.value = info.autoSummaryInterval || '';
+            }
+
             navigateTo('chat-info');
         }
+
 function enterMultiSelectMode(initialMessageId) { 
     isMultiSelectMode = true; 
     isPreviewMode = false; // 确保初始不是预览模式
