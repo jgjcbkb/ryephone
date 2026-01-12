@@ -6930,6 +6930,128 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     .anim-prev {
         animation: slideInFromLeft 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
     }
+    /* --- 兔区分享卡片样式 (强制对齐红包版) --- */
+    #page-conversation .message.tuqu_share {
+        width: 200px !important; /* 强制宽度 */
+        background: #ffffff !important; /* 强制白底 */
+        border-radius: 12px !important;
+        padding: 0 !important;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        border: none !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+    }
+    .tuqu-share-card-header {
+        background: #FDEAF5; 
+        padding: 8px 12px;
+        font-size: 10px;
+        color: #8B5A65;
+        font-weight: 600;
+        border-bottom: 1px solid rgba(0,0,0,0.03);
+        display: flex;
+        justify-content: space-between; /* 左右分布显示兔区和版块 */
+    }
+    .tuqu-share-card-body {
+        padding: 12px;
+        flex-grow: 1;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+    }
+    .tuqu-share-card-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #333;
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .tuqu-share-card-footer {
+        padding: 6px 12px;
+        font-size: 10px;
+        color: #0000FF; /* 蓝色查看文字 */
+        border-top: 1px solid #f5f5f5;
+        background: #fafafa;
+        text-align: right;
+    }
+    /* --- 兔区帖子完整预览弹窗样式 (优化版) --- */
+    .tuqu-preview-modal .modal-box {
+        width: 95% !important;
+        max-width: 400px !important;
+        height: 85vh !important;
+        padding: 0 !important;
+        background-color: #FFE7F7 !important; 
+        display: flex;
+        flex-direction: column;
+        position: relative; /* 为顶部关闭按钮定位 */
+    }
+    .tuqu-preview-header {
+        background-color: #FDEAF5;
+        padding: 15px;
+        text-align: center;
+        border-bottom: 1px solid #EEDDE8;
+        flex-shrink: 0;
+        position: relative;
+    }
+    /* 顶部关闭按钮 */
+    .tuqu-preview-close-top {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 28px;
+        height: 28px;
+        background: rgba(0,0,0,0.05);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: #8B5A65;
+        cursor: pointer;
+        line-height: 1;
+    }
+    .tuqu-preview-content {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 0;
+    }
+    .tuqu-preview-main-post {
+        padding: 15px;
+        border-bottom: 1px solid #F0F0F0;
+        background: #fff;
+    }
+    .tuqu-preview-title {
+        font-size: 18px;
+        font-weight: bold;
+        color: #8B5A65;
+        margin-bottom: 10px;
+        line-height: 1.4;
+    }
+    .tuqu-preview-floor {
+        border-bottom: 1px solid #F0F0F0;
+        padding: 12px 15px;
+        background: #fff;
+    }
+    .tuqu-preview-meta {
+        font-size: 11px;
+        color: #999;
+        margin-bottom: 8px;
+    }
+    .tuqu-preview-text {
+        font-size: 15px;
+        line-height: 1.6;
+        color: #333;
+        word-break: break-all;
+    }
+    .tuqu-preview-text img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 4px;
+    }
 
 </style>
 
@@ -7696,8 +7818,9 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                     <span class="slider"></span>
                                 </label>
                             </div>
-                            <p class="form-hint" style="padding: 0 15px 15px;">关闭后，AI将无法自动更改“拍了拍”等互动设置，提示词中也将彻底抹除相关教程。</p>
+                            <p class="form-hint" style="padding: 0 15px 15px;">禁用后，AI 将不再具备修改双击头像动作与后缀的权限，相关指令将从系统提示词中移除。</p>
                             <!-- 新增结束 -->
+
 
 
                             <div style="margin-bottom: 20px;">
@@ -7727,7 +7850,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                             <div class="form-group hidden" id="offline-worldbook-group">
     <label>选择线下世界书</label>
     <div id="offline-worldbook-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 10px; border-radius: 8px;"></div>
-    <p class="form-hint">这些世界书仅在线下模式中生效，用于扮演场景或提供额外背景信息。</p>
+    <p class="form-hint">这些世界书仅在线下模式中生效。</p>
 </div>
 <div class="form-group hidden" id="offline-wordcount-group">
     <label>线下模式字数限制 (中文字符)</label>
@@ -7761,9 +7884,10 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                             <div id="associated-npc-list" style="padding: 10px 15px; max-height: 150px; overflow-y: auto;">
                                 <!-- NPC列表将动态生成在这里 -->
                             </div>
-                            <p class="form-hint" style="padding: 0 15px 15px;">关联的NPC未来可以在朋友圈等功能中与此角色互动。</p>
+                            <p class="form-hint" style="padding: 0 15px 15px;">关联后，NPC 人设将作为背景数据同步至该角色，以辅助 AI 构建角色的社交维度与独立生活逻辑。</p>
                         </div>
                         <!-- END: 新增的关联NPC模块 -->
+
 
                         <div class="form-section">
                             
@@ -7801,7 +7925,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
         <button class="copy-btn" onclick="copyToClipboard('chat-preamble')">复制内容</button>
     </div>
     <textarea id="chat-preamble" placeholder="为本次对话设定特定的开场背景 or 情景..."></textarea>
-    <p class="form-hint">这段内容会作为最高优先级，附加在主系统提示之前，用于设定单次对话的特定场景或背景。</p>
+    <p class="form-hint">此内容将作为即时背景数据注入，用于定义当前对话的特定情节、环境或前置场景条件。</p>
 </div>
 
 <!-- 【【【在这里插入下面的新代码块】】】 -->
@@ -7912,9 +8036,10 @@ body.preview-fullscreen-active #page-conversation .chat-content {
         </div>
     </div>
     <textarea id="group-ensemble-persona" placeholder="在此处一次性定义多个角色的性格，例如：\n张三：性格火爆，有话直说。\n李四：沉默寡言，善于观察。"></textarea>
-                                <p class="form-hint">此处填写的人设将与“群聊主角”的人设合并，供AI扮演。备注中列出的名字，如果在这里定义了，AI就会使用这里的性格。</p>
+                                <p class="form-hint">此配置项与“群聊主角”逻辑一致，适用于不便拆分为独立条目的人设集合。系统将根据“备注”中列出的名称，在此处匹配对应设定并激活其主动交互行为。</p>
                             </div>
                             <!-- 【【【核心新增代码到这里结束】】】 -->
+
 
                         </div>
                         <div class="form-section">
@@ -8999,9 +9124,11 @@ if ('serviceWorker' in navigator) {
         async function showAddCityModal() {
             const cityName = await conversationManager.showContentInputModal({ 
                 title: '搜索城市', 
-                placeholder: '搜国外请试英文/拼音(如: tokyo)' 
+                placeholder: '国内请加“市”后缀，国外用英文' 
             });
             if (!cityName) return;
+
+
             try {
                 // 1. 第一次尝试：带语言限制的搜索 (优先匹配中文名)
                 let response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=20&language=zh&format=json`);
@@ -10612,10 +10739,42 @@ if ('serviceWorker' in navigator) {
     let globalTuquData = JSON.parse(localStorage.getItem('jjForumData')) || {};
 
     // 新增：监听来自兔区 iframe 的数据同步
-    window.addEventListener('message', function(event) {
+    window.addEventListener('message', async function(event) {
             if (event.data && event.data.type === 'FORUM_DATA_SYNC') {
                 globalTuquData = event.data.data;
                 console.log('[系统] 兔区数据已同步到主系统。');
+            } else if (event.data && event.data.type === 'OPEN_TUQU_SHARE_PICKER') {
+                const post = event.data.post;
+                const chats = chatList.map(c => {
+                    const info = loadFromLocalStorage(`chat_info_${c.id}`, {});
+                    return { id: c.id, name: info.remark || c.name, type: c.type };
+                });
+                const optionsHtml = chats.map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('');
+                const result = await conversationManager.showCustomModal({
+                    title: '分享帖子到聊天',
+                    html: `<p style="font-size:13px; color:#666; margin-bottom:10px;">将《${post.subject}》分享给：</p>`,
+                    form: [{ id: 'share-target-select', label: '选择目标', type: 'select', options: optionsHtml }],
+                    buttons: [ { text: '取消', value: 'cancel', class: 'secondary' }, { text: '发送', value: 'send', class: 'primary' } ]
+                });
+                if (result && result.value === 'send') {
+                    const targetChatId = result.target.closest('.modal-box').querySelector('#share-target-select').value;
+                    // 【关键优化】：只存储最核心的 ID 和标题，不存储全文
+                    const slimPost = {
+                        id: post.id,
+                        subject: post.subject,
+                        board: post.board
+                    };
+                    await conversationManager.addMessage({ 
+                        type: 'tuqu_share', 
+                        side: 'sent', 
+                        text: `[分享] ${post.subject}`, 
+                        postData: slimPost 
+                    }, targetChatId);
+                    alert('已成功分享到聊天');
+                }
+
+
+
             } else if (event.data && event.data.type === 'OPEN_TUQU_STICKER_PANEL') {
                 // 核心修改：调用主系统的表情面板
                 stickerManager.openPanel((name, type) => {
@@ -16933,7 +17092,7 @@ let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
                 console.warn("自动画中画被拦截:", e);
                 // 只有非 PWA 模式才提示手动点击
                 if (!isIOSPWA) {
-                    alert("自动弹出失败 (iOS限制)。\n\n✅ 视频已显示在右下角。\n👉 请手动点击视频上的【画中画图标】即可！");
+                    alert("由于系统权限限制，未能自动开启画中画模式。\n\n视频窗口已在右下角就绪，请手动点击视频画面上的【画中画图标】以激活后台运行权限。");
                 }
             }
         }
@@ -17801,41 +17960,65 @@ let isLoadingMore = false;
                 const list = document.getElementById('identity-list-container');
                 if (!menu || !list) return;
 
-                // 核心修复 1：先显示菜单，再处理复杂逻辑，防止计算过程中的潜在错误导致界面无响应
+                // 1. 获取当前聊天上下文
+                const currentChatId = conversationManager.getCurrentChatId();
+                const currentChat = chatList.find(c => c.id === currentChatId);
+                const chatInfo = loadFromLocalStorage(`chat_info_${currentChatId}`, {});
+                const isGroup = currentChat && currentChat.type === '群聊';
+
                 menu.classList.remove('hidden');
 
+                // 2. 准备所有可能的原始身份池
                 const allUserPersonas = userPersonas.map(p => ({ name: p.name, type: '用户人设', avatar: p.avatar }));
                 const allNpcs = npcList.map(name => {
                     const npcData = (npcSettings.personas && npcSettings.personas[name]) || {};
                     return { name: name, type: 'NPC', avatar: npcData.avatar };
                 });
-                
                 const allDynamicChars = getAllUniqueCharacters()
                     .filter(name => name !== '{{user}}' && !userPersonas.some(p => p.name === name) && !npcList.includes(name))
                     .map(name => ({ name: name, type: '角色', avatar: null }));
 
-                const identities = [
-                    { name: '{{user}}', type: '原本的用户', avatar: myAvatar },
-                    ...allUserPersonas,
-                    ...allNpcs,
-                    ...allDynamicChars
-                ];
+                let identities = [];
+                let helpText = "";
 
-                // 【核心新增】增加操作提示
-                                // 【核心新增】增加操作提示
-                const helpText = `
-                    <div style="background:#fff3cd; border:1px solid #ffeeba; color:#856404; padding:10px; border-radius:8px; font-size:12px; margin-bottom:15px; line-height:1.5;">
-                        <strong>⚠️ 注意事项：</strong><br>
-                        请不要在这里选择用户人设，请在【聊天信息】中选择。<br>
-                        <strong>单聊：</strong>你只能临时扮演其他勾选关联的 NPC 与对方进行互动。<br>
-                        <strong>群聊：</strong>你可以扮演群成员有的其他角色、其他 NPC 以及多个用户。
-                    </div>
-                `;
+                if (isGroup) {
+                    // --- 情况 A: 群聊逻辑 ---
+                    const groupMembers = loadFromLocalStorage(`chat_members_${currentChatId}`, []);
+                    
+                    // 过滤：只保留在群成员列表中的身份
+                    identities = [
+                        { name: '{{user}}', type: '原本的用户', avatar: myAvatar },
+                        ...allUserPersonas.filter(p => groupMembers.includes(p.name)),
+                        ...allNpcs.filter(n => groupMembers.includes(n.name)),
+                        ...allDynamicChars.filter(d => groupMembers.includes(d.name))
+                    ];
 
+                    helpText = `
+                        <div style="background:#f8f9fa; border:1px solid #e9ecef; color:#495057; padding:12px; border-radius:8px; font-size:12px; margin-bottom:15px; line-height:1.6;">
+                            <strong>群聊身份切换指引：</strong><br>
+                            身份切换仅限于当前群成员列表内的用户、NPC或角色。若您本人不在群聊名单中则无法发言，但若切换至在群成员，变身后即可正常参与对话。
+                        </div>
+                    `;
+                } else {
+                    // --- 情况 B: 单聊逻辑 ---
+                    const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${currentChatId}`, []);
+                    
+                    // 过滤：仅显示勾选关联的 NPC
+                    identities = [
+                        { name: '{{user}}', type: '原本的用户', avatar: myAvatar },
+                        ...allNpcs.filter(n => associatedNpcNames.includes(n.name))
+                    ];
 
-                // 核心修复 2：使用数字索引 index 作为 ID，彻底解决中文名或特殊字符名导致的 selector 匹配失败和 ID 重复问题
+                    helpText = `
+                        <div style="background:#f8f9fa; border:1px solid #e9ecef; color:#495057; padding:12px; border-radius:8px; font-size:12px; margin-bottom:15px; line-height:1.6;">
+                            <strong>身份切换提示：</strong><br>
+                            若不以当前用户身份进行互动，可切换至已关联的 NPC 身份进行对话。
+                        </div>
+                    `;
+                }
+
+                // 3. 渲染列表
                 list.innerHTML = helpText + identities.map((id, index) => `
-
                     <div class="identity-item ${chatState.currentIdentity === id.name ? 'active' : ''}" data-name="${escapeHtml(id.name)}">
                         <div class="avatar-mini" id="id-avatar-item-${index}"></div>
                         <div class="name-info">
@@ -17846,11 +18029,13 @@ let isLoadingMore = false;
                     </div>
                 `).join('');
 
+                // 4. 异步加载头像
                 identities.forEach((id, index) => {
                     const el = list.querySelector(`#id-avatar-item-${index}`);
                     if (el) setImageSrc(el, id.avatar || generateDefaultAvatar(id.name));
                 });
             }
+
 
             // 绑定事件
             dot.addEventListener('mousedown', onStart);
@@ -18168,7 +18353,26 @@ A girl with long pink hair is standing under a cherry blossom tree. She is weari
                     case 'pay_for_me': descriptiveText = `[${senderName} sent a 'Pay For Me' request for "${msg.text}" with the amount ¥${msg.details?.amount || 'N/A'}.]`; break;
                     case 'video': descriptiveText = `[${senderName} sent a video card with the description: "${msg.text}"]`; break;
                     case 'photo-description': descriptiveText = `[${senderName} sent a photo card with the text: "${msg.text}"]`; break;
+                if (result && result.value === 'send') {
+                    const targetChatId = result.target.closest('.modal-box').querySelector('#share-target-select').value;
+                    // 【关键优化】：只存储最核心的 ID 和标题，不存储全文
+                    const slimPost = {
+                        id: post.id,
+                        subject: post.subject,
+                        board: post.board
+                    };
+                    await conversationManager.addMessage({ 
+                        type: 'tuqu_share', 
+                        side: 'sent', 
+                        text: `[分享] ${post.subject}`, 
+                        postData: slimPost 
+                    }, targetChatId);
+                    alert('已成功分享到聊天');
                 }
+
+
+                }
+
 
                 let mainText = msg.text || '';
                 if (msg.type !== 'text') { mainText = descriptiveText; }
@@ -23549,6 +23753,22 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                 if (msg.type === 'red_packet') { let statusText = ''; let isFinished = false; if (msg.packetData) { const isDepleted = msg.packetData.remainingPortions === 0; const isExpired = msg.packetData.status === 'expired'; if (isDepleted) { statusText = '已领取'; isFinished = true; } else if (isExpired) { statusText = '已过期'; isFinished = true; } } if(isFinished) div.classList.add('claimed'); div.innerHTML = `<div class="red-packet-container"><div class="red-packet-header"><div class="red-packet-decoration"></div><div class="red-packet-text-content"><span class="red-packet-title">${msg.text}</span>${statusText ? `<span class="red-packet-status-text">${statusText}</span>` : ''}</div></div><div class="red-packet-footer">红包</div></div>`; } 
                 else if (msg.type === 'transfer') { let statusText = ''; let isFinished = false; const amount = parseFloat(msg.text).toFixed(2); const note = msg.recipient ? `转账给 ${msg.recipient}` : '转账'; switch(msg.transferStatus) { case 'collected': statusText = '已收款'; isFinished = true; break; case 'returned': statusText = '已退回'; isFinished = true; break; case 'expired': statusText = '已过期'; isFinished = true; break; default: statusText = msg.side === 'sent' ? '等待对方收款' : '请你收款'; break; } div.innerHTML = `<div class="transfer-header"><img src="https://i.postimg.cc/WtRBPhBG/IMG-0030.png" class="transfer-icon"><div class="transfer-text"><div class="transfer-amount">¥ ${amount}</div><div class="transfer-status">${statusText}</div></div></div><div class="transfer-footer">${note}</div>`; if (isFinished) { div.classList.add('finished'); } } 
                 else if (msg.type === 'call_summary') { div.innerHTML = `<svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"></path></svg><span>${msg.text}</span>`; }
+                else if (msg.type === 'tuqu_share') {
+                    const post = msg.postData || {};
+                    // 挂钩红包类名，确保在“吐魂祈祷猫”气泡中位置正确
+                    div.classList.add('red_packet'); 
+                    div.innerHTML = `
+                        <div class="tuqu-share-card-header">
+                            <span>兔区</span>
+                            <span>${escapeHtml(post.board || '版块')}</span>
+                        </div>
+                        <div class="tuqu-share-card-body">
+                            <div class="tuqu-share-card-title">${escapeHtml(post.subject || '无标题')}</div>
+                        </div>
+                        <div class="tuqu-share-card-footer">点击查看完整内容</div>
+                    `;
+                }
+
                 else if (msg.type === 'text') {
                     const applyRegexAndRender = (rawText) => {
                         const chatId = conversationManager.getCurrentChatId();
@@ -24114,6 +24334,22 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                 if (msg.type === 'red_packet') { let statusText = ''; let isFinished = false; if (msg.packetData) { const isDepleted = msg.packetData.remainingPortions === 0; const isExpired = msg.packetData.status === 'expired'; if (isDepleted) { statusText = '已领取'; isFinished = true; } else if (isExpired) { statusText = '已过期'; isFinished = true; } } if(isFinished) div.classList.add('claimed'); div.innerHTML = `<div class="red-packet-container"><div class="red-packet-header"><div class="red-packet-decoration"></div><div class="red-packet-text-content"><span class="red-packet-title">${msg.text}</span>${statusText ? `<span class="red-packet-status-text">${statusText}</span>` : ''}</div></div><div class="red-packet-footer">红包</div></div>`; } 
                 else if (msg.type === 'transfer') { let statusText = ''; let isFinished = false; const amount = parseFloat(msg.text).toFixed(2); const note = msg.recipient ? `转账给 ${msg.recipient}` : '转账'; switch(msg.transferStatus) { case 'collected': statusText = '已收款'; isFinished = true; break; case 'returned': statusText = '已退回'; isFinished = true; break; case 'expired': statusText = '已过期'; isFinished = true; break; statusText = msg.side === 'sent' ? '等待对方收款' : '请你收款'; break; } div.innerHTML = `<div class="transfer-header"><img src="https://i.postimg.cc/WtRBPhBG/IMG-0030.png" class="transfer-icon"><div class="transfer-text"><div class="transfer-amount">¥ ${amount}</div><div class="transfer-status">${statusText}</div></div></div><div class="transfer-footer">${note}</div>`; if (isFinished) { div.classList.add('finished'); } } 
                 else if (msg.type === 'call_summary') { div.innerHTML = `<svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"></path></svg><span>${msg.text}</span>`; }
+                else if (msg.type === 'tuqu_share') {
+                    const post = msg.postData || {};
+                    // 挂钩红包类名，确保在“吐魂祈祷猫”气泡中位置正确
+                    div.classList.add('red_packet'); 
+                    div.innerHTML = `
+                        <div class="tuqu-share-card-header">
+                            <span>兔区</span>
+                            <span>${escapeHtml(post.board || '版块')}</span>
+                        </div>
+                        <div class="tuqu-share-card-body">
+                            <div class="tuqu-share-card-title">${escapeHtml(post.subject || '无标题')}</div>
+                        </div>
+                        <div class="tuqu-share-card-footer">点击查看完整内容</div>
+                    `;
+                }
+
                 else if (msg.type === 'text') {
                 // 【【【【【【 全新的、绝对优先的表情包处理逻辑从这里开始 】】】】】】
                 const stickerMatch = msg.text.match(/^\[sticker:([^\]]+)\]$/);
@@ -24621,64 +24857,65 @@ banner.querySelector('#notification-banner-clickable-area').addEventListener('cl
             
 
 const reRenderMessages = (isInitialLoad = false) => {
+    const chatId = conversationManager.getCurrentChatId();
+    if (!chatId) return;
+
     // 1. 清空容器
     messagesContainer.innerHTML = '';
-    const chatId = conversationManager.getCurrentChatId();
+    
+    // 2. 创建一个“文档碎片”（虚拟容器），在内存中操作，不触发浏览器重绘
+    const fragment = document.createDocumentFragment();
 
-    // ** 全新、更可靠的“加载更多”提示逻辑 **
-    if (chatId) {
-        const fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
-        if (chatState.messages.length < fullHistory.length) {
-            // 只有当还有未加载的消息时，才创建提示元素
-            const loadMoreDiv = document.createElement('div');
-            loadMoreDiv.id = 'load-more-trigger'; // 给它一个ID方便我们操作
-            loadMoreDiv.style.textAlign = 'center';
-            loadMoreDiv.style.color = '#aaa';
-            loadMoreDiv.style.fontSize = '12px';
-            loadMoreDiv.style.padding = '10px 0';
-            loadMoreDiv.style.cursor = 'pointer'; // 让它看起来可以点击
-            loadMoreDiv.textContent = '点击或向上滚动加载更早的记录';
-            
-            // 为它绑定一个独立的点击事件，解决无法滚动的问题
-            loadMoreDiv.onclick = () => {
-                loadMoreMessages();
-            };
-            
-            messagesContainer.appendChild(loadMoreDiv);
-        }
+    const fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+    if (chatState.messages.length < fullHistory.length) {
+        const loadMoreDiv = document.createElement('div');
+        loadMoreDiv.id = 'load-more-trigger';
+        loadMoreDiv.style.textAlign = 'center';
+        loadMoreDiv.style.color = '#aaa';
+        loadMoreDiv.style.fontSize = '12px';
+        loadMoreDiv.style.padding = '10px 0';
+        loadMoreDiv.style.cursor = 'pointer';
+        loadMoreDiv.textContent = '点击或向上滚动加载更早的记录';
+        loadMoreDiv.onclick = () => {
+            loadMoreMessages();
+        };
+        fragment.appendChild(loadMoreDiv);
     }
 
     const TIME_GAP = 3 * 60 * 1000;
-
-    // 2. 确保消息按时间排序 (这部分不变)
     chatState.messages.sort((a, b) => a.timestamp - b.timestamp);
 
     let lastMessageTimestamp = 0;
 
-    // 3. 循环遍历所有历史消息并一次性渲染
+    // 3. 循环生成元素并塞进碎片
+    // 注意：这里调用的是 createMessageElement 而不是 addMessageToDOM
     for (const msg of chatState.messages) {
         if (msg.type === 'time_divider') {
             continue;
         }
         if (lastMessageTimestamp === 0 || (msg.timestamp - lastMessageTimestamp > TIME_GAP)) {
-            addMessageToDOM({
+            const timeDivider = createMessageElement({
                 id: `time-render-${msg.timestamp}`,
                 type: 'time_divider',
                 text: formatTimestamp(msg.timestamp),
                 timestamp: msg.timestamp
             });
+            fragment.appendChild(timeDivider);
         }
-        addMessageToDOM(msg);
+        const msgElement = createMessageElement(msg);
+        fragment.appendChild(msgElement);
         lastMessageTimestamp = msg.timestamp;
     }
 
-    // ** 全新的滚动逻辑 **
+    // 4. 最后一次性把碎片塞进真实 DOM，性能提升 10 倍
+    messagesContainer.appendChild(fragment);
+
     if (isInitialLoad) {
         // 如果是初次加载，无条件滚动到底部
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
-    // 如果是加载更多，滚动位置的恢复将在 loadMoreMessages 函数中处理
 };
+
 async function getAiGeneratedReplyForMe(targetChatId, messageToReply, stance) {
             let loadingModalOverlay = null;
 
@@ -27263,8 +27500,18 @@ messagesContainer.addEventListener('click', async (e) => {
     if(isMultiSelectMode) { toggleMessageSelection(messageId); return; } 
     const message = chatState.messages.find(m => m.id === messageId); 
     if (!message) return; 
+    if (message.type === 'tuqu_share') {
+        const postId = message.postData?.id;
+        if (postId) {
+            // 不再跳转，直接调用预览函数
+            showFullTuquPost(postId);
+        }
+        return;
+    }
+
     if (message.type === 'call_summary') { videoCallManager.showHistoryModal(message.callData); return; }
-    if (message.type === 'red_packet') { showRedPacketModal(message); return; } 
+    if (message.type === 'red_packet') { showRedPacketModal(message); return; }
+
     if (message.type === 'gift' && message.giftStatus !== 'finished' && message.giftStatus !== 'expired') { if (message.side === 'sent') { await customAlert('你送出的礼物，等待对方领取。'); return; } message.giftStatus = 'finished'; reRenderMessages(); saveConversation(); await addMessage({ type: 'system', side: 'system', text: `你领取了礼物“${message.text}”` }); return; }
     if (message.type === 'transfer' && message.transferStatus === 'pending') { if (message.side === 'sent') { await customAlert('等待对方处理。'); } else { const action = await conversationManager.showCustomModal({ title: '处理转账', text: `金额: ¥ ${parseFloat(message.text).toFixed(2)}`, buttons: [ { text: '收款', value: 'collect', class: 'primary' }, { text: '退回', value: 'return', class: 'secondary' } ] }); if (action && action.value) { if (action.value === 'collect') { message.transferStatus = 'collected'; reRenderMessages(); saveConversation(); await addMessage({ type: 'system', side: 'system', text: `你已收款 ¥${parseFloat(message.text).toFixed(2)}` }); } else if (action.value === 'return') { message.transferStatus = 'returned'; reRenderMessages(); saveConversation(); await addMessage({ type: 'system', side: 'system', text: `你将转账退回` }); } } } return; }
     if (message.type === 'pay_for_me' && message.payStatus !== 'paid') { if (message.side === 'sent') { await customAlert('等待对方代付。'); } else { const confirmed = await customConfirm(`确定要为 "${message.text}" 代付吗？`); if (confirmed) { message.payStatus = 'paid'; reRenderMessages(); saveConversation(); await addMessage({ type: 'system', side: 'system', text: `你为对方代付了 "${message.text}"。` }); } } return; }
@@ -28069,12 +28316,89 @@ async function showBranchHistoryModal(chatId) {
                     // 直接赋值给容器，绝不波及 body 或 screen
                     container.scrollTop = targetScrollTop;
 
-                    // 高亮动画
-                    targetEl.classList.add('highlight-anim');
-                    setTimeout(() => targetEl.classList.remove('highlight-anim'), 2000);
-                }
-            }, 100);
+                                targetEl.classList.add('highlight-anim');
+            setTimeout(() => targetEl.classList.remove('highlight-anim'), 2000);
         }
+    }, 100);
+}
+
+// --- 在这里插入：显示兔区帖子完整预览 ---
+async function showFullTuquPost(postId) {
+    const forumData = JSON.parse(localStorage.getItem('jjForumData')) || {};
+    let post = null;
+    for (const board in forumData) {
+        post = forumData[board].find(p => p.id === postId);
+        if (post) break;
+    }
+
+    if (!post) {
+        alert("该帖子已在兔区被删除。");
+        return;
+    }
+
+    // --- 内部渲染引擎 ---
+    const renderTuquText = (text) => {
+        if (!text) return "";
+        // 1. 处理表情标签
+        const stickers = JSON.parse(localStorage.getItem('app-stickers') || '[]');
+        let processed = text.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+            const item = stickers.find(s => s.name === name.trim() && s.type === type.toLowerCase());
+            if (item) {
+                if (type === 'emoji') return `<img src="${item.url}" class="inline-emoji" style="height:1.4em; vertical-align:middle; margin:0 2px;">`;
+                return `<img src="${item.url}" style="max-width:150px; max-height:150px; display:block; margin:8px 0; border-radius:4px;">`;
+            }
+            return match;
+        });
+        // 2. 处理简单的 Markdown (加粗/斜体)
+        processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        // 3. 处理换行
+        return processed.replace(/\n/g, '<br>');
+    };
+
+    // 构建内容 HTML
+    const mainPostHtml = `
+        <div class="tuqu-preview-main-post">
+            <div class="tuqu-preview-title">${renderTuquText(post.subject)}</div>
+            <div class="tuqu-preview-meta">楼主：${escapeHtml(post.author)} | ${post.timestamp}</div>
+            <div class="tuqu-preview-text">${renderTuquText(post.content)}</div>
+        </div>
+    `;
+
+    const commentsHtml = (post.comments || []).map((c, i) => `
+        <div class="tuqu-preview-floor">
+            <div class="tuqu-preview-meta">№${i + 1} 网友：${escapeHtml(c.author)} | ${c.timestamp}</div>
+            <div class="tuqu-preview-text">${renderTuquText(c.content)}</div>
+        </div>
+    `).join('');
+
+    // 弹出弹窗 (移除默认底部按钮，改用顶部关闭)
+    await showCustomModal({
+        title: '',
+        customClass: 'tuqu-preview-modal',
+        html: `
+            <div class="tuqu-preview-header">
+                <span style="font-size:16px; color:#333; font-weight:bold;">帖子详情</span>
+                <div class="tuqu-preview-close-top" id="js-close-tuqu-preview">×</div>
+            </div>
+            <div class="tuqu-preview-content">
+                ${mainPostHtml}
+                ${commentsHtml}
+            </div>
+        `,
+        buttons: [], // 彻底移除底部按钮
+        onRender: (modalDOM, closeModal) => {
+            // 绑定顶部关闭按钮事件
+            const closeBtn = modalDOM.querySelector('#js-close-tuqu-preview');
+            if (closeBtn) {
+                closeBtn.onclick = () => closeModal();
+            }
+        }
+    });
+}
+
+
+        
         // =========================================================================
 // ================= START: FAVORITES MANAGEMENT (NEW) =====================
 // =========================================================================
@@ -28292,7 +28616,9 @@ async function triggerBackgroundDataUpdate(context, senderName, chatId) {
         return { 
             open, 
             getCurrentChatId, 
-            updateHeaderTitle, 
+            showFullTuquPost, // <--- 添加这一行
+            updateHeaderTitle,
+
             reRenderMessages, 
             injectCustomBubbleStyles: publicInjectCustomBubbleStyles, 
             showCustomModal, 
@@ -30420,8 +30746,9 @@ function handleForwardFromAI(characterName, data) {
                 // 退出选择模式的视觉效果（去手型）但保留选中状态
                 appRoot.classList.remove('moments-select-mode');
                 
-                showNotification('双击屏幕任意位置退出预览');
+                showNotification('双击顶栏退出预览');
             });
+
 
             // 3. 点击选择逻辑 (事件委托)
             feedContainer.addEventListener('click', (e) => {
@@ -30448,8 +30775,8 @@ function handleForwardFromAI(characterName, data) {
                 }
             }, true); // 使用捕获阶段，确保最先执行
 
-            // 4. 双击退出预览
-            momentsView.addEventListener('dblclick', () => {
+            // 4. 双击退出预览 (仅限顶栏触发)
+            appRoot.querySelector('.moments-title-bar').addEventListener('dblclick', () => {
                 if (isMomentsPreviewMode) {
                     isMomentsPreviewMode = false;
                     
@@ -30466,6 +30793,7 @@ function handleForwardFromAI(characterName, data) {
                     appRoot.classList.add('moments-select-mode');
                 }
             });
+
             // 【【【 新增结束 】】】
 
             // 【【【 在这里粘贴下面的新代码块 】】】
@@ -32663,7 +32991,7 @@ function saveSettings() {
                     div.className = 'form-group-toggle';
                     div.style.borderTop = '1px solid var(--light-gray)';
                     div.innerHTML = `
-                        <label for="toggle-keep-alive" class="toggle-label" style="color: #d35400;">🔥 强力后台保活 (实验性)</label>
+                        <label for="toggle-keep-alive" class="toggle-label" style="color: #d35400;">强力后台保活</label>
                         <label class="switch">
                             <input type="checkbox" id="toggle-keep-alive">
                             <span class="slider"></span>
@@ -32674,15 +33002,15 @@ function saveSettings() {
                     const hint = document.createElement('p');
                     hint.className = 'form-hint';
                     hint.style.padding = '0 15px 15px';
-                    hint.innerHTML = '开启后，网页将持续播放静音音频以欺骗系统不冻结后台。<br><b>注意：</b>刷视频/打电话可能会打断保活。';
+                    hint.innerHTML = '开启后，系统将持续运行静音音频任务以维持后台活跃状态。iOS 用户推荐开启此项以确保 AI 持续运行。注意：使用视频或通话功能可能会导致保活中断。';
                     debugSection.appendChild(hint);
 
-                    // --- 【核心新增：画中画保活开关】 ---
+                    // --- 画中画保活开关 ---
                     const divPiP = document.createElement('div');
                     divPiP.className = 'form-group-toggle';
                     divPiP.style.borderTop = '1px solid var(--light-gray)';
                     divPiP.innerHTML = `
-                        <label for="toggle-pip-keep-alive" class="toggle-label" style="color: #2980b9;">📺 画中画保活 (推荐)</label>
+                        <label for="toggle-pip-keep-alive" class="toggle-label" style="color: #2980b9;">画中画保活</label>
                         <label class="switch">
                             <input type="checkbox" id="toggle-pip-keep-alive">
                             <span class="slider"></span>
@@ -32693,7 +33021,7 @@ function saveSettings() {
                     const hintPiP = document.createElement('p');
                     hintPiP.className = 'form-hint';
                     hintPiP.style.padding = '0 15px 15px';
-                    hintPiP.innerHTML = '开启后会弹出一个“监控窗口”。只要这个窗口在，AI 就能在后台一直运行，且<b>不会打断你的音乐</b>。';
+                    hintPiP.innerHTML = '开启后将弹出视频窗口。若窗口边框显示为绿色且未在其他应用上方悬浮，请手动点击激活。Android 用户推荐开启此项，该模式支持 AI 后台运行且不影响音乐播放。';
                     debugSection.appendChild(hintPiP);
                 }
             }
@@ -32710,10 +33038,10 @@ function saveSettings() {
                     appearanceSettings.alwaysKeepAlive = newToggle.checked;
                     saveSettings();
                     
-                    // 立即生效：如果开启，马上启动音频；如果关闭，马上停止
+                    // 立即生效
                     if (appearanceSettings.alwaysKeepAlive) {
                         conversationManager.enableKeepAlive();
-                        alert("强力保活已启动！\n请不要关闭网页，直接切换到其他应用即可。\n如果听到声音中断，说明保活失效了。");
+                        alert("强力后台保活已启动。请勿关闭网页，直接切换至其他应用即可。");
                     } else {
                         conversationManager.disableKeepAlive(true); // 强制关闭
                     }
@@ -32729,18 +33057,19 @@ function saveSettings() {
                 const newPiPToggle = pipToggle.cloneNode(true);
                 pipToggle.parentNode.replaceChild(newPiPToggle, pipToggle);
                 
-                newPiPToggle.addEventListener('change', async () => {
+                                newPiPToggle.addEventListener('change', async () => {
                     if (newPiPToggle.checked) {
                         try {
                             await conversationManager.enablePiPKeepAlive();
                         } catch (e) {
                             newPiPToggle.checked = false;
-                            alert("启动画中画失败：\n" + e.message + "\n\n请确保在浏览器设置中允许了“画中画”权限。");
+                            alert("启动画中画失败：\n" + e.message + "\n\n请确保在浏览器设置中已允许“画中画”权限。");
                         }
                     } else {
                         conversationManager.disablePiPKeepAlive();
                     }
                 });
+
             }
             // 【【【 插入结束 】】】
 
@@ -34572,49 +34901,77 @@ async function handleBatchDelete() {
     }
 }
         async function handleBatchAssociate() {
-            // --- 新增代码块 开始 ---
             const currentSelected = Array.from(document.querySelectorAll('.npc-select-checkbox:checked')).map(cb => cb.value);
             lastSelectedNpcs = new Set(currentSelected);
-            // --- 新增代码块 结束 ---
 
             const selectedNpcs = Array.from(document.querySelectorAll('.npc-select-checkbox:checked')).map(cb => cb.value);
             if (selectedNpcs.length === 0) {
-
                 alert('请至少选择一个NPC。');
                 return;
             }
             
-            // 【【【【【【 核心修复：调用 getAllUniqueCharacters() 获取完整角色列表 】】】】】】
             const characters = getAllUniqueCharacters();
             if(characters.length === 0){
                 alert('没有可关联的角色，请先创建角色或群聊。');
                 return;
             }
 
-            const optionsHtml = '<option value="">不关联</option>' + characters.map(name => `<option value="${name}">${name}</option>`).join('');
+            const charListHtml = characters.map(name => `
+                <label class="inline-label" style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; cursor: pointer;">
+                    <input type="checkbox" class="batch-assoc-cb" value="${name}" style="width: 18px; height: 18px; margin: 0;">
+                    <span style="font-size: 14px; color: #333;">${name}</span>
+                </label>
+            `).join('');
 
             const result = await conversationManager.showCustomModal({
                 title: '批量关联角色',
-                showCloseButton: true, // 确保右上角有关闭按钮
-                html: `<p>为选中的 ${selectedNpcs.length} 个NPC关联一个角色：</p>`,
-                form: [{ id: 'associate-char-select', label: '', type: 'select', options: optionsHtml }],
+                showCloseButton: true,
+                html: `
+                    <p style="font-size: 13px; color: #666; margin-bottom: 12px;">请选择要关联到这 ${selectedNpcs.length} 个 NPC 的角色：</p>
+                    <!-- 新增：全选工具栏 -->
+                    <div style="margin-bottom: 10px; padding-left: 5px;">
+                        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#333; cursor:pointer;">
+                            <input type="checkbox" id="batch-assoc-all" style="width:16px; height:16px;"> <b>全选角色</b>
+                        </label>
+                    </div>
+                    <!-- 核心修改：增加 margin-bottom: 25px 撑开与按钮的间距 -->
+                    <div style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; padding: 0 15px; background: #fafafa; margin-bottom: 25px;">
+                        ${charListHtml}
+                    </div>
+                `,
                 buttons: [
-                    { text: '取消', value: 'cancel', class: 'secondary' }, // 新增取消按钮
+                    { text: '取消', value: 'cancel', class: 'secondary' },
                     { text: '确认关联', value: 'associate', class: 'primary' }
-                ]
+                ],
+                onRender: (modalDOM) => {
+                    // 绑定全选逻辑
+                    const selectAll = modalDOM.querySelector('#batch-assoc-all');
+                    if (selectAll) {
+                        selectAll.onclick = (e) => {
+                            modalDOM.querySelectorAll('.batch-assoc-cb').forEach(cb => cb.checked = e.target.checked);
+                        };
+                    }
+                }
             });
             
             if (result && result.value === 'associate') {
                 const modalBox = result.target.closest('.modal-box');
-                const selectedChar = modalBox.querySelector('#associate-char-select').value;
+                const selectedChars = Array.from(modalBox.querySelectorAll('.batch-assoc-cb:checked')).map(cb => cb.value);
+                
+                if (selectedChars.length === 0) {
+                    if (!confirm('你没有选中任何角色，这将清除所选 NPC 的所有关联。确定吗？')) return;
+                }
+
                 selectedNpcs.forEach(npcName => {
-                    npcSettings.associations[npcName] = selectedChar;
+                    npcSettings.associations[npcName] = selectedChars;
                 });
+                
                 saveNpcData();
                 renderNpcPage();
-                alert('关联成功！');
+                alert(`成功为 ${selectedNpcs.length} 个 NPC 关联了 ${selectedChars.length} 个角色！`);
             }
         }
+
         
         async function handleBatchDynamics() {
             // --- 新增代码块 开始 ---
@@ -41942,10 +42299,11 @@ async function performRestore() {
                 buttons: [
                     { text: '纪念日', value: 'anniversary', class: 'primary' },
                     { text: '倒计时', value: 'countdown', class: 'primary' },
-                    { text: '里程碑 (小说章节)', value: 'milestone', class: 'secondary' }
+                    { text: '里程碑', value: 'milestone', class: 'secondary' }
                 ]
             });
             if (!typeResult || typeResult.value === 'close' || typeResult.value === 'cancel') return;
+
 
             const selectedType = typeResult.value;
             
