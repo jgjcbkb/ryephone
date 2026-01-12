@@ -6111,7 +6111,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
         margin-top: 5px;
     }
 
-/* 【【【 关键修复：预览模式下的特例 】】】 */
+    /* 【【【 关键修复：预览模式下的特例 】】】 */
     /* 当 body 同时拥有 frame-hidden (APP模式) 和 preview-fullscreen-active (预览模式) 时 */
     /* 强制解除高度限制，允许页面无限延伸，从而支持长截图 */
     body.frame-hidden.preview-fullscreen-active,
@@ -6121,6 +6121,15 @@ body.preview-fullscreen-active #page-conversation .chat-content {
         min-height: 100vh !important;  /* 至少有一屏高 */
         overflow: visible !important;  /* 允许溢出 */
     }
+
+    /* 【核心新增】确保 iframe 也能撑开高度 */
+    body.preview-fullscreen-active #tab-content-tuqu,
+    body.preview-fullscreen-active #tab-content-tuqu iframe {
+        height: auto !important;
+        min-height: 100vh !important;
+        overflow: visible !important;
+    }
+
 
     /* 【【【 朋友圈预览终极修复：像聊天一样无限拉长 】】】 */
     
@@ -10752,10 +10761,27 @@ if ('serviceWorker' in navigator) {
 
     // 新增：监听来自兔区 iframe 的数据同步
     window.addEventListener('message', async function(event) {
+            // 【核心新增】处理全屏预览指令
+            if (event.data && event.data.type === 'ENTER_FULLSCREEN_PREVIEW') {
+                document.body.classList.add('preview-fullscreen-active');
+                // 强制让兔区所在的 tab-content 也解除限制
+                const tuquTab = document.getElementById('tab-content-tuqu');
+                if (tuquTab) tuquTab.style.height = 'auto';
+                return;
+            }
+            if (event.data && event.data.type === 'EXIT_FULLSCREEN_PREVIEW') {
+                document.body.classList.remove('preview-fullscreen-active');
+                // 恢复兔区 tab 的高度限制
+                const tuquTab = document.getElementById('tab-content-tuqu');
+                if (tuquTab) tuquTab.style.height = '100%';
+                return;
+            }
+
             if (event.data && event.data.type === 'FORUM_DATA_SYNC') {
                 globalTuquData = event.data.data;
                 console.log('[系统] 兔区数据已同步到主系统。');
             } else if (event.data && event.data.type === 'OPEN_TUQU_SHARE_PICKER') {
+
                 const post = event.data.post;
                 const chats = chatList.map(c => {
                     const info = loadFromLocalStorage(`chat_info_${c.id}`, {});
@@ -18024,23 +18050,40 @@ let isLoadingMore = false;
                 let helpText = "";
 
                 if (isGroup) {
-                    // --- 情况 A: 群聊逻辑 ---
+                    // --- 情况 A: 群聊逻辑 (全维度身份扫描) ---
+                    // 1. 获取正式成员
                     const groupMembers = loadFromLocalStorage(`chat_members_${currentChatId}`, []);
                     
-                    // 过滤：只保留在群成员列表中的身份
+                    // 2. 获取群聊主角名单
+                    const protagonists = (chatInfo.groupPersonas || []).map(p => p.name);
+                    
+                    // 3. 获取备注中的群演名单 (支持中英文逗号和空格)
+                    const ensemble = (chatInfo.remark || '').split(/[,，\s]+/).filter(Boolean);
+                    
+                    // 4. 合并所有潜在身份并去重
+                    const allPotentialNames = [...new Set([...groupMembers, ...protagonists, ...ensemble])];
+
                     identities = [
                         { name: '{{user}}', type: '原本的用户', avatar: myAvatar },
-                        ...allUserPersonas.filter(p => groupMembers.includes(p.name)),
-                        ...allNpcs.filter(n => groupMembers.includes(n.name)),
-                        ...allDynamicChars.filter(d => groupMembers.includes(d.name))
+                        ...allUserPersonas.filter(p => allPotentialNames.includes(p.name)),
+                        ...allNpcs.filter(n => allPotentialNames.includes(n.name)),
+                        ...allDynamicChars.filter(d => allPotentialNames.includes(d.name))
                     ];
+
+                    // 5. 补全那些“仅存在于群聊人设或备注中”但在全局列表里还没建立实体的角色
+                    allPotentialNames.forEach(name => {
+                        if (name !== '{{user}}' && !identities.some(id => id.name === name)) {
+                            identities.push({ name: name, type: '群聊角色', avatar: null });
+                        }
+                    });
 
                     helpText = `
                         <div style="background:#f8f9fa; border:1px solid #e9ecef; color:#495057; padding:12px; border-radius:8px; font-size:12px; margin-bottom:15px; line-height:1.6;">
                             <strong>群聊身份切换指引：</strong><br>
-                            身份切换仅限于当前群成员列表内的用户、NPC或角色。若您本人不在群聊名单中则无法发言，但若切换至在群成员，变身后即可正常参与对话。
+                            您可以变身为群成员、群聊主角或备注中定义的群演角色。切换后，您发送的消息将以该角色身份呈现。
                         </div>
                     `;
+
                 } else {
                     // --- 情况 B: 单聊逻辑 ---
                     const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${currentChatId}`, []);
@@ -18071,11 +18114,28 @@ let isLoadingMore = false;
                     </div>
                 `).join('');
 
-                // 4. 异步加载头像
+                // 4. 异步加载头像 (多级联动查找)
                 identities.forEach((id, index) => {
                     const el = list.querySelector(`#id-avatar-item-${index}`);
-                    if (el) setImageSrc(el, id.avatar || generateDefaultAvatar(id.name));
+                    if (!el) return;
+
+                    let avatarToSet = id.avatar;
+
+                    // 如果对象本身没带头像，去群聊主角设置里找
+                    if (!avatarToSet && isGroup) {
+                        const p = (chatInfo.groupPersonas || []).find(gp => gp.name === id.name);
+                        if (p && p.avatar) avatarToSet = p.avatar;
+                    }
+
+                    // 如果还没找到，去全局 NPC 设置里找
+                    if (!avatarToSet) {
+                        const npcData = (npcSettings.personas && npcSettings.personas[id.name]);
+                        if (npcData && npcData.avatar) avatarToSet = npcData.avatar;
+                    }
+
+                    setImageSrc(el, avatarToSet || generateDefaultAvatar(id.name));
                 });
+
             }
 
 

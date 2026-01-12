@@ -83,12 +83,23 @@
 
         /* --- 页面 2: 帖子列表页 --- */
         #page-list .list-header { display: flex; justify-content: flex-start; align-items: center; padding: 8px 10px; font-size: 12px; }
-        #page-list .topic-list-table { width: 100%; background-color: var(--jj-green-text); border: 1px solid var(--jj-green-text); }
+        #page-list .topic-list-table { 
+            width: 100%; 
+            background-color: var(--jj-green-text); 
+            border: 1px solid var(--jj-green-text); 
+            table-layout: fixed; 
+        }
         #page-list .topic-list-table th { background-color: var(--jj-blue-header); padding: 8px 5px; font-size: 12px; font-weight: normal; }
         #page-list .topic-list-table td { background-color: var(--jj-pink-bg); padding: 8px 5px; font-size: 12px; border-top: 1px solid #FFFFFF; }
         #page-list .topic-title { word-break: break-all; }
-        #page-list .topic-author, #page-list .topic-time, #page-list .topic-replies { text-align: center; white-space: nowrap; }
-        #page-list .topic-author { width: 18%; }
+        #page-list .topic-time, #page-list .topic-replies { text-align: center; white-space: nowrap; }
+        #page-list .topic-author { 
+            width: 18%; 
+            text-align: center; 
+            white-space: normal; 
+            word-break: break-all; 
+            line-height: 1.2;
+        }
         #page-list .topic-time { width: 22%; }
         #page-list .topic-replies { width: 10%; }
         #page-list .no-topics-message { text-align: center; color: var(--jj-meta-text); padding: 40px 20px; }
@@ -97,7 +108,14 @@
         #page-post .post-title { font-size: 20px; font-weight: bold; padding: 15px; color: #8B5A65; line-height: 1.4; }
         #page-post .reply-item { border-bottom: 1px solid #F0F0F0; padding: 15px; }
         #page-post .reply-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-        #page-post .author-info .author-line1 { font-size: 14px; color: var(--jj-main-text); }
+        #page-post .author-info .author-line1 { 
+            font-size: 14px; 
+            color: var(--jj-main-text); 
+            word-break: break-all; 
+            white-space: normal; 
+            display: block;
+            max-width: 80vw;
+        }
         #page-post .author-info .author-id { color: var(--jj-meta-text); margin-left: 5px; }
         #page-post .author-info .author-line2 { font-size: 12px; color: var(--jj-meta-text); margin-top: 4px; }
         #page-post .reply-actions-menu { color: #888; font-size: 20px; font-weight: bold; cursor: pointer; padding: 0 5px; }
@@ -187,8 +205,7 @@
         .reported-banner-active:hover { background: #ffccc7; }
         .reported-content-hidden { display: none; padding: 10px; border: 1px dashed #ffa39e; background: #fafafa; border-radius: 4px; margin-top: 5px; }
         .reported-content-hidden.show { display: block; }
-        /* 新增：数字角标样式 */
-        .jj-badge { display: inline-block; background-color: #ff4d4f; color: white; font-size: 11px; font-weight: bold; padding: 0 6px; height: 18px; line-height: 18px; border-radius: 9px; margin-left: 8px; vertical-align: middle; min-width: 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); border: 1px solid #fff; }
+
 
         /* 新增：催更选择弹窗样式 */
         .tuqu-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 2000; }
@@ -221,11 +238,74 @@ html, body {
     overflow-y: auto; /* 让内容在内部滚动 */
 }
 
-/* 隐藏滚动条但保留滚动功能 (美观) */
-.phone-screen::-webkit-scrollbar {
-    display: none;
-}
+        /* 隐藏滚动条但保留滚动功能 (美观) */
+    .phone-screen::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* --- 新增：兔区多选与预览模式样式 (终极滚动修复版) --- */
+
+    /* 1. 多选模式：楼层变为可点击 */
+    body.tuqu-select-mode .reply-item {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    /* 选中状态：绿色边框和背景 */
+    .reply-item.selected {
+        background-color: rgba(153, 204, 0, 0.1);
+        outline: 2px solid var(--jj-green-text);
+    }
+
+    /* 2. 预览模式：核心隐藏逻辑 */
+    body.tuqu-preview-mode .reply-item:not(.selected) {
+        display: none !important;
+    }
+    body.tuqu-preview-mode .page-header .back-button,
+    body.tuqu-preview-mode .page-header .header-menu,
+    body.tuqu-preview-mode #reply-form-container,
+    body.tuqu-preview-mode #tuqu-preview-bar,
+    body.tuqu-preview-mode .reply-actions-menu {
+        display: none !important;
+    }
+
+    /* 3. 预览模式：强制滚动与高度自适应 (核心修复) */
+    
+    /* A. 根节点：必须允许滚动，且高度由内容决定 */
+    body.tuqu-preview-mode,
+    body.tuqu-preview-mode html {
+        height: auto !important;       /* 解除高度锁定 */
+        min-height: 100% !important;   /* 至少占满屏幕 */
+        overflow-y: visible !important; /* 让内容溢出 iframe */
+        background-color: #fff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* B. 中间容器：必须变为块级元素，解除 Flex 限制 */
+    body.tuqu-preview-mode .phone-screen,
+    body.tuqu-preview-mode .page.active,
+    body.tuqu-preview-mode .page-content,
+    body.tuqu-preview-mode #post-detail-container,
+    body.tuqu-preview-mode .reply-list {
+        display: block !important;     /* 【关键】杀死 Flex 布局 */
+        height: auto !important;       /* 高度随内容撑开 */
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: visible !important;  /* 允许溢出 */
+        width: 100% !important;
+        position: static !important;   /* 解除定位 */
+        box-shadow: none !important;
+    }
+
+    /* C. 选中项样式优化 */
+    body.tuqu-preview-mode .reply-item.selected {
+        outline: none !important;
+        background-color: transparent !important;
+        border-bottom: 1px solid #eee !important;
+    }
     </style>
+
+
 </head>
 <body>
 
@@ -384,7 +464,18 @@ html, body {
             <div id="header-dropdown-menu" class="header-dropdown-menu">
                 <div class="header-dropdown-item" onclick="handleHeaderAction('share')">分享到聊天</div>
                 <div class="header-dropdown-item" onclick="handleHeaderAction('update')">更新</div>
+                <div class="header-dropdown-item" onclick="toggleTuquSelectMode()">多选/预览</div>
             </div>
+
+            <!-- 新增：多选操作栏 (默认隐藏) -->
+            <div id="tuqu-preview-bar" style="display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: #fff; padding: 15px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 1100; justify-content: space-between; align-items: center; box-sizing: border-box;">
+                <span id="tuqu-select-count" style="font-size: 14px; color: #666;">已选 0 楼</span>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="exitTuquSelectMode()" style="padding: 8px 15px; border: 1px solid #ddd; background: #f5f5f5; border-radius: 6px; cursor: pointer;">取消</button>
+                    <button onclick="enterTuquPreview()" style="padding: 8px 15px; border: none; background: var(--jj-blue-link); color: white; border-radius: 6px; cursor: pointer;">生成预览</button>
+                </div>
+            </div>
+
 
 
 
@@ -1551,7 +1642,88 @@ html, body {
                  }
              }, 3000);
         });
+
+        // --- 新增：多选预览逻辑 ---
+        let isTuquSelectMode = false;
+        let isTuquPreviewMode = false;
+
+        // 1. 开启多选模式
+        function toggleTuquSelectMode() {
+            toggleHeaderMenu(); // 关闭下拉菜单
+            isTuquSelectMode = true;
+            document.body.classList.add('tuqu-select-mode');
+            document.getElementById('tuqu-preview-bar').style.display = 'flex';
+            updateTuquSelectCount();
+        }
+
+        // 2. 退出多选模式
+        function exitTuquSelectMode() {
+            isTuquSelectMode = false;
+            isTuquPreviewMode = false;
+            document.body.classList.remove('tuqu-select-mode');
+            document.body.classList.remove('tuqu-preview-mode');
+            document.getElementById('tuqu-preview-bar').style.display = 'none';
+            // 清除所有选中状态
+            document.querySelectorAll('.reply-item.selected').forEach(el => el.classList.remove('selected'));
+            
+            // 【核心新增】通知父窗口退出全屏
+            window.parent.postMessage({ type: 'EXIT_FULLSCREEN_PREVIEW' }, '*');
+        }
+
+        
+
+
+        // 3. 楼层点击事件 (使用事件委托绑定到 page-post)
+        document.getElementById('page-post').addEventListener('click', function(e) {
+            if (!isTuquSelectMode) return;
+
+            // 查找点击的是否是楼层
+            const item = e.target.closest('.reply-item');
+            if (item) {
+                // 阻止触发其他点击事件（如图片放大、菜单等）
+                e.preventDefault();
+                e.stopPropagation();
+                
+                item.classList.toggle('selected');
+                updateTuquSelectCount();
+            }
+        }, true); // 使用捕获阶段确保优先处理
+
+        // 更新选中计数
+        function updateTuquSelectCount() {
+            const count = document.querySelectorAll('.reply-item.selected').length;
+            document.getElementById('tuqu-select-count').innerText = `已选 ${count} 楼`;
+        }
+
+        // 4. 进入预览模式 (自适应高度)
+        function enterTuquPreview() {
+            const count = document.querySelectorAll('.reply-item.selected').length;
+            if (count === 0) {
+                alert('请至少选择一个楼层');
+                return;
+            }
+            isTuquPreviewMode = true;
+            document.body.classList.add('tuqu-preview-mode');
+            
+            // 【核心新增】通知父窗口进入全屏
+            window.parent.postMessage({ type: 'ENTER_FULLSCREEN_PREVIEW' }, '*');
+        }
+
+        // 5. 双击顶栏退出预览
+        document.getElementById('post-page-header').addEventListener('dblclick', function() {
+            if (isTuquPreviewMode) {
+                // 退出预览，回到多选模式
+                isTuquPreviewMode = false;
+                document.body.classList.remove('tuqu-preview-mode');
+                
+                // 【核心新增】通知父窗口退出全屏
+                window.parent.postMessage({ type: 'EXIT_FULLSCREEN_PREVIEW' }, '*');
+            }
+        });
+
+
     </script>
+
 
 </body>
 </html>
