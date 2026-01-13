@@ -10547,18 +10547,19 @@ if ('serviceWorker' in navigator) {
         }
         async function showOnlineSearchModal() {
             // 1. 弹出带有源选择的搜索框
-            // 核心修改：使用 onRender 来拦截搜索按钮的点击事件，防止弹窗直接关闭导致无法获取输入值
-            await conversationManager.showCustomModal({
+            const result = await conversationManager.showCustomModal({
                 title: '搜索网络音乐',
                 form: [
                     { id: 'music-source-select', label: '搜索来源', type: 'select', 
                       options: `
-                        <option value="gd">GD音乐台 (默认)</option>
-                        <option value="qqmp3">QQMP3源 (高音质/新)</option>
+                        <option value="gd">GD音乐台</option>
+                        <option value="qqmp3">米兔音乐</option>
                       ` 
                     },
                     { id: 'music-keyword-input', label: '关键词', placeholder: '输入歌名、歌手...' }
                 ],
+                // ... (后续代码保持不变)
+
                 buttons: [
                     { text: '取消', value: 'cancel', class: 'secondary' },
                     { text: '搜索', value: 'search', class: 'primary' }
