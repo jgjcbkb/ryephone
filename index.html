@@ -12577,11 +12577,22 @@ If you choose to use HTML snippets, you MUST follow the **WRAPPER PURITY LAW**:
 
             // 【【【 核心修复：精准外科手术式清洗 (主动模式) 】】】
             // 注意：这里使用的是 contextChatInfo
-            if (contextChatInfo && contextChatInfo.allowInteractionUpdates === false) {
+            
+            // 【逻辑修正】只有当开关【明确为 true】时才保留。
+            // 默认 (undefined) 或 关闭 (false) 都会执行清洗。
+            if (!contextChatInfo || contextChatInfo.allowInteractionUpdates !== true) {
                 console.log("[System] Interaction updates DISABLED (Proactive). Surgically removing interaction commands...");
 
                 // 1. 切除心理引擎中的 "Directive Eight"
+                // 增加双重保险，防止正则漏网
                 finalSystemPrompt = finalSystemPrompt.replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "");
+                if (finalSystemPrompt.includes("Directive Eight: System Command Distinction")) {
+                     const start = finalSystemPrompt.indexOf("Directive Eight: System Command Distinction");
+                     const end = finalSystemPrompt.indexOf("Directive Nine:");
+                     if (start !== -1 && end !== -1) {
+                         finalSystemPrompt = finalSystemPrompt.substring(0, start) + finalSystemPrompt.substring(end);
+                     }
+                }
 
                 // 2. 切除 "头像双击互动协议"
                 finalSystemPrompt = finalSystemPrompt.replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "");
@@ -12594,7 +12605,7 @@ If you choose to use HTML snippets, you MUST follow the **WRAPPER PURITY LAW**:
                 finalSystemPrompt = finalSystemPrompt.replace(/.*\[set_interaction_action:.*\n?/g, "");
                 finalSystemPrompt = finalSystemPrompt.replace(/.*\[set_interaction_suffix:.*\n?/g, "");
             }
-            // 【【【 清洗结束 】】】
+
 
             // 【核心修复】：修改“开拍板”指令，明确允许并要求思考过程
             finalMessages = [
@@ -12939,25 +12950,22 @@ ${processedChatHistory}
             // END: 注入时间上下文
             // =================================================================
 
-            // 【核心修复：主动发朋友圈时，强制移除双击互动相关的指令，防止AI混淆】
-            let cleanPsychEngine = ULTIMATE_PSYCHOLOGICAL_ENGINE;
-            // 1. 切除 "Directive Eight" (状态 vs 互动陷阱)
-            cleanPsychEngine = cleanPsychEngine.replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "");
-            
-            // 2. 切除 "头像双击互动协议" 和 "预设配置协议" (如果它们存在于 baseSystemPrompt 中)
-            let cleanBasePrompt = baseSystemPrompt;
-            cleanBasePrompt = cleanBasePrompt.replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "");
-            cleanBasePrompt = cleanBasePrompt.replace(/\*\*\[PRESET CONFIGURATION PROTOCOL[\s\S]*?(?=---)/g, "");
+            // 【核心修正】朋友圈模式：强制切除所有“双击头像”相关的指令
+            let momentsPsychEngine = ULTIMATE_PSYCHOLOGICAL_ENGINE;
+            momentsPsychEngine = momentsPsychEngine.replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "");
+            momentsPsychEngine = momentsPsychEngine.replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "");
+            momentsPsychEngine = momentsPsychEngine.replace(/\*\*\[PRESET CONFIGURATION PROTOCOL[\s\S]*?(?=---)/g, "");
 
-            // --- 核心修正：注入身份锁定指令 ---
-            const identityLockInPrompt = `
-${cleanPsychEngine}
-${cleanBasePrompt}
+            const instruction = `
+${momentsPsychEngine}
+${baseSystemPrompt}
 ${timeContext}
+${musicContext}
+
+
 
 
 # [ULTIMATE IDENTITY LOCK-IN - UNBREAKABLE RULE]
-
 **FOR THIS SPECIFIC ACTION, YOUR IDENTITY IS LOCKED. YOU ARE, AND ONLY ARE, "${senderName}".**
 
 - **Your Persona:** ${personaText}
@@ -13325,20 +13333,16 @@ ${chatHistoryForPrompt || 'No recent chat history.'}
             // END: 注入时间上下文
             // =================================================================
 
-            // 【核心修复：主动发朋友圈时，强制移除双击互动相关的指令，防止AI混淆】
-            let cleanPsychEngine = ULTIMATE_PSYCHOLOGICAL_ENGINE;
-            // 1. 切除 "Directive Eight" (状态 vs 互动陷阱)
-            cleanPsychEngine = cleanPsychEngine.replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "");
-            
-            // 2. 切除 "头像双击互动协议" 和 "预设配置协议" (如果它们存在于 baseSystemPrompt 中)
-            let cleanBasePrompt = baseSystemPrompt;
-            cleanBasePrompt = cleanBasePrompt.replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "");
-            cleanBasePrompt = cleanBasePrompt.replace(/\*\*\[PRESET CONFIGURATION PROTOCOL[\s\S]*?(?=---)/g, "");
+            // 【核心修正】发帖模式：同样强制切除所有“双击头像”相关的指令
+            let postPsychEngine = ULTIMATE_PSYCHOLOGICAL_ENGINE;
+            postPsychEngine = postPsychEngine.replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "");
+            postPsychEngine = postPsychEngine.replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "");
+            postPsychEngine = postPsychEngine.replace(/\*\*\[PRESET CONFIGURATION PROTOCOL[\s\S]*?(?=---)/g, "");
 
             // --- 核心修正：注入身份锁定指令 ---
             const identityLockInPrompt = `
-${cleanPsychEngine}
-${cleanBasePrompt}
+${postPsychEngine}
+${baseSystemPrompt}
 ${timeContext}
 
 
