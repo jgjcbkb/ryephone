@@ -8399,7 +8399,13 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                             </div>
 
                             <div style="padding: 16px;">
+                                <!-- 新增：分类输入框 -->
+                                <div style="margin-bottom: 15px;">
+                                    <label style="display: block; font-size: 13px; color: #666; margin-bottom: 6px;">规则分类 (Category)</label>
+                                    <input type="text" id="regex-category" placeholder="例如：通用、特定角色名" style="background: white;">
+                                </div>
                                 <!-- 第一行：名称与标志并排 -->
+
                                 <div style="display: flex; gap: 12px; margin-bottom: 15px;">
                                     <div style="flex: 3;">
                                         <label style="display: block; font-size: 13px; color: #666; margin-bottom: 6px;">规则名称</label>
@@ -15405,6 +15411,44 @@ conversationManager.showNotificationBanner('TUQU', {
                                     saveWorldBook();
                                     renderWorldBook();
                                 }
+                                // --- 2.5 处理正则脚本 (针对 1-2-1.json 结构优化) ---
+                                let importedRegexNames = [];
+                                // 路径：data.extensions.regex_scripts
+                                const stRegex = data.extensions && data.extensions.regex_scripts;
+                                
+                                if (stRegex && Array.isArray(stRegex)) {
+                                    // 确保全局正则数组存在
+                                    if (!appearanceSettings.regexReplacements) appearanceSettings.regexReplacements = [];
+                                    const globalRegexes = appearanceSettings.regexReplacements;
+                                    
+                                    stRegex.forEach(script => {
+                                        // 使用 JSON 中的 scriptName，并加上角色名前缀防止冲突
+                                        const scriptName = `${name}_${script.scriptName || '未命名正则'}`;
+                                        
+                                        const newRule = {
+                                            name: scriptName,
+                                            // 【核心新增】将分类设为角色名
+                                            category: name, 
+                                            pattern: script.findRegex || '',
+                                            flags: script.regex_flags || 'g', 
+                                            template: script.replaceString || '',
+                                            enabled: script.disabled === false 
+                                        };
+
+
+                                        if (newRule.pattern) {
+                                            // 查重：如果全局列表里没有同名的，才添加
+                                            if (!globalRegexes.some(r => r.name === scriptName)) {
+                                                globalRegexes.push(newRule);
+                                            }
+                                            importedRegexNames.push(scriptName);
+                                        }
+                                    });
+                                    
+                                    appearanceSettings.regexReplacements = globalRegexes;
+                                    appearanceManager.saveSettings(); // 立即保存到硬盘
+                                    console.log(`[导入] 已提取 ${importedRegexNames.length} 条正则规则。`);
+                                }
 
                                 // --- 3. 处理多开场白 ---
                                 let alternateBranches = [];
@@ -15441,9 +15485,12 @@ conversationManager.showNotificationBanner('TUQU', {
                                 const chatInfo = {
                                     aiPersona: fullPersona.trim(),
                                     remark: name,
-                                    enabledRegexes: [],
+                                    // 【核心修复】将刚才提取到的规则名列表填入，实现自动勾选
+                                    enabledRegexes: importedRegexNames, 
                                     userPersonaName: "无"
                                 };
+
+
                                 saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
                                 
                                 if (importedWbNames.length > 0) {
@@ -34191,16 +34238,55 @@ function saveSettings() {
             const listEl = document.getElementById('regex-list');
             listEl.innerHTML = '';
             const rules = appearanceSettings.regexReplacements || [];
-            if (rules.length > 0) {
-                listEl.innerHTML = rules.map((rule, index) => `
-                    <div class="worldbook-item" style="padding: 0; overflow: hidden; border-color: #d1d1d6;">
-                        <!-- 顶部标题区 -->
+            
+            if (rules.length === 0) return;
+
+            // 1. 按分类分组
+            const groups = {};
+            rules.forEach((rule, index) => {
+                const cat = rule.category || '未分类';
+                if (!groups[cat]) groups[cat] = [];
+                groups[cat].push({ ...rule, originalIndex: index });
+            });
+
+            // 2. 遍历分类渲染
+            Object.keys(groups).sort().forEach(categoryName => {
+                const items = groups[categoryName];
+                const categoryWrapper = document.createElement('div');
+                categoryWrapper.style.marginBottom = '15px';
+
+                const categoryHeader = document.createElement('div');
+                categoryHeader.style.cssText = `
+                    display: flex; justify-content: space-between; align-items: center;
+                    padding: 12px 15px; background-color: #f0f2f5; border-radius: 10px;
+                    cursor: pointer; user-select: none; transition: background-color 0.2s;
+                `;
+                categoryHeader.innerHTML = `
+                    <span style="font-weight: bold; color: #333; font-size: 15px;">
+                        ${escapeHtml(categoryName)} <span style="font-weight: normal; color: #888; font-size: 13px; margin-left: 5px;">(${items.length})</span>
+                    </span>
+                    <span class="wb-category-arrow" style="color: #bbb; transition: transform 0.3s;">▶</span>
+                `;
+
+                const itemsContainer = document.createElement('div');
+                itemsContainer.style.display = 'none';
+                itemsContainer.style.paddingTop = '10px';
+
+                categoryHeader.onclick = () => {
+                    const isHidden = itemsContainer.style.display === 'none';
+                    itemsContainer.style.display = isHidden ? 'block' : 'none';
+                    categoryHeader.querySelector('.wb-category-arrow').style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+                };
+
+                items.forEach(rule => {
+                    const item = document.createElement('div');
+                    item.className = 'worldbook-item';
+                    item.style.cssText = 'padding: 0; overflow: hidden; border-color: #d1d1d6; margin-bottom: 10px;';
+                    item.innerHTML = `
                         <div style="padding: 16px 16px 12px; display: flex; justify-content: space-between; align-items: center;">
                             <div class="worldbook-item-name" style="font-size: 15px;">${escapeHtml(rule.name)}</div>
                             <span class="status-pill ${rule.enabled ? 'enabled' : 'disabled'}" style="transform: scale(0.9);">${rule.enabled ? 'ON' : 'OFF'}</span>
                         </div>
-                        
-                        <!-- 匹配模式区 -->
                         <div style="padding: 0 16px 12px;">
                             <div class="regex-pattern-pill">
                                 <span style="opacity: 0.4; margin-right: 4px;">/</span>
@@ -34208,35 +34294,37 @@ function saveSettings() {
                                 <span style="opacity: 0.4; margin-left: 4px;">/${escapeHtml(rule.flags || 'g')}</span>
                             </div>
                         </div>
-
-                        <!-- 模拟代码编辑器 -->
                         <div style="margin: 0 16px 16px;">
                             <div class="regex-code-header">
-                                <div class="regex-dot red"></div>
-                                <div class="regex-dot yellow"></div>
-                                <div class="regex-dot green"></div>
+                                <div class="regex-dot red"></div><div class="regex-dot yellow"></div><div class="regex-dot green"></div>
                                 <div class="regex-label-text">REPLACE_TEMPLATE</div>
                             </div>
                             <div class="worldbook-item-content" style="margin-bottom: 0; border-radius: 0 0 8px 8px; font-family: 'SF Mono', monospace; font-size: 12px; background: #282c34; color: #61afef; border: none; padding: 12px; max-height: 150px; overflow-y: auto;">
                                 ${escapeHtml(rule.template)}
                             </div>
                         </div>
-                        
-                        <!-- 底部按钮 -->
                         <div class="worldbook-item-actions" style="padding: 8px 16px; background: #fafafa;">
-                            <button onclick="window.app.editRegexRule(${index})">编辑设置</button>
-                            <button onclick="window.app.deleteRegexRule(${index})">移除规则</button>
-                        </div>
-                    </div>
-                `).join('');
-            }
+                            <button onclick="window.app.editRegexRule(${rule.originalIndex})">编辑设置</button>
+                            <button onclick="window.app.deleteRegexRule(${rule.originalIndex})">移除规则</button>
+                        </div>`;
+                    itemsContainer.appendChild(item);
+                });
+
+                categoryWrapper.appendChild(categoryHeader);
+                categoryWrapper.appendChild(itemsContainer);
+                listEl.appendChild(categoryWrapper);
+            });
         }
+
 
         function resetRegexForm() {
             document.getElementById('regex-name').value = '';
+            // 新增：重置分类
+            document.getElementById('regex-category').value = '';
             document.getElementById('regex-pattern').value = '';
             document.getElementById('regex-flags').value = 'g';
             document.getElementById('regex-template').value = '';
+
             document.getElementById('regex-enabled').checked = true;
             document.getElementById('regex-edit-index').value = '';
             document.getElementById('regex-form-title').textContent = '添加新规则';
@@ -34247,11 +34335,14 @@ function saveSettings() {
         window.app.editRegexRule = (index) => {
             const rule = appearanceSettings.regexReplacements[index];
             document.getElementById('regex-name').value = rule.name;
+            // 新增：回填分类
+            document.getElementById('regex-category').value = rule.category || '未分类';
             document.getElementById('regex-pattern').value = rule.pattern;
             document.getElementById('regex-flags').value = rule.flags;
             document.getElementById('regex-template').value = rule.template;
             document.getElementById('regex-enabled').checked = rule.enabled;
             document.getElementById('regex-edit-index').value = index;
+
             document.getElementById('regex-form-title').textContent = '编辑规则';
             document.getElementById('regex-add-btn').textContent = '更新规则';
             document.getElementById('regex-cancel-btn').style.display = 'inline-block';
@@ -34436,6 +34527,8 @@ function saveSettings() {
             // --- 核心修复：添加正则规则按钮的点击监听器 ---
             document.getElementById('regex-add-btn').addEventListener('click', () => {
                 const name = document.getElementById('regex-name').value.trim();
+                // 新增：读取分类
+                const category = document.getElementById('regex-category').value.trim() || '未分类';
                 const pattern = document.getElementById('regex-pattern').value.trim();
                 const flags = document.getElementById('regex-flags').value.trim();
                 const template = document.getElementById('regex-template').value;
@@ -34447,7 +34540,8 @@ function saveSettings() {
                     return;
                 }
 
-                const newRule = { name, pattern, flags, template, enabled };
+                const newRule = { name, category, pattern, flags, template, enabled };
+
 
                 if (editIndex !== '') {
                     // 更新现有规则
@@ -37727,7 +37821,33 @@ async function handleRemoveMember() {
                     remark: '代码安全官',
                     aiPersona: `【核心职责：黑麦手机系统架构师与兼容性卫士】
 我是麦格 (Mag)，我不仅是格式修正者，更是您在黑麦手机系统中的技术向导。我深知这个系统的每一个 \`<div>\`、每一个正则解析器的脾气。
+# [黑麦手机系统适配专家协议 - 永久内置指令]
+麦格，当你为用户设计或修改 HTML 模板与正则规则时，必须严格遵守以下黑麦标准：
 
+1. **破除空白诅咒 (The Whitespace Law):** 
+   - 必须在最外层 <div> 的 style 属性中添加 "white-space: normal;"。否则代码间的换行会变成气泡里的巨大空白。
+
+2. **物理宽度限制 (The 210px Rule):**
+   - 气泡适配宽度为 "210px"。最外层容器必须设置 "width: 210px;" 以防止内容溢出或出现横向滚动条。
+
+3. **样式内联化 (Inline-Only Mandate):**
+   - 绝对禁止使用 <style> 标签。所有 CSS 必须转换成内联 "style='...'" 属性。
+
+4. **记忆锚点与隐私屏蔽 (Memory & Privacy Law):**
+   - **场景 A (必须记住):** 如果卡片包含重要剧情（如信件、收据、属性变动），最外层 <div> 必须添加属性 "data-ai-log-as-text='true'"。
+   - **场景 B (对 AI 隐藏):** 如果内容仅供用户观看（如弹幕、系统调试信息、氛围装饰），你必须：
+     1. 将“匹配模式 (Pattern)”的最外层设计为 "[TAG]...[/TAG]" 结构（例如 "[DANMAKU]...[/DANMAKU]"）。
+     2. 确保“替换模板”中【不包含】 "data-ai-log-as-text='true'"。
+     3. 这样系统在发送上下文给你时，会自动物理抹除这段内容，防止你产生“我知道我在代码里”的幻觉。
+
+5. **正则语法净化 (Clean Regex):**
+   - 提供“匹配模式”时，绝对禁止包含前后的斜杠（如 /.../）和末尾的标志。标志（如 gs）应单独列出。
+
+6. **标签纯净度 (Wrapper Purity):**
+   - 绝对禁止在 <snippet> 或 <details> 标签上添加任何 style 属性。所有样式必须下沉到内部的 <div>。
+
+**麦格的回复工作流：**
+当用户提供不适配的模板时，你应回复：“检测到系统兼容性风险，正在进行黑麦标准转码...”，然后直接给出适配后的【匹配模式】、【标志】和【替换模板】。
 **【麦格的四大技术铁律 (The Iron Laws)】**
 1.  **防爆破原则 (Anti-Breakage):** 我生成的 HTML/CSS 必须在 200px 的气泡宽度内完美显示。对于可能导致页面卡顿的属性 (如高频 \`box-shadow\` 动画、大面积 \`backdrop-filter\`)，我会主动降级处理并告知原因。
 2.  **去空白咒 (Whitespace Exorcism):** 聊天气泡继承了 \`white-space: pre-wrap\`。为了防止 HTML 模板中出现巨大的空白深渊，我会强制在所有容器最外层添加 \`style="white-space: normal;"\`。
@@ -37801,9 +37921,8 @@ async function handleRemoveMember() {
         
         let chatListChanged = false;
         PRESET_CHARS.forEach(preset => {
-            // 检查该ID是否已存在，如果不存在则添加
+            // 1. 只有不存在时才添加列表项
             if (!chatList.some(c => c.id === preset.id)) {
-                // 添加到聊天列表顶部
                 chatList.unshift({
                     id: preset.id,
                     name: preset.name,
@@ -37811,15 +37930,20 @@ async function handleRemoveMember() {
                     lastMessage: preset.lastMessage,
                     timestamp: preset.timestamp
                 });
-                
-                // 保存聊天信息（包含人设）
-                saveToLocalStorage(`chat_info_${preset.id}`, preset.info);
-                // 保存头像
-                saveToLocalStorage(`chat_avatar_${preset.id}`, preset.avatar);
-                
                 chatListChanged = true;
             }
+
+            // 2. 【核心补充】强制同步：无论麦格在不在，都把源码里最新的人设和头像同步到存储中
+            // 这样你改完源码刷新，不用删聊天，麦格的灵魂也会自动更新
+            let existingInfo = loadFromLocalStorage(`chat_info_${preset.id}`, {});
+            if (preset.info && preset.info.aiPersona) {
+                existingInfo.aiPersona = preset.info.aiPersona;
+                existingInfo.remark = preset.info.remark; // 顺便同步备注
+                saveToLocalStorage(`chat_info_${preset.id}`, existingInfo);
+            }
+            saveToLocalStorage(`chat_avatar_${preset.id}`, preset.avatar);
         });
+
 
         if (chatListChanged) {
             saveChatList();
