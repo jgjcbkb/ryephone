@@ -30459,9 +30459,12 @@ const momentsManager = (function() {
                                     contentHtml += escapeHtml(subPart);
                                 }
                             } else {
-                                // 不是标签，就是普通文本
-                                contentHtml += escapeHtml(subPart);
-                            }
+    // 【核心修复】允许 AI 在评论中使用 <br> 换行，防止显示为源码
+    // 先把 <br> 统一换成换行符，转义后再换回 <br>
+    let processedSubPart = subPart.replace(/<br\s*\/?>/gi, '\n'); 
+    contentHtml += escapeHtml(processedSubPart).replace(/\n/g, '<br>');
+}
+
                         });
                     }
                 });
