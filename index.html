@@ -10167,7 +10167,22 @@ if ('serviceWorker' in navigator) {
 
             try {
                 // 【核心逻辑】：如果是在线歌曲，且有ID，就去换新链接
-                if (song.type === 'online' && song.apiId && song.apiSource) {
+                
+                // 1. 新增：QQMP3 源的自动解析/续期逻辑
+                if (song.apiSource === 'qqmp3' && song.apiId) {
+                    console.log(`正在从 QQMP3 源获取《${song.title}》的最新链接...`);
+                    const res = await fetch(`https://api.qqmp3.vip/api/kw.php?rid=${song.apiId}&type=json&level=exhigh&lrc=true`);
+                    const json = await res.json();
+                    if (json.code === 200 && json.data.url) {
+                        audio.src = json.data.url;
+                        song.source = json.data.url;
+                        if (json.data.lrc) song.lrc = json.data.lrc; // 顺便更新歌词
+                    } else {
+                        audio.src = song.source; // 失败则尝试旧链接
+                    }
+                }
+                // 2. 原有的 GD 音乐台逻辑
+                else if (song.type === 'online' && song.apiId && song.apiSource) {
                     // 可以在这里加个 console.log 方便调试
                     console.log(`正在为《${song.title}》获取最新链接...`);
                     
@@ -10187,6 +10202,7 @@ if ('serviceWorker' in navigator) {
                 } 
                 // 本地歌曲逻辑
                 else if (song.type === 'local') { 
+
                     const blob = await imageStore.getItem(song.source); 
                     if (blob) audio.src = URL.createObjectURL(blob); 
                 } 
@@ -10247,32 +10263,66 @@ if ('serviceWorker' in navigator) {
         
         async function addSongByKeyword(keyword, senderName, targetChatId) {
             try {
-                const searchUrl = `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(keyword)}&count=50`;
+                // 1. 尝试 GD 源
+                const searchUrl = `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(keyword)}&count=1`;
                 const response = await fetch(searchUrl);
                 const results = await response.json();
-                if (!results || results.length === 0) return;
-                const s = results[0];
-                const [urlRes, picRes, lyricRes] = await Promise.all([
-                    fetch(`https://music-api.gdstudio.xyz/api.php?types=url&source=${s.source}&id=${s.id}`).then(r => r.json()),
-                    fetch(`https://music-api.gdstudio.xyz/api.php?types=pic&source=${s.source}&id=${s.pic_id}`).then(r => r.json()),
-                    fetch(`https://music-api.gdstudio.xyz/api.php?types=lyric&source=${s.source}&id=${s.lyric_id}`).then(r => r.json())
-                ]);
-                if (!urlRes.url) return;
-                const newSong = {
-                    title: s.name,
-                    artist: Array.isArray(s.artist) ? s.artist.join('/') : s.artist,
-                    source: urlRes.url,
-                    type: 'online',
-                    apiSource: s.source,
-                    apiId: s.id,
-                    cover: picRes.url,
-                    lrc: lyricRes.lyric || ''
-                };
-                playlist.push(newSong);
-                saveState();
-                await conversationManager.addMessage({ type: 'system', side: 'system', text: `“${senderName}” 将《${s.name}》添加到了歌单。` }, targetChatId);
+                
+                if (results && results.length > 0) {
+                    // GD 有结果，使用 GD
+                    const s = results[0];
+                    const [urlRes, picRes, lyricRes] = await Promise.all([
+                        fetch(`https://music-api.gdstudio.xyz/api.php?types=url&source=${s.source}&id=${s.id}`).then(r => r.json()),
+                        fetch(`https://music-api.gdstudio.xyz/api.php?types=pic&source=${s.source}&id=${s.pic_id}`).then(r => r.json()),
+                        fetch(`https://music-api.gdstudio.xyz/api.php?types=lyric&source=${s.source}&id=${s.lyric_id}`).then(r => r.json())
+                    ]);
+                    if (urlRes.url) {
+                        const newSong = {
+                            title: s.name,
+                            artist: Array.isArray(s.artist) ? s.artist.join('/') : s.artist,
+                            source: urlRes.url,
+                            type: 'online',
+                            apiSource: s.source,
+                            apiId: s.id,
+                            cover: picRes.url,
+                            lrc: lyricRes.lyric || ''
+                        };
+                        playlist.push(newSong);
+                        saveState();
+                        await conversationManager.addMessage({ type: 'system', side: 'system', text: `“${senderName}” 将《${s.name}》添加到了歌单。` }, targetChatId);
+                        return;
+                    }
+                }
+
+                // 2. 如果 GD 失败或无结果，尝试 QQMP3 源
+                console.log("GD无结果，尝试 QQMP3 源...");
+                const qqRes = await fetch(`https://api.qqmp3.vip/api/songs.php?type=search&keyword=${encodeURIComponent(keyword)}`);
+                const qqJson = await qqRes.json();
+                
+                if (qqJson.data && qqJson.data.length > 0) {
+                    const s = qqJson.data[0];
+                    const detailRes = await fetch(`https://api.qqmp3.vip/api/kw.php?rid=${s.rid}&type=json&level=exhigh&lrc=true`);
+                    const detail = await detailRes.json();
+                    
+                    if (detail.code === 200 && detail.data.url) {
+                        playlist.push({
+                            title: s.name,
+                            artist: s.artist,
+                            source: detail.data.url,
+                            type: 'online',
+                            apiSource: 'qqmp3',
+                            apiId: s.rid,
+                            cover: s.pic,
+                            lrc: detail.data.lrc || ''
+                        });
+                        saveState();
+                        await conversationManager.addMessage({ type: 'system', side: 'system', text: `“${senderName}” 通过备用源添加了《${s.name}》。` }, targetChatId);
+                    }
+                }
+
             } catch (e) { console.error("AI添加音乐失败:", e); }
         }
+
 
         async function showPlaylistModal() {
             const listHtml = playlist.length > 0 ? playlist.map((s, i) => `<div class="music-list-item ${i === currentIndex ? 'active' : ''}" data-index="${i}"><div class="music-list-item-info"><span class="music-list-item-title">${s.title}</span><span class="music-list-item-artist">${s.artist}</span></div><div class="music-list-item-actions">${s.type === 'online' ? `<button class="download-playlist-btn" data-index="${i}">下</button>` : ''}<button class="upload-cloud-btn" data-index="${i}" title="上传到云端">云</button><button class="import-cover-btn" data-index="${i}">图</button><button class="import-lrc-btn" data-index="${i}">词</button><button class="delete-song-btn" data-index="${i}">删</button></div></div>`).join('') : '<p>歌单为空</p>';
@@ -10496,176 +10546,240 @@ if ('serviceWorker' in navigator) {
             }});
         }
         async function showOnlineSearchModal() {
-            const keyword = await conversationManager.showContentInputModal({ title: '搜索网络音乐 (GD音乐台)', placeholder: '输入歌曲名、歌手或专辑...' });
-            if (!keyword || keyword.trim() === '') return;
-            
-            const loadingIndicator = document.createElement('div');
-            loadingIndicator.className = 'loading-overlay';
-            loadingIndicator.textContent = '正在搜索...';
-            document.querySelector('.app-container').appendChild(loadingIndicator);
-            
-            setTimeout(async () => {
-                try {
-                    const searchApiUrl = `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(keyword)}&count=50`;
-                    const response = await fetch(searchApiUrl);
-                    if (!response.ok) throw new Error('网络请求失败');
-                    const results = await response.json();
-                    if (!results || results.length === 0) { alert('没有找到相关的歌曲。'); return; }
-                    
-                    // --- 核心修改 1: 增加复选框，并统一下载按钮样式 ---
-                    // 按钮样式复用：background: #f0f0f0; border: 1px solid #ddd; color: #666;
-                    const listHtml = results.map((song, index) => {
-                        const picUrl = song.pic_id ? `https://music-api.gdstudio.xyz/api.php?types=pic&source=${song.source}&id=${song.pic_id}` : '';
-                        return `
-                        <div class="music-search-item" data-index="${index}" data-song-json='${JSON.stringify(song)}' style="display:flex; align-items:center; padding:10px; border-bottom:1px solid #eee; cursor:pointer;">
-                            <input type="checkbox" class="search-item-checkbox" style="margin-right:10px; transform:scale(1.2); cursor:pointer;">
-                            <div class="music-search-cover" style="background-image: url('${picUrl}'); width:40px; height:40px; border-radius:4px; background-size:cover; background-position:center; margin-right:10px; flex-shrink:0;"></div>
-                            <div class="music-search-info" style="flex-grow:1; overflow:hidden;">
-                                <span class="music-search-title" style="font-weight:500; font-size:14px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${song.name}</span>
-                                <span class="music-search-artist" style="font-size:12px; color:#666;">${Array.isArray(song.artist) ? song.artist.join(' / ') : song.artist}</span>
-                            </div>
-                            <button class="download-online-btn" style="margin-left:10px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px; padding: 4px 8px; font-size: 12px; color: #666; cursor: pointer; white-space:nowrap;">下载</button>
-                        </div>`;
-                    }).join('');
-                    
-                    loadingIndicator.remove();
-                    
-                    await conversationManager.showCustomModal({
-                        title: `搜索结果 (${results.length}) (GD音乐台)`,
-                        html: `
-                            <div style="padding: 5px 10px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
-                                <label style="font-size:14px; color:#333; display:flex; align-items:center;"><input type="checkbox" id="search-select-all" style="margin-right:5px;"> 全选</label>
-                                <span style="font-size:12px; color:#999;">点击列表选中，点击按钮下载</span>
-                            </div>
-                            <div style="max-height: 400px; overflow-y: auto;">${listHtml}</div>
-                        `,
-                        buttons: [
-                            { text: '关闭', value: 'close', class: 'secondary' },
-                            { text: '添加选中歌曲', value: 'add_selected', class: 'primary' } // --- 核心修改 2: 批量添加按钮 ---
-                        ],
-                        onRender: (dom, close) => {
-                            // 全选逻辑
-                            const selectAll = dom.querySelector('#search-select-all');
-                            selectAll.addEventListener('change', (e) => {
-                                dom.querySelectorAll('.search-item-checkbox').forEach(cb => cb.checked = e.target.checked);
-                            });
+            // 1. 弹出带有源选择的搜索框
+            // 核心修改：使用 onRender 来拦截搜索按钮的点击事件，防止弹窗直接关闭导致无法获取输入值
+            await conversationManager.showCustomModal({
+                title: '搜索网络音乐',
+                form: [
+                    { id: 'music-source-select', label: '搜索来源', type: 'select', 
+                      options: `
+                        <option value="gd">GD音乐台 (默认)</option>
+                        <option value="qqmp3">QQMP3源 (高音质/新)</option>
+                      ` 
+                    },
+                    { id: 'music-keyword-input', label: '关键词', placeholder: '输入歌名、歌手...' }
+                ],
+                buttons: [
+                    { text: '取消', value: 'cancel', class: 'secondary' },
+                    { text: '搜索', value: 'search', class: 'primary' }
+                ],
+                onRender: (modalDOM, closeModal) => {
+                    const searchBtn = modalDOM.querySelector('button[data-value="search"]');
+                    if (!searchBtn) return;
 
-                            // 列表点击逻辑 (事件委托)
-                            const container = dom.querySelector('.modal-box > div:nth-child(3)'); // 滚动容器
-                            
-                            container.addEventListener('click', async (e) => {
-                                // A. 点击下载按钮
-                                if (e.target.classList.contains('download-online-btn')) {
-                                    e.stopPropagation();
-                                    const btn = e.target;
-                                    const item = btn.closest('.music-search-item');
-                                    const songData = JSON.parse(item.dataset.songJson);
-                                    
-                                    btn.textContent = "...";
-                                    btn.disabled = true;
-                                    
-                                    try {
-                                        const urlApi = `https://music-api.gdstudio.xyz/api.php?types=url&source=${songData.source}&id=${songData.id}`;
-                                        const res = await fetch(urlApi);
-                                        const data = await res.json();
-                                        if (data.url) {
-                                            await downloadMusicFile(data.url, songData.name);
-                                        } else {
-                                            alert("无法获取下载链接");
-                                        }
-                                    } catch(err) {
-                                        alert("下载出错");
-                                    } finally {
-                                        btn.textContent = "下载";
-                                        btn.disabled = false;
-                                    }
-                                    return;
-                                }
-
-                                // B. 点击行 (切换选中状态)
-                                const item = e.target.closest('.music-search-item');
-                                if (item && e.target.type !== 'checkbox') {
-                                    const cb = item.querySelector('.search-item-checkbox');
-                                    cb.checked = !cb.checked;
-                                }
-                            });
-
-                            // C. 点击“添加选中歌曲”按钮
-                            const addBtn = dom.querySelector('button[data-value="add_selected"]');
-                            if (addBtn) {
-                                // 移除默认的关闭行为，改为手动控制
-                                // 注意：showCustomModal 的按钮默认会触发 close，我们需要覆盖 onclick 或者在逻辑里处理
-                                // 这里我们利用 showCustomModal 返回值处理比较困难，直接绑定点击事件更直接
-                                addBtn.onclick = async (e) => {
-                                    e.stopPropagation(); // 阻止冒泡关闭
-                                    
-                                    const selectedItems = dom.querySelectorAll('.search-item-checkbox:checked');
-                                    if (selectedItems.length === 0) {
-                                        alert("请先选择歌曲！");
-                                        return;
-                                    }
-
-                                    if (addBtn.classList.contains('loading')) return;
-                                    addBtn.classList.add('loading');
-                                    const originalText = addBtn.textContent;
-                                    addBtn.textContent = `正在添加 (0/${selectedItems.length})...`;
-
-                                    let successCount = 0;
-                                    
-                                    // 遍历添加
-                                    for (let i = 0; i < selectedItems.length; i++) {
-                                        const cb = selectedItems[i];
-                                        const item = cb.closest('.music-search-item');
-                                        const songData = JSON.parse(item.dataset.songJson);
-                                        
-                                        addBtn.textContent = `正在添加 (${i+1}/${selectedItems.length})...`;
-
-                                        try {
-                                            const urlApi = `https://music-api.gdstudio.xyz/api.php?types=url&source=${songData.source}&id=${songData.id}`;
-                                            const picApi = `https://music-api.gdstudio.xyz/api.php?types=pic&source=${songData.source}&id=${songData.pic_id}`;
-                                            const lyricApi = `https://music-api.gdstudio.xyz/api.php?types=lyric&source=${songData.source}&id=${songData.lyric_id}`;
-                                            
-                                            const [urlRes, picRes, lyricRes] = await Promise.all([fetch(urlApi), fetch(picApi), fetch(lyricApi)]);
-                                            const urlData = await urlRes.json();
-                                            const picData = await picRes.json();
-                                            const lyricData = await lyricRes.json();
-                                            
-                                            if (!urlData.url) throw new Error('链接获取失败');
-
-                                            // 核心：保存 apiId 和 apiSource 以便自动续期
-                                            playlist.push({ 
-                                                title: songData.name, 
-                                                artist: Array.isArray(songData.artist) ? songData.artist.join(' / ') : songData.artist, 
-                                                source: urlData.url, 
-                                                type: 'online', 
-                                                apiSource: songData.source,
-                                                apiId: songData.id,
-                                                cover: picData.url, 
-                                                lrc: lyricData.lyric || '' 
-                                            });
-                                            successCount++;
-                                            
-                                            // 稍微延时，防止请求过快触发限制 (5分钟50次)
-                                            await new Promise(r => setTimeout(r, 300)); 
-
-                                        } catch (err) {
-                                            console.error(`添加《${songData.name}》失败`, err);
-                                        }
-                                    }
-
-                                    saveState();
-                                    if (playlist.length === successCount) { currentIndex = 0; loadSong(0, false); } // 如果是首次添加，加载第一首
-                                    renderPlayer();
-                                    
-                                    alert(`成功添加 ${successCount} 首歌曲！`);
-                                    close(); // 手动关闭弹窗
-                                };
-                            }
+                    // 拦截点击事件
+                    searchBtn.onclick = async (e) => {
+                        e.stopPropagation(); // 阻止弹窗自动关闭
+                        
+                        const source = modalDOM.querySelector('#music-source-select').value;
+                        const keyword = modalDOM.querySelector('#music-keyword-input').value.trim();
+                        
+                        if (!keyword) {
+                            alert("请输入关键词");
+                            return;
                         }
-                    });
-                } catch (error) { alert('搜索失败: ' + error.message); } finally { if (document.body.contains(loadingIndicator)) loadingIndicator.remove(); }
-            }, 50);
+
+                        // UI 反馈
+                        const originalText = searchBtn.textContent;
+                        searchBtn.textContent = "搜索中...";
+                        searchBtn.disabled = true;
+
+                        try {
+                            let results = [];
+                            if (source === 'qqmp3') {
+                                // --- QQMP3 搜索逻辑 ---
+                                const res = await fetch(`https://api.qqmp3.vip/api/songs.php?type=search&keyword=${encodeURIComponent(keyword)}`);
+                                const json = await res.json();
+                                results = (json.data || []).map(s => ({
+                                    name: s.name,
+                                    artist: s.artist,
+                                    id: s.rid,
+                                    pic: s.pic,
+                                    source: 'qqmp3', // 标记来源
+                                    raw: s
+                                }));
+                            } else {
+                                // --- GD 音乐台搜索逻辑 ---
+                                const res = await fetch(`https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(keyword)}&count=30`);
+                                const json = await res.json();
+                                results = (json || []).map(s => ({
+                                    name: s.name,
+                                    artist: Array.isArray(s.artist) ? s.artist.join('/') : s.artist,
+                                    id: s.id,
+                                    pic: s.pic_id, // GD 的 pic 需要后期解析
+                                    source: 'gd',
+                                    raw: s
+                                }));
+                            }
+
+                            if (results.length === 0) {
+                                alert('没有找到相关的歌曲。');
+                                searchBtn.textContent = originalText;
+                                searchBtn.disabled = false;
+                                return;
+                            }
+
+                            // 搜索成功，手动关闭输入弹窗
+                            closeModal();
+
+                            // 2. 渲染结果列表并打开新弹窗
+                            const listHtml = results.map((song, index) => {
+                                // 处理封面预览
+                                let picUrl = song.pic;
+                                // 如果是 GD 源，封面是 id，需要拼凑 URL
+                                if (song.source === 'gd' && song.raw) {
+                                    picUrl = `https://music-api.gdstudio.xyz/api.php?types=pic&source=${song.raw.source}&id=${song.raw.pic_id}`;
+                                }
+
+                                return `
+                                <div class="music-search-item" data-index="${index}" style="display:flex; align-items:center; padding:10px; border-bottom:1px solid #eee; cursor:pointer;">
+                                    <input type="checkbox" class="search-item-checkbox" style="margin-right:10px;">
+                                    <div class="music-search-cover" style="background-image: url('${picUrl}'); width:40px; height:40px; border-radius:4px; background-size:cover; background-position:center; margin-right:10px; flex-shrink:0;"></div>
+                                    <div style="flex:1; overflow:hidden; margin-left:10px;">
+                                        <div style="font-weight:500; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${song.name}</div>
+                                        <div style="font-size:12px; color:#666;">${song.artist} [${song.source.toUpperCase()}]</div>
+                                    </div>
+                                    <button class="download-online-btn" style="margin-left:10px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px; padding: 4px 8px; font-size: 12px; color: #666; cursor: pointer; white-space:nowrap;">下载</button>
+                                </div>`;
+                            }).join('');
+
+                            // 3. 弹出结果选择框
+                            await conversationManager.showCustomModal({
+                                title: `搜索结果 (${results.length})`,
+                                html: `
+                                    <div style="padding: 5px 10px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                                        <label style="font-size:14px; color:#333; display:flex; align-items:center;"><input type="checkbox" id="search-select-all" style="margin-right:5px;"> 全选</label>
+                                        <span style="font-size:12px; color:#999;">点击列表选中，点击按钮下载</span>
+                                    </div>
+                                    <div style="max-height: 400px; overflow-y: auto;">${listHtml}</div>
+                                `,
+                                buttons: [
+                                    { text: '取消', value: 'close', class: 'secondary' },
+                                    { text: '添加选中', value: 'add', class: 'primary' }
+                                ],
+                                onRender: (dom, closeResults) => {
+                                    // 全选
+                                    const selectAll = dom.querySelector('#search-select-all');
+                                    selectAll.addEventListener('change', (e) => {
+                                        dom.querySelectorAll('.search-item-checkbox').forEach(cb => cb.checked = e.target.checked);
+                                    });
+
+                                    // 列表点击 (下载或选中)
+                                    const container = dom.querySelector('.modal-box > div:nth-child(3)');
+                                    container.addEventListener('click', async (e) => {
+                                        // 下载逻辑
+                                        if (e.target.classList.contains('download-online-btn')) {
+                                            e.stopPropagation();
+                                            const btn = e.target;
+                                            const index = btn.closest('.music-search-item').dataset.index;
+                                            const song = results[index];
+                                            
+                                            btn.textContent = "...";
+                                            btn.disabled = true;
+                                            
+                                            try {
+                                                let downloadUrl = "";
+                                                if (song.source === 'qqmp3') {
+                                                    // QQMP3 下载链接获取
+                                                    const res = await fetch(`https://api.qqmp3.vip/api/kw.php?rid=${song.id}&type=json&level=exhigh&lrc=true`);
+                                                    const json = await res.json();
+                                                    if (json.code === 200) downloadUrl = json.data.url;
+                                                } else {
+                                                    // GD 下载链接获取
+                                                    const s = song.raw;
+                                                    const res = await fetch(`https://music-api.gdstudio.xyz/api.php?types=url&source=${s.source}&id=${s.id}`);
+                                                    const json = await res.json();
+                                                    downloadUrl = json.url;
+                                                }
+
+                                                if (downloadUrl) {
+                                                    await downloadMusicFile(downloadUrl, song.name);
+                                                } else {
+                                                    alert("无法获取下载链接");
+                                                }
+                                            } catch(err) {
+                                                alert("下载出错");
+                                            } finally {
+                                                btn.textContent = "下载";
+                                                btn.disabled = false;
+                                            }
+                                            return;
+                                        }
+
+                                        // 选中逻辑
+                                        const item = e.target.closest('.music-search-item');
+                                        if (item && e.target.type !== 'checkbox') {
+                                            const cb = item.querySelector('.search-item-checkbox');
+                                            cb.checked = !cb.checked;
+                                        }
+                                    });
+
+                                    // 批量添加逻辑
+                                    const addBtn = dom.querySelector('button[data-value="add"]');
+                                    addBtn.onclick = async () => {
+                                        const checked = dom.querySelectorAll('.search-item-checkbox:checked');
+                                        if (checked.length === 0) return alert("请选择歌曲");
+                                        
+                                        addBtn.disabled = true;
+                                        addBtn.textContent = "添加中...";
+
+                                        for (const cb of checked) {
+                                            const index = cb.closest('.music-search-item').dataset.index;
+                                            const song = results[index];
+                                            
+                                            try {
+                                                if (song.source === 'qqmp3') {
+                                                    // 解析 QQMP3
+                                                    const detailRes = await fetch(`https://api.qqmp3.vip/api/kw.php?rid=${song.id}&type=json&level=exhigh&lrc=true`);
+                                                    const detail = await detailRes.json();
+                                                    if (detail.code === 200) {
+                                                        playlist.push({
+                                                            title: song.name,
+                                                            artist: song.artist,
+                                                            source: detail.data.url,
+                                                            type: 'online',
+                                                            apiSource: 'qqmp3',
+                                                            apiId: song.id,
+                                                            cover: song.pic,
+                                                            lrc: detail.data.lrc || ''
+                                                        });
+                                                    }
+                                                } else {
+                                                    // 解析 GD
+                                                    const s = song.raw;
+                                                    const urlApi = `https://music-api.gdstudio.xyz/api.php?types=url&source=${s.source}&id=${s.id}`;
+                                                    const picApi = `https://music-api.gdstudio.xyz/api.php?types=pic&source=${s.source}&id=${s.pic_id}`;
+                                                    const lrcApi = `https://music-api.gdstudio.xyz/api.php?types=lyric&source=${s.source}&id=${s.lyric_id}`;
+                                                    
+                                                    const [u, p, l] = await Promise.all([fetch(urlApi).then(r=>r.json()), fetch(picApi).then(r=>r.json()), fetch(lrcApi).then(r=>r.json())]);
+                                                    
+                                                    if (u.url) {
+                                                        playlist.push({
+                                                            title: song.name, artist: song.artist, source: u.url, type: 'online',
+                                                            apiSource: s.source, apiId: s.id, cover: p.url, lrc: l.lyric || ''
+                                                        });
+                                                    }
+                                                }
+                                                // 延时防封
+                                                await new Promise(r => setTimeout(r, 200));
+                                            } catch (e) { console.error(e); }
+                                        }
+                                        saveState(); renderPlayer(); closeResults(); alert("添加成功！");
+                                    };
+                                }
+                            });
+
+                        } catch (err) {
+                            alert('搜索失败: ' + err.message);
+                            searchBtn.textContent = originalText;
+                            searchBtn.disabled = false;
+                        }
+                    };
+                }
+            });
         }
+
+
         return { 
             init,
             getAudio: () => audio,
@@ -14090,46 +14204,58 @@ ${chatHistoryForTuqu || 'No recent history.'}
                 }
             });
 
-            // 3. 构建指令
+            // 3. 构建指令 (终极拟真版：引入随机性与混乱)
             const specificInstruction = `
-# [ULTIMATE DIRECTIVE: SPECIFIC THREAD UPDATE - CONTENT CONTINUATION MODE]
-The user has clicked "Update/催更". They want to see the **CONTINUATION** of the content, not just random comments.
+# [ULTIMATE DIRECTIVE: SPECIFIC THREAD UPDATE - THE CHAOS ENGINE]
+The user has clicked "Update/催更". They want to see **NEW ACTIVITY** in this thread.
 
-**【【【 ABSOLUTE ANONYMITY LAW 】】】**
-1. **AUTHOR NAME:** Use "LZ" (楼主) or the Original Author's pseudonym. **NEVER** use your real character name ("${senderName}") as the author.
-2. **CONTENT:** Keep the story/gossip anonymous. Use "my friend", "he/she", or "A/B" to refer to people.
-3. **NO META-TALK:** **ABSOLUTELY FORBIDDEN** to mention HTML, snippets, or visual effects. Talk about the story as if it's real life.
-**[GLOBAL IP & DIALECT STRATEGY]**
-1.  **Location:** Feel free to use overseas IPs (e.g., "Germany", "Singapore").
-2.  Dialect: If using dialect, append a translation in parentheses.
+**CRITICAL SHIFT: REALISM OVER CONTINUATION**
+In a real forum, a "bump" does NOT always guarantee a story update. Real life happens. Drama happens. Writer's block happens.
+**You are NOT a content vending machine.** You are simulating a living, breathing, chaotic community.
 
+**[YOUR MANDATORY CHOICE: ROLL THE DICE]**
+You MUST choose **ONE** of the following scenarios based on the thread type and current "vibe". Do not always choose Scenario A. Mix it up!
 
-**[CRITICAL CONTENT ANALYSIS]**
+---
+### **SCENARIO A: THE "GOLDEN DROP" (Probability: 40%)**
+*   **Condition:** The author is inspired and productive.
+*   **Action:** 
+    *   **IF YOU ARE THE AUTHOR (LZ):** Post the **NEXT CHAPTER/PART**. Make it substantial (800+ chars). End on a cliffhanger.
+    *   **IF YOU ARE A READER:** Write a long, high-quality analysis or a "screaming" reaction to the previous part that reignites the hype.
 
-Read the [TARGET THREAD CONTEXT]. Determine the type of the thread:
-1.  **Creative Work (Fanfic/Novel/Roleplay/Anco):** The thread contains a story, a scenario, or a creative writing piece.
-2.  **Discussion/Gossip:** The thread is about news, complaints, or questions.
+### **SCENARIO B: THE "EXCUSE & DELAY" (Probability: 20%)**
+*   **Condition:** Real life hit the author hard.
+*   **Action:**
+    *   **IF YOU ARE THE AUTHOR (LZ):** Post a short "Leave of Absence" (请假条).
+        *   *Examples:* "Sorry guys, my cat stepped on my keyboard and deleted the draft.", "Work is killing me, update tomorrow!", "Stuck on a plot hole, need ideas."
+    *   **IF YOU ARE A READER:** Complain about the cliffhanger. "It's been 84 years...", "LZ don't drop this!", "Sending blades (寄刀片)."
 
-**[YOUR MANDATORY ROLE & ACTION]**
+### **SCENARIO C: THE "DRAMA & CONFLICT" (Probability: 20%)**
+*   **Condition:** The plot went a direction some people hate, or a troll appeared.
+*   **Action:**
+    *   **Role:** Act as a **Disappointed Reader** or **Anti-Fan**.
+    *   **Content:** "避雷 (Avoid this)!", "OOC is too much.", "Why did A do that? It makes no sense.", "I'm dropping this."
+    *   **Water Army Response:** Generate a wave of arguments. Some defending the author, some attacking. Create a "flame war" (骂战).
 
-**IF IT IS A CREATIVE WORK (Priority):**
-*   **STEP 1: VERIFY OWNERSHIP:** Look at the "Author" of the thread in the [TARGET THREAD CONTEXT].
-*   **STEP 2: CHOOSE YOUR ROLE:**
-    *   **IF THE AUTHOR IS YOU (or your pseudonym):** You MUST act as the **Original Author (LZ / 楼主)**. Write the **NEXT PART/CHAPTER** of the story. Ensure the plot moves forward significantly.
-    *   **IF THE AUTHOR IS SOMEONE ELSE (User or another AI):** You are **STRICTLY FORBIDDEN** from acting as the author. You are a **FAN/READER**. 
-        *   **Your Action:** Do NOT write a story update. Instead, write a detailed, high-emotion review, scream in excitement, or beg the original author for more content.
-        *   **Example:** "楼主救命！卡在这里真的好吗？我愿意用我室友单身十年换你现在更新！"
+### **SCENARIO D: THE "SPECULATION & HYPE" (Probability: 20%)**
+*   **Condition:** No update yet, but the audience is bored.
+*   **Action:**
+    *   **Role:** Act as a **Theory Crafter**.
+    *   **Content:** "Guys, I think B is actually the villain.", "What if the ring is fake?", "Betting 50 cents they kiss in the next chapter."
+    *   **Water Army Response:** People debating the theory.
 
-**IF IT IS A DISCUSSION:**
-*   **YOUR ROLE:** A key participant or the OP providing a major update.
-*   **MAIN ACTION:** Provide new information, a plot twist, or a strong counter-argument to escalate the drama.
+---
+**[COMMON RULES FOR ALL SCENARIOS]**
 
-**[WATER ARMY TASK - HYPES & REACTIONS]**
-You have full control over the crowd's reaction.
-- If your update reveals a major secret or plot twist, generate a massive wave of 15 to 30+ comments to simulate the "Hype" and forum chaos.
-- If the update is a minor bridge chapter, 2 to 6 comments are enough.
-- **Constraint:** Ensure the volume of comments reflects the actual significance of the update.
+**1. AUTHOR NAME:** Use "LZ" (楼主) or the Original Author's pseudonym. **NEVER** use your real character name ("${senderName}") as the author.
+**2. CONTENT ANONYMITY:** Keep the story/gossip anonymous.
+**3. NO META-TALK:** **ABSOLUTE BAN** on mentioning HTML, snippets, or visual effects.
 
+**[WATER ARMY TASK - MATCH THE VIBE]**
+*   **If Scenario A (Update):** 10-20 comments of "AHHHH!", "Kneeling!", "More!".
+*   **If Scenario B (Excuse):** 5-10 comments of "Take care", "Waiting", "Noooo!".
+*   **If Scenario C (Drama):** 15-30 comments of arguing, fighting, "You don't understand", "Don't read if you don't like it".
+*   **If Scenario D (Speculation):** 5-10 comments of discussion.
 
 **[ROLEPLAY SETTING]**
 ${senderName !== 'Anonymous_System' ? `Character: "${senderName}"\nUser Persona: ${finalUserPersonaText}\nYour Persona: ${finalCharPersonaText}\n${associatedNpcsPrompt}` : `Role: Anonymous Internet User / Original Author`}
@@ -14139,20 +14265,14 @@ Setting: ${extraOptions.worldview || "Standard reality"}
 **[STRICT JSON FORMAT REQUIRED]**
 You MUST output using this EXACT JSON structure.
 
-\`[tuqu_complex_action: {"type":"comment", "postId":"${targetPost.id}", "content":"[Your Story Continuation / Major Update Here]", "author":"LZ", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}, {"author":"ReplyName2", "location":"City2", "content":"Reply2"}]}]\`
+\`[tuqu_complex_action: {"type":"comment", "postId":"${targetPost.id}", "content":"[YOUR CHOSEN SCENARIO CONTENT HERE]", "author":"[Pseudonym based on Role]", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}, {"author":"ReplyName2", "location":"City2", "content":"Reply2"}]}]\`
 
 ${TUQU_MEDIA_PROTOCOL}
-
-**[ABSOLUTE CP PURITY LAW - THE "THIRD WHEEL" BAN]**
-Check the **"Setting"** provided above.
-1.  **IF A CP IS IMPLIED (e.g., Char x NPC):** You are **STRICTLY FORBIDDEN** from inserting \`{{user}}\` into the story.
-    *   **ERASE THE USER:** In this specific fiction/thread, \`{{user}}\` DOES NOT EXIST. Do not make them a jealous ex, a friend, or a passerby.
-    *   **FOCUS:** The spotlight must be 100% on the specified couple.
-    *   **IGNORE USER PERSONA:** For the content of this story, ignore the "User Persona" provided in the context. It is irrelevant.
 
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 `;
+
 
             
             // 4. 发送 (注入了 lifeContext)
