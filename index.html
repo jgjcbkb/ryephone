@@ -15011,11 +15011,12 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                 forceId: newPostId
                             }, '*');
 
-                            // 兔区新帖横幅通知
-                            conversationManager.showNotificationBanner('TUQU', { 
-                                text: `兔区新帖：${data.subject}`, 
-                                type: 'text' 
-                            });
+                            // 兔区新帖横幅通知 (显示版块和标题)
+conversationManager.showNotificationBanner('TUQU', { 
+    text: `兔区【${data.board}】新帖：${data.subject}`, 
+    type: 'text' 
+});
+
                             
                             if (data.water_army && Array.isArray(data.water_army)) {
                                 data.water_army.forEach((c, index) => {
@@ -15054,11 +15055,21 @@ const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_p
                                 quote: data.quote 
                             }, '*');
 
-                            // 兔区评论横幅通知
-                            conversationManager.showNotificationBanner('TUQU', { 
-                                text: `兔区收到新的回复`, 
-                                type: 'text' 
-                            });
+                            // 兔区评论横幅通知 (显示版块和原帖标题)
+let postTitle = "某个帖子";
+// 尝试从缓存数据中找出原帖的标题
+if (data.board && globalTuquData[data.board]) {
+    const targetPost = globalTuquData[data.board].find(p => p.id === data.postId);
+    if (targetPost) {
+        postTitle = targetPost.subject;
+    }
+}
+
+conversationManager.showNotificationBanner('TUQU', { 
+    text: `兔区【${data.board || '论坛'}】新回复：${postTitle}`, 
+    type: 'text' 
+});
+
 
                             if (data.water_army && Array.isArray(data.water_army)) {
                                 data.water_army.forEach((c, index) => {
@@ -17972,7 +17983,12 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
         }
 
         function open(chatId) {
-    timeManager.updateSettingsForChat(chatId); // 【【【在这里添加这行新代码】】】
+            // 【核心新增】进入聊天时，清空队列中所有属于该角色的通知
+            notificationQueue = notificationQueue.filter(n => n.chatId !== chatId);
+
+            timeManager.updateSettingsForChat(chatId); 
+            // ... (原有的逻辑)
+
 
     relationship = { myStatus: 'normal', contactStatusToMe: 'normal' };
 
@@ -25273,13 +25289,36 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
             // 如果当前正在展示动画，或者队列空了，就停止
             if (isBannerAnimating || notificationQueue.length === 0) return;
 
-            // 锁定状态，防止下一条通知同时挤进来
+            // --- 【核心修复：展示前拦截】 ---
+            const next = notificationQueue[0]; // 看看排在队首的是哪条
+            const currentActiveChatId = conversationManager.getCurrentChatId();
+            const isConvPageActive = document.getElementById('page-conversation').classList.contains('active');
+
+            let shouldSuppress = false;
+            if (next.chatId === 'MOMENTS') {
+                if (document.getElementById('tab-content-moments').classList.contains('active')) shouldSuppress = true;
+            } else if (next.chatId === 'TUQU') {
+                if (document.getElementById('tab-content-tuqu').classList.contains('active')) shouldSuppress = true;
+            } else {
+                // 如果是普通聊天，且当前聊天窗口已打开并处于激活状态
+                if (next.chatId === currentActiveChatId && isConvPageActive) shouldSuppress = true;
+            }
+
+            if (shouldSuppress) {
+                notificationQueue.shift(); // 默默丢弃这条通知
+                processNotificationQueue(); // 立即处理下一条
+                return;
+            }
+            // --- 拦截逻辑结束 ---
+
             isBannerAnimating = true;
 
             // 取出队首的通知数据
             const { chatId, msgData, unreadCount } = notificationQueue.shift();
 
             let displayName, avatarUrl, clickAction;
+            // ... (后面原有的渲染 DOM 逻辑保持不变)
+
 
             // 1. 判定虚拟 ID (朋友圈或兔区)
             if (chatId === 'MOMENTS') {

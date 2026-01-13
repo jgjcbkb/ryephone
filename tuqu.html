@@ -988,78 +988,61 @@ html, body {
 
         // 计算板块内的新贴数量
         function getNewPostsCount(boardName) {
-            // 修改：使用 app_ 前缀，确保标记能被主系统备份和恢复
-            const lastViewed = parseInt(localStorage.getItem('app_tuqu_read_board_' + boardName) || 0, 10);
+            const lastViewed = parseInt(localStorage.getItem('last_viewed_board_' + boardName) || 0, 10);
             const posts = forumData[boardName] || [];
-            // 只要帖子的创建时间晚于上次记录的时间，就算新贴
+            // 只要帖子的创建时间晚于上次离开板块的时间，就算新贴
             return posts.filter(p => getTimeFromId(p.id) > lastViewed).length;
         }
 
+        
+
         // 计算帖子内的新回复数量
         function getNewRepliesCount(post) {
-            // 修改：使用 app_ 前缀，确保标记能被主系统备份和恢复
-            const lastViewed = parseInt(localStorage.getItem('app_tuqu_read_topic_' + post.id) || 0, 10);
+            const lastViewed = parseInt(localStorage.getItem('last_viewed_topic_' + post.id) || 0, 10);
             if (!post.comments) return 0;
-            // 只要评论的创建时间晚于上次记录的时间，就算新回复
-            return post.comments.filter(c => getTimeFromId(c.id) > lastViewed).length;
+            return post.comments.filter(c => {
+                const cTime = c.id ? getTimeFromId(c.id) : 0;
+                // 如果评论没ID（旧数据），用发帖时间凑合，或者在 AI_POST_COMMENT 里补 ID
+                return cTime > lastViewed;
+            }).length;
         }
 
-        // 刷新首页板块的数字标注 (增强版：支持实时局部更新)
+        // 刷新首页板块的数字标注
         function renderBoardBadges() {
-            if (!document.getElementById('page-home').classList.contains('active')) return;
-            
             document.querySelectorAll('.board-row').forEach(row => {
                 const boardLink = row.querySelector('.board-name a');
                 if (!boardLink) return;
-                
-                // 获取干净的版块名称
-                const boardName = boardLink.getAttribute('onclick').match(/'([^']+)'/)[1];
+                const boardName = boardLink.innerText.replace(/\s*\d+$/, ''); // 清除旧数字
                 const count = getNewPostsCount(boardName);
                 
-                let badge = row.querySelector('.jj-badge');
+                // 移除旧角标
+                const oldBadge = row.querySelector('.jj-badge');
+                if (oldBadge) oldBadge.remove();
+                
                 if (count > 0) {
-                    if (!badge) {
-                        badge = document.createElement('span');
-                        badge.className = 'jj-badge';
-                        boardLink.appendChild(badge);
-                    }
+                    const badge = document.createElement('span');
+                    badge.className = 'jj-badge';
                     badge.textContent = count > 99 ? '99+' : count;
-                } else if (badge) {
-                    badge.remove();
+                    boardLink.appendChild(badge);
                 }
             });
         }
 
-
         function navigateTo(pageId, title = '') {
             // 标记已读逻辑
             if (pageId === 'list' && title) {
+                // 【核心修复】切换版块时清空勾选记忆
                 selectedTopicIds = [];
                 const selectAllEl = document.getElementById('topic-select-all');
                 if (selectAllEl) selectAllEl.checked = false;
 
-                // 修改：标记已读时使用 app_ 前缀。
-                // 逻辑：将已读时间设为该版块下“最新一个帖子”的时间戳，确保导入旧数据时不会报错。
-                const topics = forumData[title] || [];
-                const latestTs = topics.length > 0 ? Math.max(...topics.map(p => getTimeFromId(p.id))) : Date.now();
-                localStorage.setItem('app_tuqu_read_board_' + title, latestTs);
+                localStorage.setItem('last_viewed_board_' + title, Date.now());
             } else if (pageId === 'post' && currentPostId) {
+                // 离开列表页时，清空勾选记忆
                 selectedTopicIds = [];
-                
-                // 修改：标记已读时使用 app_ 前缀。
-                // 逻辑：找到该帖子内最新的回复时间，将其记为已读截止点。
-                let postData = null;
-                for(const board in forumData) {
-                    postData = forumData[board].find(p => p.id === currentPostId);
-                    if (postData) break;
-                }
-                const latestReplyTs = (postData && postData.comments && postData.comments.length > 0) 
-                    ? Math.max(...postData.comments.map(c => getTimeFromId(c.id))) 
-                    : getTimeFromId(currentPostId);
-                
-                localStorage.setItem('app_tuqu_read_topic_' + currentPostId, latestReplyTs);
+                // 进入帖子，标记该帖子所有回复为已读
+                localStorage.setItem('last_viewed_topic_' + currentPostId, Date.now());
             } else if (pageId === 'home') {
-
                 // 返回首页时，刷新一次板块数字
                 renderBoardBadges();
             }
