@@ -8160,7 +8160,24 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                     <div class="app-header"><button class="back-btn" data-target="home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button><h1>动态设置</h1></div>
                     <div class="content-wrapper">
 
-                        
+                                              <!-- 【核心新增】模块专用 API 设置 -->
+                        <div class="form-section">
+                            <h3>模块 API 配置</h3>
+                            <div class="form-group">
+                                <label for="dynamics-msg-api">主动消息 API</label>
+                                <select id="dynamics-msg-api" class="modal-input modal-select"></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="dynamics-moments-api">朋友圈互动 API</label>
+                                <select id="dynamics-moments-api" class="modal-input modal-select"></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="dynamics-tuqu-api">兔区动态 API</label>
+                                <select id="dynamics-tuqu-api" class="modal-input modal-select"></select>
+                            </div>
+                            <p class="form-hint" style="padding: 0 15px 15px;">为不同模块指定特定的 API 配置。若选“跟随全局”，则使用 API 设置中激活的配置。</p>
+                        </div>
+  
                         <div class="form-section">
                              <div class="list-header" style="padding: 15px; display:flex; align-items:center; flex-wrap: wrap; gap: 10px;">
     <h2 style="margin:0; flex-basis: 100%;">角色设置</h2>
@@ -11525,21 +11542,39 @@ You are ENCOURAGED to use emojis and stickers, but you MUST follow the **STRICT 
 
         // 【核心修复】：重新定义 isGroupPersona 变量，它是主角或群演的合集
         // 这样后面代码里引用的 isGroupPersona 就能找到了，不会再报 ReferenceError
-        const isGroupPersona = isProtagonist || isEnsemble;
+                const isGroupPersona = isProtagonist || isEnsemble;
 
-        // 只要符合其中之一，就允许执行主动行为并使用全局 API
-        // 核心新增：增加了 'themed_tuqu_interaction' 和 'specific_post_interaction'
-        // 确保无论是不是单聊角色，只要是在兔区搞事，都强制走全局 API
+        // 【核心修改】模块化 API 路由逻辑
+        const dynSettings = loadFromLocalStorage('app-dynamics-settings', {});
+        
         if (isNpc || isProtagonist || isEnsemble || senderName === 'Anonymous_System' || 
             actionType === 'post_moment' || 
             actionType === 'browse_moments' || 
             actionType === 'tuqu_interaction' || 
             actionType === 'pure_tuqu_interaction' ||
-            actionType === 'themed_tuqu_interaction' ||      // <--- 新增
-            actionType === 'specific_post_interaction') {    // <--- 新增
+            actionType === 'themed_tuqu_interaction' ||
+            actionType === 'specific_post_interaction') {
 
-            // 【核心修正】: 朋友圈、兔区、NPC、群聊主角、手动触发，全部强制使用全局激活的API配置
-            profileIndex = activeProfileIndex;
+            let targetProfile = 'global';
+
+            // 1. 根据 actionType 确定所属模块
+            if (actionType.includes('tuqu')) {
+                targetProfile = dynSettings.tuquProfile;
+            } else if (actionType.includes('moment')) {
+                targetProfile = dynSettings.momentsProfile;
+            } else if (actionType === 'message') {
+                targetProfile = dynSettings.msgProfile;
+            }
+
+            // 2. 应用路由结果
+            if (targetProfile && targetProfile !== 'global') {
+                profileIndex = parseInt(targetProfile, 10);
+                console.log(`[路由] 任务 "${actionType}" 使用模块专用 API (Index: ${profileIndex})`);
+            } else {
+                profileIndex = activeProfileIndex;
+                console.log(`[路由] 任务 "${actionType}" 使用全局激活 API`);
+            }
+
             if (profileIndex === null) {
                  console.warn(`[诊断日志] 角色 "${senderName}": 无法执行朋友圈/NPC 动态，因为没有全局激活的 API 配置。行动已跳过。`);
                  return;
@@ -32745,10 +32780,36 @@ checkMomentsUpdates(); // <--- 新增这一行
         }
         function saveSettings() { saveToLocalStorage('app-dynamics-settings', settings); }
 
-        function renderPage() {
-    loadSettings();
-    document.getElementById('dynamics-global-interval').value = settings.globalInterval || 15;
-    document.getElementById('dynamics-global-rate-limit').value = settings.rateLimit || 2; // <--- 新增这一行
+                function renderPage() {
+            loadSettings();
+            document.getElementById('dynamics-global-interval').value = settings.globalInterval || 15;
+            document.getElementById('dynamics-global-rate-limit').value = settings.rateLimit || 2;
+
+            // --- 【核心新增】渲染三个模块的 API 选择框 ---
+            const apiOptions = apiProfiles.map((p, i) => `<option value="${i}">${p.name}</option>`).join('');
+            const defaultOption = '<option value="global">跟随全局激活</option>';
+            
+            const msgSelect = document.getElementById('dynamics-msg-api');
+            const momentsSelect = document.getElementById('dynamics-moments-api');
+            const tuquSelect = document.getElementById('dynamics-tuqu-api');
+
+            [msgSelect, momentsSelect, tuquSelect].forEach(sel => sel.innerHTML = defaultOption + apiOptions);
+
+            msgSelect.value = settings.msgProfile || 'global';
+            momentsSelect.value = settings.momentsProfile || 'global';
+            tuquSelect.value = settings.tuquProfile || 'global';
+
+            // 绑定保存事件
+            [msgSelect, momentsSelect, tuquSelect].forEach(sel => {
+                sel.onchange = () => {
+                    settings.msgProfile = msgSelect.value;
+                    settings.momentsProfile = momentsSelect.value;
+                    settings.tuquProfile = tuquSelect.value;
+                    saveSettings();
+                };
+            });
+            // ------------------------------------------
+
         
         const listContainer = document.getElementById('dynamics-char-list');
         listContainer.innerHTML = '';
