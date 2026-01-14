@@ -38496,6 +38496,7 @@ async function handleRemoveMember() {
                 }
             }
 
+            // ...
             // 【核心新增】导出小说内容 (从 IndexedDB 读取)
             const bookshelf = loadFromLocalStorage('app_novel_bookshelf', []);
             for (const book of bookshelf) {
@@ -38508,6 +38509,22 @@ async function handleRemoveMember() {
                     console.warn(`Failed to export novel content for ${book.title}`, e);
                 }
             }
+
+            // 【【【 核心补丁：从大仓库提取音乐和聊天记录用于导出 】】】
+            // 1. 提取音乐列表
+            const dbPlaylist = await imageStore.getItem('app_music_playlist');
+            if (dbPlaylist) {
+                allData['app_music_playlist'] = await conversationManager.makeDataPortable(dbPlaylist);
+            }
+            // 2. 提取所有聊天记录
+            for (const chat of chatList) {
+                const dbHistory = await imageStore.getItem(`conversation_${chat.id}`);
+                if (dbHistory) {
+                    allData[`conversation_${chat.id}`] = await conversationManager.makeDataPortable(dbHistory);
+                }
+            }
+// ...
+
         
             const jsonString = JSON.stringify(allData, null, 2);
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[-T:]/g, "");
@@ -38601,12 +38618,15 @@ async function handleRemoveMember() {
                             
                             // ...
                             try {
-                                // 【核心新增】如果是小说数据、音乐列表或聊天记录，强制存入 IndexedDB (大容量存储)
-                                // 这样可以完美避开 iOS 的 5MB 限制
+                                // 【核心修复】识别大文件 Key，强制分流到大容量数据库
                                 if (key.startsWith('novel_data_') || key === 'app_music_playlist' || key.startsWith('conversation_')) {
                                     await imageStore.setItem(key, value);
+                                    // 同时也清理掉 LocalStorage 里的旧残余，防止占空间
+                                    localStorage.removeItem(key); 
                                     continue;
                                 }
+// ...
+
 
                                 let valueToStore;
 // ...
