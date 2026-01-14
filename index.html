@@ -10071,9 +10071,24 @@ if ('serviceWorker' in navigator) {
             alert("由于音乐文件较大，已为您开启直接下载通道。\n\n1. 如果浏览器直接开始播放，请点击播放器右侧的“三个点”按钮选择“下载”。\n2. 如果是手机端，可以长按播放器画面选择“另存为”或“下载音频”。");
         }
 
-        function init() {
+        // 【核心修改】增加 async 关键字
+        async function init() {
             if (!widget) return;
+            
+            // 1. 尝试从 LocalStorage 加载
             playlist = loadFromLocalStorage(STORAGE_KEY, []);
+            
+            // 2. 【核心新增】如果 LocalStorage 为空，尝试从 IndexedDB (大容量存储) 加载
+            if (playlist.length === 0) {
+                try {
+                    const dbData = await imageStore.getItem(STORAGE_KEY);
+                    if (dbData && Array.isArray(dbData)) {
+                        playlist = dbData;
+                        console.log("从数据库加载了音乐列表");
+                    }
+                } catch(e) { console.error("读取音乐数据库失败", e); }
+            }
+
             const savedState = loadFromLocalStorage(STATE_KEY, {});
             currentIndex = savedState.currentIndex || 0;
             playMode = savedState.playMode || 'order';
@@ -10090,7 +10105,20 @@ if ('serviceWorker' in navigator) {
             renderPlayer();
             if (playlist.length > 0) loadSong(currentIndex, false);
         }
-        function saveState() { saveToLocalStorage(STORAGE_KEY, playlist); saveToLocalStorage(STATE_KEY, { currentIndex, playMode }); }
+        
+        // 【核心修改】改为异步函数，并增加容量超限处理
+        async function saveState() { 
+            try {
+                // 尝试存入 LocalStorage
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(playlist));
+            } catch (e) {
+                // 如果满了 (QuotaExceededError)，存入 IndexedDB
+                console.warn("LocalStorage 满了，音乐列表转存至数据库");
+                await imageStore.setItem(STORAGE_KEY, playlist);
+            }
+            saveToLocalStorage(STATE_KEY, { currentIndex, playMode }); 
+        }
+
         async function renderPlayer() {
             const song = playlist[currentIndex] || { title: '暂无音乐', artist: '点击右下角按钮导入' };
             widget.innerHTML = `<div class="music-main-row" id="music-display-area"><div class="music-flip-container ${isLyricsView ? 'show-lyrics' : ''}"><div class="music-face-front"><div class="music-record-wrapper" id="music-record"><div class="music-record-cover"></div><div class="music-record-overlay"></div></div><div class="music-info"><div class="music-title">${song.title}</div><div class="music-artist">${song.artist}</div><div class="music-progress-container" id="music-progress-click"><div class="music-progress-bar" id="music-progress-bar"></div></div></div></div><div class="music-face-back" id="music-lyrics-container"><div class="music-lyrics-box" id="music-lyrics-box"><p>暂无歌词</p></div></div></div></div><div class="music-controls"><button class="music-btn music-mode-btn" id="music-mode-btn">${ICONS.modes[playMode]}</button><div style="display:flex; align-items:center; gap:10px;"><button class="music-btn" id="music-prev-btn">${ICONS.prev}</button><button class="music-btn music-btn-play" id="music-play-btn">${isPlaying ? ICONS.pause : ICONS.play}</button><button class="music-btn" id="music-next-btn">${ICONS.next}</button></div><button class="music-btn music-list-btn" id="music-list-btn">${ICONS.list}</button></div>`;
@@ -18308,18 +18336,36 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                 console.log('[诊断探针] 2. 即将被保存的 fullMessageHistory 内容:', JSON.parse(JSON.stringify(fullMessageHistory)));
 
                 const key = `conversation_${chatState.chatId}`;
-                const dataToSave = JSON.stringify(fullMessageHistory);
+                // const dataToSave = JSON.stringify(fullMessageHistory); // 这行删掉或注释，下面逻辑变了
 
-                console.log(`[诊断探针] 3. 准备写入 localStorage。Key: ${key}, 数据大小: ${dataToSave.length} 字符。`);
+                console.log(`[诊断探针] 3. 准备保存。Key: ${key}, 消息条数: ${fullMessageHistory.length}`);
                 
-                // 使用 try...catch 包裹，捕获所有可能的写入错误
-                localStorage.setItem(key, dataToSave);
-
-                console.log(`[诊断探针] 4. localStorage.setItem 执行完毕，没有抛出错误。`);
+                // 【核心修改】智能保存逻辑
+                try {
+                    // 1. 先尝试存入 LocalStorage
+                    localStorage.setItem(key, JSON.stringify(fullMessageHistory));
+                    console.log(`[诊断探针] 4. localStorage 保存成功。`);
+                } catch (e) {
+                    // 2. 如果报错 (空间满)，则存入 IndexedDB
+                    if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
+                        console.warn(`[诊断探针] LocalStorage 已满，转存至 IndexedDB: ${key}`);
+                        // 注意：imageStore.setItem 是异步的，但 saveConversation 这里没法 await
+                        // 我们用 .then 处理，或者你可以把 saveConversation 改成 async
+                        imageStore.setItem(key, fullMessageHistory).then(() => {
+                            console.log(`[诊断探针] IndexedDB 保存成功。`);
+                        }).catch(err => {
+                            console.error("IndexedDB 保存也失败:", err);
+                            alert("保存失败：存储空间严重不足！");
+                        });
+                    } else {
+                        console.error('[诊断探针] 致命错误：', e);
+                        alert(`保存聊天记录失败！\n错误信息: ${e.message}`);
+                    }
+                }
 
             } catch (error) {
-                console.error('[诊断探针] 致命错误：在保存聊天记录到 localStorage 时发生崩溃！', error);
-                alert(`保存聊天记录失败！\n错误信息: ${error.message}\n请检查浏览器存储空间是否已满。`);
+                // 外层捕获 (针对 JSON.stringify 可能的错误)
+                console.error('[诊断探针] 致命错误：', error);
             }
             
             const chatInList = chatList.find(c => c.id === chatState.chatId);
@@ -18341,7 +18387,8 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
             console.log('[诊断探针] 5. saveConversation 函数执行完毕。');
         }
 
-        function initializeFromStorage(chatId) {
+        // 【核心修改】增加 async 关键字
+        async function initializeFromStorage(chatId) {
             // 【核心新增：初始化当前身份】
             // 默认身份为 '{{user}}'
             const currentIdentity = loadFromLocalStorage(`chat_identity_${chatId}`, '{{user}}');
@@ -18350,6 +18397,18 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
 
             // 1. 将完整的历史记录加载到我们新的“保险柜”数组中
             fullMessageHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+            
+            // 【核心新增】如果 LocalStorage 为空，尝试从 IndexedDB 读取
+            if (fullMessageHistory.length === 0) {
+                try {
+                    const dbData = await imageStore.getItem(`conversation_${chatId}`);
+                    if (dbData && Array.isArray(dbData)) {
+                        fullMessageHistory = dbData;
+                        console.log(`从数据库加载了聊天记录: ${chatId}`);
+                    }
+                } catch(e) { console.error("读取聊天数据库失败", e); }
+            }
+
             const messagesToLoad = 40;
 
             // 2. 只截取最后40条消息用于初次显示，放入旧的数组
@@ -38479,6 +38538,38 @@ async function handleRemoveMember() {
                 }
             }
 
+            // 【核心修复：防丢失补丁】主动去数据库捞取可能不在 LocalStorage 里的“大户”数据
+            
+            // 1. 捞取音乐列表
+            if (!allData['app_music_playlist']) {
+                const musicDb = await imageStore.getItem('app_music_playlist');
+                if (musicDb) allData['app_music_playlist'] = await conversationManager.makeDataPortable(musicDb);
+            }
+
+            // 2. 捞取所有聊天记录 (通过遍历聊天列表来找 ID)
+            const chatListForExport = loadFromLocalStorage('app-chat-list', []);
+            for (const chat of chatListForExport) {
+                const convKey = `conversation_${chat.id}`;
+                // 如果 LocalStorage 里没导出到（说明存数据库了），就去数据库捞
+                if (!allData[convKey]) {
+                    const convDb = await imageStore.getItem(convKey);
+                    if (convDb) allData[convKey] = await conversationManager.makeDataPortable(convDb);
+                }
+                
+                // 【核心新增：防丢失】同时捞取该聊天的“历史回溯分支”
+                const branchKey = `chat_branches_${chat.id}`;
+                if (!allData[branchKey]) {
+                    const branchDb = await imageStore.getItem(branchKey);
+                    if (branchDb) allData[branchKey] = await conversationManager.makeDataPortable(branchDb);
+                }
+            }
+
+            // 【核心新增：防丢失】捞取朋友圈数据
+            if (!allData['moments_feed_data']) {
+                const momentsDb = await imageStore.getItem('moments_feed_data');
+                if (momentsDb) allData['moments_feed_data'] = await conversationManager.makeDataPortable(momentsDb);
+            }
+
             // 【核心新增】导出小说内容 (从 IndexedDB 读取)
             const bookshelf = loadFromLocalStorage('app_novel_bookshelf', []);
             for (const book of bookshelf) {
@@ -38583,9 +38674,9 @@ async function handleRemoveMember() {
                             let value = importedRawData[key];
                             
                             try {
-                                // 【核心新增】如果是小说数据，或者数据量极大(>2MB)且不是关键配置，尝试存入 IndexedDB
-                                // 注意：普通聊天记录如果存入 IndexedDB 需要重写读取逻辑，这里主要拦截小说
-                                if (key.startsWith('novel_data_')) {
+                                // 【核心新增】如果是小说、音乐、聊天记录、朋友圈、历史分支，强制存入 IndexedDB (大容量存储)
+                                // 这样可以绕过 iOS 的 5MB 限制，确保大文件绝对安全
+                                if (key.startsWith('novel_data_') || key === 'app_music_playlist' || key.startsWith('conversation_') || key === 'moments_feed_data' || key.startsWith('chat_branches_')) {
                                     await imageStore.setItem(key, value);
                                     continue;
                                 }
@@ -41836,9 +41927,44 @@ const cloudBackupManager = (function() {
                 if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
                     const rawValue = localStorage.getItem(key);
                     allTextData[key] = rawValue;
-                    const matches = rawValue.match(/indexeddb:([a-zA-Z0-9_-]+)/g);
-                    if (matches) matches.forEach(m => blobKeys.add(m.split(':')[1]));
+                    // 提取图片引用
+                    if (rawValue) {
+                        const matches = rawValue.match(/indexeddb:([a-zA-Z0-9_-]+)/g);
+                        if (matches) matches.forEach(m => blobKeys.add(m.split(':')[1]));
+                    }
                 }
+            }
+
+            // 【核心修复：防丢失补丁】GitHub 备份也要去数据库捞大文件
+            
+            // 1. 捞取音乐
+            if (!allTextData['app_music_playlist']) {
+                const musicDb = await imageStore.getItem('app_music_playlist');
+                if (musicDb) allTextData['app_music_playlist'] = JSON.stringify(musicDb);
+            }
+
+            // 2. 捞取聊天记录
+            const chatListForBackup = JSON.parse(localStorage.getItem('app-chat-list') || '[]');
+            for (const chat of chatListForBackup) {
+                const convKey = `conversation_${chat.id}`;
+                if (!allTextData[convKey]) {
+                    const convDb = await imageStore.getItem(convKey);
+                    // 注意：从数据库读出来的是对象，要转成字符串才能上传到 GitHub 的 data.json
+                    if (convDb) allTextData[convKey] = JSON.stringify(convDb);
+                }
+                
+                // 【核心新增：防丢失】GitHub备份也要带上历史分支
+                const branchKey = `chat_branches_${chat.id}`;
+                if (!allTextData[branchKey]) {
+                    const branchDb = await imageStore.getItem(branchKey);
+                    if (branchDb) allTextData[branchKey] = JSON.stringify(branchDb);
+                }
+            }
+
+            // 【核心新增：防丢失】GitHub备份也要带上朋友圈
+            if (!allTextData['moments_feed_data']) {
+                const momentsDb = await imageStore.getItem('moments_feed_data');
+                if (momentsDb) allTextData['moments_feed_data'] = JSON.stringify(momentsDb);
             }
 
             // 2. 获取 GitHub 上已有的文件列表（用于获取 SHA）
