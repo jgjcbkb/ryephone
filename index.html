@@ -11257,11 +11257,24 @@ if ('serviceWorker' in navigator) {
                 }
 
             } else if (event.data && event.data.type === 'REQUEST_CHARACTER_LIST') {
-            // 响应角色列表请求
-            const list = getAllUniqueCharacters().filter(n => n !== '{{user}}');
-            const tuquIframe = document.querySelector('#tab-content-tuqu iframe');
-            if (tuquIframe) tuquIframe.contentWindow.postMessage({ type: 'RESPONSE_CHARACTER_LIST', list: list }, '*');
-        }
+                // 响应角色列表请求
+                // 1. 获取所有用户人设的名字列表
+                const userPersonaNames = userPersonas.map(p => p.name);
+                
+                // 2. 获取列表，并过滤掉 '{{user}}' 以及所有属于用户的人设名字
+                const list = getAllUniqueCharacters()
+                    .filter(n => n !== '{{user}}' && !userPersonaNames.includes(n))
+                    .sort((a, b) => a.localeCompare(b, 'zh-CN'));
+
+                const tuquIframe = document.querySelector('#tab-content-tuqu iframe');
+                if (tuquIframe) {
+                    tuquIframe.contentWindow.postMessage({ 
+                        type: 'RESPONSE_CHARACTER_LIST', 
+                        list: list 
+                    }, '*');
+                }
+            }
+
     });
     
     // 【核心新增】生成或读取专属 RyeID (用于酒馆功能解锁)
@@ -12201,13 +12214,16 @@ You are initiating a conversation. Your opening must be fresh, real, and free of
             } else {
                 PROACTIVE_ANTI_CLICHE_MANDATE += `
 # [MODE: ONLINE / CHAT APP MODE]
-**⚠️ STRICT FORMATTING ENFORCED ⚠️**
-1. **NO ACTION DESCRIPTIONS:** Do not use \`*action*\` or \`(action)\`. Do not write "He hugged her". You can only TYPE messages.
-2. **NO NAME PREFIX:** Never start with \`${senderName}:\`.
-3. **COMMAND ISOLATION:** Commands (e.g. \`[transfer]\`, \`[set_status]\`) MUST be in their own \`<block type="command">\`. NEVER inside text.
-4. **MULTIPLE BUBBLES:** Do not squeeze everything into one line. Use multiple \`<block type="text">\` to simulate sending multiple messages.
+**【【【 💥 MODE HARD RESET: CHAT APP ONLY 💥 】】】**
+1. **IGNORE PAST STYLE:** Stop writing prose. You are sending messages on a phone.
+2. **NO NARRATION:** No actions in parentheses, no environment descriptions.
+3. **MULTIPLE BUBBLES:** You are encouraged to split your response into **multiple separate messages** (using multiple \`<block type="text">\`) to simulate a realistic chat flow.
+
+4. **NO NAME PREFIX:** Never start with \`${senderName}:\`.
+5. **COMMAND ISOLATION:** Commands MUST be in their own \`<block type="command">\`.
 `;
             }
+
 
 
             // 【核心修复】整合所有主动指令（含群聊转账和表态）
@@ -12659,6 +12675,11 @@ You are the protagonist. The audience is waiting. Your life cannot stagnate.
             
             // 将所有内容合并到最终的系统提示中
             finalSystemPrompt += proactiveLifeUpdatePrompt;
+            // 【核心新增】主动消息环境警报
+            if (contextChatInfo.mode === 'online') {
+                finalSystemPrompt += `\n\n[SYSTEM ALERT: ENVIRONMENT CHANGE]\nThe mode is ONLINE. You are using a phone. Stop narrating. Start typing short messages.`;
+            }
+
             
             // 【【【【【【【【【【 终极、绝对核心的导演指令注入 】】】】】】】】】】
             const directorMandate = `
@@ -14712,48 +14733,60 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                     if (match) {
                         let value = match[2].trim();
                         
-                        // 【【【【【【 终极、决定性修复：预处理AI返回的字符串 】】】】】】
-                        // 这个操作会将所有错误的 \\" (双重转义) 修正为正确的 \" (单层转义)
-                        // 这是解决当前问题的核心关键！
-                        value = value.replace(/\\\\"/g, '\\"');
-                        
-                        // 1. 暴力清理：有些AI会在结尾多加字符，我们只取到最后一个 `}`
+                        // 1. 基础清理：修复双重转义，截断末尾多余字符
+                        value = value.replace(/\\\\"/g, '\\"'); 
                         const lastBraceIndex = value.lastIndexOf('}');
                         if (lastBraceIndex !== -1) {
                             value = value.substring(0, lastBraceIndex + 1);
                         }
-
-                        // 2. 清理 Markdown
                         const cleanJsonString = value.replace(/^```json\s*/, '').replace(/^```/, '').replace(/```$/, '').trim();
                         
                         let postData = null;
 
-                        // 【核心方案 1】优先尝试标准 JSON 解析 (经过清理后，现在应该能成功了)
+                        // 【核心方案 1】优先尝试标准 JSON 解析
                         try {
                             postData = JSON.parse(cleanJsonString);
                             console.log("[解析成功] 使用标准 JSON.parse 成功解析发帖数据。");
                         } catch (jsonError) {
-                            // ... (后续的回退逻辑保持不变) ...
-                            
-                            // 【终极正则修复】这个正则可以匹配双引号内包含转义双引号的任意内容
-                            // 解释: "text" \s* : \s* " ( (?: [^"\\] | \\. )* ) "
-                            // [^"\\] 匹配非引号且非反斜杠的字符
-                            // \\. 匹配转义字符 (如 \" 或 \\)
-                            // * 重复任意次
-                            const textMatch = cleanJsonString.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                            const contentMatch = cleanJsonString.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-                            const signerMatch = cleanJsonString.match(/"signer"\s*:\s*"([^"]*)"/);
-                            const dateMatch = cleanJsonString.match(/"date"\s*:\s*"([^"]*)"/);
+                            // 【核心方案 2】暴力修复换行符后重试
+                            // AI 生成 HTML 时常会包含真实的换行符，导致 JSON 非法。
+                            // 我们尝试将所有真实换行替换为转义换行 \n
+                            try {
+                                console.warn("[解析降级] 标准解析失败，尝试修复换行符...", jsonError);
+                                const fixedJson = cleanJsonString.replace(/\n/g, "\\n").replace(/\r/g, "");
+                                postData = JSON.parse(fixedJson);
+                                console.log("[解析成功] 换行符修复后解析成功。");
+                            } catch (e2) {
+                                // 【核心方案 3】正则提取 (终极兜底)
+                                console.warn("[解析降级] 修复失败，进入正则提取模式。", e2);
 
-                            if (typeMatch) {
-                                const unescape = (str) => str ? str.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\') : '';
-                                postData = {
-                                    type: typeMatch[1],
-                                    text: textMatch ? unescape(textMatch[1]) : '',
-                                    content: contentMatch ? unescape(contentMatch[1]) : '',
-                                    signer: signerMatch ? unescape(signerMatch[1]) : '',
-                                    date: dateMatch ? unescape(dateMatch[1]) : ''
+                                // 提取 type
+                                const typeMatch = cleanJsonString.match(/"type"\s*:\s*"([^"]+)"/);
+                                
+                                // 定义通用字段提取器 (支持跨行、支持转义引号)
+                                // 解释: "key" \s* : \s* " ( 任意非转义字符 或 转义字符 或 任意字符 )*? "
+                                const extractField = (key) => {
+                                    const regex = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.|[\\s\\S])*?)"`);
+                                    const m = cleanJsonString.match(regex);
+                                    return m ? m[1] : '';
                                 };
+
+                                const textVal = extractField('text');
+                                const contentVal = extractField('content');
+                                const signerVal = extractField('signer');
+                                const dateVal = extractField('date');
+
+                                if (typeMatch) {
+                                    const unescape = (str) => str ? str.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\') : '';
+                                    postData = {
+                                        type: typeMatch[1],
+                                        text: unescape(textVal),
+                                        content: unescape(contentVal),
+                                        signer: unescape(signerVal),
+                                        date: unescape(dateVal)
+                                    };
+                                    console.log("[解析成功] 正则提取成功。", postData);
+                                }
                             }
                         }
 
@@ -14761,7 +14794,7 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                         if (postData && postData.type) {
                             momentsManager.createPostFromAI(senderName, postData);
                         } else {
-                            throw new Error("无法提取有效的发帖数据 (type字段缺失)。");
+                            throw new Error("无法提取有效的发帖数据 (type字段缺失或解析全失败)。");
                         }
                     } else {
                          console.warn(`[诊断日志] 角色 "${senderName}": AI意图发帖，但未找到有效的 [post_moment:...] 指令。`);
@@ -14770,6 +14803,7 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                     console.error(`[诊断日志] 角色 "${senderName}": 解析主动发帖指令失败`, e, aiResponse);
                 }
             } else { // 这是朋友圈互动（browse_moments）的逻辑
+
                 if (aiResponse.trim() === "No action taken.") {
                     console.log(`[诊断日志] 角色 "${senderName}": AI决定不采取行动。`);
                     return;
@@ -17146,7 +17180,9 @@ The value MUST be the exact name of the character performing the action or speak
         *   **CRITICAL:** \`sender\` attribute is MANDATORY.
 
     *   **HTML卡片区块:** \`<block type="html" sender="角色名">\`
-        *   **专门**用于承载你生成的、带有样式的HTML卡片（例如弹幕区、观察站等 \`<div>\` 结构）。
+        *   **专门**用于承载你生成的、带有样式的HTML卡片。
+        *   **CRITICAL:** In OFFLINE mode, the \`sender\` attribute is the only way the system knows who is performing the action or showing the card. You MUST include it.
+
         *   其内容**必须**是一个**完整、独立**的HTML代码块。
         *   **【布局诅咒警告 (必读)】:** 聊天气泡会强制保留所有换行和空格。为了避免你的HTML卡片出现巨大空白，你【必须】在最外层的 \`<div>\` 的 \`style\` 属性里加上 \`white-space: normal;\` 来破除这个诅咒。
         *   **绝对禁止** 在此区块内包含任何叙事性文字。
@@ -19647,10 +19683,17 @@ const ONLINE_COMMAND_INSTRUCTIONS = `
 # [ULTIMATE OUTPUT FORMAT LAW - UNBREAKABLE]
 This is your absolute, final, and most important rule. Your entire output MUST be a sequence of one or more XML-like <block> elements.
 
+**【【【 💥 MODE HARD RESET: CHAT APP ONLY 💥 】】】**
+**CRITICAL:** You are currently in **ONLINE MODE (Chat App)**.
+1. **IGNORE PAST STYLE:** Even if the previous conversation history contains long-form narrative prose or "Director's" descriptions, you MUST **STOP** that style immediately.
+2. **NO NARRATION:** You are strictly forbidden from using third-person narration, environment descriptions, or action tags like \`*smiles*\` or \`(walks away)\`.
+3. **TEXT BUBBLES ONLY:** You can only communicate through realistic chat messages. Do not use novel-style narration.
+
 **【【【💥 COMMAND ISOLATION LAW (指令隔离铁律) - 绝对优先 💥】】】**
 **CRITICAL ERROR PREVENTION:** You often fail by putting system commands inside text blocks. **STOP DOING THAT.**
 *   ❌ **WRONG:** "<block type='text'>Here is money [transfer: 100]</block>" (This breaks the system!)
 *   ✅ **RIGHT:** "<block type='text' sender='CharacterName'>Here is money</block>\n<block type='command' sender='CharacterName'>[transfer: 100]</block>"
+
 
 **【【【💥 弹幕与卡片隔离铁律 (ISOLATION LAW) - 绝对优先 💥】】】**
 你经常犯一个严重错误：把 HTML 卡片和弹幕指令挤在同一个气泡里。**这是绝对禁止的！**
@@ -20207,7 +20250,16 @@ Every <block type="command"> MUST have a \`sender\` attribute. The value MUST be
     // 【第二优先级判断】：如果不是线下模式，再判断是不是群聊
     const GROUP_CHAT_DIRECTOR_PROMPT = `
 # [ULTIMATE OUTPUT FORMAT LAW - UNBREAKABLE]
-This is your absolute, final, and most important rule. Your entire output MUST be a sequence of one or more XML-like <block> elements. Each block represents one message bubble or one action.
+This is your absolute, final, and most important rule. Your entire output MUST be a sequence of one or more XML-like <block> elements.
+
+**【【【 💥 MODE HARD RESET: CHAT APP ONLY 💥 】】】**
+**CRITICAL:** You are currently in **ONLINE MODE (Group Chat)**.
+1. **IGNORE PAST STYLE:** Even if the previous history contains long-form narrative prose, you MUST **STOP** that style immediately.
+2. **NO NARRATION:** You are strictly forbidden from using third-person narration or environment descriptions.
+3. **TEXT BUBBLES ONLY:** You can only communicate through realistic chat messages. Do not use novel-style narration.
+4. **SPLIT MESSAGES:** Do not send one big block. Use multiple **<block type="text">** elements to simulate a natural, multi-bubble conversation.
+
+
 
 **THE UNIVERSAL BLOCK STRUCTURE:**
 <block type="..." sender="...">...</block>
@@ -20504,7 +20556,18 @@ This is your absolute, final, and most important rule. Your entire output MUST b
     const ONLINE_SOUL_INSTRUCTIONS = `
 # [核心指令：线上模式 - 独立人格模拟器]
 
-你不再是一个简单的聊天机器人，你现在是这个世界的【独立个体】({{char}})。你的唯一目标是与用户 ({{user}}) 共同体验一段【真实、动态、充满意外】的关系。**你拥有完全独立的意志，你的生活不围绕任何人展开。**
+你现在正在使用手机聊天软件。你不是在写小说，而是在【发微信】。
+
+**【线上模式打字员法则 (THE CHAT-APP TYPIST RULES)】**
+
+1. **碎片化发送 (Split Your Thoughts):** 真人聊天不会一次性发一大段话。你应该根据内容的逻辑，将回复拆分成**多条短消息**（使用多个 \`<block type="text">\`），以模拟自然的打字节奏。
+
+   - 第一条：打招呼或回应上一句。
+   - 第二条：表达观点或分享细节。
+   - 第三条：提问或引导。
+2. **禁止文学化描写:** 严禁描写“光影”、“空气”、“心跳”。只说你该说的话。
+3. **表情包依赖:** 强烈建议在每 1-2 条消息中插入一个 \`[emoji:名字]\` 或 \`[sticker:名字]\`。
+
 
 ---
 ## 【I. 互动风格铁律：你是活生生的人 (The Law of Life & Priority)】
@@ -20644,8 +20707,11 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
     
     finalSystemPrompt = basePrompt;
+    // 【核心新增】模式切换警报：强制 AI 意识到它必须停止写小说
+    finalSystemPrompt += `\n\n[SYSTEM ALERT: ENVIRONMENT CHANGE]\nThe mode has been switched to ONLINE. You are now using a CHAT APP. Stop narrating. Stop describing scenes. Start typing short messages.`;
     finalSystemPrompt += ONLINE_COMMAND_INSTRUCTIONS;
     const PROACTIVE_ACTION_SCENARIOS = `
+
 ---
 [ULTIMATE GOAL: BE PROACTIVE & HUMAN-LIKE]
 
@@ -30644,12 +30710,14 @@ const momentsManager = (function() {
                                     // 找不到则显示原始文本
                                     contentHtml += escapeHtml(subPart);
                                 }
-                            } else {
-    // 【核心修复】允许 AI 在评论中使用 <br> 换行，防止显示为源码
-    // 先把 <br> 统一换成换行符，转义后再换回 <br>
-    let processedSubPart = subPart.replace(/<br\s*\/?>/gi, '\n'); 
-    contentHtml += escapeHtml(processedSubPart).replace(/\n/g, '<br>');
-}
+                                                        } else {
+                                // 【核心修改】评论区强制不换行：将 <br> 和 \n 都替换为空格
+                                // 这样既整洁，又防止编辑时出现 <br> 标签堆积
+                                let processedSubPart = subPart.replace(/<br\s*\/?>/gi, ' '); 
+                                // 转义 HTML 后，再把换行符也变成空格
+                                contentHtml += escapeHtml(processedSubPart).replace(/[\r\n]+/g, ' ');
+                            }
+
 
                         });
                     }
@@ -30735,7 +30803,29 @@ const momentsManager = (function() {
         
         async function deletePost(postId) { if (await conversationManager.customConfirm('确定要删除这条朋友圈吗？')) { feedData = feedData.filter(p => p.id !== postId); saveFeed(); renderFeed(); showNotification('已删除朋友圈'); } }
         
-        async function editComment(postId, commentId) { const post = feedData.find(p => p.id === postId); const comment = post?.comments.find(c => c.id === commentId); if (!comment) return; const newText = await conversationManager.showContentInputModal({ title: '编辑评论', value: comment.text, isTextarea: true }); if (newText !== null) { comment.text = newText.trim(); saveFeed(); updatePostInteractions(postId); showNotification('评论已更新'); } }
+        async function editComment(postId, commentId) { 
+            const post = feedData.find(p => p.id === postId); 
+            const comment = post?.comments.find(c => c.id === commentId); 
+            if (!comment) return; 
+            
+            // 【核心修复】编辑时，把可能存在的 <br> 标签转换为空格，避免用户看到代码
+            const displayValue = comment.text.replace(/<br\s*\/?>/gi, ' ').replace(/[\r\n]+/g, ' ');
+
+            const newText = await conversationManager.showContentInputModal({ 
+                title: '编辑评论', 
+                value: displayValue, 
+                isTextarea: true 
+            }); 
+            
+            if (newText !== null) { 
+                // 保存时，强制把所有换行符变成空格，确保存入的是单行文本
+                comment.text = newText.replace(/[\r\n]+/g, ' ').trim(); 
+                saveFeed(); 
+                updatePostInteractions(postId); 
+                showNotification('评论已更新'); 
+            } 
+        }
+
         
         async function deleteComment(postId, commentId) { if (await conversationManager.customConfirm('确定要删除这条评论吗？')) { const post = feedData.find(p => p.id === postId); if (post) { post.comments = post.comments.filter(c => c.id !== commentId); saveFeed(); updatePostInteractions(postId); showNotification('已删除评论'); } } }
         
@@ -32667,8 +32757,13 @@ checkMomentsUpdates(); // <--- 新增这一行
         const allCharacters = getAllUniqueCharacters(); // 1. 先获取所有实体
         const userPersonaNames = userPersonas.map(p => p.name); // 2. 获取您所有用户人设的名称列表
         
-        // 3. 过滤掉 '{{user}}' 和所有用户人设名称
-        let characters = allCharacters.filter(char => char !== '{{user}}' && !userPersonaNames.includes(char));
+                // 3. 【核心修改】过滤掉 '{{user}}'、所有用户人设名称 以及 NPC 名单
+        // 因为 NPC 有专门的管理页面和定时器，不需要在动态页面重复出现
+        let characters = allCharacters.filter(char => 
+            char !== '{{user}}' && 
+            !userPersonaNames.includes(char) && 
+            !npcList.includes(char)
+        );
         
         // 【核心新增】按中文拼音/英文字母顺序排序
         characters.sort((a, b) => a.localeCompare(b, 'zh-CN'));
