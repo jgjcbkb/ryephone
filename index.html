@@ -38381,7 +38381,11 @@ async function handleRemoveMember() {
         'video_',        // 视频通话背景
         'pending_',      // 小说分享等临时状态
         'catbox_userhash', // 新增：Catbox 图床密钥
-        'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+        'jjForumData',   // 兔区数据
+        'tuqu_',         // 兔区状态
+        'token_usage_',  // Token 消耗
+        'blacklist_reply_count_', // 拉黑回复计数
+        'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_'
     ];
 
     function base64ToBlob(base64, contentType = '', sliceSize = 512) {
@@ -38448,7 +38452,8 @@ async function handleRemoveMember() {
             const EXPORT_PREFIXES = [ 
                 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
                 'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
-                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+                'tuqu_', 'token_usage_', 'blacklist_reply_count_',
+                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_' 
             ];
 
             for (let i = 0; i < localStorage.length; i++) {
@@ -38471,6 +38476,19 @@ async function handleRemoveMember() {
                     
                     // 无论 valueToProcess 是对象、数组还是字符串，都送去处理图片引用
                     allData[key] = await conversationManager.makeDataPortable(valueToProcess);
+                }
+            }
+
+            // 【核心新增】导出小说内容 (从 IndexedDB 读取)
+            const bookshelf = loadFromLocalStorage('app_novel_bookshelf', []);
+            for (const book of bookshelf) {
+                try {
+                    const bookContent = await imageStore.getItem(`novel_data_${book.id}`);
+                    if (bookContent) {
+                        allData[`novel_data_${book.id}`] = bookContent;
+                    }
+                } catch (e) {
+                    console.warn(`Failed to export novel content for ${book.title}`, e);
                 }
             }
         
@@ -38544,7 +38562,8 @@ async function handleRemoveMember() {
                     const CLEANUP_PREFIXES = [ 
                         'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
                         'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
-                        'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+                        'tuqu_', 'token_usage_', 'blacklist_reply_count_',
+                        'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_' 
                     ];
 
                     const keysToRemove = [];
@@ -38557,36 +38576,33 @@ async function handleRemoveMember() {
                     keysToRemove.forEach(key => localStorage.removeItem(key));
 
                     // 4. 写入新数据
-                    try {
-                        for (const key in importedRawData) {
-                            if (Object.prototype.hasOwnProperty.call(importedRawData, key)) {
-                                let value = importedRawData[key];
-                                let valueToStore;
+                    for (const key in importedRawData) {
+                        if (Object.prototype.hasOwnProperty.call(importedRawData, key)) {
+                            let value = importedRawData[key];
+                            
+                            // 【核心新增】如果是小说数据，存入 IndexedDB
+                            if (key.startsWith('novel_data_')) {
+                                await imageStore.setItem(key, value);
+                                continue;
+                            }
 
-                                if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
+                            let valueToStore;
+
+                            if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
+                                valueToStore = value;
+                            } else {
+                                // 核心修改：如果是ZIP导入，数据已经是字符串了，不需要再stringify
+                                if (isZip && typeof value === 'string') {
                                     valueToStore = value;
                                 } else {
-                                    // 核心修改：如果是ZIP导入，数据已经是字符串了，不需要再stringify
-                                    if (isZip && typeof value === 'string') {
-                                        valueToStore = value;
-                                    } else {
-                                        valueToStore = JSON.stringify(value);
-                                    }
+                                    valueToStore = JSON.stringify(value);
                                 }
-                                localStorage.setItem(key, valueToStore);
                             }
+                            localStorage.setItem(key, valueToStore);
                         }
-                    } catch (e) {
-                        // 【核心修复】专门捕获 iOS 的存储溢出错误
-                        if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
-                            throw new Error("iOS 系统限制：存储空间已满 (5MB上限)。\n\n请尝试：\n1. 先点击“清空全量数据”彻底释放空间后再导入。\n2. 如果依然失败，说明该备份文件过大，超过了苹果浏览器的单站限制。");
-                        }
-                        throw e; // 其他错误继续抛出
                     }
-                    
                     await conversationManager.customAlert('数据导入成功！应用即将刷新以加载新数据。');
                     location.reload();
-
                 } catch (error) {
                     console.error("Import failed:", error);
                     await conversationManager.customAlert(`导入失败: ${error.message}`);
@@ -42110,11 +42126,13 @@ async function performRestore() {
                          // 只处理属于黑麦手机的数据前缀
                          const APP_DATA_PREFIXES = [ 
                             'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
-                            'gh_', 'auto_', 'video_', 'pending_',
-                            'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+                            'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
+                            'tuqu_', 'token_usage_', 'blacklist_reply_count_',
+                            'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_' 
                          ];
 
                          if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
+
                              const rawValue = localStorage.getItem(key);
                              if (rawValue && rawValue.includes(oldDomain)) {
                                  // 执行全局替换
