@@ -38557,26 +38557,36 @@ async function handleRemoveMember() {
                     keysToRemove.forEach(key => localStorage.removeItem(key));
 
                     // 4. 写入新数据
-                    for (const key in importedRawData) {
-                        if (Object.prototype.hasOwnProperty.call(importedRawData, key)) {
-                            let value = importedRawData[key];
-                            let valueToStore;
+                    try {
+                        for (const key in importedRawData) {
+                            if (Object.prototype.hasOwnProperty.call(importedRawData, key)) {
+                                let value = importedRawData[key];
+                                let valueToStore;
 
-                            if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
-                                valueToStore = value;
-                            } else {
-                                // 核心修改：如果是ZIP导入，数据已经是字符串了，不需要再stringify
-                                if (isZip && typeof value === 'string') {
+                                if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
                                     valueToStore = value;
                                 } else {
-                                    valueToStore = JSON.stringify(value);
+                                    // 核心修改：如果是ZIP导入，数据已经是字符串了，不需要再stringify
+                                    if (isZip && typeof value === 'string') {
+                                        valueToStore = value;
+                                    } else {
+                                        valueToStore = JSON.stringify(value);
+                                    }
                                 }
+                                localStorage.setItem(key, valueToStore);
                             }
-                            localStorage.setItem(key, valueToStore);
                         }
+                    } catch (e) {
+                        // 【核心修复】专门捕获 iOS 的存储溢出错误
+                        if (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED') {
+                            throw new Error("iOS 系统限制：存储空间已满 (5MB上限)。\n\n请尝试：\n1. 先点击“清空全量数据”彻底释放空间后再导入。\n2. 如果依然失败，说明该备份文件过大，超过了苹果浏览器的单站限制。");
+                        }
+                        throw e; // 其他错误继续抛出
                     }
+                    
                     await conversationManager.customAlert('数据导入成功！应用即将刷新以加载新数据。');
                     location.reload();
+
                 } catch (error) {
                     console.error("Import failed:", error);
                     await conversationManager.customAlert(`导入失败: ${error.message}`);
