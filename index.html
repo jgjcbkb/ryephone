@@ -15434,8 +15434,28 @@ conversationManager.showNotificationBanner('TUQU', {
 
 
     const messageListContainer = document.getElementById('message-list-container');
-    function saveChatList() { saveToLocalStorage('app-chat-list', chatList); }
-    function loadChatList() { chatList = loadFromLocalStorage('app-chat-list'); }
+    
+    // 【核心修改】支持大容量保存
+    async function saveChatList() { 
+        try {
+            localStorage.setItem('app-chat-list', JSON.stringify(chatList));
+        } catch (e) {
+            console.warn("聊天列表过大，转存至 IndexedDB");
+            await imageStore.setItem('app-chat-list', chatList);
+        }
+    }
+    
+    // 【核心修改】支持大容量读取
+    async function loadChatList() { 
+        chatList = loadFromLocalStorage('app-chat-list', null); 
+        if (!chatList) {
+            try {
+                const dbData = await imageStore.getItem('app-chat-list');
+                chatList = dbData || [];
+            } catch(e) { chatList = []; }
+        }
+    }
+    
     function renderChatList() { 
         messageListContainer.innerHTML = '';
         if (chatList.length === 0) {
@@ -31287,10 +31307,30 @@ sendCommentBtn.addEventListener('click', () => {
             img.src = src;
             overlay.classList.add('visible');
         }
-        function saveFeed() { 
-            saveToLocalStorage('moments_feed_data', feedData); 
+        // 【核心修改】改为异步保存，支持大容量数据库
+        async function saveFeed() { 
+            try {
+                localStorage.setItem('moments_feed_data', JSON.stringify(feedData));
+            } catch (e) {
+                console.warn("朋友圈数据过大，转存至 IndexedDB");
+                await imageStore.setItem('moments_feed_data', feedData);
+            }
         }
-        function loadFeed() { feedData = loadFromLocalStorage('moments_feed_data', []); }
+        
+        // 【核心修改】支持从大容量数据库读取
+        async function loadFeed() { 
+            feedData = loadFromLocalStorage('moments_feed_data', null);
+            if (!feedData) {
+                try {
+                    const dbData = await imageStore.getItem('moments_feed_data');
+                    feedData = dbData || [];
+                } catch(e) { feedData = []; }
+            }
+            // 确保读取后刷新界面
+            if (document.getElementById('tab-content-moments').classList.contains('active')) {
+                renderFeed();
+            }
+        }
         
         function createPostFromAI(senderName, data) {
             const newPost = {
@@ -31641,14 +31681,15 @@ function handleForwardFromAI(characterName, data) {
             showNotification(`“${characterName}”转发了一条朋友圈`);
             checkMomentsUpdates();
         }
-        function init() {
+        // 【核心修改】增加 async
+        async function init() {
             // --- ↓↓↓ 核心修改 从这里开始 ↓↓↓ ---
             // 1. 从 localStorage 读取上次查看时间，如果没有，就默认为当前时间
             lastCheckedTimestamp = loadFromLocalStorage('moments_last_checked', Date.now());
             // --- ↑↑↑ 核心修改 到这里结束 ↑↑↑ ---
 
             myName = '{{user}}';
-            loadFeed();
+            await loadFeed(); // 【核心修改】增加 await，确保数据读完再渲染
             updateUserPersonaSelector();
             renderFeed();
             updatePrivacyButtonIcon(currentPrivacy);
@@ -38283,7 +38324,7 @@ async function handleRemoveMember() {
             }
         ];
 
-        loadChatList(); // 加载现有列表
+        await loadChatList(); // 【核心修改】增加 await
         
         let chatListChanged = false;
         PRESET_CHARS.forEach(preset => {
@@ -38547,7 +38588,16 @@ async function handleRemoveMember() {
             }
 
             // 2. 捞取所有聊天记录 (通过遍历聊天列表来找 ID)
-            const chatListForExport = loadFromLocalStorage('app-chat-list', []);
+            // 先尝试从 LocalStorage 获取列表，如果没有，去数据库捞
+            let chatListForExport = loadFromLocalStorage('app-chat-list', null);
+            if (!chatListForExport) {
+                chatListForExport = await imageStore.getItem('app-chat-list') || [];
+                // 如果是从数据库捞出来的，也要放入导出包
+                if (chatListForExport.length > 0) {
+                    allData['app-chat-list'] = await conversationManager.makeDataPortable(chatListForExport);
+                }
+            }
+
             for (const chat of chatListForExport) {
                 const convKey = `conversation_${chat.id}`;
                 // 如果 LocalStorage 里没导出到（说明存数据库了），就去数据库捞
@@ -38555,19 +38605,16 @@ async function handleRemoveMember() {
                     const convDb = await imageStore.getItem(convKey);
                     if (convDb) allData[convKey] = await conversationManager.makeDataPortable(convDb);
                 }
-                
-                // 【核心新增：防丢失】同时捞取该聊天的“历史回溯分支”
-                const branchKey = `chat_branches_${chat.id}`;
-                if (!allData[branchKey]) {
-                    const branchDb = await imageStore.getItem(branchKey);
-                    if (branchDb) allData[branchKey] = await conversationManager.makeDataPortable(branchDb);
-                }
             }
 
-            // 【核心新增：防丢失】捞取朋友圈数据
+            // 【核心修复：防丢失补丁】捞取朋友圈和表情包
             if (!allData['moments_feed_data']) {
                 const momentsDb = await imageStore.getItem('moments_feed_data');
                 if (momentsDb) allData['moments_feed_data'] = await conversationManager.makeDataPortable(momentsDb);
+            }
+            if (!allData['app-stickers']) {
+                const stickersDb = await imageStore.getItem('app-stickers');
+                if (stickersDb) allData['app-stickers'] = await conversationManager.makeDataPortable(stickersDb);
             }
 
             // 【核心新增】导出小说内容 (从 IndexedDB 读取)
@@ -38674,9 +38721,15 @@ async function handleRemoveMember() {
                             let value = importedRawData[key];
                             
                             try {
-                                // 【核心新增】如果是小说、音乐、聊天记录、朋友圈、历史分支，强制存入 IndexedDB (大容量存储)
-                                // 这样可以绕过 iOS 的 5MB 限制，确保大文件绝对安全
-                                if (key.startsWith('novel_data_') || key === 'app_music_playlist' || key.startsWith('conversation_') || key === 'moments_feed_data' || key.startsWith('chat_branches_')) {
+                                // 【核心新增】如果是小说、音乐、聊天记录、朋友圈、表情包、好友列表，强制存入 IndexedDB (大容量存储)
+                                // 这样可以绕过 iOS 的 5MB 限制，确保任何数据都不会丢
+                                if (key.startsWith('novel_data_') || 
+                                    key === 'app_music_playlist' || 
+                                    key.startsWith('conversation_') ||
+                                    key === 'moments_feed_data' ||  // 朋友圈
+                                    key === 'app-stickers' ||       // 表情包
+                                    key === 'app-chat-list') {      // 好友/聊天列表
+                                    
                                     await imageStore.setItem(key, value);
                                     continue;
                                 }
@@ -41944,7 +41997,14 @@ const cloudBackupManager = (function() {
             }
 
             // 2. 捞取聊天记录
-            const chatListForBackup = JSON.parse(localStorage.getItem('app-chat-list') || '[]');
+            let chatListForBackup = JSON.parse(localStorage.getItem('app-chat-list') || 'null');
+            if (!chatListForBackup) {
+                chatListForBackup = await imageStore.getItem('app-chat-list') || [];
+                if (chatListForBackup.length > 0) {
+                    allTextData['app-chat-list'] = JSON.stringify(chatListForBackup);
+                }
+            }
+
             for (const chat of chatListForBackup) {
                 const convKey = `conversation_${chat.id}`;
                 if (!allTextData[convKey]) {
@@ -41952,19 +42012,16 @@ const cloudBackupManager = (function() {
                     // 注意：从数据库读出来的是对象，要转成字符串才能上传到 GitHub 的 data.json
                     if (convDb) allTextData[convKey] = JSON.stringify(convDb);
                 }
-                
-                // 【核心新增：防丢失】GitHub备份也要带上历史分支
-                const branchKey = `chat_branches_${chat.id}`;
-                if (!allTextData[branchKey]) {
-                    const branchDb = await imageStore.getItem(branchKey);
-                    if (branchDb) allTextData[branchKey] = JSON.stringify(branchDb);
-                }
             }
 
-            // 【核心新增：防丢失】GitHub备份也要带上朋友圈
+            // 【核心修复】捞取朋友圈和表情包
             if (!allTextData['moments_feed_data']) {
                 const momentsDb = await imageStore.getItem('moments_feed_data');
                 if (momentsDb) allTextData['moments_feed_data'] = JSON.stringify(momentsDb);
+            }
+            if (!allTextData['app-stickers']) {
+                const stickersDb = await imageStore.getItem('app-stickers');
+                if (stickersDb) allTextData['app-stickers'] = JSON.stringify(stickersDb);
             }
 
             // 2. 获取 GitHub 上已有的文件列表（用于获取 SHA）
