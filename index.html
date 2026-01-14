@@ -38575,33 +38575,48 @@ async function handleRemoveMember() {
                     }
                     keysToRemove.forEach(key => localStorage.removeItem(key));
 
-                    // 4. 写入新数据
+                    // 4. 写入新数据 (带错误捕获和智能分流)
+                    let failedKeys = [];
+                    
                     for (const key in importedRawData) {
                         if (Object.prototype.hasOwnProperty.call(importedRawData, key)) {
                             let value = importedRawData[key];
                             
-                            // 【核心新增】如果是小说数据，存入 IndexedDB
-                            if (key.startsWith('novel_data_')) {
-                                await imageStore.setItem(key, value);
-                                continue;
-                            }
+                            try {
+                                // 【核心新增】如果是小说数据，或者数据量极大(>2MB)且不是关键配置，尝试存入 IndexedDB
+                                // 注意：普通聊天记录如果存入 IndexedDB 需要重写读取逻辑，这里主要拦截小说
+                                if (key.startsWith('novel_data_')) {
+                                    await imageStore.setItem(key, value);
+                                    continue;
+                                }
 
-                            let valueToStore;
-
-                            if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
-                                valueToStore = value;
-                            } else {
-                                // 核心修改：如果是ZIP导入，数据已经是字符串了，不需要再stringify
-                                if (isZip && typeof value === 'string') {
+                                let valueToStore;
+                                if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
                                     valueToStore = value;
                                 } else {
-                                    valueToStore = JSON.stringify(value);
+                                    if (isZip && typeof value === 'string') {
+                                        valueToStore = value;
+                                    } else {
+                                        valueToStore = JSON.stringify(value);
+                                    }
                                 }
+                                
+                                localStorage.setItem(key, valueToStore);
+                                
+                            } catch (e) {
+                                // 捕获 QuotaExceededError
+                                console.error(`Write failed for key: ${key}`, e);
+                                failedKeys.push(key);
                             }
-                            localStorage.setItem(key, valueToStore);
                         }
                     }
-                    await conversationManager.customAlert('数据导入成功！应用即将刷新以加载新数据。');
+                    
+                    if (failedKeys.length > 0) {
+                        await conversationManager.customAlert(`导入部分完成，但以下数据因 iOS 存储空间限制(5MB)而失败：\n\n${failedKeys.join(', ')}\n\n建议：删除一些不用的聊天或小说后再试。`);
+                    } else {
+                        await conversationManager.customAlert('数据导入成功！应用即将刷新以加载新数据。');
+                    }
+                    
                     location.reload();
                 } catch (error) {
                     console.error("Import failed:", error);
@@ -38610,6 +38625,7 @@ async function handleRemoveMember() {
             };
         });
     }
+
 
     async function resetEntireApp() {
         const confirmed1 = await conversationManager.customConfirm(
