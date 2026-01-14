@@ -10071,17 +10071,10 @@ if ('serviceWorker' in navigator) {
             alert("由于音乐文件较大，已为您开启直接下载通道。\n\n1. 如果浏览器直接开始播放，请点击播放器右侧的“三个点”按钮选择“下载”。\n2. 如果是手机端，可以长按播放器画面选择“另存为”或“下载音频”。");
         }
 
-// ...
-        // 【核心修复】改为 async
-        async function init() {
+        function init() {
             if (!widget) return;
-            // 优先从数据库加载歌单
-            const dbPlaylist = await imageStore.getItem(STORAGE_KEY);
-            playlist = dbPlaylist || loadFromLocalStorage(STORAGE_KEY, []);
-            
+            playlist = loadFromLocalStorage(STORAGE_KEY, []);
             const savedState = loadFromLocalStorage(STATE_KEY, {});
-// ...
-
             currentIndex = savedState.currentIndex || 0;
             playMode = savedState.playMode || 'order';
             audio.addEventListener('timeupdate', handleTimeUpdate);
@@ -18204,9 +18197,6 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
         };
 
         function getCurrentChatId() { return chatState.chatId; }
-                // 【核心新增】供外部获取当前完整内存数据，防止丢失
-        function getCurrentChatMessages() { return fullMessageHistory; }
-
         function updateHeaderTitle(title) {
             // 首先，获取当前聊天的完整信息
             const chatId = chatState.chatId;
@@ -18311,30 +18301,27 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
         function saveConversation() {
             if (!chatState.chatId) return;
 
-            // 【核心新增：防数据自杀安全锁】
-            // 逻辑：屏幕上显示的消息(chatState.messages)只是完整历史(fullMessageHistory)的一小部分。
-            // 如果完整历史的长度 竟然比 屏幕上的还少，说明内存数据出错了。
-            // 这时候绝对不能保存，否则会把长历史覆盖成短的。
-            if (fullMessageHistory.length < chatState.messages.length) {
-                console.error(`[严重警告] 数据异常拦截！完整历史(${fullMessageHistory.length}) 少于 显示消息(${chatState.messages.length})`);
-                alert("系统检测到数据可能未完全加载，已阻止自动保存以防止数据丢失！\n请刷新页面重试。");
-                return; // 强制终止，保护数据库
-            }
-
+            console.log(`[诊断探针] 1. 开始执行 saveConversation，目标 chat ID: ${chatState.chatId}`);
+            
             try {
-                const key = `conversation_${chatState.chatId}`;
-                
-                // 【核心修复】保存的是 fullMessageHistory (完整保险柜)，而不是 chatState.messages (展示窗口)
-                imageStore.setItem(key, fullMessageHistory).catch(e => console.error("DB Save Error:", e));
+                // 打印出即将被保存的数据，让我们看看它在保存前一刻是否正确
+                console.log('[诊断探针] 2. 即将被保存的 fullMessageHistory 内容:', JSON.parse(JSON.stringify(fullMessageHistory)));
 
-                // 清理旧存储
-                localStorage.removeItem(key);
+                const key = `conversation_${chatState.chatId}`;
+                const dataToSave = JSON.stringify(fullMessageHistory);
+
+                console.log(`[诊断探针] 3. 准备写入 localStorage。Key: ${key}, 数据大小: ${dataToSave.length} 字符。`);
+                
+                // 使用 try...catch 包裹，捕获所有可能的写入错误
+                localStorage.setItem(key, dataToSave);
+
+                console.log(`[诊断探针] 4. localStorage.setItem 执行完毕，没有抛出错误。`);
 
             } catch (error) {
-                console.error('[诊断探针] 致命错误：保存聊天记录失败', error);
+                console.error('[诊断探针] 致命错误：在保存聊天记录到 localStorage 时发生崩溃！', error);
+                alert(`保存聊天记录失败！\n错误信息: ${error.message}\n请检查浏览器存储空间是否已满。`);
             }
             
-            // 更新聊天列表显示的最后一条消息
             const chatInList = chatList.find(c => c.id === chatState.chatId);
             if (chatInList) {
                 const lastMsg = [...chatState.messages].filter(m => m.type !== 'time_divider' && m.side !== 'system').pop();
@@ -18351,31 +18338,21 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                 saveChatList();
                 renderChatList();
             }
+            console.log('[诊断探针] 5. saveConversation 函数执行完毕。');
         }
 
-
-
-                        // 【核心修复】必须是 async，因为读取数据库是异步的
-        async function initializeFromStorage(chatId) {
+        function initializeFromStorage(chatId) {
             // 【核心新增：初始化当前身份】
+            // 默认身份为 '{{user}}'
             const currentIdentity = loadFromLocalStorage(`chat_identity_${chatId}`, '{{user}}');
             chatState.currentIdentity = currentIdentity;
             updateIdentityDotUI();
 
-            // 1. 【核心修复】优先从 IndexedDB 读取完整历史
-            let dbHistory = await imageStore.getItem(`conversation_${chatId}`);
-            
-            // 2. 如果数据库是空的，尝试从 LocalStorage 抢救一下（兼容旧数据）
-            if (!dbHistory || !Array.isArray(dbHistory)) {
-                dbHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
-            }
-
-            // 3. 赋值给内存中的“保险柜”
-            fullMessageHistory = dbHistory;
-            
+            // 1. 将完整的历史记录加载到我们新的“保险柜”数组中
+            fullMessageHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
             const messagesToLoad = 40;
 
-            // 4. 只截取最后40条消息用于初次显示
+            // 2. 只截取最后40条消息用于初次显示，放入旧的数组
             chatState.messages = fullMessageHistory.slice(-messagesToLoad);
 
             if (chatState.messages.length > 0) {
@@ -18384,10 +18361,8 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                 simulatedCurrentTime = timeManager.getCurrentTimestamp();
             }
             contactInfo.avatarUrl = loadFromLocalStorage(`chat_avatar_${chatId}`, null) || generateDefaultAvatar(chatState.chatName);
-            
             // 确保状态检查是在完整的历史上进行的
             fullMessageHistory.forEach(msg => { if (msg.side === 'system' && msg.type !== 'time_divider') processSystemMessageForState(msg.text); });
-            
             const savedBg = loadFromLocalStorage(`chat_bg_${chatState.chatId}`, null);
             if (savedBg) {
                 chatContent.style.backgroundImage = `url('${savedBg}')`;
@@ -18395,7 +18370,7 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                 chatContent.style.backgroundImage = '';
             }
 
-            // 刷新时从硬盘恢复 Token 显示
+            // 核心新增：刷新时从硬盘恢复 Token 显示
             const savedTokenUsage = loadFromLocalStorage(`token_usage_${chatId}`, null);
             const usageEl = document.getElementById('token-usage-display');
             const inputVal = document.getElementById('token-input-val');
@@ -18408,11 +18383,9 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                 usageEl.style.display = 'none';
             }
 
-            loadPersonalizationSettings(); 
-            loadAutoReplySettings(); 
+            loadPersonalizationSettings(); loadAutoReplySettings(); 
             reRenderMessages(true);
         }
-
 let isLoadingMore = false;
         async function loadMoreMessages() {
             if (isLoadingMore) return;
@@ -22511,30 +22484,26 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
             return;
         }
 
+        // --- 核心修复：这是全新的、尊重你原始设计的逻辑 ---
         // 1. 我们要删除的位置，就是从你点击的那条消息开始
         const spliceIndex = clickedIndex;
 
         // 2. 保存历史分支的分叉点，是前一条消息
         const branchPointId = clickedIndex > 0 ? chatState.messages[clickedIndex - 1].id : 'root';
+        // --- 修复结束 ---
 
         if (spliceIndex >= chatState.messages.length) {
              await customAlert('这是最后一条消息，无需从此重新生成。');
              return;
         }
         
-        // 保存即将被覆盖的时间线为分支
+        // 保存即将被覆盖的时间线为分支 (这部分逻辑和之前一致)
         const messagesToBranch = chatState.messages.slice(spliceIndex);
         
         if (messagesToBranch.length > 0) {
             const chatId = conversationManager.getCurrentChatId();
             const branchHistoryKey = `chat_branches_${chatId}`;
-            
-            // 【核心修复】从大数据库读取分支
-            let branches = await imageStore.getItem(branchHistoryKey);
-            if (!branches) {
-                branches = loadFromLocalStorage(branchHistoryKey, []);
-            }
-
+            let branches = loadFromLocalStorage(branchHistoryKey, []);
             const fullConversationToBranch = [...chatState.messages]; 
             const lastMessage = fullConversationToBranch[fullConversationToBranch.length - 1];
             const previewText = lastMessage ? (lastMessage.text || `[${lastMessage.type}]`).substring(0, 20) + '...' : '空分支';
@@ -22547,29 +22516,27 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
             };
             branches.unshift(newBranch);
             if (branches.length > 20) { branches = branches.slice(0, 20); }
-            
-            // 【核心修复】存入大数据库，并清理旧存储
-            await imageStore.setItem(branchHistoryKey, branches);
-            localStorage.removeItem(branchHistoryKey);
+            saveToLocalStorage(branchHistoryKey, branches);
         }
 
-        // 1. 找出所有需要被删除的消息的 ID
-        const idsToDelete = chatState.messages.slice(spliceIndex).map(m => m.id);
-        
-        // 2. 在临时的“账本”中删除
-        chatState.messages.splice(spliceIndex);
-        
-        // 3. 在永久的“账本”中，根据 ID 过滤掉所有要删除的消息
-        fullMessageHistory = fullMessageHistory.filter(m => !idsToDelete.includes(m.id));
+        // --- 核心修复：同时操作两个“账本” ---
+            // 1. 找出所有需要被删除的消息的 ID
+            const idsToDelete = chatState.messages.slice(spliceIndex).map(m => m.id);
+            
+            // 2. 在临时的“账本”中删除
+            chatState.messages.splice(spliceIndex);
+            
+            // 3. 在永久的“账本”中，根据 ID 过滤掉所有要删除的消息
+            fullMessageHistory = fullMessageHistory.filter(m => !idsToDelete.includes(m.id));
+            // --- 修复结束 ---
 
-        // 【核心新增】重新生成前，重置状态、备注和后缀
-        resetCurrentChatState();
+            // 【核心新增】重新生成前，重置状态、备注和后缀，确保逻辑回到分叉点
+            resetCurrentChatState();
 
-        reRenderMessages();
-        saveConversation(); // 这个函数之前已经改好了，会自动存入大数据库
-        triggerAIContinuation(true);
-    }
-
+            reRenderMessages();
+            saveConversation();
+            triggerAIContinuation(true);
+        }
 
 // ===== 到这里结束复制 =====
         async function handleOutgoingCallAttempt(callId) {
@@ -23776,25 +23743,14 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
 
             // 【新逻辑】如果不是当前聊天，或者页面不可见，统一走后台逻辑
             if (!isCurrentChat) {
-                // --- 核心修复：后台静默处理逻辑 (必须读写 IndexedDB) ---
-                
-                // 1. 尝试从大容量数据库读取现有记录
-                let backgroundMessages = await imageStore.getItem(`conversation_${finalTargetChatId}`);
-                
-                // 2. 如果数据库里没有，尝试从旧存取读取（兼容旧数据）
-                if (!backgroundMessages || !Array.isArray(backgroundMessages)) {
-                    backgroundMessages = loadFromLocalStorage(`conversation_${finalTargetChatId}`, []);
-                }
+                // --- 后台静默处理逻辑 (保持不变) ---
+                let backgroundMessages = loadFromLocalStorage(`conversation_${finalTargetChatId}`, []);
                 
                 msgData.id = msgData.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
                 if (!msgData.timestamp) msgData.timestamp = Date.now();
                 
                 backgroundMessages.push(msgData);
-                
-                // 3. 【关键】存入大容量数据库
-                await imageStore.setItem(`conversation_${finalTargetChatId}`, backgroundMessages);
-                // 4. 【关键】清理旧存储，防止下次读错
-                localStorage.removeItem(`conversation_${finalTargetChatId}`);
+                saveToLocalStorage(`conversation_${finalTargetChatId}`, backgroundMessages);
 
                 const chatInList = chatList.find(c => c.id === finalTargetChatId);
                 if (chatInList) {
@@ -23812,17 +23768,15 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                         chatList.splice(index, 1);
                         chatList.unshift(chatInList);
                     }
-                    // 聊天列表很小，继续存 LocalStorage 没问题
                     saveChatList();
                 }
 
                 if (document.getElementById('page-chat').classList.contains('active')) {
                     renderChatList();
                 }
-                showNotificationBanner(finalTargetChatId, msgData, chatInList ? chatInList.unreadCount : 1);
+                showNotificationBanner(finalTargetChatId, msgData, chatInList.unreadCount);
                 return; // 后台处理完成，必须终止函数
             }
-
 
             // --- 【全新】实时增量更新逻辑 ---
             msgData.id = msgData.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -28954,17 +28908,11 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
 }
 
     
-        async function showBranchHistoryModal(chatId) {
+async function showBranchHistoryModal(chatId) {
             const branchHistoryKey = `chat_branches_${chatId}`;
-            
-            // 【核心修复】优先从 IndexedDB 读取分支数据
-            let branches = await imageStore.getItem(branchHistoryKey);
-            if (!branches) {
-                branches = loadFromLocalStorage(branchHistoryKey, []);
-            }
+            let branches = loadFromLocalStorage(branchHistoryKey, []);
 
             // **1. 新增：自动清理7天前未命名的分支**
-
             const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
             const cleanedBranches = branches.filter(branch => {
                 // 如果分支有名字，就保留
@@ -28982,11 +28930,8 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
             // 如果清理后数量有变化，则更新存储
             if (cleanedBranches.length !== branches.length) {
                 branches = cleanedBranches;
-                // 【核心修复】存入 IndexedDB
-                imageStore.setItem(branchHistoryKey, branches);
-                localStorage.removeItem(branchHistoryKey);
+                saveToLocalStorage(branchHistoryKey, branches);
             }
-
 
             if (branches.length === 0) {
                 await customAlert('当前聊天没有可回溯的历史分支。');
@@ -29068,13 +29013,7 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
             if (!confirmed) return;
 
             const branchHistoryKey = `chat_branches_${chatId}`;
-            
-            // 【核心修复】从大数据库读取分支
-            let branches = await imageStore.getItem(branchHistoryKey);
-            if (!branches) {
-                branches = loadFromLocalStorage(branchHistoryKey, []);
-            }
-
+            let branches = loadFromLocalStorage(branchHistoryKey, []);
             const branchToRestoreIndex = branches.findIndex(b => b.id === branchId);
             if (branchToRestoreIndex === -1) {
                 await customAlert('恢复失败：找不到该历史分支。');
@@ -29083,60 +29022,47 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
 
             const branchToRestore = branches[branchToRestoreIndex];
             const mainConversationKey = `conversation_${chatId}`;
-            
-            // 【核心修复】从大数据库读取当前主线
-            let currentMainMessages = await imageStore.getItem(mainConversationKey);
-            if (!currentMainMessages) {
-                currentMainMessages = loadFromLocalStorage(mainConversationKey, []);
-            }
+            let currentMainMessages = loadFromLocalStorage(mainConversationKey, []);
 
             // **1. 自动保存当前时间线为一个新分支 (避免数据丢失)**
             if (currentMainMessages.length > 0) {
+                // --- 新增：提前生成预览文本 ---
                 const lastMessage = currentMainMessages[currentMainMessages.length - 1];
                 const previewText = lastMessage ? (lastMessage.text || `[${lastMessage.type}]`).substring(0, 20) + '...' : '空分支';
 
                 const newBranchToSave = {
                     id: `branch_${Date.now()}`,
+                    // 新分支的分叉点，逻辑上是我们要恢复的老分支的分叉点
                     branchedFromId: branchToRestore.branchedFromId, 
                     timestamp: Date.now(),
-                    messages: currentMainMessages, 
-                    preview: previewText 
+                    messages: currentMainMessages, // 保存完整的当前对话
+                    preview: previewText // 将预览文本一并存入
                 };
-                branches.unshift(newBranchToSave); 
+                branches.unshift(newBranchToSave); // 存入历史
             }
 
             // **2. 彻底替换主线**
+            // 直接使用分支的完整消息快照作为新的主线
             const restoredMessages = branchToRestore.messages;
-            
-            // 【核心修复】存入大数据库
-            await imageStore.setItem(mainConversationKey, restoredMessages);
-            localStorage.removeItem(mainConversationKey);
+            saveToLocalStorage(mainConversationKey, restoredMessages);
 
             // **3. 清理工作**
+            // 从历史记录中移除已被恢复的分支
             branches.splice(branches.findIndex(b => b.id === branchId), 1);
+            // 限制分支总数并保存
             if (branches.length > 20) {
                 branches = branches.slice(0, 20);
             }
-            
-            // 【核心修复】存入大数据库
-            await imageStore.setItem(branchHistoryKey, branches);
-            localStorage.removeItem(branchHistoryKey);
+            saveToLocalStorage(branchHistoryKey, branches);
 
             await customAlert('历史分支已成功恢复！即将刷新聊天界面。');
             
             // 重新打开聊天以加载全新的主线
             open(chatId);
         }
-
         async function renameBranch(chatId, branchId, closeModalCallback) {
             const branchHistoryKey = `chat_branches_${chatId}`;
-            
-            // 【核心修复】从大数据库读取
-            let branches = await imageStore.getItem(branchHistoryKey);
-            if (!branches) {
-                branches = loadFromLocalStorage(branchHistoryKey, []);
-            }
-
+            let branches = loadFromLocalStorage(branchHistoryKey, []);
             const branch = branches.find(b => b.id === branchId);
             if (!branch) {
                 await customAlert('错误：找不到该分支。');
@@ -29149,51 +29075,42 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
                 value: branch.name || ''
             });
 
+            // 如果用户点击了取消，newName会是null
             if (newName !== null) {
                 const trimmedName = newName.trim();
                 
                 if (trimmedName) {
-                    branch.name = trimmedName; 
+                    branch.name = trimmedName; // 更新或添加名称
                 } else {
-                    delete branch.name; 
+                    delete branch.name; // 如果输入为空，则删除名称属性
                 }
                 
-                // 【核心修复】存入大数据库
-                await imageStore.setItem(branchHistoryKey, branches);
-                localStorage.removeItem(branchHistoryKey);
-
+                saveToLocalStorage(branchHistoryKey, branches);
                 await customAlert('命名已更新！');
                 
+                // 关闭并重新打开列表以刷新显示
                 if (closeModalCallback) closeModalCallback();
                 setTimeout(() => showBranchHistoryModal(chatId), 100);
             }
         }
-
         async function deleteBranch(chatId, branchId, closeModalCallback) {
             const confirmed = await customConfirm('确定要永久删除这个历史分支吗？此操作不可恢复。');
             if (!confirmed) return;
 
             const branchHistoryKey = `chat_branches_${chatId}`;
-            
-            // 【核心修复】从大数据库读取
-            let branches = await imageStore.getItem(branchHistoryKey);
-            if (!branches) {
-                branches = loadFromLocalStorage(branchHistoryKey, []);
-            }
-
+            let branches = loadFromLocalStorage(branchHistoryKey, []);
             const branchIndex = branches.findIndex(b => b.id === branchId);
 
             if (branchIndex !== -1) {
                 branches.splice(branchIndex, 1);
-                
-                // 【核心修复】存入大数据库
-                await imageStore.setItem(branchHistoryKey, branches);
-                localStorage.removeItem(branchHistoryKey);
-
+                saveToLocalStorage(branchHistoryKey, branches);
                 await customAlert('分支已删除。');
                 
+                // 关闭旧的模态框
                 if(closeModalCallback) closeModalCallback();
                 
+                // 重新打开模态框以刷新列表
+                // 使用 setTimeout 确保旧的模态框完全关闭后再打开新的
                 setTimeout(() => {
                     showBranchHistoryModal(chatId);
                 }, 100);
@@ -29202,7 +29119,6 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
                 await customAlert('删除失败：找不到该分支。');
             }
         }
-
         // --- 聊天搜索功能 ---
         const searchOverlay = document.getElementById('search-overlay');
         const searchInput = document.getElementById('chat-search-input');
@@ -38563,7 +38479,6 @@ async function handleRemoveMember() {
                 }
             }
 
-            // ...
             // 【核心新增】导出小说内容 (从 IndexedDB 读取)
             const bookshelf = loadFromLocalStorage('app_novel_bookshelf', []);
             for (const book of bookshelf) {
@@ -38576,34 +38491,6 @@ async function handleRemoveMember() {
                     console.warn(`Failed to export novel content for ${book.title}`, e);
                 }
             }
-
-            // 【【【 核心补丁：从大仓库提取所有大数据用于导出 】】】
-            // 1. 提取音乐列表
-            const dbPlaylist = await imageStore.getItem('app_music_playlist');
-            if (dbPlaylist) {
-                allData['app_music_playlist'] = await conversationManager.makeDataPortable(dbPlaylist);
-            }
-            // 2. 遍历所有聊天，提取记录、分支、里程碑
-            for (const chat of chatList) {
-                // 聊天记录
-                const dbHistory = await imageStore.getItem(`conversation_${chat.id}`);
-                if (dbHistory) {
-                    allData[`conversation_${chat.id}`] = await conversationManager.makeDataPortable(dbHistory);
-                }
-                // 历史分支
-                const dbBranches = await imageStore.getItem(`chat_branches_${chat.id}`);
-                if (dbBranches) {
-                    allData[`chat_branches_${chat.id}`] = await conversationManager.makeDataPortable(dbBranches);
-                }
-                // 里程碑
-                const dbMilestones = await imageStore.getItem(`app-milestones_${chat.id}`);
-                if (dbMilestones) {
-                    allData[`app-milestones_${chat.id}`] = await conversationManager.makeDataPortable(dbMilestones);
-                }
-            }
-
-// ...
-
         
             const jsonString = JSON.stringify(allData, null, 2);
             const timestamp = new Date().toISOString().slice(0, 19).replace(/[-T:]/g, "");
@@ -38695,22 +38582,15 @@ async function handleRemoveMember() {
                         if (Object.prototype.hasOwnProperty.call(importedRawData, key)) {
                             let value = importedRawData[key];
                             
-                            // ...
                             try {
-                                // 【核心修复】识别大文件 Key，强制分流到大容量数据库
-                                // 新增了 历史分支 和 里程碑
-                                if (key.startsWith('novel_data_') || key === 'app_music_playlist' || key.startsWith('conversation_') || key.startsWith('chat_branches_') || key.startsWith('app-milestones_')) {
+                                // 【核心新增】如果是小说数据，或者数据量极大(>2MB)且不是关键配置，尝试存入 IndexedDB
+                                // 注意：普通聊天记录如果存入 IndexedDB 需要重写读取逻辑，这里主要拦截小说
+                                if (key.startsWith('novel_data_')) {
                                     await imageStore.setItem(key, value);
-                                    // 同时也清理掉 LocalStorage 里的旧残余，防止占空间
-                                    localStorage.removeItem(key); 
                                     continue;
                                 }
-// ...
-
 
                                 let valueToStore;
-// ...
-
                                 if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
                                     valueToStore = value;
                                 } else {
@@ -41944,15 +41824,13 @@ const cloudBackupManager = (function() {
         try {
             const APP_DATA_PREFIXES = [ 
                 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
-                'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData', 'tuqu_',
-                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_', 'app-milestones_'
+                'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
+                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
             ];
 
-            // 【核心修复】1. 准备文本数据
+            // 1. 准备文本数据和图片引用列表
             const allTextData = {};
             const blobKeys = new Set();
-
-            // A. 先从 LocalStorage 捞小件
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
                 if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
@@ -41962,32 +41840,6 @@ const cloudBackupManager = (function() {
                     if (matches) matches.forEach(m => blobKeys.add(m.split(':')[1]));
                 }
             }
-
-            // B. 再从 IndexedDB 捞大件 (聊天记录、分支、里程碑、音乐、小说)
-            // 我们需要遍历所有可能的大件 Key
-            const largeDataKeys = [
-                'app_music_playlist',
-                ...chatList.map(c => `conversation_${c.id}`),
-                ...chatList.map(c => `chat_branches_${c.id}`),
-                ...chatList.map(c => `app-milestones_${c.id}`)
-            ];
-            
-            // 还要捞小说
-            const bookshelf = loadFromLocalStorage('app_novel_bookshelf', []);
-            bookshelf.forEach(b => largeDataKeys.push(`novel_data_${b.id}`));
-
-            for (const key of largeDataKeys) {
-                const dbValue = await imageStore.getItem(key);
-                if (dbValue) {
-                    // 如果是大件，直接把整个对象转成 JSON 存入备份
-                    allTextData[key] = JSON.stringify(dbValue);
-                    // 扫描大件内容里是否还引用了其他图片
-                    const stringified = allTextData[key];
-                    const matches = stringified.match(/indexeddb:([a-zA-Z0-9_-]+)/g);
-                    if (matches) matches.forEach(m => blobKeys.add(m.split(':')[1]));
-                }
-            }
-
 
             // 2. 获取 GitHub 上已有的文件列表（用于获取 SHA）
             const baseDir = "rye_backup_v2";
@@ -42152,26 +42004,8 @@ async function performRestore() {
             }
             keysToRemove.forEach(key => localStorage.removeItem(key));
 
-            // 【核心修复】写入数据时，必须进行分流
             for (const key in allTextData) {
-                let value = allTextData[key];
-                
-                // 识别大文件 Key，强制存入 IndexedDB
-                if (key.startsWith('novel_data_') || key === 'app_music_playlist' || key.startsWith('conversation_') || key.startsWith('chat_branches_') || key.startsWith('app-milestones_')) {
-                    try {
-                        const parsedValue = JSON.parse(value);
-                        await imageStore.setItem(key, parsedValue);
-                        // 确保 LocalStorage 里没有残余
-                        localStorage.removeItem(key); 
-                    } catch (e) {
-                        // 如果不是JSON字符串，就直接存
-                        await imageStore.setItem(key, value);
-                        localStorage.removeItem(key);
-                    }
-                } else {
-                    // 小件存入 LocalStorage
-                    localStorage.setItem(key, value);
-                }
+                localStorage.setItem(key, allTextData[key]);
             }
 
             if (statusEl) {
@@ -43167,31 +43001,16 @@ async function performRestore() {
         const deleteBtn = document.getElementById('milestone-delete-btn');
         const closeBtn = overlay.querySelector('.modal-close-btn');
 
-        // 【核心修复】改为 async，优先从大数据库读取
-        async function loadData() {
+        function loadData() {
             const chatId = conversationManager.getCurrentChatId();
-            const key = `app-milestones_${chatId}`;
-            
-            // 1. 尝试从 IndexedDB 读取
-            let dbData = await imageStore.getItem(key);
-            
-            // 2. 兼容旧数据：如果没有，从 LocalStorage 读取
-            if (!dbData) {
-                dbData = loadFromLocalStorage(key, []);
-            }
-            
-            milestones = dbData;
-            console.log("加载里程碑数据:", milestones);
+            milestones = loadFromLocalStorage(`app-milestones_${chatId}`, []);
+            console.log("加载里程碑数据:", milestones); // 增加这一行日志
             milestones.sort((a, b) => b.timestamp - a.timestamp);
         }
 
-        // 【核心修复】存入大数据库，并清理旧存储
         function saveData() {
             const chatId = conversationManager.getCurrentChatId();
-            const key = `app-milestones_${chatId}`;
-            
-            imageStore.setItem(key, milestones).catch(e => console.error("Milestone Save Error:", e));
-            localStorage.removeItem(key); // 释放 LocalStorage 空间
+            saveToLocalStorage(`app-milestones_${chatId}`, milestones);
         }
 
         // 新增：计算日期差的辅助函数
@@ -43874,12 +43693,11 @@ async function performRestore() {
             };
         }
 
-        window.app.openMilestones = async () => {
-            await loadData(); // 加上 await
+        window.app.openMilestones = () => {
+            loadData();
             showList();
             overlay.classList.add('visible');
         };
-
 
         return { init, loadData };
     })();
