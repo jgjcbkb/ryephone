@@ -16186,9 +16186,12 @@ You MUST use the custom \`<dm>\` tag format.
             `;
             
             categoryHeader.innerHTML = `
-                <span style="font-weight: bold; color: #333; font-size: 15px;">
-                    ${categoryName} <span style="font-weight: normal; color: #888; font-size: 13px; margin-left: 5px;">(${items.length})</span>
-                </span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-weight: bold; color: #333; font-size: 15px;">
+                        ${categoryName} <span style="font-weight: normal; color: #888; font-size: 13px; margin-left: 5px;">(${items.length})</span>
+                    </span>
+                    <button onclick="event.stopPropagation(); window.app.deleteWorldBookCategory('${categoryName.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #ff3b30; font-size: 12px; cursor: pointer; padding: 4px; opacity: 0.6;">[删除分类]</button>
+                </div>
                 <span class="wb-category-arrow" style="color: #bbb; transition: transform 0.3s;">▶</span>
             `;
 
@@ -16291,7 +16294,16 @@ You MUST use the custom \`<dm>\` tag format.
         worldbookEditIndexInput.value = index; worldbookAddBtn.textContent = '更新条目';
     };
     window.app.deleteWorldBookEntry = (index) => { if (confirm('确定删除?')) { worldBookEntries.splice(index, 1); saveWorldBook(); renderWorldBook(); } };
-    
+        window.app.deleteWorldBookCategory = async (categoryName) => {
+        const confirmed = await conversationManager.customConfirm(`确定要删除分类 "${categoryName}" 下的所有世界书条目吗？\n此操作不可撤销。`, '删除分类确认');
+        if (confirmed) {
+            worldBookEntries = worldBookEntries.filter(entry => (entry.category || '未分类') !== categoryName);
+            saveWorldBook();
+            renderWorldBook();
+            alert(`分类 "${categoryName}" 已删除。`);
+        }
+    };
+
     const apiProfilesList = document.getElementById('api-profiles-list'), addNewProfileBtn = document.getElementById('add-new-profile-btn'), apiFormContainer = document.getElementById('api-form-container'), apiFormTitle = document.getElementById('api-form-title'), saveApiProfileBtn = document.getElementById('save-api-profile-btn'), cancelApiFormBtn = document.getElementById('cancel-api-form-btn'), apiNameInput = document.getElementById('api-name'), apiKeyInput = document.getElementById('api-key'), apiUrlInput = document.getElementById('api-url'), systemPromptInput = document.getElementById('system-prompt'), apiEditIndexInput = document.getElementById('api-edit-index'), fetchModelsBtn = document.getElementById('fetch-models-btn'), apiFetchStatus = document.getElementById('api-fetch-status'), modelSelectGroup = document.getElementById('model-select-group'), apiModelSelect = document.getElementById('api-model-select');
     function saveApiSettings() { saveToLocalStorage('chat-api-profiles', apiProfiles); localStorage.setItem('chat-active-profile-index', activeProfileIndex); }
     function loadApiSettings() { apiProfiles = loadFromLocalStorage('chat-api-profiles'); activeProfileIndex = JSON.parse(localStorage.getItem('chat-active-profile-index') || 'null'); }
@@ -34262,9 +34274,12 @@ function saveSettings() {
                     cursor: pointer; user-select: none; transition: background-color 0.2s;
                 `;
                 categoryHeader.innerHTML = `
-                    <span style="font-weight: bold; color: #333; font-size: 15px;">
-                        ${escapeHtml(categoryName)} <span style="font-weight: normal; color: #888; font-size: 13px; margin-left: 5px;">(${items.length})</span>
-                    </span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-weight: bold; color: #333; font-size: 15px;">
+                            ${escapeHtml(categoryName)} <span style="font-weight: normal; color: #888; font-size: 13px; margin-left: 5px;">(${items.length})</span>
+                        </span>
+                        <button onclick="event.stopPropagation(); window.app.deleteRegexCategory('${categoryName.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #ff3b30; font-size: 12px; cursor: pointer; padding: 4px; opacity: 0.6;">[删除分类]</button>
+                    </div>
                     <span class="wb-category-arrow" style="color: #bbb; transition: transform 0.3s;">▶</span>
                 `;
 
@@ -34353,6 +34368,15 @@ function saveSettings() {
                 appearanceSettings.regexReplacements.splice(index, 1);
                 saveSettings();
                 renderRegexList();
+            }
+        };
+        window.app.deleteRegexCategory = async (categoryName) => {
+            const confirmed = await conversationManager.customConfirm(`确定要删除分类 "${categoryName}" 下的所有正则规则吗？\n此操作不可撤销。`, '删除分类确认');
+            if (confirmed) {
+                appearanceSettings.regexReplacements = appearanceSettings.regexReplacements.filter(rule => (rule.category || '未分类') !== categoryName);
+                saveSettings();
+                renderRegexList();
+                alert(`分类 "${categoryName}" 已删除。`);
             }
         };
 
