@@ -10071,10 +10071,17 @@ if ('serviceWorker' in navigator) {
             alert("由于音乐文件较大，已为您开启直接下载通道。\n\n1. 如果浏览器直接开始播放，请点击播放器右侧的“三个点”按钮选择“下载”。\n2. 如果是手机端，可以长按播放器画面选择“另存为”或“下载音频”。");
         }
 
-        function init() {
+// ...
+        // 【核心修复】改为 async
+        async function init() {
             if (!widget) return;
-            playlist = loadFromLocalStorage(STORAGE_KEY, []);
+            // 优先从数据库加载歌单
+            const dbPlaylist = await imageStore.getItem(STORAGE_KEY);
+            playlist = dbPlaylist || loadFromLocalStorage(STORAGE_KEY, []);
+            
             const savedState = loadFromLocalStorage(STATE_KEY, {});
+// ...
+
             currentIndex = savedState.currentIndex || 0;
             playMode = savedState.playMode || 'order';
             audio.addEventListener('timeupdate', handleTimeUpdate);
@@ -18307,17 +18314,22 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                 // 打印出即将被保存的数据，让我们看看它在保存前一刻是否正确
                 console.log('[诊断探针] 2. 即将被保存的 fullMessageHistory 内容:', JSON.parse(JSON.stringify(fullMessageHistory)));
 
+                // ...
                 const key = `conversation_${chatState.chatId}`;
-                const dataToSave = JSON.stringify(fullMessageHistory);
+                // const dataToSave = JSON.stringify(fullMessageHistory); // 不需要手动转字符串了
 
-                console.log(`[诊断探针] 3. 准备写入 localStorage。Key: ${key}, 数据大小: ${dataToSave.length} 字符。`);
+                console.log(`[诊断探针] 3. 准备写入 IndexedDB (大容量)。Key: ${key}`);
                 
-                // 使用 try...catch 包裹，捕获所有可能的写入错误
-                localStorage.setItem(key, dataToSave);
+                // 【核心修复】改为存入 imageStore (IndexedDB)，支持存储超大对象
+                imageStore.setItem(key, fullMessageHistory).catch(e => console.error("DB Save Error:", e));
 
-                console.log(`[诊断探针] 4. localStorage.setItem 执行完毕，没有抛出错误。`);
+                // localStorage.setItem(key, dataToSave); // <--- 这行删掉或注释掉
+
+                console.log(`[诊断探针] 4. 写入请求已发送。`);
 
             } catch (error) {
+// ...
+
                 console.error('[诊断探针] 致命错误：在保存聊天记录到 localStorage 时发生崩溃！', error);
                 alert(`保存聊天记录失败！\n错误信息: ${error.message}\n请检查浏览器存储空间是否已满。`);
             }
@@ -18341,16 +18353,21 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
             console.log('[诊断探针] 5. saveConversation 函数执行完毕。');
         }
 
-        function initializeFromStorage(chatId) {
+                // 【核心修复】改为 async 函数，以便等待数据库读取
+        async function initializeFromStorage(chatId) {
             // 【核心新增：初始化当前身份】
             // 默认身份为 '{{user}}'
             const currentIdentity = loadFromLocalStorage(`chat_identity_${chatId}`, '{{user}}');
             chatState.currentIdentity = currentIdentity;
             updateIdentityDotUI();
 
-            // 1. 将完整的历史记录加载到我们新的“保险柜”数组中
-            fullMessageHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+            // 1. 优先从 IndexedDB 读取，如果没有则回退到 LocalStorage
+            const dbHistory = await imageStore.getItem(`conversation_${chatId}`);
+            fullMessageHistory = dbHistory || loadFromLocalStorage(`conversation_${chatId}`, []);
+            
             const messagesToLoad = 40;
+// ...
+
 
             // 2. 只截取最后40条消息用于初次显示，放入旧的数组
             chatState.messages = fullMessageHistory.slice(-messagesToLoad);
@@ -38582,15 +38599,18 @@ async function handleRemoveMember() {
                         if (Object.prototype.hasOwnProperty.call(importedRawData, key)) {
                             let value = importedRawData[key];
                             
+                            // ...
                             try {
-                                // 【核心新增】如果是小说数据，或者数据量极大(>2MB)且不是关键配置，尝试存入 IndexedDB
-                                // 注意：普通聊天记录如果存入 IndexedDB 需要重写读取逻辑，这里主要拦截小说
-                                if (key.startsWith('novel_data_')) {
+                                // 【核心新增】如果是小说数据、音乐列表或聊天记录，强制存入 IndexedDB (大容量存储)
+                                // 这样可以完美避开 iOS 的 5MB 限制
+                                if (key.startsWith('novel_data_') || key === 'app_music_playlist' || key.startsWith('conversation_')) {
                                     await imageStore.setItem(key, value);
                                     continue;
                                 }
 
                                 let valueToStore;
+// ...
+
                                 if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
                                     valueToStore = value;
                                 } else {
