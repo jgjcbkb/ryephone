@@ -11545,21 +11545,31 @@ if ('serviceWorker' in navigator) {
         // --- 核心新增：兔区专属媒体防幻觉协议 (终极严厉版) ---
         const TUQU_MEDIA_PROTOCOL = `
 ---
-### **[STRICT MEDIA & EXPRESSION PROTOCOL - ANTI-HALLUCINATION]**
+### **[STRICT MEDIA & EXPRESSION PROTOCOL - THE LAW OF SIZE]**
 
-You are ENCOURAGED to use emojis and stickers, but you MUST follow the **STRICT MATCHING RULE**.
+You MUST distinguish between **EMOJIS** and **STICKERS** based on their visual impact:
 
-1.  **THE LIST IS GOD:** You are **ABSOLUTELY FORBIDDEN** from using any emoji or sticker name that is NOT in the provided lists below.
-2.  **NO INVENTION:** Do NOT invent names like \`[emoji:滑稽]\` or \`[sticker:黑人问号]\` if they are not in the list.
-3.  **FALLBACK:** If you want to express an emotion but the exact sticker/emoji is not in the list, **DO NOT use a tag**. Use text description instead (e.g., \`(流汗黄豆)\`, \`(无语)\`).
-4.  **FORMAT:** Always use the prefix. \`[emoji:Name]\` or \`[sticker:Name]\`.
+1.  **EMOJIS (The "Inline" Rule):**
+    *   **Visual:** Small, fits inside a line of text.
+    *   **Usage:** Use \`[emoji:Name]\` for facial expressions or small symbols *within* a sentence.
+    *   **Example:** "楼主你太牛了[emoji:给力]！我真的看呆了。"
+
+2.  **STICKERS (The "Standalone" Rule):**
+    *   **Visual:** Large, high-impact images.
+    *   **Usage:** Use \`[sticker:Name]\` for major reactions. They **MUST** be on their own line or at the very end of a paragraph.
+    *   **Example:** "这瓜太大了，我先吃为敬。\\n[sticker:吃瓜]"
+
+3.  **STRICT MATCHING LAW (ANTI-HALLUCINATION):**
+    *   **THE LIST IS GOD:** You are **ABSOLUTELY FORBIDDEN** from using any name NOT in the lists below.
+    *   **NO CROSS-USAGE:** Do NOT use a name from the Sticker list with the \`[emoji:]\` prefix, and vice versa.
+    *   **FALLBACK:** If a name is not in the list, use plain text in parentheses: \`(笑哭)\`.
 
 **Available Emoji Names (EXACT MATCH ONLY):** [${emojiNames}]
 **Available Sticker Names (EXACT MATCH ONLY):** [${stickerNames}]
 
-
 ---
 `;
+
 
 
         console.log(`%c[ULTIMATE DIAGNOSIS]`, 'color: red; font-weight: bold; font-size: 14px;', `
@@ -14160,6 +14170,14 @@ ${TUQU_MEDIA_PROTOCOL}
 3.  **FALLBACK PROTOCOL:** If you want to use an expression but are unsure of the prefix or if it exists in the list, you **MUST** use the universal fallback image:
     *   **Command:** \`[sticker:地铁老人看手机]\` (Use this for confusion, shock, or speechlessness).
 
+**[MEDIA PREFIX LAW - ABSOLUTE & UNBREAKABLE]**
+1.  **NO NAKED TAGS:** You are **STRICTLY FORBIDDEN** from outputting tags like \`[抓狂]\`, \`[笑哭]\`. This is a critical syntax error.
+2.  **MANDATORY PREFIX:** You **MUST** use the correct prefix:
+    *   **Emoji:** \`[emoji:抓狂]\`
+    *   **Sticker:** \`[sticker:抓狂]\`
+3.  **FALLBACK PROTOCOL:** If you want to use an expression but are unsure of the prefix or if it exists in the list, you **MUST** use the universal fallback image:
+    *   **Command:** \`[sticker:地铁老人看手机]\` (Use this for confusion, shock, or speechlessness).
+
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 `;
@@ -14420,6 +14438,14 @@ Check the **"Setting"** provided above.
     *   **FOCUS:** The spotlight must be 100% on the specified couple.
     *   **IGNORE USER PERSONA:** For the content of this story, ignore the "User Persona" provided in the context. It is irrelevant.
 
+**[MEDIA PREFIX LAW - ABSOLUTE & UNBREAKABLE]**
+1.  **NO NAKED TAGS:** You are **STRICTLY FORBIDDEN** from outputting tags like \`[抓狂]\`, \`[笑哭]\`. This is a critical syntax error.
+2.  **MANDATORY PREFIX:** You **MUST** use the correct prefix:
+    *   **Emoji:** \`[emoji:抓狂]\`
+    *   **Sticker:** \`[sticker:抓狂]\`
+3.  **FALLBACK PROTOCOL:** If you want to use an expression but are unsure of the prefix or if it exists in the list, you **MUST** use the universal fallback image:
+    *   **Command:** \`[sticker:地铁老人看手机]\` (Use this for confusion, shock, or speechlessness).
+
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 `;
@@ -14622,6 +14648,14 @@ You MUST output using this EXACT JSON structure.
 \`[tuqu_complex_action: {"type":"comment", "postId":"${targetPost.id}", "content":"[YOUR CHOSEN SCENARIO CONTENT HERE]", "author":"[Pseudonym based on Role]", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}, {"author":"ReplyName2", "location":"City2", "content":"Reply2"}]}]\`
 
 ${TUQU_MEDIA_PROTOCOL}
+
+**[MEDIA PREFIX LAW - ABSOLUTE & UNBREAKABLE]**
+1.  **NO NAKED TAGS:** You are **STRICTLY FORBIDDEN** from outputting tags like \`[抓狂]\`, \`[笑哭]\`. This is a critical syntax error.
+2.  **MANDATORY PREFIX:** You **MUST** use the correct prefix:
+    *   **Emoji:** \`[emoji:抓狂]\`
+    *   **Sticker:** \`[sticker:抓狂]\`
+3.  **FALLBACK PROTOCOL:** If you want to use an expression but are unsure of the prefix or if it exists in the list, you **MUST** use the universal fallback image:
+    *   **Command:** \`[sticker:地铁老人看手机]\` (Use this for confusion, shock, or speechlessness).
 
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
