@@ -16256,9 +16256,15 @@ conversationManager.showNotificationBanner('TUQU', {
                                     keysToRemove.push(key);
                                 }
                             }
-                            keysToRemove.forEach(key => localStorage.removeItem(key));
+                            // 【核心修复】不仅删缓存，还要检查并删除数据库里对应的记录
+                            for (const key of keysToRemove) {
+                                localStorage.removeItem(key);
+                                if (key.startsWith('conversation_')) {
+                                    await imageStore.removeItem(key);
+                                }
+                            }
                             renderChatList();
-                            await conversationManager.customAlert('聊天已删除。');
+                            await conversationManager.customAlert('聊天及所有备份已彻底删除。');
                         }
                     }
                 }
@@ -18575,19 +18581,7 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
         function saveConversation() {
             if (!chatState.chatId) return;
 
-            // 【核心修复：防清空保险丝】
-            // 如果内存中的历史记录为空，但我们不是在执行“清空聊天记录”操作
-            // 那么这极有可能是数据加载失败了。此时绝对禁止保存，否则会覆盖硬盘上的数据！
-            if (fullMessageHistory.length === 0) {
-                // 检查一下硬盘里是不是真的没数据
-                const lsData = localStorage.getItem(`conversation_${chatState.chatId}`);
-                // 如果硬盘里有数据(字符串长度>2，即不是"[]")，但内存里是空的，说明出事了，拦截！
-                if (lsData && lsData.length > 2) {
-                    console.error("[CRITICAL SAFETY] Attempted to save empty history over existing data. BLOCKED.");
-                    return;
-                }
-                // 注意：这里无法同步检查IndexedDB，但LS检查已经能拦截大部分事故
-            }
+    
 
             console.log(`[诊断探针] 1. 开始执行 saveConversation，目标 chat ID: ${chatState.chatId}`);
             
@@ -26987,7 +26981,8 @@ const showContextMenu = (event, messageId) => {
                         fullMessageHistory = fullMessageHistory.filter(m => !idsToRemove.includes(m.id));
                         
                         // 5. 保存并重绘
-                        saveConversation();
+                        // 【核心修复】必须等待保存彻底完成
+                        await saveConversation();
                         reRenderMessages();
                         updateHeaderTitle(document.getElementById('chat-contact-name').textContent);
                         window.showNotification('已清理后续对话并重置相关状态');
@@ -29019,7 +29014,8 @@ multiSelectCancelBtn.addEventListener('click', exitMultiSelectMode);
 
             exitMultiSelectMode(); 
             reRenderMessages(); 
-            saveConversation(); 
+            // 【核心修复】必须等待保存彻底完成
+            await saveConversation(); 
         } 
     });
     // 在 multiSelectDeleteBtn.addEventListener 附近添加这个新的监听器
@@ -37121,11 +37117,14 @@ async function handleRemoveMember() {
         if (!chatId) return;
         const confirmed = await conversationManager.customConfirm('此操作将永久删除当前会话的所有消息，且无法恢复。确定要清空吗？','清空聊天记录');
         if (confirmed) {
-            saveToLocalStorage(`conversation_${chatId}`, []);
+            // 1. 删除缓存中的记录
+            localStorage.removeItem(`conversation_${chatId}`);
+            // 2. 【关键】删除数据库中的备份，防止它“复活”
+            await imageStore.removeItem(`conversation_${chatId}`);
+            
             conversationManager.open(chatId);
             navigateTo('chat-info');
-            
-            alert('聊天记录已清空。');
+            alert('聊天记录已彻底清空。');
         }
     });
 
