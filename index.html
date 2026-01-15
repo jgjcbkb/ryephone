@@ -15879,7 +15879,8 @@ conversationManager.showNotificationBanner('TUQU', {
                                         if (entry.content && entry.content.trim()) {
                                             const hasKeys = entry.keys && Array.isArray(entry.keys) && entry.keys.length > 0;
                                             const entryTitle = entry.comment || entry.name || (hasKeys ? entry.keys[0] : `Entry_${index}`);
-                                            const wbName = `${name}_${entryTitle}`;
+                                            // 【核心修改】导入时自动加上 (VC-IGNORE)
+                                            const wbName = `${name}_${entryTitle}(VC-IGNORE)`;
 
                                             if (!worldBookEntries.some(wb => wb.name === wbName)) {
                                                 worldBookEntries.push({
@@ -16747,8 +16748,15 @@ You MUST use the custom \`<dm>\` tag format.
         });
     }
     worldbookAddBtn.addEventListener('click', () => {
-        const name = worldbookNameInput.value.trim();
-        // 【核心新增】读取分类输入框的值
+        // 【核心修复】这里必须用 let，不能用 const
+        let name = worldbookNameInput.value.trim();
+        const editIndex = worldbookEditIndexInput.value;
+
+        // 【自动添加逻辑】仅在新增时触发
+        if (editIndex === '' && name && !name.includes('(VC-IGNORE)')) {
+            name += '(VC-IGNORE)';
+        }
+
         const category = document.getElementById('worldbook-category').value.trim() || '未分类';
         const keywords = worldbookKeywordsInput.value.trim();
         const content = worldbookContentInput.value.trim();
@@ -16756,24 +16764,37 @@ You MUST use the custom \`<dm>\` tag format.
         const useInMoments = document.getElementById('worldbook-use-in-moments').checked;
         const useInTuqu = document.getElementById('worldbook-use-in-tuqu').checked;
         const triggerMode = document.querySelector('input[name="worldbook-trigger"]:checked').value;
+        
         if (!name || !content) { alert('名称和内容不能为空！'); return; }
-        const editIndex = worldbookEditIndexInput.value;
-        if (worldBookEntries.some((entry, index) => entry.name === name && index.toString() !== editIndex)) { alert('世界书名称已存在，请使用唯一的名称。'); return; }
-        // 【核心修改】将 category 加入对象
+        
+        if (worldBookEntries.some((entry, index) => entry.name === name && index.toString() !== editIndex)) { 
+            alert('世界书名称已存在，请使用唯一的名称。'); 
+            return; 
+        }
+
         const newEntry = { name, category, keywords, content, enabled, triggerMode, useInMoments, useInTuqu };
-        if (editIndex !== '') { worldBookEntries[editIndex] = newEntry; } else { worldBookEntries.push(newEntry); }
-        saveWorldBook(); renderWorldBook();
+        if (editIndex !== '') { 
+            worldBookEntries[editIndex] = newEntry; 
+        } else { 
+            worldBookEntries.push(newEntry); 
+        }
+        
+        saveWorldBook(); 
+        renderWorldBook();
+        
+        // 重置表单
         worldbookNameInput.value = ''; 
-        // 【核心新增】重置分类输入框
         document.getElementById('worldbook-category').value = '';
-        worldbookKeywordsInput.value = ''; worldbookContentInput.value = '';
+        worldbookKeywordsInput.value = ''; 
+        worldbookContentInput.value = '';
         worldbookEnabledInput.checked = true; 
         document.getElementById('worldbook-use-in-moments').checked = false;
         document.getElementById('worldbook-use-in-tuqu').checked = false;
-        // --- 核心修改：默认选中“始终触发” ---
         document.querySelector('input[name="worldbook-trigger"][value="always"]').checked = true; 
-        worldbookEditIndexInput.value = ''; worldbookAddBtn.textContent = '添加条目';
-            });
+        worldbookEditIndexInput.value = ''; 
+        worldbookAddBtn.textContent = '添加条目';
+    });
+
     window.app = window.app || {};
     window.app.editWorldBookEntry = (index) => {
         const entry = worldBookEntries[index];
