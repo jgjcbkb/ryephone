@@ -601,10 +601,12 @@ html, body {
             <label style="font-size: 12px; color: #888; display: block; margin-bottom: 5px;">输入世界观/设定 (可选)：</label>
             <textarea id="trigger-worldview" placeholder="例如：假如角色是皇上 / 假如这是末世背景..." rows="3"></textarea>
             
-            <!-- 新增：上下文发送开关 -->
-            <label style="display:flex; align-items:center; margin-bottom:15px; font-size:12px; color:#333; cursor:pointer;">
-                <input type="checkbox" id="trigger-include-context" checked style="margin-right:5px;"> 参考其他帖子内容 (勾选可看10条，不勾选则只看设定)
-            </label>
+            <!-- 【核心修改】增加 ID 容器以便 JS 控制显隐 -->
+            <div id="trigger-context-group">
+                <label style="display:flex; align-items:center; margin-bottom:15px; font-size:12px; color:#333; cursor:pointer;">
+                    <input type="checkbox" id="trigger-include-context" checked style="margin-right:5px;"> 参考其他帖子内容 (勾选可看10条，不勾选则只看设定)
+                </label>
+            </div>
 
 
             <div class="btns">
@@ -681,11 +683,13 @@ html, body {
             const modal = document.getElementById('board-trigger-modal');
             document.getElementById('trigger-modal-title').innerText = "全站随机更新";
             
-            // 向父窗口请求角色列表
-            window.parent.postMessage({ type: 'REQUEST_CHARACTER_LIST' }, '*');
+            // 【核心修改】随机模式下，不请求角色列表，直接锁定为“随机路人”
+            const select = document.getElementById('trigger-char-select');
+            select.innerHTML = '<option value="">随机路人</option>';
             
             modal.style.display = 'flex';
         }
+
 
 
         // 新增：切换右上角菜单显示
@@ -750,10 +754,13 @@ html, body {
         function triggerPostUpdate() {
             currentTriggerMode = 'post';
             const modal = document.getElementById('board-trigger-modal');
+            
+            // 【核心修复】帖子内更新时，隐藏“参考其他帖子”的勾选项
+            document.getElementById('trigger-context-group').style.display = 'none';
+
             const select = document.getElementById('trigger-char-select');
             document.getElementById('trigger-modal-title').innerText = `更新当前帖子`;
             
-            // 向父窗口请求角色列表
             window.parent.postMessage({ type: 'REQUEST_CHARACTER_LIST' }, '*');
             
             modal.style.display = 'flex';
@@ -772,17 +779,20 @@ html, body {
         }
 
         // 打开催更弹窗
+                // 修改后
         function triggerBoardTuqu() {
-            currentTriggerMode = 'board'; // 新增：标记为版块模式
+            currentTriggerMode = 'board';
             const modal = document.getElementById('board-trigger-modal');
+            
+            // 【核心修复】确保勾选项可见
+            document.getElementById('trigger-context-group').style.display = 'block';
+
             const select = document.getElementById('trigger-char-select');
             document.getElementById('trigger-modal-title').innerText = `在“${currentBoardTitle}”催更`;
-            
-            // 向父窗口请求角色列表
             window.parent.postMessage({ type: 'REQUEST_CHARACTER_LIST' }, '*');
-            
             modal.style.display = 'flex';
         }
+
 
         function closeTriggerModal() {
             document.getElementById('board-trigger-modal').style.display = 'none';
@@ -791,6 +801,9 @@ html, body {
         // 接收父窗口发来的角色列表
         window.addEventListener('message', function(event) {
             if (event.data.type === 'RESPONSE_CHARACTER_LIST') {
+                // 【核心修改】如果是随机模式，忽略发来的列表，保持“随机路人”
+                if (currentTriggerMode === 'random') return;
+
                 const select = document.getElementById('trigger-char-select');
                 const currentVal = select.value;
                 select.innerHTML = '<option value="">随机路人</option>';
@@ -803,6 +816,7 @@ html, body {
                 select.value = currentVal;
             }
         });
+
 
         // 确认提交催更指令
         function confirmBoardTrigger() {

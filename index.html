@@ -5644,12 +5644,13 @@ input:checked + .slider:before {
 }
 /* --- 聊天记录搜索样式 (美化版) --- */
 #search-overlay {
-    /* 修改：改为 fixed 定位，并使用 100dvh 确保高度适配键盘 */
-    position: fixed; 
+    /* 【核心修复】由于父级 .screen 存在 transform，fixed 会失效 */
+    /* 改为 absolute 并使用 100% 高度，确保在手机容器内完全对齐 */
+    position: absolute; 
     top: 0; 
     left: 0; 
-    width: 100vw; 
-    height: 100dvh;
+    width: 100%; 
+    height: 100%;
     background: #f7f7f7; 
     z-index: 2000; 
     display: flex; 
@@ -5705,8 +5706,16 @@ input:checked + .slider:before {
 .search-cancel-btn:active { opacity: 0.7; }
 
 .search-results-container {
-    flex: 1; overflow-y: auto; padding: 0;
+    flex: 1;
+    overflow-y: auto;
+    /* 【核心修复】开启 iOS 丝滑滚动支持 */
+    -webkit-overflow-scrolling: touch;
+    /* 【核心修复】确保触摸手势只处理纵向滚动，防止被父级容器拦截 */
+    touch-action: pan-y;
+    padding: 0;
     background: #f7f7f7;
+    /* 【核心修复】防止在 Flex 布局中出现高度塌陷导致无法滚动 */
+    min-height: 0;
 }
 
 /* 结果项样式优化 */
@@ -7268,8 +7277,15 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                         </div>
                                         <div class="publish-content">
                                             <div class="publish-section">
-                                                <textarea class="main-text-input" placeholder="分享新鲜事..."></textarea>
-                                            </div>
+                                    <textarea class="main-text-input" placeholder="分享新鲜事..."></textarea>
+                                    <!-- 【核心新增】发布页面的表情包按钮 -->
+                                    <div style="display: flex; justify-content: flex-end; padding: 5px 0;">
+                                        <button id="moments-publish-sticker-btn" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 12px; font-size: 12px; color: #666; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                                            <img src="https://i.postimg.cc/qMXdv4V5/IMG-9900.png" style="width: 18px; height: 18px;"> 选择表情
+                                        </button>
+                                    </div>
+                                </div>
+
                                             
                                             <div class="publish-type-selector">
                                                 <input type="radio" id="type-photo" name="publish-type" value="photo" checked><label for="type-photo">图片</label>
@@ -8531,6 +8547,12 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 <!-- START: PUBLISH UI REDESIGN -->
                                 <div class="publish-section">
                                     <textarea class="main-text-input" placeholder="分享新鲜事..."></textarea>
+                                    <!-- 【核心新增】发布页面的表情包按钮 -->
+                                    <div style="display: flex; justify-content: flex-end; padding: 5px 0;">
+                                        <button id="moments-publish-sticker-btn" style="background: #fff; border: 1px solid #ddd; border-radius: 20px; padding: 4px 12px; font-size: 12px; color: #666; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                                            <img src="https://i.postimg.cc/qMXdv4V5/IMG-9900.png" style="width: 18px; height: 18px;"> 选择表情
+                                        </button>
+                                    </div>
                                 </div>
                                 
                                 <div class="publish-type-selector">
@@ -12119,16 +12141,32 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
             
             // --- 注入结束 ---
 
-            // --- START: 重新注入聊天记录上下文 ---
+                        // ... (上文代码) ...
+
+            // --- START: 重新注入聊天记录上下文 (修复版) ---
             let chatHistoryForPrompt = '';
             if (targetChatId) {
                 const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
-                const sourceMessages = loadFromLocalStorage(`conversation_${targetChatId}`, []);
+                
+                // 【核心修复】加载历史记录时，增加数据库回退检查
+                let sourceMessages = loadFromLocalStorage(`conversation_${targetChatId}`, []);
+                if (sourceMessages.length === 0) {
+                    try {
+                        // 如果LS为空，尝试从数据库读取，这里不能用 await，因为外层没有 async (或者用 .then)
+                        // 但由于 triggerProactiveAI 本身是 async 的，我们可以用 await
+                        // 注意：这里假设 imageStore.getItem 是可用的
+                        const dbData = await imageStore.getItem(`conversation_${targetChatId}`);
+                        if (dbData && Array.isArray(dbData)) {
+                            sourceMessages = dbData;
+                            console.log(`[Proactive Context] Loaded ${sourceMessages.length} messages from DB for chat ${targetChatId}`);
+                        }
+                    } catch (e) { console.error("Failed to load history from DB for proactive context", e); }
+                }
+
                 const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
 
-                                const lastCallSummary = [...sourceMessages].reverse().find(m => m.type === 'call_summary');
+                const lastCallSummary = [...sourceMessages].reverse().find(m => m.type === 'call_summary');
                 if (lastCallSummary && lastCallSummary.callData && lastCallSummary.callData.conversation) {
-                    // 【核心修复】在生成剧本时，实时判断并替换 {{user}} 为当前人设名
                     const callHistoryText = lastCallSummary.callData.conversation.map(c => {
                         const displayName = c.sender === '{{user}}' ? userNameForPrompt : c.sender;
                         return `${displayName}: ${c.text}`;
@@ -12136,7 +12174,6 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                     finalSystemPrompt += `\n\n[Recent Video Call Transcript]\n${callHistoryText}\n[End of Transcript]`;
                 }
 
-                // 【核心修复】传入 targetChatId，确保在后台触发主动消息时，能正确解析群聊成员名字
                 const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, targetChatId);
                 chatHistoryForPrompt = apiPayloadMessages.map(msg => {
                     let content = '';
@@ -12146,7 +12183,6 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                         content = msg.content;
                     }
 
-                    // 【核心修改】如果是日期分割线，直接返回内容，不加姓名
                     if (content.startsWith('[---')) {
                         return content;
                     }
@@ -12159,29 +12195,28 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                 finalSystemPrompt += `\n\n[RECENT CHAT HISTORY]\n${chatHistoryForPrompt}`;
             }
             // --- END: 重新注入聊天记录上下文 ---
+
             // =================================================================
 // 【【【 核心新增：注入朋友圈上下文 (主动发消息版) 】】】
 // =================================================================
-const aiCharacterName = senderName; // 主动发消息时，senderName 就是 AI 角色名
+const aiCharacterName = senderName; 
 const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 5); 
 
 let momentsContext = "";
 if (momentsData && momentsData.allVisibleMoments.length > 0) {
     momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
     momentsData.allVisibleMoments.forEach((post, i) => {
-         // 【核心修复】：不再将名字替换为 "You" 或其他代词。
-         // 直接使用帖子原始的用户名，确保AI能区分不同的人设（如“阿衍”和“周衍”）。
          let author = post.userName;
          
-         // --- 核心修改：优先读取图片描述 ---
-         let content = post.text || post.content || "";
+         // --- 核心修改：对发帖内容进行脱壳处理 ---
+         let rawContent = post.text || post.content || "";
+         // 【核心修复】剥离所有 HTML 标签，仅保留内部文字
+         let content = rawContent.replace(/<[^>]+>/g, '').trim();
          
          if (post.image) {
              if (post.imageDescription) {
-                 // 如果有AI生成过的描述，直接使用
                  content += ` [图片内容: ${post.imageDescription}]`;
              } else {
-                 // 如果还没有描述，标记为图片
                  content += ` [图片(未描述)]`;
              }
          } else if (post.type === 'video' && !content) {
@@ -12189,32 +12224,26 @@ if (momentsData && momentsData.allVisibleMoments.length > 0) {
          }
          
          if (!content.trim()) content = "[分享]";
-         // --------------------------------
 
          let interactions = "";
-         // 检查点赞
          if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
              interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
          }
+         
          // 检查评论
          if (post.comments.length > 0) {
              const commentsText = post.comments.map(c => {
-                 // 1. 获取原始文本
-                 let rawText = c.text || "";
-                 // 2. 定义专门匹配 HTML/Snippet 代码块的正则
-                 const codeBlockRegex = /(<snippet>[\s\S]*?<\/snippet>)|(<div[\s\S]*?>[\s\S]*?<\/div>)/g;
-                 // 3. 【核心】直接替换为空字符串
-                 let cleanText = rawText.replace(codeBlockRegex, "").trim();
-                 return `${c.user}: ${cleanText}`; 
+                 let rawCommentText = c.text || "";
+                 // 【核心修复】对评论内容也进行脱壳处理，剥离标签保留文字
+                 let cleanCommentText = rawCommentText.replace(/<[^>]+>/g, '').trim();
+                 return `${c.user}: ${cleanCommentText}`; 
              }).join(' | ');
              interactions += ` (Comments: ${commentsText})`;
          }
          
-         // 【核心新增】格式化朋友圈发布时间
          const pDate = new Date(post.timestamp);
          const pTimeStr = `${pDate.getFullYear()}年${pDate.getMonth() + 1}月${pDate.getDate()}日 ${pDate.getHours().toString().padStart(2, '0')}:${pDate.getMinutes().toString().padStart(2, '0')}`;
 
-         // 【核心修改】在摘要中注入 [Posted at: 时间]
          momentsContext += `Post #${i+1} by ${author} [Posted at: ${pTimeStr}]: "${content}"${interactions}\n`;
     });
 }
@@ -13004,16 +13033,28 @@ if (isGroupPersona) {
                 return `Post #${i + 1} (ID: ${post.id}) by ${authorLabel} [Posted at: ${pTimeStr}] ${privacyInfo}: "${contentDescription}" ${imageInfo}\n  Recent Comments:\n${commentsPreview || '  - No comments yet.'}`;
             }).join('\n\n');
             
-            // --- START: 需求 1 & 2 的核心修改 - 加载聊天记录 ---
+            // --- START: 需求 1 & 2 的核心修改 - 加载聊天记录 (数据库修复版) ---
             let chatHistoryForPrompt = '';
             // 【【【【【【 核心修复：重新启用并强化聊天记录加载逻辑 】】】】】】
             if (contextChatId) { // 仅当上下文聊天ID存在时才加载
                 const memoryLength = parseInt(contextChatInfo.memoryLength || 100, 10);
-                const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                
+                // 【关键修复】优先读缓存，缓存没有读数据库
+                let sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                if (sourceMessages.length === 0) {
+                    try {
+                        const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
+                        if (dbData && Array.isArray(dbData)) {
+                            sourceMessages = dbData;
+                            console.log(`[Moments Browse] Loaded ${sourceMessages.length} messages from DB.`);
+                        }
+                    } catch (e) { console.error("DB Read Error", e); }
+                }
+
                 const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
                 
                 // 使用 conversationManager.prepareApiPayload 来正确处理图片、语音等复杂消息
-                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages); 
+                const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, contextChatId); 
                 
                 // 将处理后的消息转换成纯文本剧本格式
                 chatHistoryForPrompt = apiPayloadMessages.map(msg => {
@@ -13029,6 +13070,7 @@ if (isGroupPersona) {
                 }).join('\n');
             }
             // --- END: 需求 1 & 2 的核心修改 ---
+
 
             // ... 省略了 browse_moments 分支前面的代码 ...
 
@@ -13399,11 +13441,23 @@ This API call is an opportunity for you to live your social life. You **MUST** p
             // 【第四步：为发朋友圈的行为，也注入上下文】
             console.log(`[诊断日志] 角色 "${senderName}": 决定主动发布一条朋友圈...`);
             
-            // --- START: 核心修正 - 为发帖行为注入完整的聊天历史上下文 ---
+            // --- START: 核心修正 - 为发帖行为注入完整的聊天历史上下文 (数据库修复版) ---
             let chatHistoryForPrompt = '';
             if (contextChatId) { // contextChatId 是在函数开头部分根据角色身份智能确定的
                 const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
-                const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                
+                // 【关键修复】优先读缓存，缓存没有读数据库
+                let sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                if (sourceMessages.length === 0) {
+                    try {
+                        const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
+                        if (dbData && Array.isArray(dbData)) {
+                            sourceMessages = dbData;
+                            console.log(`[Moments Post] Loaded ${sourceMessages.length} messages from DB.`);
+                        }
+                    } catch (e) { console.error("DB Read Error", e); }
+                }
+
                 const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
                 
                 // 【核心修复】传入 contextChatId，确保后台运行时也能正确识别群聊名字
@@ -13422,6 +13476,7 @@ This API call is an opportunity for you to live your social life. You **MUST** p
                 }).join('\n');
             }
             // --- END: 核心修正 ---
+
 
             // 【【【 核心新增：为发帖行为注入关联角色人设 】】】
             let associatedNpcsPrompt = '';
@@ -13574,8 +13629,35 @@ ${timeContext}
 - **ABSOLUTE FORBIDDANCE:** You are **STRICTLY FORBIDDEN** from posting in the voice or from the perspective of any other character.
 ---
 `;
-            // 将身份锁定指令、上下文、音乐信息和发帖指南拼接在一起
-            const finalPostInstruction = `${identityLockInPrompt}${contextHeader}${momentsWorldBookContent}${musicContext}${postInstruction}`;
+            // 【核心修复】从全局变量 stickers 中提取名称，确保列表真实有效
+            const stickerNamesList = stickers.filter(s => s.type === 'sticker').map(s => `"${s.name}"`).join(', ') || 'None';
+            const emojiNamesList = stickers.filter(s => s.type === 'emoji').map(s => `"${s.name}"`).join(', ') || 'None';
+
+            const mediaProtocol = `
+---
+[STRICT MEDIA PROTOCOL - MOMENTS EDITION]
+You are ENCOURAGED to use emojis and stickers in your Moment text.
+
+**1. AVAILABLE EMOJIS (Inline):**
+[${emojiNamesList}]
+*   **Command:** \`[emoji:ExactName]\`
+*   **Use Case:** Insert into sentences to express emotion.
+
+**2. AVAILABLE STICKERS (Large):**
+[${stickerNamesList}]
+*   **Command:** \`[sticker:ExactName]\`
+*   **Use Case:** Standalone reaction or emphasis.
+
+**[ANTI-HALLUCINATION LAW - UNBREAKABLE]**
+You are **STRICTLY FORBIDDEN** from using any name that is NOT in the lists above.
+*   **WRONG:** \`[emoji:happy]\` (If "happy" is not in the list).
+*   **RIGHT:** \`[emoji:开心]\` (If "开心" is in the list).
+*   **FALLBACK:** If no match is found, use text like \`(开心)\`.
+---
+`;
+
+            // 将身份锁定指令、上下文、音乐信息、表情协议和发帖指南拼接在一起
+            const finalPostInstruction = `${identityLockInPrompt}${contextHeader}${momentsWorldBookContent}${musicContext}${mediaProtocol}${postInstruction}`;
             const systemMessageContent = [{ type: 'text', text: finalPostInstruction }];
             
             finalMessages = [{ role: "system", content: systemMessageContent }];
@@ -13618,11 +13700,23 @@ ${timeContext}
                 });
             }
 
-            // 2. 新增：读取并格式化最近的聊天记录上下文
+            // 2. 新增：读取并格式化最近的聊天记录上下文 (数据库修复版)
             let chatHistoryForTuqu = '';
             if (contextChatId) {
                 const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
-                const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                
+                // 【关键修复】优先读缓存，缓存没有读数据库
+                let sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                if (sourceMessages.length === 0) {
+                    try {
+                        const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
+                        if (dbData && Array.isArray(dbData)) {
+                            sourceMessages = dbData;
+                            console.log(`[Tuqu] Loaded ${sourceMessages.length} messages from DB.`);
+                        }
+                    } catch (e) { console.error("DB Read Error", e); }
+                }
+
                 const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
                 const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, contextChatId);
                 chatHistoryForTuqu = apiPayloadMessages.map(msg => {
@@ -13636,6 +13730,7 @@ ${timeContext}
                     return `${role}: ${content}`;
                 }).join('\n');
             }
+
 
             // 3. 获取兔区数据摘要
             let tuquWorldBookContent = '';
@@ -14119,11 +14214,23 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                 });
             }
 
-            // 2. 新增：读取并格式化最近的聊天记录上下文
+            // 2. 新增：读取并格式化最近的聊天记录上下文 (数据库修复版)
             let chatHistoryForTuqu = '';
             if (contextChatId) {
                 const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
-                const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                
+                // 【关键修复】优先读缓存，缓存没有读数据库
+                let sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                if (sourceMessages.length === 0) {
+                    try {
+                        const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
+                        if (dbData && Array.isArray(dbData)) {
+                            sourceMessages = dbData;
+                            console.log(`[Tuqu] Loaded ${sourceMessages.length} messages from DB.`);
+                        }
+                    } catch (e) { console.error("DB Read Error", e); }
+                }
+
                 const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
                 const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, contextChatId);
                 chatHistoryForTuqu = apiPayloadMessages.map(msg => {
@@ -14137,6 +14244,7 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                     return `${role}: ${content}`;
                 }).join('\n');
             }
+
 
             // 获取兔区数据摘要
             const tuquData = globalTuquData || {};
@@ -14363,7 +14471,7 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                 }
             }
 
-            // 【【【 核心新增：获取该角色的前情提要与聊天记录上下文 】】】
+            // 【【【 核心新增：获取该角色的前情提要与聊天记录上下文 (数据库修复版) 】】】
             let chatHistoryForTuqu = '';
             let preambleForTuqu = '';
             if (contextChatId) {
@@ -14371,7 +14479,21 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                 preambleForTuqu = contextChatInfo.preamble || '';
                 
                 const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
-                const sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                
+                // 【核心修复】优先读缓存，缓存没有读数据库
+                let sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                if (sourceMessages.length === 0) {
+                    try {
+                        // 注意：这里需要 await，因为外层函数已经是 async 的
+                        // 假设 imageStore.getItem 是可用的
+                        const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
+                        if (dbData && Array.isArray(dbData)) {
+                            sourceMessages = dbData;
+                            console.log(`[Specific Post Update] Loaded ${sourceMessages.length} messages from DB.`);
+                        }
+                    } catch (e) { console.error("DB Read Error", e); }
+                }
+
                 const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
                 const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, contextChatId);
                 chatHistoryForTuqu = apiPayloadMessages.map(msg => {
@@ -14394,6 +14516,7 @@ Preamble (Background): ${preambleForTuqu || 'None'}
 ${chatHistoryForTuqu || 'No recent history.'}
 `;
             // 【【【 插入结束 】】】
+
 
             // 2. 构建仅包含当前帖子的上下文
             let singlePostContext = `\n[TARGET THREAD CONTEXT]\nYou are viewing ONLY this specific thread.\n`;
@@ -14500,10 +14623,12 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 
             
             // 4. 发送 (注入了 lifeContext)
+            // 【核心修复】删除了重复的 associatedNpcsPrompt，因为它已经在 specificInstruction 的 [ROLEPLAY SETTING] 部分被正确包含进去了
             finalMessages = [
-                { role: "system", content: (profile.prompt || "") + lifeContext + tuquWorldBookContent + associatedNpcsPrompt + singlePostContext + specificInstruction.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName) },
+                { role: "system", content: (profile.prompt || "") + lifeContext + tuquWorldBookContent + singlePostContext + specificInstruction.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName) },
                 { role: "user", content: `Update the thread "${targetPost.subject}" based on the "${extraOptions.worldview || 'current'}" worldview.` }
             ];
+
         }
 
         if (!finalMessages) {
@@ -14790,84 +14915,77 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                 console.log(`[诊断日志] 角色 "${senderName}": 主动消息解析并执行完毕。`);
 
             } else if (actionType === 'post_moment') {
-                console.log(`[诊断日志] 角色 "${senderName}": 开始解析【主动发帖】指令...`);
+                console.log(`[诊断日志] 角色 "${senderName}": 启动【全字段边界解析】模式...`);
                 try {
-                    const commandRegex = /\[(post_moment):\s*([\s\S]+?)\]/g;
-                    const match = commandRegex.exec(aiResponse);
+                    // 1. 准确定位指令边界，防止被 AI 的其他废话干扰
+                    const startMarker = '[post_moment:';
+                    const startPos = aiResponse.indexOf(startMarker);
+                    const endPos = aiResponse.lastIndexOf(']');
                     
-                    if (match) {
-                        let value = match[2].trim();
-                        
-                        // 1. 基础清理：修复双重转义，截断末尾多余字符
-                        value = value.replace(/\\\\"/g, '\\"'); 
-                        const lastBraceIndex = value.lastIndexOf('}');
-                        if (lastBraceIndex !== -1) {
-                            value = value.substring(0, lastBraceIndex + 1);
-                        }
-                        const cleanJsonString = value.replace(/^```json\s*/, '').replace(/^```/, '').replace(/```$/, '').trim();
-                        
-                        let postData = null;
+                    if (startPos === -1 || endPos === -1) {
+                        console.warn("未找到完整的 post_moment 指令");
+                        return;
+                    }
 
-                        // 【核心方案 1】优先尝试标准 JSON 解析
-                        try {
-                            postData = JSON.parse(cleanJsonString);
-                            console.log("[解析成功] 使用标准 JSON.parse 成功解析发帖数据。");
-                        } catch (jsonError) {
-                            // 【核心方案 2】暴力修复换行符后重试
-                            // AI 生成 HTML 时常会包含真实的换行符，导致 JSON 非法。
-                            // 我们尝试将所有真实换行替换为转义换行 \n
-                            try {
-                                console.warn("[解析降级] 标准解析失败，尝试修复换行符...", jsonError);
-                                const fixedJson = cleanJsonString.replace(/\n/g, "\\n").replace(/\r/g, "");
-                                postData = JSON.parse(fixedJson);
-                                console.log("[解析成功] 换行符修复后解析成功。");
-                            } catch (e2) {
-                                // 【核心方案 3】正则提取 (终极兜底)
-                                console.warn("[解析降级] 修复失败，进入正则提取模式。", e2);
+                    const rawPayload = aiResponse.substring(startPos + startMarker.length, endPos).trim();
 
-                                // 提取 type
-                                const typeMatch = cleanJsonString.match(/"type"\s*:\s*"([^"]+)"/);
-                                
-                                // 定义通用字段提取器 (支持跨行、支持转义引号)
-                                // 解释: "key" \s* : \s* " ( 任意非转义字符 或 转义字符 或 任意字符 )*? "
-                                const extractField = (key) => {
-                                    const regex = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.|[\\s\\S])*?)"`);
-                                    const m = cleanJsonString.match(regex);
-                                    return m ? m[1] : '';
-                                };
+                    // 2. 定义边界锚点提取器 (不依赖 JSON.parse)
+                    const keys = ["type", "text", "content", "signer", "date", "image"];
+                    const data = {};
 
-                                const textVal = extractField('text');
-                                const contentVal = extractField('content');
-                                const signerVal = extractField('signer');
-                                const dateVal = extractField('date');
+                    const cleanValue = (str) => {
+                        if (!str) return "";
+                        return str
+                            .replace(/\\"/g, '"')      // 还原引号
+                            .replace(/\\n/g, '\n')     // 还原转义换行
+                            .replace(/\\\\/g, '\\')    // 还原反斜杠
+                            .replace(/\n/g, '\n')      // 处理真实换行
+                            .trim();
+                    };
 
-                                if (typeMatch) {
-                                    const unescape = (str) => str ? str.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\') : '';
-                                    postData = {
-                                        type: typeMatch[1],
-                                        text: unescape(textVal),
-                                        content: unescape(contentVal),
-                                        signer: unescape(signerVal),
-                                        date: unescape(dateVal)
-                                    };
-                                    console.log("[解析成功] 正则提取成功。", postData);
+                    // 3. 逐个字段扫描提取
+                    keys.forEach(key => {
+                        const pattern = new RegExp(`"${key}"\\s*:\\s*"`);
+                        const match = rawPayload.match(pattern);
+                        if (match) {
+                            const valStart = match.index + match[0].length;
+                            const textAfterStart = rawPayload.substring(valStart);
+                            
+                            // 寻找该字段的结束引号：寻找下一个 ", "键名": 或者末尾的 "}
+                            let valEnd = -1;
+                            const nextKeyRegex = /",\s*"/;
+                            const nextMatch = textAfterStart.match(nextKeyRegex);
+                            
+                            if (nextMatch) {
+                                valEnd = nextMatch.index;
+                            } else {
+                                // 可能是最后一个字段，寻找末尾引号
+                                const endBraceMatch = textAfterStart.match(/"\s*\}\s*$/);
+                                if (endBraceMatch) {
+                                    valEnd = endBraceMatch.index;
+                                } else {
+                                    valEnd = textAfterStart.lastIndexOf('"');
                                 }
                             }
+                            
+                            if (valEnd !== -1) {
+                                data[key] = cleanValue(textAfterStart.substring(0, valEnd));
+                            }
                         }
+                    });
 
-                        // 如果成功获取到了数据，执行发帖
-                        if (postData && postData.type) {
-                            momentsManager.createPostFromAI(senderName, postData);
-                        } else {
-                            throw new Error("无法提取有效的发帖数据 (type字段缺失或解析全失败)。");
-                        }
+                    // 4. 执行发帖
+                    if (data.type) {
+                        console.log("[解析成功] 提取到的数据:", data);
+                        momentsManager.createPostFromAI(senderName, data);
                     } else {
-                         console.warn(`[诊断日志] 角色 "${senderName}": AI意图发帖，但未找到有效的 [post_moment:...] 指令。`);
+                        console.error("[解析失败] 无法从指令中提取 type 字段。原始指令:", rawPayload);
                     }
                 } catch (e) {
-                    console.error(`[诊断日志] 角色 "${senderName}": 解析主动发帖指令失败`, e, aiResponse);
+                    console.error(`[解析崩溃] 错误信息: ${e.message}`, aiResponse);
                 }
             } else { // 这是朋友圈互动（browse_moments）的逻辑
+
 
                 if (aiResponse.trim() === "No action taken.") {
                     console.log(`[诊断日志] 角色 "${senderName}": AI决定不采取行动。`);
@@ -14888,69 +15006,100 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                 }
 
                 // --- 核心修复：把正则改宽，允许匹配任意内容，不强制要求是 JSON 对象 ---
-const momentInteractionRegex = /\[(like_moment|comment_moment|post_moment|send_private_message|forward_moment):\s*({[\s\S]+?}|[^\]]+?)\]/g;
-                let match;
+                // 【核心重构】朋友圈互动指令切片器：智能平衡扫描
+                const responseToScan = cleanedResponse;
+                let searchIndex = 0;
                 let commandsFound = 0;
 
-                while ((match = momentInteractionRegex.exec(cleanedResponse)) !== null) {
-                    commandsFound++;
-                    const command = match[1];
-                    const value = match[2];
+                while (true) {
+                    const startBracket = responseToScan.indexOf('[', searchIndex);
+                    if (startBracket === -1) break;
 
-                    console.log(`[诊断日志] 角色 "${senderName}": 找到指令 #${commandsFound}: ${command}`);
+                    // 【关键修复】不再简单查找下一个 ']'，而是寻找与当前 '[' 匹配的闭合括号
+                    // 因为指令内容（如 post_moment）内部可能包含 JSON 数组的 ']'，简单的 indexOf 会导致截断
+                    let endBracket = -1;
+                    let bracketDepth = 0;
+                    let inString = false;
+
+                    for (let i = startBracket + 1; i < responseToScan.length; i++) {
+                        const char = responseToScan[i];
+                        
+                        // 处理字符串内的字符，防止被误判
+                        if (char === '"' && responseToScan[i-1] !== '\\') {
+                            inString = !inString;
+                            continue;
+                        }
+                        if (inString) continue;
+
+                        if (char === '[') {
+                            bracketDepth++;
+                        } else if (char === ']') {
+                            if (bracketDepth === 0) {
+                                endBracket = i;
+                                break;
+                            }
+                            bracketDepth--;
+                        }
+                    }
+
+                    if (endBracket === -1) break; // 未闭合，跳出
+
+                    const fullCommand = responseToScan.substring(startBracket + 1, endBracket);
+                    searchIndex = endBracket + 1; // 正确移动指针到指令结束之后
+
+                    // 简单校验：必须包含冒号
+                    const colonIndex = fullCommand.indexOf(':');
+                    if (colonIndex === -1) continue;
+
+                    const command = fullCommand.substring(0, colonIndex).trim();
+                    const value = fullCommand.substring(colonIndex + 1).trim();
+                    commandsFound++;
+
+                    console.log(`[诊断日志] 角色 "${senderName}": 正在处理指令 #${commandsFound}: ${command}`);
 
                     if (command === 'like_moment') {
-                        let targetPostId = value.trim();
-                        // 尝试解析，万一AI发神经有时候用JSON有时候用纯文本
-                        if (targetPostId.startsWith('{')) {
-                            try {
-                                const parsed = JSON.parse(targetPostId);
-                                if (parsed.postId) targetPostId = parsed.postId;
-                            } catch (e) {}
-                        }
+                        let targetPostId = value.replace(/["'{}]/g, '').replace('postId:', '').trim();
                         momentsManager.handleInteractionFromAI(senderName, 'like', { postId: targetPostId });
-                    } else if (command === 'comment_moment') {
+                    } 
+                    else if (command === 'comment_moment' || command === 'post_moment') {
                         try {
-                            // --- 终极修复 V3.0: 使用能处理转义和换行的健壮正则表达式 ---
+                            // 使用边界锚点法提取 JSON 字段，无视内部嵌套的大括号
+                            const keys = ["postId", "content", "replyTo", "type", "text", "signer", "date", "image"];
+                            const data = {};
+                            const clean = (str) => str ? str.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\').replace(/\n/g, '\n').trim() : '';
 
-                            // 定义一个可以匹配 JSON 字符串值（包括内部的转义引号和换行符）的正则表达式部分
-                            const jsonStringValueRegexPart = "((?:\\\\.|[^\"\\\\])*)";
+                            keys.forEach(key => {
+                                const pattern = new RegExp(`"${key}"\\s*:\\s*"`);
+                                const m = value.match(pattern);
+                                if (m) {
+                                    const vStart = m.index + m[0].length;
+                                    const afterV = value.substring(vStart);
+                                    let vEnd = -1;
+                                    const nextK = afterV.match(/",\s*"/);
+                                    if (nextK) vEnd = nextK.index;
+                                    else {
+                                        const endB = afterV.match(/"\s*\}\s*$/);
+                                        vEnd = endB ? endB.index : afterV.lastIndexOf('"');
+                                    }
+                                    if (vEnd !== -1) data[key] = clean(afterV.substring(0, vEnd));
+                                }
+                            });
 
-                            // 使用上面的部分来构建针对每个字段的正则表达式
-                            const postIdMatch = value.match(new RegExp(`"postId"\\s*:\\s*"` + jsonStringValueRegexPart));
-                            const contentMatch = value.match(new RegExp(`"content"\\s*:\\s*"` + jsonStringValueRegexPart));
-                            const replyToMatch = value.match(new RegExp(`"replyTo"\\s*:\\s*"` + jsonStringValueRegexPart));
-
-                            // 定义一个反转义函数，用于清理捕获到的字符串
-                            const unescape = (str) => str ? str.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\') : '';
-                            
-                            const postId = postIdMatch ? unescape(postIdMatch[1]) : null;
-                            const content = contentMatch ? unescape(contentMatch[1]) : null;
-                            const replyTo = replyToMatch ? unescape(replyToMatch[1]) : null;
-
-                            if (postId && content) {
-                                const commentData = {
-                                    postId: postId,
-                                    content: content,
-                                    replyTo: replyTo
-                                };
-                                momentsManager.handleInteractionFromAI(senderName, 'comment', commentData);
-                            } else {
-                                throw new Error("无法从AI的响应中提取出有效的 postId 或 content。");
+                            if (command === 'comment_moment' && data.postId && data.content) {
+                                momentsManager.handleInteractionFromAI(senderName, 'comment', data);
+                            } else if (command === 'post_moment' && data.type) {
+                                momentsManager.createPostFromAI(senderName, data);
                             }
-                        } catch (e) {
-                            console.error(`[诊断日志] 角色 "${senderName}": 解析评论指令失败`, e, value);
-                        }
-                    } else if (command === 'forward_moment') { // 【核心新增：处理转发指令】
+                        } catch (e) { console.error(`[指令解析失败] ${command}:`, e); }
+                    }
+                    else if (command === 'forward_moment') {
                         try {
                             const forwardPayload = JSON.parse(value);
-                            if (forwardPayload.postId) {
-                                momentsManager.handleForwardFromAI(senderName, forwardPayload);
-                            }
-                        } catch (e) {
-                            console.error(`[诊断日志] 角色 "${senderName}": 解析转发指令失败`, e, value);
-                        }
-                    } else if (command === 'send_private_message') {
+                            if (forwardPayload.postId) momentsManager.handleForwardFromAI(senderName, forwardPayload);
+                        } catch (e) { console.error(`[转发解析失败]:`, e); }
+                    }
+                    else if (command === 'send_private_message') {
+
                     try {
                         let messageContent = value.trim();
                         
@@ -18355,16 +18504,24 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
         function saveConversation() {
             if (!chatState.chatId) return;
 
+            // 【核心修复：防清空保险丝】
+            // 如果内存中的历史记录为空，但我们不是在执行“清空聊天记录”操作
+            // 那么这极有可能是数据加载失败了。此时绝对禁止保存，否则会覆盖硬盘上的数据！
+            if (fullMessageHistory.length === 0) {
+                // 检查一下硬盘里是不是真的没数据
+                const lsData = localStorage.getItem(`conversation_${chatState.chatId}`);
+                // 如果硬盘里有数据(字符串长度>2，即不是"[]")，但内存里是空的，说明出事了，拦截！
+                if (lsData && lsData.length > 2) {
+                    console.error("[CRITICAL SAFETY] Attempted to save empty history over existing data. BLOCKED.");
+                    return;
+                }
+                // 注意：这里无法同步检查IndexedDB，但LS检查已经能拦截大部分事故
+            }
+
             console.log(`[诊断探针] 1. 开始执行 saveConversation，目标 chat ID: ${chatState.chatId}`);
             
             try {
-                // 打印出即将被保存的数据，让我们看看它在保存前一刻是否正确
-                console.log('[诊断探针] 2. 即将被保存的 fullMessageHistory 内容:', JSON.parse(JSON.stringify(fullMessageHistory)));
-
                 const key = `conversation_${chatState.chatId}`;
-                // const dataToSave = JSON.stringify(fullMessageHistory); // 这行删掉或注释，下面逻辑变了
-
-                console.log(`[诊断探针] 3. 准备保存。Key: ${key}, 消息条数: ${fullMessageHistory.length}`);
                 
                 // 【核心修改】智能保存逻辑 (防复活版)
                 try {
@@ -18372,10 +18529,8 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                     localStorage.setItem(key, JSON.stringify(fullMessageHistory));
                     
                     // 【关键修复】如果 LS 保存成功，必须把数据库里的旧备份删掉！
-                    // 否则下次加载时，旧备份会覆盖新数据，导致删除的消息复活。
                     imageStore.removeItem(key).catch(e => console.warn("清理旧数据库失败", e));
                     
-                    console.log(`[诊断探针] 4. localStorage 保存成功，旧数据库已清理。`);
                 } catch (e) {
                     // 2. 如果 LS 满了，存入 IndexedDB
                     if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
@@ -18383,30 +18538,27 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                         
                         imageStore.setItem(key, fullMessageHistory).then(() => {
                             // 【关键修复】如果存入了数据库，必须把 LS 里的残余数据删掉！
-                            // 保持唯一真理源。
                             localStorage.removeItem(key);
-                            console.log(`[诊断探针] IndexedDB 保存成功。`);
                         }).catch(err => {
                             console.error("IndexedDB 保存也失败:", err);
-                            alert("保存失败：存储空间严重不足！");
+                            // 此时不弹窗打扰用户，因为addMessage已经尝试过保存了
                         });
                     } else {
                         console.error('[诊断探针] 致命错误：', e);
-                        alert(`保存聊天记录失败！\n错误信息: ${e.message}`);
                     }
                 }
 
             } catch (error) {
-                // 外层捕获 (针对 JSON.stringify 可能的错误)
                 console.error('[诊断探针] 致命错误：', error);
             }
             
+            // 更新聊天列表预览
             const chatInList = chatList.find(c => c.id === chatState.chatId);
             if (chatInList) {
                 const lastMsg = [...chatState.messages].filter(m => m.type !== 'time_divider' && m.side !== 'system').pop();
                 if (lastMsg) {
                     let lastMessageText = lastMsg.text;
-                    if(lastMsg.type !== 'text') { const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'transfer': '[转账]', 'red_packet': '[红包]', 'photo-description': '[图文]', 'video': '[视频]', 'location': '[位置]', 'gift': '[礼物]', 'pay_for_me': '[代付]', 'call_summary': '[视频通话]' }; lastMessageText = typeMap[lastMsg.type] || '[消息]'; }
+                    if(lastMsg.type !== 'text') { const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'transfer': '[转账]', 'red_packet': '[红包]', 'photo-description': '[图文]', 'video': '[视频]', 'location': '[位置]', 'gift': '[礼物]', 'pay_for_me': '[代付]', 'call_summary': '[视频通话]', 'tuqu_share': '[分享]' }; lastMessageText = typeMap[lastMsg.type] || '[消息]'; }
                     if(lastMsg.side === 'sent') lastMessageText = "{{user}}: " + lastMessageText;
                     else if(contactInfo.isGroup && lastMsg.sender) lastMessageText = `${lastMsg.sender}: ${lastMessageText}`;
                     chatInList.lastMessage = lastMessageText.length > 25 ? lastMessageText.substring(0, 25) + '...' : lastMessageText;
@@ -18417,8 +18569,8 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                 saveChatList();
                 renderChatList();
             }
-            console.log('[诊断探针] 5. saveConversation 函数执行完毕。');
         }
+
 
         // 【核心修改】增加 async 关键字
         async function initializeFromStorage(chatId) {
@@ -21509,38 +21661,26 @@ const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 
             momentsData.allVisibleMoments.forEach((post, i) => {
                  let authorLabel = post.userName;
 
-                 // =================================================================
-                 // 【【【【【【 全新的、绝对严格的身份识别逻辑 】】】】】】
-                 // =================================================================
-                 // 这是我们解决问题的核心。它遵循一个绝对严格的优先级顺序来判断身份。
-
-                 // 优先级 1：是不是AI自己发的？
                  if (post.userName === aiCharacterName) {
                      authorLabel = "You (yourself)";
                  } 
-                 // 优先级 2：是不是【当前正在和我聊天的这个你】？
                  else if (knownMap.has(post.userName) && knownMap.get(post.userName).includes('(the user')) {
                      authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
                  } 
-                 // 优先级 3 (最关键的一步)：是不是【你的其他马甲】？
-                 // 如果是，就强制打上“(陌生人)”标签，让AI彻底失忆！
                  else if (allUserPersonaNames.includes(post.userName)) {
                      authorLabel = `${post.userName} (Stranger/Other User)`;
                  }
-                 // 优先级 4：是不是AI认识的其他熟人（比如NPC、群友）？
                  else if (knownMap.has(post.userName)) {
                      authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
                  } 
-                 // 优先级 5：如果以上都不是，那它就是个纯路人。
                  else {
                      authorLabel = `${post.userName} (Stranger/Other User)`;
                  }
-                 // =================================================================
-                 // 【【【【【【 身份识别逻辑结束 】】】】】】
-                 // =================================================================
                  
-                 // --- 核心修改：优先读取图片描述 ---
-                 let content = post.text || post.content || ""; 
+                 // --- 核心修改：对发帖内容进行脱壳处理 ---
+                 let rawContent = post.text || post.content || ""; 
+                 // 【核心修复】剥离所有 HTML 标签，仅保留内部文字
+                 let content = rawContent.replace(/<[^>]+>/g, '').trim();
                  
                  if (post.image) {
                      if (post.imageDescription) {
@@ -21553,29 +21693,26 @@ const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 
                  }
                  
                  if (!content.trim()) content = "[分享]";
-                 // --------------------------------
 
                  let interactions = "";
-                 // 检查点赞
                  if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
                      interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
                  }
+                 
                  // 检查评论
                  if (post.comments.length > 0) {
                      const commentsText = post.comments.map(c => {
-                         let rawText = c.text || "";
-                         const codeBlockRegex = /(<snippet>[\s\S]*?<\/snippet>)|(<div[\s\S]*?>[\s\S]*?<\/div>)/g;
-                         let cleanText = rawText.replace(codeBlockRegex, "").trim();
-                         return `${c.user}: ${cleanText}`; 
+                         let rawCommentText = c.text || "";
+                         // 【核心修复】对评论内容也进行脱壳处理，剥离标签保留文字
+                         let cleanCommentText = rawCommentText.replace(/<[^>]+>/g, '').trim();
+                         return `${c.user}: ${cleanCommentText}`; 
                      }).join(' | ');
                      interactions += ` (Comments: ${commentsText})`;
                  }
                  
-                 // 【核心新增】格式化朋友圈发布时间
                  const pDate = new Date(post.timestamp);
                  const pTimeStr = `${pDate.getFullYear()}年${pDate.getMonth() + 1}月${pDate.getDate()}日 ${pDate.getHours().toString().padStart(2, '0')}:${pDate.getMinutes().toString().padStart(2, '0')}`;
 
-                 // 【核心修改】在摘要中注入 [Posted at: 时间]
                  momentsContext += `Post #${i+1} by ${authorLabel} [Posted at: ${pTimeStr}]: "${content}"${interactions}\n`;
             });
             }
@@ -23816,209 +23953,173 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
             }
         }
         async function addMessage(msgData, targetChatId = null) {
-            // 【核心修复】全局空消息拦截器
-            // 如果是文本消息，且内容为空（或只包含空白字符），直接丢弃，绝不入库
+            // 1. 确定目标聊天ID
+            const activeChatId = chatState.chatId;
+            const finalTargetChatId = targetChatId || activeChatId;
+
+            // 2. 初始化消息元数据 (ID, 时间戳, 表态容器)
+            msgData.id = msgData.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            if (!msgData.timestamp) msgData.timestamp = timeManager.getCurrentTimestamp();
+            if (!msgData.reactions) msgData.reactions = [];
+            
+            // 同步模拟时间
+            simulatedCurrentTime = msgData.timestamp;
+
+            // 【核心修复：空消息拦截】
             if (msgData.type === 'text') {
                 const cleanText = (msgData.text || '').replace(/\s/g, '');
                 if (cleanText.length === 0) {
-                    console.warn("[System] Blocked empty text message from entering database.");
+                    console.warn("[System] Blocked empty text message.");
                     return;
                 }
             }
 
-            const activeChatId = chatState.chatId;
-            const finalTargetChatId = targetChatId || activeChatId;
-
-            const isRegularMessage = msgData.side !== 'system';
-
-            const isCurrentChat = finalTargetChatId === activeChatId && document.getElementById('page-conversation').classList.contains('active');
-
-            // 【新逻辑】如果不是当前聊天，或者页面不可见，统一走后台逻辑
-            if (!isCurrentChat) {
-                // --- 后台静默处理逻辑 (保持不变) ---
-                let backgroundMessages = loadFromLocalStorage(`conversation_${finalTargetChatId}`, []);
-                
-                msgData.id = msgData.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-                if (!msgData.timestamp) msgData.timestamp = Date.now();
-                
-                backgroundMessages.push(msgData);
-                saveToLocalStorage(`conversation_${finalTargetChatId}`, backgroundMessages);
-
-                const chatInList = chatList.find(c => c.id === finalTargetChatId);
-                if (chatInList) {
-                    let lastMessageText = msgData.text;
-                     if(msgData.type !== 'text') { const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'transfer': '[转账]', 'red_packet': '[红包]', 'video': '[视频]', 'location': '[位置]', 'gift': '[礼物]', 'pay_for_me': '[代付]'}; lastMessageText = typeMap[msgData.type] || '[新消息]'; }
-                    if(msgData.sender && chatInList.type === '群聊') lastMessageText = `${msgData.sender}: ${lastMessageText}`;
-
-                    chatInList.lastMessage = lastMessageText.length > 25 ? lastMessageText.substring(0, 25) + '...' : lastMessageText;
-
-                    chatInList.timestamp = formatTimestamp(msgData.timestamp).split(' ')[0];
-                    chatInList.unreadCount = (chatInList.unreadCount || 0) + 1;
-                    
-                    const index = chatList.indexOf(chatInList);
-                    if (index > 0) {
-                        chatList.splice(index, 1);
-                        chatList.unshift(chatInList);
+            // =================================================================
+            // 【【【 核心安全保存逻辑 (READ-MODIFY-WRITE) 】】】
+            // =================================================================
+            
+            // A. 先从硬盘加载“绝对真理” (优先LS，失败查DB)
+            let safeHistory = loadFromLocalStorage(`conversation_${finalTargetChatId}`, []);
+            if (safeHistory.length === 0) {
+                try {
+                    const dbData = await imageStore.getItem(`conversation_${finalTargetChatId}`);
+                    if (dbData && Array.isArray(dbData)) {
+                        safeHistory = dbData;
                     }
-                    saveChatList();
+                } catch (e) { console.error("DB Read Error in addMessage", e); }
+            }
+
+            // B. 在完整历史中追加新消息
+            safeHistory.push(msgData);
+
+            // C. 安全写回硬盘 (优先LS，超限存DB)
+            const storageKey = `conversation_${finalTargetChatId}`;
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(safeHistory));
+                // 如果存入LS成功，务必清理DB中的旧副本，防止数据版本冲突
+                await imageStore.removeItem(storageKey);
+            } catch (e) {
+                if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
+                    console.warn(`LocalStorage full, saving chat ${finalTargetChatId} to IndexedDB.`);
+                    await imageStore.setItem(storageKey, safeHistory);
+                    localStorage.removeItem(storageKey); // 清理LS残余
+                } else {
+                    console.error("Critical Save Error:", e);
+                    await customAlert("保存失败！存储空间可能不足。");
+                    return; // 保存失败则终止，防止UI不同步
+                }
+            }
+            // =================================================================
+
+            // 3. 更新 UI 状态 (如果用户正在看这个聊天)
+            const isCurrentChat = (finalTargetChatId === activeChatId) && document.getElementById('page-conversation').classList.contains('active');
+            
+            if (isCurrentChat) {
+                // 同步内存中的全局变量
+                fullMessageHistory = safeHistory;
+                chatState.messages = fullMessageHistory.slice(-40); // 仅保持最近40条在渲染池
+
+                // 播放提示音 (仅接收到的非系统消息)
+                if (msgData.side === 'received' && msgData.type !== 'time_divider' && msgData.side !== 'system') {
+                    setTimeout(() => {
+                        if (window.app && window.app.playNotificationSound) {
+                            window.app.playNotificationSound();
+                        }
+                    }, 100);
                 }
 
+                // 检查是否需要时间分割线
+                const TIME_GAP = 3 * 60 * 1000;
+                // 注意：这里要检查倒数第二条，因为新消息已经push进去了
+                const lastMsgIndex = chatState.messages.length - 2;
+                if (lastMsgIndex >= 0) {
+                    const lastMsg = chatState.messages[lastMsgIndex];
+                    if (msgData.timestamp - lastMsg.timestamp > TIME_GAP) {
+                        addMessageToDOM({
+                            id: `time-render-${msgData.timestamp}`,
+                            type: 'time_divider',
+                            text: formatTimestamp(msgData.timestamp),
+                            timestamp: msgData.timestamp
+                        });
+                    }
+                }
+
+                // 渲染新消息气泡
+                addMessageToDOM(msgData);
+                
+                // 滚动到底部
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+                // 处理系统消息对状态的影响
+                if (msgData.side === 'system' && msgData.type !== 'time_divider') {
+                    processSystemMessageForState(msgData.text);
+                }
+
+                // 自动回复逻辑
+                if (msgData.side === 'received' && !contactInfo.isGroup && autoReplySettings.enabled && autoReplySettings.message) {
+                    setTimeout(async () => {
+                        await handleSendMessageAttempt('text', autoReplySettings.message);
+                        autoReplySettings.enabled = false;
+                        saveAutoReplySettings();
+                        await addMessage({ type: 'system', side: 'system', text: '自动回复已发送，现已关闭。' }); 
+                    }, 1000);
+                }
+
+                // 触发自动总结检查
+                try {
+                    const chatInfo = loadFromLocalStorage(`chat_info_${finalTargetChatId}`, {});
+                    const interval = parseInt(chatInfo.autoSummaryInterval || 0, 10);
+                    if (interval > 0) {
+                        const lastSummaryRounds = parseInt(chatInfo.lastSummaryRoundCount || 0, 10);
+                        const currentTotalRounds = fullMessageHistory.filter(m => m.side === 'sent' && m.type !== 'system').length;
+                        if ((currentTotalRounds - lastSummaryRounds) >= interval) {
+                            if (!summaryLocks[finalTargetChatId]) {
+                                summaryLocks[finalTargetChatId] = true;
+                                generateSummary(finalTargetChatId, true);
+                            }
+                        }
+                    }
+                } catch (e) { console.error(e); summaryLocks[finalTargetChatId] = false; }
+
+            } else {
+                // 如果不在当前聊天，发送横幅通知
+                const chatInList = chatList.find(c => c.id === finalTargetChatId);
+                const unread = chatInList ? (chatInList.unreadCount || 0) + 1 : 1;
+                showNotificationBanner(finalTargetChatId, msgData, unread);
+            }
+
+            // 4. 更新聊天列表预览 (Last Message)
+            const chatInList = chatList.find(c => c.id === finalTargetChatId);
+            if (chatInList) {
+                let lastMessageText = msgData.text;
+                if(msgData.type !== 'text') { 
+                    const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'transfer': '[转账]', 'red_packet': '[红包]', 'video': '[视频]', 'location': '[位置]', 'gift': '[礼物]', 'pay_for_me': '[代付]', 'photo-description': '[图文]', 'tuqu_share': '[分享]' }; 
+                    lastMessageText = typeMap[msgData.type] || '[新消息]'; 
+                }
+                if(msgData.sender && chatInList.type === '群聊') lastMessageText = `${msgData.sender}: ${lastMessageText}`;
+
+                chatInList.lastMessage = lastMessageText.length > 25 ? lastMessageText.substring(0, 25) + '...' : lastMessageText;
+                chatInList.timestamp = formatTimestamp(msgData.timestamp).split(' ')[0];
+                
+                if (!isCurrentChat) {
+                    chatInList.unreadCount = (chatInList.unreadCount || 0) + 1;
+                }
+                
+                // 将该聊天置顶到列表首位
+                const index = chatList.indexOf(chatInList);
+                if (index > 0) {
+                    chatList.splice(index, 1);
+                    chatList.unshift(chatInList);
+                }
+                saveChatList();
+                
+                // 如果在聊天列表页，刷新列表
                 if (document.getElementById('page-chat').classList.contains('active')) {
                     renderChatList();
                 }
-                showNotificationBanner(finalTargetChatId, msgData, chatInList.unreadCount);
-                return; // 后台处理完成，必须终止函数
-            }
-
-            // --- 【全新】实时增量更新逻辑 ---
-            msgData.id = msgData.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            if (!msgData.timestamp) msgData.timestamp = timeManager.getCurrentTimestamp();
-            // 【核心新增】初始化表态数据口袋，让消息能存下表情
-            if (!msgData.reactions) msgData.reactions = [];
-            simulatedCurrentTime = msgData.timestamp;
-
-            // 【新增：播放提示音 (修复版)】
-            // 条件：收到消息 + 不是系统消息 + 不是时间分割线
-            if (msgData.side === 'received' && msgData.type !== 'time_divider' && msgData.side !== 'system') {
-                setTimeout(() => {
-                    // 核心修复：直接调用 window.app 上的方法，不再依赖 appearanceManager 变量
-                    if (window.app && window.app.playNotificationSound) {
-                        window.app.playNotificationSound();
-                    }
-                }, 100);
-            }
-
-            // 更新数据数组
-            const existingIndex = chatState.messages.findIndex(m => m.id === msgData.id);
-            // **核心修改：同时检查并更新两个数组**
-            const fullHistoryIndex = fullMessageHistory.findIndex(m => m.id === msgData.id);
-
-            if (existingIndex > -1) {
-                // 更新“显示用”数组
-                chatState.messages[existingIndex] = { ...chatState.messages[existingIndex], ...msgData };
-                
-                // 同时更新“完整历史”数组
-                if (fullHistoryIndex > -1) {
-                    fullMessageHistory[fullHistoryIndex] = { ...fullMessageHistory[fullHistoryIndex], ...msgData };
-                }
-
-
-                // 【核心性能修正】直接在DOM中找到旧消息并替换它
-                const oldWrapper = messagesContainer.querySelector(`[data-message-id="${msgData.id}"]`);
-                if (oldWrapper) {
-                    // 创建一个新的DOM元素来替换旧的
-                    const tempContainer = document.createElement('div');
-                    addMessageToDOM(chatState.messages[existingIndex]); // addMessageToDOM现在会把新元素添加到messagesContainer末尾
-                    const newWrapper = messagesContainer.lastElementChild; // 获取刚刚添加的新元素
-                    
-                    // 用新的替换旧的，并清理
-                    if(newWrapper) {
-                        oldWrapper.replaceWith(newWrapper);
-                    } else {
-                         reRenderMessages(); // 如果新元素创建失败，则回退到全局刷新
-                    }
-                } else {
-                    // 如果找不到旧的DOM元素，作为备用方案，才进行完整重绘
-                    reRenderMessages();
-                }
-
-            } else {
-                // 检查是否需要添加时间分割线
-                const TIME_GAP = 3 * 60 * 1000;
-                const lastMessage = chatState.messages[chatState.messages.length - 1];
-                if (!lastMessage || (msgData.timestamp - lastMessage.timestamp > TIME_GAP)) {
-                     addMessageToDOM({
-                        id: `time-render-${msgData.timestamp}`,
-                        type: 'time_divider',
-                        text: formatTimestamp(msgData.timestamp),
-                        timestamp: msgData.timestamp
-                    });
-                }
-                // 直接向DOM追加新消息
-                addMessageToDOM(msgData);
-                // 向“显示用”数组追加新消息
-                chatState.messages.push(msgData);
-                // **同时向“完整历史”数组追加新消息**
-                fullMessageHistory.push(msgData);
-            }
-            
-            // 确保滚动到底部
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-            if (msgData.side === 'system' && msgData.type !== 'time_divider') {
-                processSystemMessageForState(msgData.text);
-            }
-
-            // 自动回复逻辑保持不变
-            if (msgData.side === 'received' && !contactInfo.isGroup && autoReplySettings.enabled && autoReplySettings.message) {
-                setTimeout(async () => {
-                    await handleSendMessageAttempt('text', autoReplySettings.message);
-                    autoReplySettings.enabled = false;
-                    saveAutoReplySettings();
-                    await addMessage({ type: 'system', side: 'system', text: '自动回复已发送，现已关闭。' }); 
-                }, 1000);
-            }
-            
-          // 【关键】不再调用 reRenderMessages()项，而是直接保存
-            saveConversation();
-
-            // 【核心修复：直接调用版】
-            try {
-                // 1. 重新读取最新的配置
-                const chatInfo = loadFromLocalStorage(`chat_info_${finalTargetChatId}`, {});
-                const interval = parseInt(chatInfo.autoSummaryInterval || 0, 10);
-                
-                // 2. 强制打印日志
-                console.log(`[自动总结检查] 聊天ID: ${finalTargetChatId}, 设定间隔: ${interval}`);
-
-                // 只有设置了间隔且大于0时才执行检查
-                if (interval > 0) {
-                    // 3. 获取上次总结时的轮数
-                    const lastSummaryRounds = parseInt(chatInfo.lastSummaryRoundCount || 0, 10);
-                    
-                    // 4. 获取当前聊天记录
-                    let currentHistory = [];
-                    if (isCurrentChat) {
-                        currentHistory = fullMessageHistory;
-                    } else {
-                        currentHistory = loadFromLocalStorage(`conversation_${finalTargetChatId}`, []);
-                    }
-
-                    // 5. 计算当前总轮数 (只计算用户发送的消息，且排除系统指令)
-                    const currentTotalRounds = currentHistory.filter(m => 
-                        m.side === 'sent' && 
-                        m.type !== 'system'
-                    ).length;
-
-                    // 6. 计算差值
-                    const diff = currentTotalRounds - lastSummaryRounds;
-
-                    console.log(`[自动总结详情] 当前轮数: ${currentTotalRounds}, 上次基准: ${lastSummaryRounds}, 差值: ${diff}`);
-
-                    // 7. 检查是否达到阈值
-                                        // 检查轮数差值是否达到阈值
-                    if ((currentTotalRounds - lastSummaryRounds) >= interval) {
-                        // 【核心修复】检查锁状态：如果正在总结中，直接跳过！
-                        if (summaryLocks[finalTargetChatId]) {
-                            console.log(`[自动总结] 拦截重复触发：当前已有总结任务正在运行。`);
-                            return;
-                        }
-
-                        console.log(`[Auto Summary] Triggering summary for chat ${finalTargetChatId}. Round Diff: ${currentTotalRounds - lastSummaryRounds} >= ${interval}`);
-                        
-                        // 【核心修复】立即上锁！
-                        summaryLocks[finalTargetChatId] = true;
-
-                        // 调用函数
-                        generateSummary(finalTargetChatId, true);
-                    }
-                }
-            } catch (e) {
-                console.error("[Auto Summary Check Failed]", e);
-                // 如果出错，也要防止死锁
-                summaryLocks[finalTargetChatId] = false;
             }
         }
+
 
 
 
@@ -30231,12 +30332,17 @@ const momentsManager = (function() {
                 return; 
             }
 
+            // 【修复】如果数据还没加载好，直接跳过，防止崩溃
+            if (!feedData || !Array.isArray(feedData)) return;
+
             const updatedPostIds = new Set();
 
             feedData.forEach(post => {
                 if (!isPostVisibleToUser(post, currentPersonaName)) {
                     return;
                 }
+                // ...
+
 
                 const postTimestamp = new Date(post.timestamp).getTime();
                 if (postTimestamp > lastCheckedTimestamp && post.userName !== currentPersonaName) {
@@ -30453,22 +30559,40 @@ const momentsManager = (function() {
                                           textContent.includes('<style>') || 
                                           textContent.startsWith('<div');
 
+                        // 【核心新增】朋友圈标签解析器
+                                                // 1. 定义统一的标签解析函数
+                        const parseMomentsTags = (text) => {
+                            if (!text) return "";
+                            return text.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                                const item = stickers.find(s => s.name === name.trim() && s.type === type.toLowerCase());
+                                if (item) {
+                                    if (type.toLowerCase() === 'emoji') {
+                                        return `<img src="${item.url}" class="inline-emoji" style="height:1.4em; vertical-align:middle; margin:0 2px;">`;
+                                    } else {
+                                        return `<img src="${item.url}" style="max-width:120px; max-height:120px; display:block; margin:8px 0; border-radius:8px;">`;
+                                    }
+                                }
+                                return match;
+                            });
+                        };
+
                         if (isHtmlBlock) {
-                            // 如果包含 <snippet> 标签，将其剥离，只保留内部的 HTML/CSS
-                            // 这样可以防止 <snippet> 标签本身干扰布局
-                            if (textContent.includes('<snippet>')) {
-                                textContent = textContent.replace(/<snippet>/g, '').replace(/<\/snippet>/g, '');
+                            // 2. 如果是 HTML 块，先剥离 snippet 标签
+                            let htmlContent = textContent;
+                            if (htmlContent.includes('<snippet>')) {
+                                htmlContent = htmlContent.replace(/<snippet>/g, '').replace(/<\/snippet>/g, '');
                             }
-                            
-                            // 直接渲染 HTML，这样 <style> 标签就能生效，<div> 也能正常显示
-                            postBody.innerHTML = textContent;
+                            // 【核心修复】关键：先解析表情标签，再赋值给 innerHTML
+                            postBody.innerHTML = parseMomentsTags(htmlContent);
                         } else {
-                            // 纯文本模式：保持原样，包裹在 post-content-text 中以保留换行
+                            // 3. 如果是纯文本
                             const textDiv = document.createElement('div');
                             textDiv.className = 'post-content-text';
-                            textDiv.innerHTML = textContent;
+                            // 【核心修复】关键：先解析表情标签，再处理换行，最后赋值
+                            textDiv.innerHTML = parseMomentsTags(textContent).replace(/\n/g, '<br>');
                             postBody.appendChild(textDiv);
                         }
+
                     }
                 switch (post.type) {
                    
@@ -31012,6 +31136,25 @@ const momentsManager = (function() {
         publishBtn.addEventListener('click', () => {
             publishPage.classList.add('visible');
             mainTextInput.value = '';
+
+            // 【核心新增】绑定发布页表情按钮
+            const emojiBtn = appRoot.querySelector('#moments-publish-sticker-btn');
+            if (emojiBtn) {
+                // 先移除旧事件防止重复绑定
+                emojiBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    stickerManager.openPanel((name, type) => {
+                        const start = mainTextInput.selectionStart;
+                        const end = mainTextInput.selectionEnd;
+                        const text = mainTextInput.value;
+                        const tag = `[${type}:${name}]`;
+                        mainTextInput.value = text.substring(0, start) + tag + text.substring(end);
+                        mainTextInput.focus();
+                        mainTextInput.setSelectionRange(start + tag.length, start + tag.length);
+                        updatePublishButtonState(); // 触发发布按钮高亮
+                    });
+                };
+            }
             
             publishInputContainer.querySelectorAll('textarea, input[type="text"]').forEach(input => input.value = '');
             
@@ -31336,13 +31479,21 @@ sendCommentBtn.addEventListener('click', () => {
         
         // 【核心修改】支持从大容量数据库读取
         async function loadFeed() { 
-            feedData = loadFromLocalStorage('moments_feed_data', null);
-            if (!feedData) {
+            // 【修复】默认值改为空数组 []，绝对不能是 null
+            feedData = loadFromLocalStorage('moments_feed_data', []); 
+            
+            // 如果本地存储没读到东西（空数组），再去数据库捞
+            if (!feedData || feedData.length === 0) {
                 try {
                     const dbData = await imageStore.getItem('moments_feed_data');
-                    feedData = dbData || [];
+                    // 如果数据库也没捞到，保底为空数组
+                    if (dbData) {
+                        feedData = dbData;
+                    }
                 } catch(e) { feedData = []; }
             }
+            // ...
+
             // 确保读取后刷新界面
             if (document.getElementById('tab-content-moments').classList.contains('active')) {
                 renderFeed();
@@ -31382,6 +31533,12 @@ sendCommentBtn.addEventListener('click', () => {
         }
 
         async function getRecentMomentsForAI(characterName, limit = 5) {
+            // 【核心修复】如果内存中没有朋友圈数据，强制从数据库加载！
+            if (!feedData || feedData.length === 0) {
+                console.log("[Moments] Feed data is empty in memory, forcing reload from DB...");
+                await loadFeed();
+            }
+
             const senderName = characterName;
 
             console.log(`[诊断日志] 角色 "${senderName}" 开始检查朋友圈...`);
@@ -31456,11 +31613,15 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
 ---
 `;
             
+            // 【修复】如果 feedData 为空，给它一个空数组保底
+            if (!feedData) feedData = [];
+
             const allVisibleMoments = feedData.filter(post => {
                 return isPostVisibleToUser(post, senderName);
             });
 
             const recentMoments = allVisibleMoments.slice(0, limit);
+
             console.log(`[诊断日志] 结果: "${senderName}" 看到了 ${recentMoments.length} 条朋友圈。`);
             
             const imagePayloads = [];
@@ -31479,15 +31640,17 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
                     authorLabel = `${post.userName} (陌生人)`;
                 }
 
-                const commentsPreview = post.comments.slice(-3).map(c => {
+                // 【核心修复】将评论可见深度从 3 条增加到 10 条，确保 AI 不会“看完就忘”
+                const commentsPreview = post.comments.slice(-10).map(c => {
                     let commenterLabel = c.user;
                     if (c.user === mainUserName) { commenterLabel = `${c.user} (the user)`; }
+                    
                     const rawText = c.text.trim();
-                    let simplifiedContent = rawText;
-                    const htmlBlockRegex = /(<snippet>[\s\S]*?<\/snippet>)|(<div[\s\S]*?>[\s\S]*?<\/div>)/g;
-                    if (htmlBlockRegex.test(rawText)) {
-                        simplifiedContent = rawText.replace(htmlBlockRegex, ' [一条格式化消息] ').trim();
-                    }
+                    
+                    // 【核心修复】不再使用抹除逻辑，而是剥离所有 HTML 标签，保留内部文字
+                    // 这样 "<snippet>...👊 铁拳...</snippet>" 就会变成 "👊 铁拳"
+                    let simplifiedContent = rawText.replace(/<[^>]+>/g, '').trim();
+
                     const stickerMatch = simplifiedContent.match(/^\[sticker:([^\]]+)\]$/);
                     if (stickerMatch) {
                         simplifiedContent = `[表情: ${stickerMatch[1]}]`;
@@ -32950,21 +33113,20 @@ checkMomentsUpdates(); // <--- 新增这一行
         const listContainer = document.getElementById('dynamics-char-list');
         listContainer.innerHTML = '';
 
-        // --- 从这里开始是核心修改 ---
-        const allCharacters = getAllUniqueCharacters(); // 1. 先获取所有实体
-        const userPersonaNames = userPersonas.map(p => p.name); // 2. 获取您所有用户人设的名称列表
+        // 【核心修复】渲染前强制从硬盘同步最新的 NPC 名单，防止过滤失效
+        const latestNpcList = loadFromLocalStorage('app-npc-list', []);
+        const allCharacters = getAllUniqueCharacters(); 
+        const userPersonaNames = userPersonas.map(p => p.name); 
         
-                // 3. 【核心修改】过滤掉 '{{user}}'、所有用户人设名称 以及 NPC 名单
-        // 因为 NPC 有专门的管理页面和定时器，不需要在动态页面重复出现
+        // 执行严格过滤：排除本人、用户人设、以及 NPC 列表中的所有人
         let characters = allCharacters.filter(char => 
             char !== '{{user}}' && 
             !userPersonaNames.includes(char) && 
-            !npcList.includes(char)
+            !latestNpcList.includes(char) // 使用刚读到的最新名单
         );
         
-        // 【核心新增】按中文拼音/英文字母顺序排序
+        // 按中文拼音/英文字母顺序排序
         characters.sort((a, b) => a.localeCompare(b, 'zh-CN'));
-        // --- 核心修改结束 ---
 
         if (characters.length === 0) {
 
@@ -33061,9 +33223,19 @@ checkMomentsUpdates(); // <--- 新增这一行
         }
 
         async function showBulkDynamicsModal() {
+        // 【核心修复】同样强制同步最新的 NPC 名单
+        const latestNpcList = loadFromLocalStorage('app-npc-list', []);
         const allCharacters = getAllUniqueCharacters();
         const userPersonaNames = userPersonas.map(p => p.name);
-        const characters = allCharacters.filter(char => char !== '{{user}}' && !userPersonaNames.includes(char));
+        
+        // 过滤掉用户自己、用户人设、以及所有的 NPC
+        const characters = allCharacters
+            .filter(char => 
+                char !== '{{user}}' && 
+                !userPersonaNames.includes(char) &&
+                !latestNpcList.includes(char)
+            )
+            .sort((a, b) => a.localeCompare(b, 'zh-CN'));
 
         if (characters.length === 0) { alert('没有可设置的角色。'); return; }
         const charListHtml = characters.map(name => `<label class="inline-label"><input type="checkbox" class="bulk-char-select" value="${name}"> ${name}</label>`).join('');
@@ -35624,9 +35796,12 @@ fileInput.style.display = 'none';
                     }
                 }
 
-                const config = charDynamics;
+                                const config = charDynamics;
                  if (!config.lastTick || (now - config.lastTick >= config.interval * 60 * 1000)) {
                     if (Math.random() * 100 < config.probability) {
+                        
+                        // =================================================================
+
                         
                         // =================================================================
                         // START: Proactive Action Rate Limiter (for NPCs)
@@ -36110,7 +36285,9 @@ async function handleBatchDelete() {
                 return;
             }
             
-            const characters = getAllUniqueCharacters();
+            // 【核心修改】获取角色列表后，立即进行排序
+            const characters = getAllUniqueCharacters().sort((a, b) => a.localeCompare(b, 'zh-CN'));
+            
             if(characters.length === 0){
                 alert('没有可关联的角色，请先创建角色或群聊。');
                 return;
