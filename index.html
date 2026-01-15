@@ -6125,8 +6125,10 @@ body.preview-fullscreen-active #page-conversation .chat-content {
         height: auto !important;
         min-height: 0 !important;      /* 【核心修改】防止内容少时强制撑出大片空白 */
         overflow: visible !important;
-        padding-bottom: 20px !important; /* 【核心修改】全局统一留出 20px 呼吸空间 */
+        padding-bottom: 0 !important;  /* 【核心修复】改为 0，消除底部白边 */
+        margin-bottom: 0 !important;   /* 【核心修复】确保没有外边距 */
     }
+
 
     /* 【核心新增】朋友圈预览模式下的底部修正 */
     #moments-view.moments-preview-active .moments-feed {
