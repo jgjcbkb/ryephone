@@ -12435,6 +12435,10 @@ This law overrides all other preferences. It is a simple, binary choice:
 2.  **Does your intended message contain ANY text, even a single character, alongside an image?**
     *   If YES, then you **MUST** use **MODULE 1 (Text & Emoji Composer)**.
 
+**[SPECIAL EXCEPTION: DANMAKU PLAYER]**
+If you are generating content inside a \`[DANMAKU_PLAYER]\` block, the Law of Exclusivity is **VOID**. You MUST place \`[emoji:...]\` or \`[sticker:...]\` directly inside the \`<dm>\` tags. Do NOT create separate blocks for them.
+
+
 ---
 ### **MODULE 1: The "Text & Emoji Composer"**
 
@@ -13869,6 +13873,10 @@ This is an **ANONYMOUS** forum. Real names are **FORBIDDEN**.
     *   **Refer to others as:** "My friend", "A colleague", "Roommate", or use abbreviations (e.g., "Z-san", "L-teacher").
     *   **EXCEPTION:** Only in "Fan Fiction" (同人衍生) boards, you can use real character names as the *subjects* of the story, but the *author* must still be anonymous.
 
+**[CREATIVE DIVERSITY MANDATE]**
+If you post in **"同人衍生"**, do NOT just write "Chat Logs" or "Found Phone" stories. Those are boring.
+**WRITE AU (Alternate Universe) STORIES:** Ancient China, Cyberpunk, Magic School, Mafia, etc. Be creative!
+
 **3. 【ABSOLUTE BAN: THE FOURTH WALL】(绝对禁令)**
     *   **STRICTLY FORBIDDEN:** You are **PROHIBITED** from mentioning, acknowledging, or praising the HTML, CSS, code blocks, snippets, or visual "styles" of any post.
     *   **IMMERSION LAW:** You must act as if the "paper notes," "UI cards," or "formatted text" are **REAL PHYSICAL OBJECTS** or **REAL FORUM POSTS**. 
@@ -13923,11 +13931,16 @@ When you decide to **COMMENT** on an existing thread, you MUST check the **Autho
 **IF YOU CHOOSE BOARD "同人衍生" (Fan Fiction):**
 *   **ABSOLUTE CREATION LAW:** You **MUST** write actual creative content (Fiction, Snippet, AU Outline, Script).
 *   **FORBIDDEN:** You are **STRICTLY FORBIDDEN** from posting pure discussions, questions, or "water" posts here.
-*   **Logic:** If you just want to discuss a CP or complain, you **MUST** go to "闲聊水区" or "情感百态". "同人衍生" is ONLY for posting work.
-*   **Required Format:**
-    *   **Short Snippet (短打):** A high-emotion scene or interaction.
-    *   **Plot Outline (大纲):** "Theme: [Cyberpunk AU]. If A and B were enemies..."
-    *   **Chat Log (聊天体):** Script-style dialogue between characters.
+*   **DIVERSITY MANDATE (ANTI-REPETITION):** 
+    *   **STOP defaulting to "Found Phone/Chat Log" (捡手机/聊天体).** This trope is overused.
+    *   **PRIORITIZE ALTERNATE UNIVERSES (AU):** You are strongly encouraged to write stories set in different worlds.
+    *   **Suggested Themes (Pick One Randomly):**
+        *   **Fantasy/Xianxia:** Cultivation sects, demons, gods.
+        *   **Modern/Urban:** Office romance, campus enemies-to-lovers,娱乐圈.
+        *   **Sci-Fi/Cyberpunk:** Androids, hackers, dystopian future.
+        *   **Historical/Palace:** Emperors, generals, political intrigue.
+        *   **Supernatural:** Vampires, werewolves, ghosts.
+    *   **Format:** Write a narrative snippet (小说片段) or a plot outline (大纲) set in one of these worlds.
 
 **[FORUM SUBCULTURE DICTIONARY]**
 1.  **拆逆 (Split/Reverse):** Breaking official couples or reversing Top/Bottom roles.
@@ -14143,7 +14156,10 @@ You are part of a diverse internet ecosystem. **DO NOT be repetitive.**
 **IF YOU CHOOSE BOARD "同人衍生" (Fan Fiction):**
 *   **ABSOLUTE CREATION LAW:** You **MUST** write actual creative content.
 *   **FORBIDDEN:** Do NOT post discussions or questions. If you want to discuss, choose a different board like "闲聊水区".
-*   **Content:** Write a snippet, a micro-novel, or a funny AU outline.
+*   **DIVERSITY MANDATE (ANTI-REPETITION):** 
+    *   **STOP defaulting to "Found Phone/Chat Log" (捡手机/聊天体).** This trope is overused.
+    *   **PRIORITIZE ALTERNATE UNIVERSES (AU):** You are strongly encouraged to write stories set in different worlds (Fantasy, Sci-Fi, Historical, Supernatural).
+    *   **Content:** Write a narrative snippet (小说片段) or a plot outline (大纲) set in one of these worlds.
 
 **[UPDATED INSTRUCTIONS]**
 1.  **Analyze the Forum:** Review the latest posts.
@@ -15620,9 +15636,23 @@ conversationManager.showNotificationBanner('TUQU', {
                 element.src = keyOrUrl || '';
             } else {
                 element.style.backgroundImage = keyOrUrl ? `url('${keyOrUrl}')` : 'none';
-            }
+                        }
         }
     }
+
+    // 【核心急救包：专门修复裂开的本地表情包】
+    window.app = window.app || {};
+    window.app.fixLocalImage = function(img) {
+        const originalUrl = img.dataset.originalSrc;
+        // 只有当图片真的裂了，且我们有备份地址时才修复
+        if (originalUrl && originalUrl.startsWith('indexeddb:')) {
+            // 移除 onerror 防止死循环
+            img.removeAttribute('onerror'); 
+            // 调用你现有的强大加载器
+            setImageSrc(img, originalUrl);
+        }
+    };
+
 
 
     const messageListContainer = document.getElementById('message-list-container');
@@ -19947,6 +19977,10 @@ This law overrides all other preferences. It is a simple, binary choice:
 2.  **Does your intended message contain ANY text, even a single character, alongside an image?**
     *   If YES, then you **MUST** use **MODULE 1 (Text & Emoji Composer)**.
 
+**[SPECIAL EXCEPTION: DANMAKU PLAYER]**
+If you are generating content inside a \`[DANMAKU_PLAYER]\` block, the Law of Exclusivity is **VOID**. You MUST place \`[emoji:...]\` or \`[sticker:...]\` directly inside the \`<dm>\` tags. Do NOT create separate blocks for them.
+
+
 ---
 ### **MODULE 1: The "Text & Emoji Composer"**
 
@@ -23462,34 +23496,6 @@ You are the Director. If multiple characters react to the rejection, generate a 
             
             // --- 核心修复：区分处理 Sticker 和 Emoji ---
 
-        // 1. 检查消息中是否包含【独立的】表情包指令
-        //    使用 split 将文本分割成 “文本” 和 “表情包名称” 的交替数组
-        const stickerRegexForSplit = /(\[sticker:[^\]]+\])/g;
-        if (stickerRegexForSplit.test(textContent)) {
-            const parts = textContent.split(stickerRegexForSplit);
-
-            for (const part of parts) {
-                if (!part || !part.trim()) continue;
-
-                const stickerMatch = part.match(/^\[sticker:([^\]]+)\]$/);
-                if (stickerMatch) {
-                    // 这部分是表情包指令
-                    const stickerName = stickerMatch[1].trim();
-                    const sticker = stickers.find(s => s.name === stickerName && s.type === 'sticker');
-                    if (sticker) {
-                        // 作为独立的图片消息发送
-                        await addMessage({ type: 'photo', text: sticker.url, side: 'received', sender: sender }, targetChatId);
-                    } else {
-                        // 如果找不到，作为文本发送
-                        await addMessage({ type: 'text', sender, text: part.trim(), side: 'received' }, targetChatId);
-                    }
-                } else {
-                    // 这部分是纯文本（可能包含emoji），正常发送
-                    await addMessage({ type: 'text', sender, text: part.trim(), side: 'received' }, targetChatId);
-                }
-            }
-            return; // 处理完毕，结束函数
-        }
 
             // 【核心修复】移除了过时的 nudge 和 set_nudge_suffix，保留了 set_interaction_suffix
 const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action|set_interaction_suffix|music_add|music_play_title|music_next|music_prev|music_toggle|set_status|set_avatar|post_moment_with_image|set_user_remark|pay_for_user|claim_red_packet|accept_transfer|reject_transfer|accept_gift|remove_member|accept_join_request|reject_join_request|send_join_request|red_packet|photo|voice|transfer|gift|post_moment|photo-description|video|video_call|set_bubble|set_font|set_font_color|reset_style|advance_time|set_time|send_friend_request|location|pay_for_me)(?:\s*[:：]\s*((?:\[[^\]]*\]|[^\]]|[\r\n])*))?\s*\]/g;
@@ -24867,31 +24873,70 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                         }
                         
                         if (hasBeenReplaced) {
-                            return processedText;
-                        } else {
-                            // --- 【Emoji 终极修复：混合内容处理器】 ---
-                            // 1. 定义一个正则表达式来匹配我们生成的 inline-emoji <img> 标签
-                            const emojiRegex = /(<img src="[^"]+" alt="[^"]+" class="inline-emoji">)/g;
-
-                            // 2. 使用 split() 分割文本，保留 emoji 标签作为数组的一部分
-                            const parts = rawText.split(emojiRegex);
-
-                            // 3. 遍历分割后的部分，只对非 emoji 的文本部分进行转义和格式化
-                            const processedParts = parts.map(part => {
-                                // 如果这部分是 emoji 标签，或者为空，直接返回
-                                if (!part || part.match(emojiRegex)) {
-                                    return part;
+                            // 【核心修复：让弹幕和正则生成的HTML也能显示表情包】
+                            // 在返回正则替换后的HTML之前，最后扫描一遍里面的 [emoji:xx] 或 [sticker:xx]
+                            return processedText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                                const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type.toLowerCase());
+                                if (item) {
+                                    if (type.toLowerCase() === 'emoji') {
+                                        // Emoji：加上急救包
+                                        return `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${name}" class="inline-emoji">`;
+                                    } else {
+                                        // 表情包：加上急救包，并限制在弹幕里的尺寸
+                                        return `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${name}" style="max-width: 40px; max-height: 40px; display: inline-block; vertical-align: middle; margin: 0 2px;">`;
+                                    }
                                 }
-                                // 否则，这就是纯文本，执行安全处理
-                                let safeText = escapeHtml(part);
-                                let formattedText = simpleMarkdownToHtml(safeText);
-                                return formattedText.replace(/\n/g, '<br>');
+                                return match;
+                            });
+                        } else {
+                            // 【核心修复：这里补上了表情包翻译逻辑】
+                            // 1. 先用占位符替换所有的 [sticker:xx] 和 [emoji:xx]
+                            let tempPlaceholders = {};
+                            let tempCounter = 0;
+                            
+                            const textWithPlaceholders = rawText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                                type = type.toLowerCase();
+                                const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
+                                if (item) {
+                                    const key = `__MEDIA_${tempCounter++}__`;
+                                    let imgTag = '';
+                                    if (type === 'emoji') {
+                                        // Emoji 也加上急救，以防万一
+                                        imgTag = `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" class="inline-emoji">`;
+                                    } else {
+                                        // 表情包：加上急救指令
+                                        imgTag = `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" style="max-width: 100px; max-height: 100px; display: block; margin: 5px 0; border-radius: 4px;">`;
+                                    }
+                                    tempPlaceholders[key] = imgTag;
+                                    return key;
+                                }
+                                // 如果没找到对应表情，就原样返回文字
+                                return match;
                             });
 
-                            // 4. 将所有部分重新组合成最终的 HTML 字符串
-                            return processedParts.join('');
-                            // --- 【修复结束】 ---
+                            // 2. 对剩下的文字进行安全转义 (防止HTML注入)
+                            let safeText = escapeHtml(textWithPlaceholders);
+
+                            // 3. 把占位符还原成图片标签
+                            let textWithImages = safeText;
+                            for (const [key, val] of Object.entries(tempPlaceholders)) {
+                                textWithImages = textWithImages.replace(key, val);
+                            }
+                            
+                            // 4. 处理简单的 Markdown (加粗/斜体)
+                            let formattedText = simpleMarkdownToHtml(textWithImages);
+                            
+                            // 5. 处理换行
+                            let finalHtml = formattedText.replace(/\n/g, '<br>');
+
+                            // 如果包含图片，外层包一个 div 确保布局正常
+                            if (Object.keys(tempPlaceholders).length > 0) {
+                                finalHtml = `<div>${finalHtml}</div>`;
+                            }
+
+                            return finalHtml;
                         }
+
                     };
 
                     const trimmedText = msg.text.trim();
@@ -30600,22 +30645,24 @@ const momentsManager = (function() {
                                           textContent.includes('<style>') || 
                                           textContent.startsWith('<div');
 
-                        // 【核心新增】朋友圈标签解析器
-                                                // 1. 定义统一的标签解析函数
+                                                // 【核心新增】朋友圈标签解析器
+                        // 1. 定义统一的标签解析函数
                         const parseMomentsTags = (text) => {
                             if (!text) return "";
                             return text.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
                                 const item = stickers.find(s => s.name === name.trim() && s.type === type.toLowerCase());
                                 if (item) {
+                                    // 【核心修复】给朋友圈的图片也加上 onerror 急救包
                                     if (type.toLowerCase() === 'emoji') {
-                                        return `<img src="${item.url}" class="inline-emoji" style="height:1.4em; vertical-align:middle; margin:0 2px;">`;
+                                        return `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" class="inline-emoji" style="height:1.4em; vertical-align:middle; margin:0 2px;">`;
                                     } else {
-                                        return `<img src="${item.url}" style="max-width:120px; max-height:120px; display:block; margin:8px 0; border-radius:8px;">`;
+                                        return `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" style="max-width:120px; max-height:120px; display:block; margin:8px 0; border-radius:8px;">`;
                                     }
                                 }
                                 return match;
                             });
                         };
+
 
                         if (isHtmlBlock) {
                             // 2. 如果是 HTML 块，先剥离 snippet 标签
@@ -30966,9 +31013,11 @@ const momentsManager = (function() {
                              const item = stickers.find(s => s.name === name && s.type === type);
                              if (item) {
                                  if (type === 'sticker') {
-                                     return `<img src="${item.url}" alt="${escapeHtml(name)}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+                                     // 加上急救包
+                                     return `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
                                  } else {
-                                     return `<img src="${item.url}" alt="${escapeHtml(name)}" class="inline-emoji">`;
+                                     // 加上急救包
+                                     return `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" class="inline-emoji">`;
                                  }
                              }
                              return match;
@@ -30992,11 +31041,11 @@ const momentsManager = (function() {
 
                                 if (item) {
                                     if (type === 'sticker') {
-                                        // 表情包使用固定尺寸
-                                        contentHtml += `<img src="${item.url}" alt="${escapeHtml(name)}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+                                        // 表情包：加上急救包
+                                        contentHtml += `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
                                     } else { // type === 'emoji'
-                                        // Emoji 使用 inline-emoji 样式
-                                        contentHtml += `<img src="${item.url}" alt="${escapeHtml(name)}" class="inline-emoji">`;
+                                        // Emoji：加上急救包
+                                        contentHtml += `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" class="inline-emoji">`;
                                     }
                                 } else {
                                     // 找不到则显示原始文本
