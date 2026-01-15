@@ -15435,13 +15435,17 @@ conversationManager.showNotificationBanner('TUQU', {
 
     const messageListContainer = document.getElementById('message-list-container');
     
-    // 【核心修改】支持大容量保存
+    // 【核心修改】支持大容量保存 (防复活版)
     async function saveChatList() { 
         try {
             localStorage.setItem('app-chat-list', JSON.stringify(chatList));
+            // 成功存入缓存，必须删除数据库备份
+            await imageStore.removeItem('app-chat-list');
         } catch (e) {
             console.warn("聊天列表过大，转存至 IndexedDB");
             await imageStore.setItem('app-chat-list', chatList);
+            // 存入数据库，必须删除缓存残余
+            localStorage.removeItem('app-chat-list');
         }
     }
     
@@ -18360,18 +18364,25 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
 
                 console.log(`[诊断探针] 3. 准备保存。Key: ${key}, 消息条数: ${fullMessageHistory.length}`);
                 
-                // 【核心修改】智能保存逻辑
+                // 【核心修改】智能保存逻辑 (防复活版)
                 try {
                     // 1. 先尝试存入 LocalStorage
                     localStorage.setItem(key, JSON.stringify(fullMessageHistory));
-                    console.log(`[诊断探针] 4. localStorage 保存成功。`);
+                    
+                    // 【关键修复】如果 LS 保存成功，必须把数据库里的旧备份删掉！
+                    // 否则下次加载时，旧备份会覆盖新数据，导致删除的消息复活。
+                    imageStore.removeItem(key).catch(e => console.warn("清理旧数据库失败", e));
+                    
+                    console.log(`[诊断探针] 4. localStorage 保存成功，旧数据库已清理。`);
                 } catch (e) {
-                    // 2. 如果报错 (空间满)，则存入 IndexedDB
+                    // 2. 如果 LS 满了，存入 IndexedDB
                     if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
                         console.warn(`[诊断探针] LocalStorage 已满，转存至 IndexedDB: ${key}`);
-                        // 注意：imageStore.setItem 是异步的，但 saveConversation 这里没法 await
-                        // 我们用 .then 处理，或者你可以把 saveConversation 改成 async
+                        
                         imageStore.setItem(key, fullMessageHistory).then(() => {
+                            // 【关键修复】如果存入了数据库，必须把 LS 里的残余数据删掉！
+                            // 保持唯一真理源。
+                            localStorage.removeItem(key);
                             console.log(`[诊断探针] IndexedDB 保存成功。`);
                         }).catch(err => {
                             console.error("IndexedDB 保存也失败:", err);
@@ -31307,13 +31318,17 @@ sendCommentBtn.addEventListener('click', () => {
             img.src = src;
             overlay.classList.add('visible');
         }
-        // 【核心修改】改为异步保存，支持大容量数据库
+        // 【核心修改】改为异步保存 (防复活版)
         async function saveFeed() { 
             try {
                 localStorage.setItem('moments_feed_data', JSON.stringify(feedData));
+                // 成功存入缓存，必须删除数据库备份
+                await imageStore.removeItem('moments_feed_data');
             } catch (e) {
                 console.warn("朋友圈数据过大，转存至 IndexedDB");
                 await imageStore.setItem('moments_feed_data', feedData);
+                // 存入数据库，必须删除缓存残余
+                localStorage.removeItem('moments_feed_data');
             }
         }
         
@@ -32179,8 +32194,18 @@ checkMomentsUpdates(); // <--- 新增这一行
             saveStickers();
         }
         
-        function loadStickers() {
-            stickers = loadFromLocalStorage('app-stickers', []);
+        // 【核心修复】改为 async，并增加数据库读取逻辑
+        async function loadStickers() {
+            // 1. 先尝试从 LocalStorage 读取
+            stickers = loadFromLocalStorage('app-stickers', null);
+            
+            // 2. 如果 LocalStorage 没有，去 IndexedDB 捞
+            if (!stickers) {
+                try {
+                    const dbData = await imageStore.getItem('app-stickers');
+                    stickers = dbData || [];
+                } catch(e) { stickers = []; }
+            }
             
             // 1. 兼容旧数据：补全 type
             stickers.forEach(s => {
@@ -32216,8 +32241,17 @@ checkMomentsUpdates(); // <--- 新增这一行
                 saveStickers();
             }
         }
-        function saveStickers() {
-            saveToLocalStorage('app-stickers', stickers);
+        // 【核心修改】改为异步保存 (防复活版)
+        async function saveStickers() {
+            try {
+                localStorage.setItem('app-stickers', JSON.stringify(stickers));
+                // 成功存入缓存，删除数据库备份
+                await imageStore.removeItem('app-stickers');
+            } catch (e) {
+                // 缓存满了，存数据库
+                await imageStore.setItem('app-stickers', stickers);
+                localStorage.removeItem('app-stickers');
+            }
         }
 
         function renderPanel(panelDOM, searchTerm = '', type = 'sticker') {
@@ -32270,7 +32304,7 @@ checkMomentsUpdates(); // <--- 新增这一行
         }
         async function openPanel(onSelectCallback = null) {
             while (true) {
-                loadStickers();
+                await loadStickers(); // 【核心修复】加上 await，等待数据从数据库读完
                 isManageMode = false;
 
                 // 【核心修改】重写 HTML 结构：
@@ -38721,18 +38755,20 @@ async function handleRemoveMember() {
                             let value = importedRawData[key];
                             
                             try {
-                                // 【核心新增】如果是小说、音乐、聊天记录、朋友圈、表情包、好友列表，强制存入 IndexedDB (大容量存储)
+                                                                                               // 【核心新增】如果是小说、音乐、聊天记录、朋友圈、表情包、好友列表，强制存入 IndexedDB (大容量存储)
                                 // 这样可以绕过 iOS 的 5MB 限制，确保任何数据都不会丢
                                 if (key.startsWith('novel_data_') || 
                                     key === 'app_music_playlist' || 
                                     key.startsWith('conversation_') ||
                                     key === 'moments_feed_data' ||  // 朋友圈
-                                    key === 'app-stickers' ||       // 表情包
+                                    // key === 'app-stickers' ||    <-- 这一行已经被删除了
                                     key === 'app-chat-list') {      // 好友/聊天列表
                                     
                                     await imageStore.setItem(key, value);
                                     continue;
                                 }
+
+
 
                                 let valueToStore;
                                 if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
@@ -40959,7 +40995,16 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             if (currentNotes.length === 0) {
                  currentNotes.push({ content: ">> (没有备忘录) <<" });
             }
-            saveToLocalStorage(storageKey, currentNotes);
+            
+            // 【核心修改】防复活保存逻辑
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(currentNotes));
+                imageStore.removeItem(storageKey); // 清理数据库
+            } catch(e) {
+                imageStore.setItem(storageKey, currentNotes);
+                localStorage.removeItem(storageKey); // 清理缓存
+            }
+
             currentIndex = Math.min(currentIndex, currentNotes.length - 1);
             currentLineIndex = 0;
         }
