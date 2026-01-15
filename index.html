@@ -8182,15 +8182,15 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                         <div class="form-section">
                             <h3>模块 API 配置</h3>
                             <div class="form-group">
-                                <label for="dynamics-msg-api">主动消息 API</label>
+                                <label for="dynamics-msg-api">主动发消息 API</label>
                                 <select id="dynamics-msg-api" class="modal-input modal-select"></select>
                             </div>
                             <div class="form-group">
-                                <label for="dynamics-moments-api">朋友圈互动 API</label>
+                                <label for="dynamics-moments-api">朋友圈 API</label>
                                 <select id="dynamics-moments-api" class="modal-input modal-select"></select>
                             </div>
                             <div class="form-group">
-                                <label for="dynamics-tuqu-api">兔区动态 API</label>
+                                <label for="dynamics-tuqu-api">兔区 API</label>
                                 <select id="dynamics-tuqu-api" class="modal-input modal-select"></select>
                             </div>
                             <p class="form-hint" style="padding: 0 15px 15px;">为不同模块指定特定的 API 配置。若选“跟随全局”，则使用 API 设置中激活的配置。</p>
@@ -13405,6 +13405,13 @@ This API call is an opportunity for you to live your social life. You **MUST** p
    - **Comment with Substance:** Write a meaningful comment or a witty retort instead of a silent like.
 
 **Mandate:** You must act, but your actions must be psychologically consistent. Random, "bot-like" liking is a violation of your persona's integrity.
+
+**[THE SELECTIVITY AMENDMENT]**
+1. **DO NOT USE LIKES AS FILLER:** If the posts in your timeline do not warrant a "Like" based on the "Selective Protocol" above, do NOT use the \`[like_moment]\` command just to satisfy the mandate.
+2. **PRIORITIZE OTHER ACTIONS:** If the timeline is boring, instead of liking randomly, you SHOULD:
+   - **Post your own Moment:** Share a thought, a photo-description, or an HTML card about your current state.
+   - **Send a Private Message:** Start a direct conversation with someone based on a post you saw (even if you didn't like it).
+   - **Comment with Substance:** Write a meaningful comment or a witty retort instead of a silent like.
 `;
 
 
@@ -33849,10 +33856,10 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             // --- 2. 检查朋友圈互动 ---
             if (charSettings.moments && charSettings.moments.enabled && charSettings.moments.probability > 0) {
                 const config = charSettings.moments;
-                // 核心修复：使用 Date.now() 实时检查
                 if (!config.lastTick || (Date.now() - config.lastTick >= config.interval * 60 * 1000)) {
                     if (Math.random() * 100 < config.probability) {
-                        const action = Math.random() < 0.2 ? 'post_moment' : 'browse_moments';
+                        // 【核心修改】将 0.2 (20%) 降低为 0.05 (5%)，极大减少顺便发帖的频率
+                        const action = Math.random() < 0.05 ? 'post_moment' : 'browse_moments'; 
                         console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering moment action (${action}) for private character "${charName}".`);
                         // 核心修复：在 await 前更新并保存
                         config.lastTick = Date.now();
