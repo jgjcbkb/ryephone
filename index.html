@@ -42958,7 +42958,7 @@ const cloudBackupManager = (function() {
             if (!isAuto) alert("备份失败: " + e.message);
         }
     }
-async function performRestore() {
+    async function performRestore() {
         var info = getRepoInfo();
         if (!info) return alert("请先填写仓库链接和Token！");
 
@@ -42983,55 +42983,56 @@ async function performRestore() {
             const jsonRes = await fetch(`${apiBaseUrl}/data.json`, {
                 headers: { 
                     'Authorization': 'token ' + info.token,
-                    // 核心修改：强制要求返回原始文件内容，绕过 1MB 限制
                     'Accept': 'application/vnd.github.v3.raw' 
                 }
             });
             if (!jsonRes.ok) throw new Error("无法获取文本备份文件，请确认已执行过新版备份。");
             
-            // 既然是 Raw 模式，返回的就是纯文本 JSON，直接解析即可，无需 atob
             const allTextData = await jsonRes.json();
 
             // 2. 扫描 data.json 找出所有需要的图片 ID
             const blobKeys = new Set();
             for (const key in allTextData) {
                 const rawValue = allTextData[key];
-                const matches = rawValue.match(/indexeddb:([a-zA-Z0-9_-]+)/g);
-                if (matches) matches.forEach(m => blobKeys.add(m.split(':')[1]));
+                // 简单的正则检查，防止非字符串报错
+                if (typeof rawValue === 'string') {
+                    const matches = rawValue.match(/indexeddb:([a-zA-Z0-9_-]+)/g);
+                    if (matches) matches.forEach(m => blobKeys.add(m.split(':')[1]));
+                }
             }
 
-            // 3. 逐个同步图片 (核心：一张一张下载，防止白屏)
+            // 3. 逐个同步图片
             let count = 0;
             const total = blobKeys.size;
             for (const blobKey of blobKeys) {
                 count++;
                 if (statusEl) statusEl.textContent = `正在同步图片 (${count}/${total})...`;
 
-                // 检查本地是否已经有这张图了，如果有就跳过，节省流量和时间
                 const localExists = await imageStore.getItem(blobKey);
                 if (localExists) continue;
 
                 const blobRes = await fetch(`${apiBaseUrl}/blobs/${blobKey}`, {
                     headers: { 
                         'Authorization': 'token ' + info.token,
-                        // 核心修改：直接获取二进制图片流
                         'Accept': 'application/vnd.github.v3.raw'
                     }
                 });
 
                 if (blobRes.ok) {
-                    // 直接作为 Blob 接收，不经过字符串转换，极大地节省内存，防止白屏
                     const blob = await blobRes.blob();
                     await imageStore.setItem(blobKey, blob);
                 }
             }
 
-            // 4. 清理旧的 LocalStorage 并写入新数据
+            // 4. 清理旧数据并写入新数据 (核心修复：加入大容量分流)
             if (statusEl) statusEl.textContent = "正在应用更改...";
+            
+            // 先清理旧数据
             const CLEANUP_PREFIXES = [ 
                 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
                 'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
-                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+                'tuqu_', 'token_usage_', 'blacklist_reply_count_',
+                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_' 
             ];
 
             const keysToRemove = [];
@@ -43043,8 +43044,37 @@ async function performRestore() {
             }
             keysToRemove.forEach(key => localStorage.removeItem(key));
 
+            // 【核心修复】写入新数据时的智能分流逻辑
+            let failedKeys = [];
             for (const key in allTextData) {
-                localStorage.setItem(key, allTextData[key]);
+                let value = allTextData[key];
+                
+                try {
+                    // 1. 如果是大容量数据的 Key，强制存入 IndexedDB
+                    if (key.startsWith('novel_data_') || 
+                        key === 'app_music_playlist' || 
+                        key.startsWith('conversation_') ||
+                        key === 'moments_feed_data' ||
+                        key === 'app-chat-list') {
+                        
+                        // GitHub 上存的是字符串化的 JSON，存入 DB 前需要解析回对象
+                        // 否则读取时会报错
+                        let parsedValue = value;
+                        if (typeof value === 'string') {
+                            try { parsedValue = JSON.parse(value); } catch(e) {}
+                        }
+                        
+                        await imageStore.setItem(key, parsedValue);
+                        continue; // 跳过后续的 localStorage 写入
+                    }
+
+                    // 2. 普通小数据存入 localStorage
+                    localStorage.setItem(key, value);
+                    
+                } catch (e) {
+                    console.error(`Restore failed for key: ${key}`, e);
+                    failedKeys.push(key);
+                }
             }
 
             if (statusEl) {
@@ -43052,7 +43082,11 @@ async function performRestore() {
                 statusEl.textContent = "✅ 恢复成功！正在重启...";
             }
             
-            alert("恢复成功！应用即将刷新。");
+            if (failedKeys.length > 0) {
+                alert(`恢复完成，但有 ${failedKeys.length} 个非关键配置因空间不足未写入。核心数据已安全恢复。`);
+            } else {
+                alert("恢复成功！应用即将刷新。");
+            }
             location.reload();
 
         } catch (e) {
@@ -43064,6 +43098,147 @@ async function performRestore() {
             alert("恢复失败: " + e.message);
         }
     }
+    async function performRestore() {
+        var info = getRepoInfo();
+        if (!info) return alert("请先填写仓库链接和Token！");
+
+        const confirmed = await conversationManager.customConfirm(
+            "这将从 GitHub 下载并覆盖当前手机的所有数据。建议操作前先手动备份一次。确定要继续吗？",
+            "云端恢复确认"
+        );
+        if (!confirmed) return;
+
+        var statusEl = document.getElementById('gh-status-msg');
+        if (statusEl) {
+            statusEl.style.color = "#007aff";
+            statusEl.textContent = "正在连接云端...";
+        }
+
+        try {
+            const baseDir = "rye_backup_v2";
+            const apiBaseUrl = `https://api.github.com/repos/${info.owner}/${info.repo}/contents/${baseDir}`;
+
+            // 1. 下载 data.json (文本数据)
+            if (statusEl) statusEl.textContent = "正在同步文本数据...";
+            const jsonRes = await fetch(`${apiBaseUrl}/data.json`, {
+                headers: { 
+                    'Authorization': 'token ' + info.token,
+                    'Accept': 'application/vnd.github.v3.raw' 
+                }
+            });
+            if (!jsonRes.ok) throw new Error("无法获取文本备份文件，请确认已执行过新版备份。");
+            
+            const allTextData = await jsonRes.json();
+
+            // 2. 扫描 data.json 找出所有需要的图片 ID
+            const blobKeys = new Set();
+            for (const key in allTextData) {
+                const rawValue = allTextData[key];
+                // 简单的正则检查，防止非字符串报错
+                if (typeof rawValue === 'string') {
+                    const matches = rawValue.match(/indexeddb:([a-zA-Z0-9_-]+)/g);
+                    if (matches) matches.forEach(m => blobKeys.add(m.split(':')[1]));
+                }
+            }
+
+            // 3. 逐个同步图片
+            let count = 0;
+            const total = blobKeys.size;
+            for (const blobKey of blobKeys) {
+                count++;
+                if (statusEl) statusEl.textContent = `正在同步图片 (${count}/${total})...`;
+
+                const localExists = await imageStore.getItem(blobKey);
+                if (localExists) continue;
+
+                const blobRes = await fetch(`${apiBaseUrl}/blobs/${blobKey}`, {
+                    headers: { 
+                        'Authorization': 'token ' + info.token,
+                        'Accept': 'application/vnd.github.v3.raw'
+                    }
+                });
+
+                if (blobRes.ok) {
+                    const blob = await blobRes.blob();
+                    await imageStore.setItem(blobKey, blob);
+                }
+            }
+
+            // 4. 清理旧数据并写入新数据 (核心修复：加入大容量分流)
+            if (statusEl) statusEl.textContent = "正在应用更改...";
+            
+            // 先清理旧数据
+            const CLEANUP_PREFIXES = [ 
+                'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
+                'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
+                'tuqu_', 'token_usage_', 'blacklist_reply_count_',
+                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_' 
+            ];
+
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (CLEANUP_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+
+            // 【核心修复】写入新数据时的智能分流逻辑
+            let failedKeys = [];
+            for (const key in allTextData) {
+                let value = allTextData[key];
+                
+                try {
+                    // 1. 如果是大容量数据的 Key，强制存入 IndexedDB
+                    if (key.startsWith('novel_data_') || 
+                        key === 'app_music_playlist' || 
+                        key.startsWith('conversation_') ||
+                        key === 'moments_feed_data' ||
+                        key === 'app-chat-list') {
+                        
+                        // GitHub 上存的是字符串化的 JSON，存入 DB 前需要解析回对象
+                        // 否则读取时会报错
+                        let parsedValue = value;
+                        if (typeof value === 'string') {
+                            try { parsedValue = JSON.parse(value); } catch(e) {}
+                        }
+                        
+                        await imageStore.setItem(key, parsedValue);
+                        continue; // 跳过后续的 localStorage 写入
+                    }
+
+                    // 2. 普通小数据存入 localStorage
+                    localStorage.setItem(key, value);
+                    
+                } catch (e) {
+                    console.error(`Restore failed for key: ${key}`, e);
+                    failedKeys.push(key);
+                }
+            }
+
+            if (statusEl) {
+                statusEl.style.color = "#28a745";
+                statusEl.textContent = "✅ 恢复成功！正在重启...";
+            }
+            
+            if (failedKeys.length > 0) {
+                alert(`恢复完成，但有 ${failedKeys.length} 个非关键配置因空间不足未写入。核心数据已安全恢复。`);
+            } else {
+                alert("恢复成功！应用即将刷新。");
+            }
+            location.reload();
+
+        } catch (e) {
+            console.error(e);
+            if (statusEl) {
+                statusEl.style.color = "#d73a49";
+                statusEl.textContent = `❌ 恢复失败: ${e.message}`;
+            }
+            alert("恢复失败: " + e.message);
+        }
+    }
+
     function setupAutoBackup(intervalMinutes) {
         if (autoBackupTimer) clearInterval(autoBackupTimer);
         if (intervalMinutes > 0) {
