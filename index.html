@@ -33475,7 +33475,16 @@ checkMomentsUpdates(); // <--- 新增这一行
             }
         }
 
+        // 在 dynamicsManager 顶部变量声明区增加一个锁
+        let isTicking = false; 
+
         async function tick() {
+            if (isTicking) {
+                console.log(`[Dynamics Tick] Previous cycle still running, skipping...`);
+                return;
+            }
+            isTicking = true;
+
             console.log(`%c[Dynamics Tick]`, 'color: blue; font-weight: bold;', `New check cycle started...`);
             const now = Date.now();
             let settingsChanged = false;
@@ -33494,9 +33503,22 @@ checkMomentsUpdates(); // <--- 新增这一行
         
                     if (!config.lastTick || (Date.now() - config.lastTick >= config.interval * 60 * 1000)) {
                         if (Math.random() * 100 < config.probability) {
-                            // 核心修复：进入概率后第一时间锁死时间戳，不再使用旧的 now 变量
-                            config.lastTick = Date.now();
-                            saveSettings(); 
+                            // --- 速率限制检查 ---
+                            const ONE_MINUTE = 60 * 1000;
+                            const dynamicsSettings = loadFromLocalStorage('app-dynamics-settings', { rateLimit: 2 });
+                            const RATE_LIMIT = (dynamicsSettings.rateLimit && dynamicsSettings.rateLimit >= 1) ? dynamicsSettings.rateLimit : 2;
+                            proactiveApiCallTimestamps = proactiveApiCallTimestamps.filter(timestamp => Date.now() - timestamp < ONE_MINUTE);
+                            
+                            if (proactiveApiCallTimestamps.length >= RATE_LIMIT) {
+                                console.log(`%c[Rate Limiter]`, 'color: orange;', `Group "${group.name}" action blocked by rate limit (${RATE_LIMIT}/min).`);
+                                continue; // 被拦截，直接跳过，不更新时间戳，下次还能试
+                            } else {
+                                // 通过拦截，才更新时间戳并保存
+                                config.lastTick = Date.now();
+                                saveSettings();
+                                proactiveApiCallTimestamps.push(Date.now());
+                            }
+                            // --------------------
 
                             // 【【【【【【 核心新增代码从这里开始 】】】】】】
                             // 在触发前，检查群聊是否已解散
@@ -33839,9 +33861,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                                 } catch (e) {
                                     console.error(`[Dynamics Tick] Failed to generate group scene for "${group.name}":`, e);
                                 }
-                                
-                                config.lastTick = now;
-                                settingsChanged = true;
+                                // config.lastTick = now; // <---这行删掉，前面已经更新过了
+                                // settingsChanged = true; // <---这行删掉
                             } else {
                                 console.warn(`[Dynamics Tick] Group "${group.name}" was triggered, but no potential AI speakers were found.`);
                             }
@@ -33869,12 +33890,25 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                         const config = actorSettings.moments;
                         if (!config.lastTick || (Date.now() - config.lastTick >= config.interval * 60 * 1000)) {
                             if (Math.random() * 100 < config.probability) {
-                                const action = Math.random() < 0.2 ? 'post_moment' : 'browse_moments';
-                                console.log(`%c[Dynamics Action - Actor Trigger]`, 'color: green; font-weight: bold;', `Triggering "${action}" for actor "${actorName}".`);
-                                // 核心修复：在 await 前更新并保存
-                                config.lastTick = Date.now();
-                                saveSettings(); 
-                                await triggerProactiveAI(null, actorName, action);
+                                // 1. 速率检查
+                                const ONE_MINUTE = 60 * 1000;
+                                const dynamicsSettings = loadFromLocalStorage('app-dynamics-settings', { rateLimit: 2 });
+                                const RATE_LIMIT = (dynamicsSettings.rateLimit && dynamicsSettings.rateLimit >= 1) ? dynamicsSettings.rateLimit : 2;
+                                proactiveApiCallTimestamps = proactiveApiCallTimestamps.filter(timestamp => Date.now() - timestamp < ONE_MINUTE);
+                                
+                                if (proactiveApiCallTimestamps.length >= RATE_LIMIT) {
+                                    console.log(`%c[Rate Limiter]`, 'color: orange;', `Actor "${actorName}" moments action blocked.`);
+                                    // 被拦截，不更新时间戳
+                                } else {
+                                    // 2. 通过检查，更新时间戳并执行
+                                    config.lastTick = Date.now();
+                                    saveSettings();
+                                    proactiveApiCallTimestamps.push(Date.now());
+                                    
+                                    const action = Math.random() < 0.2 ? 'post_moment' : 'browse_moments';
+                                    console.log(`%c[Dynamics Action - Actor Trigger]`, 'color: green; font-weight: bold;', `Triggering "${action}" for actor "${actorName}".`);
+                                    await triggerProactiveAI(null, actorName, action);
+                                }
                             }
                         }
                     }
@@ -33883,13 +33917,24 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                         const config = actorSettings.tuqu;
                         if (!config.lastTick || (Date.now() - config.lastTick >= config.interval * 60 * 1000)) {
                             if (Math.random() * 100 < config.probability) {
-                                // 【核心修复】：将 charName 修正为 actorName，解决未定义报错
-                                console.log(`Dynamics: Triggering Tuqu action for ${actorName}`);
-                                // 核心修复：更新时间戳并保存设置
-                                config.lastTick = Date.now();
-                                saveSettings();
-                                // 【核心修复】：将 charName 修正为 actorName，解决未定义报错
-                                await triggerProactiveAI(null, actorName, 'tuqu_interaction');
+                                // 速率检查
+                                const ONE_MINUTE = 60 * 1000;
+                                const dynamicsSettings = loadFromLocalStorage('app-dynamics-settings', { rateLimit: 2 });
+                                const RATE_LIMIT = (dynamicsSettings.rateLimit && dynamicsSettings.rateLimit >= 1) ? dynamicsSettings.rateLimit : 2;
+                                proactiveApiCallTimestamps = proactiveApiCallTimestamps.filter(timestamp => Date.now() - timestamp < ONE_MINUTE);
+
+                                if (proactiveApiCallTimestamps.length >= RATE_LIMIT) {
+                                    console.log(`%c[Rate Limiter]`, 'color: orange;', `Actor "${actorName}" tuqu action blocked.`);
+                                    // 被拦截，不更新时间戳
+                                } else {
+                                    // 通过检查，更新时间戳并执行
+                                    config.lastTick = Date.now();
+                                    saveSettings();
+                                    proactiveApiCallTimestamps.push(Date.now());
+                                    
+                                    console.log(`Dynamics: Triggering Tuqu action for ${actorName}`);
+                                    await triggerProactiveAI(null, actorName, 'tuqu_interaction');
+                                }
                                 continue; 
                             }
                         }
@@ -33906,12 +33951,24 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
         
                         if (isChatIdle && (!config.lastTick || (Date.now() - config.lastTick >= config.interval * 60 * 1000))) {
                             if (Math.random() * 100 < config.probability) {
-                                // 核心修复：在调用 API 之前必须完成保存
-                                config.lastTick = Date.now();
-                                saveSettings();
+                                // 速率检查
+                                const ONE_MINUTE = 60 * 1000;
+                                const dynamicsSettings = loadFromLocalStorage('app-dynamics-settings', { rateLimit: 2 });
+                                const RATE_LIMIT = (dynamicsSettings.rateLimit && dynamicsSettings.rateLimit >= 1) ? dynamicsSettings.rateLimit : 2;
+                                proactiveApiCallTimestamps = proactiveApiCallTimestamps.filter(timestamp => Date.now() - timestamp < ONE_MINUTE);
 
-                                console.log(`%c[Dynamics Action - Actor Trigger]`, 'color: green; font-weight: bold;', `Triggering proactive message for actor "${actorName}" in group "${group.name}".`);
-                                await triggerProactiveAI(targetChatId, actorName, 'message');
+                                if (proactiveApiCallTimestamps.length >= RATE_LIMIT) {
+                                    console.log(`%c[Rate Limiter]`, 'color: orange;', `Actor "${actorName}" message action blocked.`);
+                                    // 被拦截，不更新时间戳
+                                } else {
+                                    // 通过检查，更新时间戳并执行
+                                    config.lastTick = Date.now();
+                                    saveSettings();
+                                    proactiveApiCallTimestamps.push(Date.now());
+
+                                    console.log(`%c[Dynamics Action - Actor Trigger]`, 'color: green; font-weight: bold;', `Triggering proactive message for actor "${actorName}" in group "${group.name}".`);
+                                    await triggerProactiveAI(targetChatId, actorName, 'message');
+                                }
                             }
                         }
                     }
@@ -33933,11 +33990,24 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                     const tConfig = charSettings.tuqu;
                     if (!tConfig.lastTick || (Date.now() - tConfig.lastTick >= tConfig.interval * 60 * 1000)) {
                         if (Math.random() * 100 < tConfig.probability) {
-                            console.log(`[Dynamics] ${charName} 决定去兔区发帖/回帖`);
-                            // 核心修复：使用 Date.now() 实时锁死并立即写入 localStorage
-                            tConfig.lastTick = Date.now();
-                            saveSettings(); 
-                            await triggerProactiveAI(chat.id, charName, 'tuqu_interaction');
+                            // 速率检查
+                            const ONE_MINUTE = 60 * 1000;
+                            const dynamicsSettings = loadFromLocalStorage('app-dynamics-settings', { rateLimit: 2 });
+                            const RATE_LIMIT = (dynamicsSettings.rateLimit && dynamicsSettings.rateLimit >= 1) ? dynamicsSettings.rateLimit : 2;
+                            proactiveApiCallTimestamps = proactiveApiCallTimestamps.filter(timestamp => Date.now() - timestamp < ONE_MINUTE);
+
+                            if (proactiveApiCallTimestamps.length >= RATE_LIMIT) {
+                                console.log(`%c[Rate Limiter]`, 'color: orange;', `Private actor "${charName}" tuqu action blocked.`);
+                                // 被拦截，不更新时间戳
+                            } else {
+                                // 通过检查，更新时间戳并执行
+                                tConfig.lastTick = Date.now();
+                                saveSettings();
+                                proactiveApiCallTimestamps.push(Date.now());
+                                
+                                console.log(`[Dynamics] ${charName} 决定去兔区发帖/回帖`);
+                                await triggerProactiveAI(chat.id, charName, 'tuqu_interaction');
+                            }
                             continue; 
                         }
                     }
@@ -33945,65 +34015,81 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
 
                 // --- 2. 检查主动发消息 ---
                 if (charSettings.message && charSettings.message.enabled) {
-                const config = charSettings.message;
-                const messages = loadFromLocalStorage(`conversation_${chat.id}`, []);
-                
-                // 核心修复：全部改用 Date.now()，防止异步函数执行期间时间戳失效
-                const realTimeCooldownPassed = !config.lastTick || (Date.now() - config.lastTick >= config.interval * 60 * 1000);
+                    const config = charSettings.message;
+                    const messages = loadFromLocalStorage(`conversation_${chat.id}`, []);
+                    
+                    const realTimeCooldownPassed = !config.lastTick || (Date.now() - config.lastTick >= config.interval * 60 * 1000);
+                    const lastMessageTimestamp = messages.length > 0 ? messages[messages.length - 1].timestamp : 0;
+                    const messageHistoryCooldownPassed = messages.length === 0 || (Date.now() - lastMessageTimestamp >= config.interval * 60 * 1000);
 
-                const lastMessageTimestamp = messages.length > 0 ? messages[messages.length - 1].timestamp : 0;
-                const messageHistoryCooldownPassed = messages.length === 0 || (Date.now() - lastMessageTimestamp >= config.interval * 60 * 1000);
+                    if (realTimeCooldownPassed && messageHistoryCooldownPassed) {
+                        if (Math.random() * 100 < config.probability) {
+                            // 速率检查
+                            const ONE_MINUTE = 60 * 1000;
+                            const dynamicsSettings = loadFromLocalStorage('app-dynamics-settings', { rateLimit: 2 });
+                            const RATE_LIMIT = (dynamicsSettings.rateLimit && dynamicsSettings.rateLimit >= 1) ? dynamicsSettings.rateLimit : 2;
+                            proactiveApiCallTimestamps = proactiveApiCallTimestamps.filter(timestamp => Date.now() - timestamp < ONE_MINUTE);
 
-                if (realTimeCooldownPassed && messageHistoryCooldownPassed) {
-                    if (Math.random() * 100 < config.probability) {
-                        // 核心修复：第一时间更新并保存
-                        config.lastTick = Date.now();
-                        saveSettings();
+                            if (proactiveApiCallTimestamps.length >= RATE_LIMIT) {
+                                console.log(`%c[Rate Limiter]`, 'color: orange;', `Private actor "${charName}" message action blocked.`);
+                                // 被拦截，不更新时间戳
+                            } else {
+                                // 通过检查，更新时间戳并保存
+                                config.lastTick = Date.now();
+                                saveSettings();
 
-                        // 【【【【【【 核心新增代码从这里开始 】】】】】】
-                        // 在决定发消息前，检查关系状态
-                        let myStatus = 'normal';
-                        for (const msg of messages) {
-                            if (msg.side === 'system') {
-                                if (msg.text.includes('你将') && (msg.text.includes('加入黑名单') || msg.text.includes('拉黑'))) {
-                                    myStatus = 'blacklisted';
-                                } else if (msg.text.includes('你已删除')) {
-                                    myStatus = 'deleted';
-                                } else if (msg.text.includes('你将') && msg.text.includes('移出黑名单')) {
-                                    myStatus = 'normal';
-                                } else if (msg.text.includes('你已添加了')) {
-                                    myStatus = 'normal';
+                                // 关系检查
+                                let myStatus = 'normal';
+                                for (const msg of messages) {
+                                    if (msg.side === 'system') {
+                                        if (msg.text.includes('你将') && (msg.text.includes('加入黑名单') || msg.text.includes('拉黑'))) {
+                                            myStatus = 'blacklisted';
+                                        } else if (msg.text.includes('你已删除')) {
+                                            myStatus = 'deleted';
+                                        } else if (msg.text.includes('你将') && msg.text.includes('移出黑名单')) {
+                                            myStatus = 'normal';
+                                        } else if (msg.text.includes('你已添加了')) {
+                                            myStatus = 'normal';
+                                        }
+                                    }
+                                }
+
+                                if (myStatus === 'deleted' || myStatus === 'blacklisted') {
+                                    console.log(`[Dynamics Tick] Skipping proactive message for "${charName}" because user relationship is: ${myStatus}.`);
+                                } else {
+                                    proactiveApiCallTimestamps.push(Date.now());
+                                    console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering proactive message for private character "${charName}".`);
+                                    await triggerProactiveAI(chat.id, charName, 'message');
                                 }
                             }
                         }
-
-                        // 如果用户已拉黑或删除，则跳过本次发消息行为
-                        if (myStatus === 'deleted' || myStatus === 'blacklisted') {
-                            console.log(`[Dynamics Tick] Skipping proactive message for "${charName}" because user relationship is: ${myStatus}.`);
-                        } else {
-                            // 只有关系正常时，才执行发消息
-                            console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering proactive message for private character "${charName}".`);
-                            await triggerProactiveAI(chat.id, charName, 'message');
-                        }
-                        // 【【【【【【 核心新增代码到这里结束 】】】】】】
-                        
-                        // 注意：单聊的主动消息不更新 lastTick，因为它只在空闲时触发一次
                     }
                 }
-            }
 
-            // --- 2. 检查朋友圈互动 ---
+            // --- 3. 检查朋友圈互动 ---
             if (charSettings.moments && charSettings.moments.enabled && charSettings.moments.probability > 0) {
                 const config = charSettings.moments;
                 if (!config.lastTick || (Date.now() - config.lastTick >= config.interval * 60 * 1000)) {
                     if (Math.random() * 100 < config.probability) {
-                        // 【核心修改】将 0.2 (20%) 降低为 0.05 (5%)，极大减少顺便发帖的频率
-                        const action = Math.random() < 0.05 ? 'post_moment' : 'browse_moments'; 
-                        console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering moment action (${action}) for private character "${charName}".`);
-                        // 核心修复：在 await 前更新并保存
-                        config.lastTick = Date.now();
-                        saveSettings(); 
-                        await triggerProactiveAI(chat.id, charName, action);
+                        // 速率检查
+                        const ONE_MINUTE = 60 * 1000;
+                        const dynamicsSettings = loadFromLocalStorage('app-dynamics-settings', { rateLimit: 2 });
+                        const RATE_LIMIT = (dynamicsSettings.rateLimit && dynamicsSettings.rateLimit >= 1) ? dynamicsSettings.rateLimit : 2;
+                        proactiveApiCallTimestamps = proactiveApiCallTimestamps.filter(timestamp => Date.now() - timestamp < ONE_MINUTE);
+
+                        if (proactiveApiCallTimestamps.length >= RATE_LIMIT) {
+                            console.log(`%c[Rate Limiter]`, 'color: orange;', `Private actor "${charName}" moments action blocked.`);
+                            // 被拦截，不更新时间戳
+                        } else {
+                            // 通过检查，更新时间戳并执行
+                            config.lastTick = Date.now();
+                            saveSettings();
+                            proactiveApiCallTimestamps.push(Date.now());
+
+                            const action = Math.random() < 0.05 ? 'post_moment' : 'browse_moments'; 
+                            console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering moment action (${action}) for private character "${charName}".`);
+                            await triggerProactiveAI(chat.id, charName, action);
+                        }
                     }
                 }
             }
@@ -34013,6 +34099,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 saveSettings();
             }
             console.log(`%c[Dynamics Tick]`, 'color: blue; font-weight: bold;', `Check cycle finished.`);
+            isTicking = false; // 解锁，允许下一次 tick 运行
         }
 
         function init() {
