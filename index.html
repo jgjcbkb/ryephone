@@ -40618,6 +40618,11 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                     aiResponse = data.choices?.[0]?.message?.content;
                 }
 
+                // 【核心修复】先清洗掉 AI 的思考过程，防止 AI 在思考中提到挂断指令导致误判
+                if (aiResponse) {
+                    aiResponse = aiResponse.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '').trim();
+                }
+
                 if (aiResponse && aiResponse.includes('[hang_up_call]')) {
                     const lastWords = aiResponse.replace('[hang_up_call]', '').trim();
                     if (lastWords) {
@@ -40751,7 +40756,11 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                     aiResponse = data.choices?.[0]?.message?.content;
                 }
                 
-                aiResponse = aiResponse ? aiResponse.replace('[hang_up_call]', '').trim() : '';
+                // 【核心修复】先清洗思考，再处理挂断标签
+                if (aiResponse) {
+                    aiResponse = aiResponse.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '').trim();
+                    aiResponse = aiResponse.replace('[hang_up_call]', '').trim();
+                }
 
                 if (aiResponse) {
                     addAiDialogue(aiResponse);
