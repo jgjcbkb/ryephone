@@ -12283,8 +12283,18 @@ if (momentsContext) {
                 finalSystemPrompt += milestonesContext;
             }
 
-            // 拼接世界书
+            // 拼接世界书 (修复版：包含线下专用世界书)
             const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${targetChatId}`, []);
+            
+            // 【核心修复】如果当前聊天是线下模式，把“线下专用世界书”也加进加载列表
+            if (contextChatInfo.mode === 'offline' && Array.isArray(contextChatInfo.offlineWorldbookNames)) {
+                contextChatInfo.offlineWorldbookNames.forEach(name => {
+                    if (!mountedWbNames.includes(name)) {
+                        mountedWbNames.push(name);
+                    }
+                });
+            }
+
             worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
                 if (entry.triggerMode === 'always') {
                     finalSystemPrompt += `\n\n[Background Information: ${entry.name}]\n${entry.content}`;
@@ -16129,9 +16139,9 @@ conversationManager.showNotificationBanner('TUQU', {
             }
         });
     }
-    // 【核心新增：单独导入酒馆世界书逻辑】
+    // 【核心新增：单独导入酒馆世界书逻辑 (修正版)】
     async function importSillyTavernLorebook() {
-        // 1. 权限检查：只有解锁了酒馆功能的才能使用
+        // 1. 权限检查
         const isUnlocked = localStorage.getItem('app_st_feature_unlocked') === 'true';
         if (!isUnlocked) {
             await conversationManager.customAlert('该功能尚未解锁。请前往“API 设置”完成开发者认证。', '功能受限');
@@ -16150,38 +16160,49 @@ conversationManager.showNotificationBanner('TUQU', {
                 const text = await file.text();
                 const lbData = JSON.parse(text);
                 
-                // 酒馆世界书格式通常在 entries 字段下，可能是数组也可能是对象
-                const entriesRaw = lbData.entries || lbData;
+                // 兼容 entries 在根目录或在 entries 字段下的情况
+                // 兼容 entries 是数组或对象的情况
+                let entriesRaw = lbData.entries || lbData;
+                
+                // 如果 entriesRaw 是一个包含 uid 的对象（如你提供的文件），需要转为数组
                 const entries = Array.isArray(entriesRaw) ? entriesRaw : Object.values(entriesRaw);
                 
                 if (!entries || entries.length === 0) {
                     throw new Error("未在 JSON 中检测到有效的世界书条目。");
                 }
 
-                // 获取分类名（优先使用文件名，或 JSON 里的名称）
                 const categoryName = lbData.name || file.name.replace(/\.[^/.]+$/, "");
                 let importedCount = 0;
 
                 entries.forEach(entry => {
+                    // 确保内容存在
                     if (entry.content && entry.content.trim()) {
-                        const hasKeys = entry.keys && Array.isArray(entry.keys) && entry.keys.length > 0;
-                        // 提取标题：优先用注释，其次用名称，最后用第一个关键词
-                        const entryTitle = entry.comment || entry.name || (hasKeys ? entry.keys[0] : `Entry_${Date.now()}`);
+                        // 关键词兼容 key 和 keys
+                        const keyList = entry.key || entry.keys || [];
+                        const hasKeys = Array.isArray(keyList) && keyList.length > 0;
                         
-                        // 【核心规则】：强制加上 (VC-IGNORE) 标记
+                        const entryTitle = entry.comment || entry.name || (hasKeys ? keyList[0] : `Entry_${Date.now()}`);
                         const wbName = `${entryTitle}(VC-IGNORE)`;
 
-                        // 查重：如果已经存在同名条目则跳过
+                        // 【核心修复逻辑】
+                        // 1. 开关状态：酒馆用 disable: false 表示开启。所以我们要取反。
+                        //    如果 disable 字段不存在，默认为开启。
+                        const isEnabled = (entry.disable === true) ? false : true;
+
+                        // 2. 触发模式：酒馆用 constant: true 表示蓝灯（始终触发）。
+                        //    如果 constant 为 false，则为绿灯（关键词触发）。
+                        const triggerMode = (entry.constant === true) ? 'always' : 'keyword';
+
+                        const keywordsStr = Array.isArray(keyList) ? keyList.join(', ') : '';
+
                         if (!worldBookEntries.some(wb => wb.name === wbName)) {
                             worldBookEntries.push({
                                 name: wbName,
                                 category: categoryName,
-                                keywords: hasKeys ? entry.keys.join(', ') : '',
+                                keywords: keywordsStr,
                                 content: entry.content,
-                                // 核心修复：直接读取酒馆的 enabled 状态 (灰灯/亮灯)
-                                enabled: entry.enabled === true, 
-                                // 核心修复：根据 constant 字段判断 (蓝灯为 always，绿灯为 keyword)
-                                triggerMode: entry.constant ? 'always' : 'keyword',
+                                enabled: isEnabled,     // <--- 修复点
+                                triggerMode: triggerMode, // <--- 修复点
                                 useInMoments: false,
                                 useInTuqu: false
                             });
@@ -16205,6 +16226,7 @@ conversationManager.showNotificationBanner('TUQU', {
         };
         fileInput.click();
     }
+
 
     async function extractDataFromPng(file) {
         const buffer = await file.arrayBuffer();
@@ -19888,9 +19910,10 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
 **CONTENT RULES PER TYPE:**
 1.  **type="text"**: The content is plain text for a message bubble.
-    - Example (Group): <block type="text" sender="苏瓷言">你好呀</block>
-    - Example (Private): <block type="text">你好呀</block>
-    - **[ONLINE MODE RULE]:** In \`type="text"\` blocks, you MUST output **PURE DIALOGUE**. Do NOT include actions in parentheses like \`(smiles)\` or asterisks \`*runs*\`. If you want to perform an action, use a \`type="command"\` block.
+    *   **FLEXIBILITY:** You can mix narration and dialogue in one block, OR split them into separate blocks.
+    *   **Example (Mixed):** <block type="text" sender="A">他笑了笑。「你好。」</block>
+    *   **Example (Split):** <block type="text" sender="A">他笑了笑。</block><block type="text" sender="A">「你好。」</block>
+    *   **RULE:** Do whatever feels best for the pacing of the story. No fixed limits.
 
 2.  **type="html"**: The content is a complete, multi-line HTML snippet (like <snippet> or <div>).
     - **【标签纯净度铁律 (WRAPPER PURITY)】:** 你【绝对禁止】使用 \`<snippet style=\` 或 \`<details style=\` 开头。
@@ -20341,9 +20364,10 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
 **CONTENT RULES PER TYPE:**
 1.  **type="text"**: The content is plain text for a message bubble.
-    - Example (Group): <block type="text" sender="苏瓷言">你好呀</block>
-    - Example (Private): <block type="text">你好呀</block>
-    - **[ONLINE MODE RULE]:** In \`type="text"\` blocks, you MUST output **PURE DIALOGUE**. Do NOT include actions in parentheses like \`(smiles)\` or asterisks \`*runs*\`. If you want to perform an action, use a \`type="command"\` block.
+    *   **FLEXIBILITY:** You can mix narration and dialogue in one block, OR split them into separate blocks.
+    *   **Example (Mixed):** <block type="text" sender="A">他笑了笑。「你好。」</block>
+    *   **Example (Split):** <block type="text" sender="A">他笑了笑。</block><block type="text" sender="A">「你好。」</block>
+    *   **RULE:** Do whatever feels best for the pacing of the story. No fixed limits.
 
 2.  **type="html"**: The content is a complete, multi-line HTML snippet (like <snippet> or <div>).
     - **Remember the Memory Anchor Rule:** If this HTML describes an action or transaction, add \`data-ai-log-as-text="true"\`!
@@ -20716,6 +20740,10 @@ Your entire output MUST be a sequence of one or more XML-like <block> elements.
 
 **CONTENT RULES:**
 1.  **type="text"**: Pure text for narration or dialogue.
+    *   **FLEXIBILITY:** You can mix narration and dialogue in one block, OR split them into separate blocks.
+    *   **Example (Mixed):** <block type="text">他笑了笑。「你好。」</block>
+    *   **Example (Split):** <block type="text">他笑了笑。</block><block type="text">「你好。」</block>
+    *   **RULE:** Do whatever feels best for the pacing of the story.
 2.  **type="html"**: Complete HTML snippet (e.g., <snippet>).
 3.  **type="command"**: System commands.
 
@@ -20830,7 +20858,10 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 1. **IGNORE PAST STYLE:** Even if the previous history contains long-form narrative prose, you MUST **STOP** that style immediately.
 2. **NO NARRATION:** You are strictly forbidden from using third-person narration or environment descriptions.
 3. **TEXT BUBBLES ONLY:** You can only communicate through realistic chat messages. Do not use novel-style narration.
-4. **SPLIT MESSAGES:** Do not send one big block. Use multiple **<block type="text">** elements to simulate a natural, multi-bubble conversation.
+4. **FREE FLOW (NO LIMITS):** You are **NOT** limited to a fixed number of messages. 
+   - If the characters are arguing rapidly, send MANY short blocks.
+   - If a character is explaining something, send one or two long blocks.
+   - **Do not count.** Just flow naturally.
 
 
 
@@ -20843,9 +20874,10 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
 **CONTENT RULES PER TYPE:**
 1.  **type="text"**: The content is plain text for a message bubble.
-    - Example (Group): <block type="text" sender="苏瓷言">你好呀</block>
-    - Example (Private): <block type="text">你好呀</block>
-    - **[ONLINE MODE RULE]:** In \`type="text"\` blocks, you MUST output **PURE DIALOGUE**. Do NOT include actions in parentheses like \`(smiles)\` or asterisks \`*runs*\`. If you want to perform an action, use a \`type="command"\` block.
+    *   **FLEXIBILITY:** You can mix narration and dialogue in one block, OR split them into separate blocks.
+    *   **Example (Mixed):** <block type="text" sender="A">他笑了笑。「你好。」</block>
+    *   **Example (Split):** <block type="text" sender="A">他笑了笑。</block><block type="text" sender="A">「你好。」</block>
+    *   **RULE:** Do whatever feels best for the pacing of the story. No fixed limits.
 
 2.  **type="html"**: The content is a complete, multi-line HTML snippet (like <snippet> or <div>).
     - **【标签纯净度铁律 (WRAPPER PURITY)】:** 你【绝对禁止】使用 \`<snippet style=\` 或 \`<details style=\` 开头。
@@ -21133,12 +21165,14 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
 **【线上模式打字员法则 (THE CHAT-APP TYPIST RULES)】**
 
-1. **碎片化发送 (Split Your Thoughts):** 真人聊天不会一次性发一大段话。你应该根据内容的逻辑，将回复拆分成**多条短消息**（使用多个 \`<block type="text">\`），以模拟自然的打字节奏。
+1. **自由节奏 (Free Flow):** 
+   - **NO FIXED COUNT:** You are **NOT** limited to a specific number of messages. You can send 1 message, or you can send 15 messages. It depends entirely on your character's mood and typing style.
+   - **Burst Mode:** If you are excited, angry, or anxious, send MANY short messages in a row (e.g., 5-10 short bubbles).
+   - **Chill Mode:** If you are lazy or calm, send 1-2 longer messages or a voice message.
+   - **Split Naturally:** Don't write a wall of text. Split your thoughts into separate bubbles whenever you would naturally hit "Send" on a phone.
 
-   - 第一条：打招呼或回应上一句。
-   - 第二条：表达观点或分享细节。
-   - 第三条：提问或引导。
 2. **禁止文学化描写:** 严禁描写“光影”、“空气”、“心跳”。只说你该说的话。
+
 3. **表情包依赖:** 强烈建议在每 1-2 条消息中插入一个 \`[emoji:名字]\` 或 \`[sticker:名字]\`。
 
 
@@ -21348,7 +21382,7 @@ Remember to also vary your message count as instructed before. Your goal is to b
 ---
 `;
     finalSystemPrompt += PROACTIVE_ACTION_SCENARIOS;
-    finalSystemPrompt += "\n[Generation Style]: You are in 'online' mode. Please provide multiple, short, chat-like messages, separated by newlines. Each line will be a separate message bubble.";
+    finalSystemPrompt += "\n[Generation Style]: You are in 'online' mode. Please generate as many (or as few) message bubbles as you need to express yourself naturally. Do not count them. Just flow.";
 }
             
             // --- 【核心修正】在所有分支逻辑之前，统一加载和拼接前情提要 ---
@@ -33838,8 +33872,18 @@ You are responsible for playing every AI character in the "Active Cast" list.`;
                                     fullContextPrompt += groupPersonasPrompt + individualPersonasText;
                                     fullContextPrompt += `\n\n[Ensemble & Supporting Cast Persona]\n${info.ensemblePersona || 'No general ensemble persona has been defined.'}`;
                                     
-                                    // 5. 注入世界书和NPC
+                                    // 5. 注入世界书和NPC (修复版：包含线下专用世界书)
                                     const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${group.id}`, []);
+                                    
+                                    // 【核心修复】如果群聊处于线下模式，把“线下专用世界书”也加进加载列表
+                                    if (info.mode === 'offline' && Array.isArray(info.offlineWorldbookNames)) {
+                                        info.offlineWorldbookNames.forEach(name => {
+                                            if (!mountedWbNames.includes(name)) {
+                                                mountedWbNames.push(name);
+                                            }
+                                        });
+                                    }
+
                                     worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
                                         if (entry.triggerMode === 'always') fullContextPrompt += `\n\n[Background Information: ${entry.name}]\n${entry.content}`;
                                     });
