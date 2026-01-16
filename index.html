@@ -11512,34 +11512,9 @@ if ('serviceWorker' in navigator) {
         }
 
     async function triggerProactiveAI(chatId, senderName, actionType, lockedBoard = null, extraOptions = {}) {
-        // =================================================================
-      // =================================================================
-        // START: Proactive Action Rate Limiter (Configurable)
-        // =================================================================
-        const now = Date.now();
-        const ONE_MINUTE = 60 * 1000;
+        // 【核心修复】删除了内部的速率限制逻辑，防止与 tick() 循环发生“双重记账”
+        // 现在速率控制完全由 tick() 循环在外部负责，这里只管执行。
         
-        // 从 localStorage 动态加载速率限制设置，如果找不到则默认为 2
-        const dynamicsSettings = loadFromLocalStorage('app-dynamics-settings', { rateLimit: 2 });
-        const RATE_LIMIT = (dynamicsSettings.rateLimit && dynamicsSettings.rateLimit >= 1) ? dynamicsSettings.rateLimit : 2;
-
-        // 1. 移除所有超过一分钟的旧时间戳 (这就是“滑动窗口”)
-        proactiveApiCallTimestamps = proactiveApiCallTimestamps.filter(timestamp => now - timestamp < ONE_MINUTE);
-
-        // 2. 检查当前窗口内的调用次数是否已达到上限
-        if (proactiveApiCallTimestamps.length >= RATE_LIMIT) {
-            // 如果达到上限，打印一条日志并立即中止函数，阻止本次API调用
-            console.log(`%c[Rate Limiter]`, 'color: orange; font-weight: bold;', `Proactive API call for "${senderName}" (${actionType}) blocked. Limit of ${RATE_LIMIT} per minute reached.`);
-            return; 
-        }
-
-        // 3. 如果未达到上限，就记录本次调用的时间戳，然后继续执行函数
-        proactiveApiCallTimestamps.push(now);
-        console.log(`%c[Rate Limiter]`, 'color: #27ae60; font-weight: bold;', `Proactive API call for "${senderName}" (${actionType}) allowed. Count in last minute: ${proactiveApiCallTimestamps.length}`);
-        // =================================================================
-        // END: Proactive Action Rate Limiter
-        // =================================================================
-
         // --- 核心新增：统一提取表情包和Emoji名称列表 ---
         const stickerNames = stickers.filter(s => s.type === 'sticker').map(s => `"${s.name}"`).join(', ') || 'None';
         const emojiNames = stickers.filter(s => s.type === 'emoji').map(s => `"${s.name}"`).join(', ') || 'None';
@@ -34171,7 +34146,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                                     
                                     const action = Math.random() < 0.2 ? 'post_moment' : 'browse_moments';
                                     console.log(`%c[Dynamics Action - Actor Trigger]`, 'color: green; font-weight: bold;', `Triggering "${action}" for actor "${actorName}".`);
-                                    await triggerProactiveAI(null, actorName, action);
+                                    // 【核心修改】移除 await，实现并发触发
+                                    triggerProactiveAI(null, actorName, action);
                                 }
                             }
                         }
@@ -34197,7 +34173,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                                     proactiveApiCallTimestamps.push(Date.now());
                                     
                                     console.log(`Dynamics: Triggering Tuqu action for ${actorName}`);
-                                    await triggerProactiveAI(null, actorName, 'tuqu_interaction');
+                                    // 【核心修改】移除 await
+                                    triggerProactiveAI(null, actorName, 'tuqu_interaction');
                                 }
                                 continue; 
                             }
@@ -34231,7 +34208,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                                     proactiveApiCallTimestamps.push(Date.now());
 
                                     console.log(`%c[Dynamics Action - Actor Trigger]`, 'color: green; font-weight: bold;', `Triggering proactive message for actor "${actorName}" in group "${group.name}".`);
-                                    await triggerProactiveAI(targetChatId, actorName, 'message');
+                                    // 【核心修改】移除 await
+                                    triggerProactiveAI(targetChatId, actorName, 'message');
                                 }
                             }
                         }
@@ -34270,7 +34248,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                                 proactiveApiCallTimestamps.push(Date.now());
                                 
                                 console.log(`[Dynamics] ${charName} 决定去兔区发帖/回帖`);
-                                await triggerProactiveAI(chat.id, charName, 'tuqu_interaction');
+                                // 【核心修改】移除 await
+                                triggerProactiveAI(chat.id, charName, 'tuqu_interaction');
                             }
                             continue; 
                         }
@@ -34323,7 +34302,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                                 } else {
                                     proactiveApiCallTimestamps.push(Date.now());
                                     console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering proactive message for private character "${charName}".`);
-                                    await triggerProactiveAI(chat.id, charName, 'message');
+                                    // 【核心修改】移除 await
+                                    triggerProactiveAI(chat.id, charName, 'message');
                                 }
                             }
                         }
@@ -34352,7 +34332,8 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
 
                             const action = Math.random() < 0.05 ? 'post_moment' : 'browse_moments'; 
                             console.log(`%c[Dynamics Action - Private Trigger]`, 'color: #16a085; font-weight: bold;', `Triggering moment action (${action}) for private character "${charName}".`);
-                            await triggerProactiveAI(chat.id, charName, action);
+                            // 【核心修改】移除 await
+                            triggerProactiveAI(chat.id, charName, action);
                         }
                     }
                 }
@@ -36324,7 +36305,8 @@ fileInput.style.display = 'none';
                                 proactiveApiCallTimestamps.push(Date.now());
 
                                 console.log(`NPC Dynamics: Triggering Tuqu action for ${charName}`);
-                                await triggerProactiveAI(null, charName, 'tuqu_interaction');
+                                // 【核心修改】移除 await
+                                triggerProactiveAI(null, charName, 'tuqu_interaction');
                             }
                         }
                     }
@@ -36351,7 +36333,8 @@ fileInput.style.display = 'none';
 
                             const action = Math.random() < 0.8 ? 'browse_moments' : 'post_moment';
                             console.log(`NPC Dynamics: Triggering moment action (${action}) for ${charName}`);
-                            await triggerProactiveAI(null, charName, action);
+                            // 【核心修改】移除 await
+                            triggerProactiveAI(null, charName, action);
                         }
                     }
                 }
