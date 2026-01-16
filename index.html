@@ -26381,46 +26381,30 @@ const reRenderMessages = (isInitialLoad = false) => {
     }
 };
 
-async function getAiGeneratedReplyForMe(targetChatId, messageToReply, stance) {
+        async function getAiGeneratedReplyForMe(targetChatId, messageToReply, stance) {
             let loadingModalOverlay = null;
 
-            // 创建一个可以手动控制的关闭函数
+            // 弹窗显示逻辑
             const showLoadingModal = () => {
                 const existingModal = document.querySelector('.modal-overlay[data-modal-id]');
-                if (existingModal) existingModal.remove(); // 移除可能残留的旧弹窗
-                
+                if (existingModal) existingModal.remove();
                 conversationManager.showCustomModal({ 
                     title: 'AI 正在代写...', 
                     text: '请稍候...',
-                    onRender: (modalDOM) => {
-                        loadingModalOverlay = modalDOM;
-                        // 允许点击遮罩层关闭（虽然在自动发送模式下用户可能来不及点）
-                        modalDOM.addEventListener('click', (e) => {
-                            if (e.target === modalDOM) {
-                                modalDOM.classList.remove('visible');
-                            }
-                        });
-                    }
+                    onRender: (modalDOM) => { loadingModalOverlay = modalDOM; }
                 });
             };
             
-            // 立即显示加载弹窗
             showLoadingModal();
 
             const closeLoadingModal = () => {
                 if (loadingModalOverlay) {
                     loadingModalOverlay.classList.remove('visible');
-                    // 确保弹窗从DOM中移除
-                    setTimeout(() => {
-                        if (loadingModalOverlay && loadingModalOverlay.parentElement) {
-                            loadingModalOverlay.remove();
-                        }
-                    }, 300);
+                    setTimeout(() => { if (loadingModalOverlay?.parentElement) loadingModalOverlay.remove(); }, 300);
                 }
             };
             
             try {
-                // 【【【核心修复1】】】所有数据都从传入的 targetChatId 加载，不再依赖全局状态
                 const chatInfo = loadFromLocalStorage(`chat_info_${targetChatId}`, {});
                 const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
                 
@@ -26428,14 +26412,16 @@ async function getAiGeneratedReplyForMe(targetChatId, messageToReply, stance) {
                 const profile = apiProfiles[parseInt(profileIndexStr)];
                 if (!profile) throw new Error("API配置不存在。");
 
+                // 【核心新增】获取当前身份
+                const currentIdentity = loadFromLocalStorage(`chat_identity_${targetChatId}`, '{{user}}');
+                const isActing = currentIdentity !== '{{user}}';
+
                 // 1. 构建完整的系统上下文
                 let fullSystemPrompt = profile.prompt || '';
-                
-                // 将终极心理引擎作为最高优先级指令注入
                 fullSystemPrompt = ULTIMATE_PSYCHOLOGICAL_ENGINE + fullSystemPrompt;
                 
                 const userDisplayName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
-                const charDisplayName = messageToReply.sender || chatState.chatName; // 保持不变，用于指代目标
+                const charDisplayName = messageToReply.sender || chatState.chatName;
 
                 if (chatInfo.preamble) { fullSystemPrompt = `[Preamble]\n${chatInfo.preamble}\n\n` + fullSystemPrompt; }
 
@@ -26455,41 +26441,96 @@ async function getAiGeneratedReplyForMe(targetChatId, messageToReply, stance) {
                     fullSystemPrompt += `\n\n[AI Character Persona]\n${chatInfo.aiPersona || 'A helpful assistant.'}`;
                 }
 
+                // 注入世界书
                 const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${targetChatId}`, []);
                 worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
                     fullSystemPrompt += `\n\n[World Book: ${entry.name}]\n${entry.content}`;
                 });
+
+                // 【核心新增】注入关联 NPC 人设，解决扮演 NPC 时代写 AI “不认识自己”的问题
+                const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${targetChatId}`, []);
+                if (associatedNpcNames.length > 0) {
+                    fullSystemPrompt += '\n\n[Associated NPCs for this Context]\n';
+                    const npcSettingsData = loadFromLocalStorage('app-npc-settings', {});
+                    associatedNpcNames.forEach(name => {
+                        const rawData = npcSettingsData.personas?.[name];
+                        let npcPersona = 'No specific persona defined.';
+                        if (typeof rawData === 'object' && rawData !== null) {
+                            npcPersona = rawData.description || '';
+                        } else if (typeof rawData === 'string') {
+                            npcPersona = rawData;
+                        }
+                        fullSystemPrompt += `- **${name}**: ${npcPersona}\n`;
+                    });
+                }
                 
                 timeManager.updateSettingsForChat(targetChatId);
                 fullSystemPrompt += timeManager.getAITimeContext();
                 
                 fullSystemPrompt = fullSystemPrompt.replace(/{{user}}/g, userDisplayName).replace(/{{char}}/g, charDisplayName);
 
-                // 2. 【【【核心修复2】】】重构任务指令，强调“回复前文”
-                const taskPrompt = `
-# 角色扮演任务：代写回复
-
-你是一个顶级的写作助手。你的任务是扮演用户 "${userDisplayName}"，根据他的人设、当前的对话上下文（已在系统指令和历史记录中提供），以及指定的回复策略，为他代写一条回复。
-
-## 任务详情
-
+                // 2. 【核心重构】任务指令：支持“变身”模式
+                let identityInstruction = "";
+                if (isActing) {
+                    identityInstruction = `
+1.  **你的身份 (最高优先级锁定):** 用户当前正在扮演角色 **"${currentIdentity}"**。
+2.  **执行任务:** 你必须完全抛弃 "${userDisplayName}" 的身份，转而以 **"${currentIdentity}"** 的性格、口吻和立场来写这条回复。
+3.  **认知参考:** 请在上方 [Associated NPCs] 或历史记录中查找 "${currentIdentity}" 的人设信息。`;
+                } else {
+                    identityInstruction = `
 1.  **你的身份:** 你就是用户 "${userDisplayName}"。
-2.  **核心目标:** 你的回复应该是对【整个对话前文】的自然延续和回应，而不仅仅是针对下面引用的最后一条消息。
-3.  **参考消息:** 作为你回应的直接触发点，对方的最后一条消息是：
-    > "${charDisplayName}": "${messageToReply.text}"
-4.  **回复策略 (必须遵守):** 你的回复必须严格遵循以下策略：**${stance}**
-5.  **输出要求:**
-    *   你的回复必须完全符合 "${userDisplayName}" 的人设和口吻。
-    *   你的输出【只能】包含代写的回复文本本身。
-    *   【绝对禁止】包含任何解释、分析、或 "好的，这是代写的回复：" 之类的额外内容。
-    *   语言：简体中文。
+2.  **执行任务:** 请根据 "${userDisplayName}" 的人设和口吻进行回复。`;
+                }
+
+                const taskPrompt = `
+# [顶级剧本顾问任务：代写符合逻辑的后续回复]
+
+你现在是该剧本的首席作家。上方提供的 [RECENT CHAT HISTORY] 是你**唯一且绝对**的参考依据。
+
+## **核心任务指令**
+
+1.  **深度上下文分析 (MANDATORY):** 
+    *   你必须仔细阅读上方历史记录中的每一句话。
+    *   分析 ${userDisplayName} 与对方目前的**情感阶段**（暧昧、争吵、冷战、热恋？）。
+    *   分析当前的**谈话主题**，确保回复不跑题。
+    *   分析 ${userDisplayName} 的**性格连贯性**，不要写出 OOC（不符合人设）的话。
+
+2.  **身份锁定:** 
+    ${isActing ? `当前用户正在变身扮演 **"${currentIdentity}"**，请务必以此身份发言。` : `你就是 **"${userDisplayName}"** 本人。`}
+
+3.  **回复触发点:** 
+    对方最后说的是：\`"${charDisplayName}": "${messageToReply.text}"\`。请针对这句话，并结合**前文所有伏笔和情绪积累**进行回复。
+
+4.  **回复策略:** 
+    你必须执行此特定策略：**【${stance}】**
+
+## **输出规范**
+- **禁止废话:** 直接输出回复内容，禁止带任何分析、解释或引号。
+- **禁止复读:** 不要复述历史记录里已经说过的话。
+- **语言:** 简体中文。
 `;
+
+
                 
-                // 【【【核心修复3】】】从目标聊天的完整历史记录中加载上下文
+                // 【核心重构】上下文加载逻辑：确保 AI 能看到“目标消息”及其之前的全部对话
                 const fullHistory = loadFromLocalStorage(`conversation_${targetChatId}`, []);
-                const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
-                const recentMessages = memoryLength > 0 ? fullHistory.slice(-memoryLength) : fullHistory;
-                const apiPayloadMessages = await prepareApiPayload(recentMessages);
+                const memoryLength = parseInt(chatInfo.memoryLength || 100, 10); // 默认读100条，更有全局感
+                
+                // 找到用户点击的那条消息在历史中的位置
+                const targetIdx = fullHistory.findIndex(m => m.id === messageToReply.id);
+                let recentMessages = [];
+                
+                if (targetIdx !== -1) {
+                    // 截取目标消息及其之前的对话，最多不超过 memoryLength
+                    const startIdx = Math.max(0, targetIdx - memoryLength + 1);
+                    recentMessages = fullHistory.slice(startIdx, targetIdx + 1);
+                } else {
+                    // 找不到则按常规逻辑截取最后一段
+                    recentMessages = memoryLength > 0 ? fullHistory.slice(-memoryLength) : fullHistory;
+                }
+
+                // 【核心修改】传入 targetChatId 确保 prepareApiPayload 逻辑正确
+                const apiPayloadMessages = await prepareApiPayload(recentMessages, targetChatId);
 
                 const finalMessages = [
                 { role: "system", content: fullSystemPrompt },
