@@ -15995,9 +15995,12 @@ conversationManager.showNotificationBanner('TUQU', {
                                                     category: name,
                                                     keywords: hasKeys ? entry.keys.join(', ') : '',
                                                     content: entry.content,
-                                                    enabled: true,
-                                                    triggerMode: hasKeys ? 'keyword' : 'always',
-                                                    useInMoments: false
+                                                    // 核心修复：导入角色卡时也要遵循词条本身的开关状态
+                                                    enabled: entry.enabled === true,
+                                                    // 核心修复：遵循蓝灯(constant:true)和绿灯(constant:false)
+                                                    triggerMode: entry.constant ? 'always' : 'keyword',
+                                                    useInMoments: false,
+                                                    useInTuqu: false
                                                 });
                                             }
                                             importedWbNames.push(wbName);
@@ -16175,8 +16178,10 @@ conversationManager.showNotificationBanner('TUQU', {
                                 category: categoryName,
                                 keywords: hasKeys ? entry.keys.join(', ') : '',
                                 content: entry.content,
-                                enabled: entry.enabled !== false, // 尊重原始开关状态
-                                triggerMode: hasKeys ? 'keyword' : 'always',
+                                // 核心修复：直接读取酒馆的 enabled 状态 (灰灯/亮灯)
+                                enabled: entry.enabled === true, 
+                                // 核心修复：根据 constant 字段判断 (蓝灯为 always，绿灯为 keyword)
+                                triggerMode: entry.constant ? 'always' : 'keyword',
                                 useInMoments: false,
                                 useInTuqu: false
                             });
