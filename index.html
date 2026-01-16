@@ -35404,20 +35404,26 @@ function saveSettings() {
                 const fileInput = document.createElement('input');
                 fileInput.type = 'file';
                 fileInput.accept = 'image/*';
-                fileInput.onchange = async (e) => {
-                    const file = e.target.files[0];
+                fileInput.onchange = async (event) => { // 修改变量名为 event 避免冲突
+                    const file = event.target.files[0];
                     if (!file) return;
 
-                    const dbKey = `bg-image-${storageKey}-${Date.now()}`;
+                    // 核心修改：清理 storageKey 中的点号，防止生成非法的数据库键名
+                    const safeKey = storageKey.replace(/\./g, '-');
+                    const dbKey = `bg-image-${safeKey}-${Date.now()}`;
                     const indexedDbRef = `indexeddb:${dbKey}`;
                     try {
                         await imageStore.setItem(dbKey, file);
                         inputElement.value = indexedDbRef; // 更新输入框的值
                         
+                        // 核心修改：手动触发一次 input 事件，确保数据被同步到 appearanceSettings 对象
+                        inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+
                         // 触发保存逻辑
                         document.getElementById('appearance-save-btn').click();
                         alert('图片已上传并自动保存！');
                     } catch (error) {
+                        console.error(error);
                         alert("图片上传失败！");
                     }
                 };
@@ -35614,14 +35620,25 @@ function saveSettings() {
                 handleBackgroundUpload('globalChatBgUrlDark', inputEl);
             });
 
+            // 1. 修复主页背景按钮
             document.getElementById('home-bg-upload-btn').addEventListener('click', () => {
-
-                if (e.target.classList.contains('local-icon-upload-btn')) {
-                    const page = e.target.dataset.page;
-                    const inputEl = document.getElementById(`icon-url-${page}`);
-                    handleBackgroundUpload(`iconUrls.${page}`, inputEl);
-                }
+                const inputEl = document.getElementById('home-bg-url');
+                handleBackgroundUpload('homeBgUrl', inputEl);
             });
+
+            // 2. 核心修复：为图标设置容器添加独立的事件委托监听器
+            const iconContainer = document.getElementById('home-icon-settings-container');
+            if (iconContainer) {
+                iconContainer.addEventListener('click', (e) => {
+                    const btn = e.target.closest('.local-icon-upload-btn');
+                    if (btn) {
+                        const page = btn.dataset.page;
+                        const inputEl = document.getElementById(`icon-url-${page}`);
+                        // 传入唯一的标识符，确保存入数据库的键名不冲突
+                        handleBackgroundUpload(`icon-${page}`, inputEl);
+                    }
+                });
+            }
             // 【【【修改结束】】】
 
             document.getElementById('global-css-select').addEventListener('change', (e) => {
