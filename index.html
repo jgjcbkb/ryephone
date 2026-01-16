@@ -7477,6 +7477,8 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                             </div>
                         </div>
                         <button id="worldbook-add-btn" class="btn-primary">添加条目</button>
+                        <!-- 【核心新增】导入酒馆世界书按钮 -->
+                        <button id="import-st-lorebook-btn" class="btn-primary" style="margin-top: 10px; background-color: #6f42c1;">导入酒馆世界书 (.json)</button>
                         <input type="hidden" id="worldbook-edit-index">
                     </div>
                 </div>
@@ -16112,6 +16114,80 @@ conversationManager.showNotificationBanner('TUQU', {
             }
         });
     }
+    // 【核心新增：单独导入酒馆世界书逻辑】
+    async function importSillyTavernLorebook() {
+        // 1. 权限检查：只有解锁了酒馆功能的才能使用
+        const isUnlocked = localStorage.getItem('app_st_feature_unlocked') === 'true';
+        if (!isUnlocked) {
+            await conversationManager.customAlert('该功能尚未解锁。请前往“API 设置”完成开发者认证。', '功能受限');
+            return;
+        }
+
+        // 2. 触发文件选择
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.json,application/json';
+        fileInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const lbData = JSON.parse(text);
+                
+                // 酒馆世界书格式通常在 entries 字段下，可能是数组也可能是对象
+                const entriesRaw = lbData.entries || lbData;
+                const entries = Array.isArray(entriesRaw) ? entriesRaw : Object.values(entriesRaw);
+                
+                if (!entries || entries.length === 0) {
+                    throw new Error("未在 JSON 中检测到有效的世界书条目。");
+                }
+
+                // 获取分类名（优先使用文件名，或 JSON 里的名称）
+                const categoryName = lbData.name || file.name.replace(/\.[^/.]+$/, "");
+                let importedCount = 0;
+
+                entries.forEach(entry => {
+                    if (entry.content && entry.content.trim()) {
+                        const hasKeys = entry.keys && Array.isArray(entry.keys) && entry.keys.length > 0;
+                        // 提取标题：优先用注释，其次用名称，最后用第一个关键词
+                        const entryTitle = entry.comment || entry.name || (hasKeys ? entry.keys[0] : `Entry_${Date.now()}`);
+                        
+                        // 【核心规则】：强制加上 (VC-IGNORE) 标记
+                        const wbName = `${entryTitle}(VC-IGNORE)`;
+
+                        // 查重：如果已经存在同名条目则跳过
+                        if (!worldBookEntries.some(wb => wb.name === wbName)) {
+                            worldBookEntries.push({
+                                name: wbName,
+                                category: categoryName,
+                                keywords: hasKeys ? entry.keys.join(', ') : '',
+                                content: entry.content,
+                                enabled: entry.enabled !== false, // 尊重原始开关状态
+                                triggerMode: hasKeys ? 'keyword' : 'always',
+                                useInMoments: false,
+                                useInTuqu: false
+                            });
+                            importedCount++;
+                        }
+                    }
+                });
+
+                if (importedCount > 0) {
+                    saveWorldBook();
+                    renderWorldBook();
+                    alert(`成功导入 ${importedCount} 条世界书条目！\n分类：${categoryName}`);
+                } else {
+                    alert("导入完成，但未发现新条目（可能已全部存在）。");
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("导入失败：请确保上传的是标准的 SillyTavern Lorebook JSON 文件。");
+            }
+        };
+        fileInput.click();
+    }
 
     async function extractDataFromPng(file) {
         const buffer = await file.arrayBuffer();
@@ -17320,7 +17396,8 @@ info.myPersona = document.getElementById('my-persona').value.trim();
         delete info.groupPersonas; 
     }
 
-    const mountedWbCheckboxes = document.querySelectorAll('#mounted-worldbook-list input[type="checkbox"]:checked');
+    // 核心修复：只抓取 class 为 wb-individual-checkbox 的勾选框，避免存入分类名
+    const mountedWbCheckboxes = document.querySelectorAll('#mounted-worldbook-list .wb-individual-checkbox:checked');
     const mountedWbNames = Array.from(mountedWbCheckboxes).map(cb => cb.value);
     saveToLocalStorage(`chat_mounted_wb_${currentChatId}`, mountedWbNames);
 
@@ -27790,7 +27867,41 @@ elements.userPersonaSelect.innerHTML = '<option value="无">无</option>';
 
             const wbListContainer = document.getElementById('mounted-worldbook-list');
             const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${chatState.chatId}`, []);
-            wbListContainer.innerHTML = worldBookEntries.length > 0 ? worldBookEntries.map(wb => `<label class="inline-label"><input type="checkbox" value="${wb.name}" ${mountedWbNames.includes(wb.name) ? 'checked' : ''}> ${wb.name}</label>`).join('') : '<p style="text-align:center;color:#888;">没有可用的世界书</p>';
+            
+            if (worldBookEntries.length === 0) {
+                wbListContainer.innerHTML = '<p style="text-align:center;color:#888;">没有可用的世界书</p>';
+            } else {
+                // 1. 按分类分组
+                const groups = {};
+                worldBookEntries.forEach(wb => {
+                    const cat = wb.category || '未分类';
+                    if (!groups[cat]) groups[cat] = [];
+                    groups[cat].push(wb);
+                });
+
+                // 2. 渲染分组列表
+                wbListContainer.innerHTML = Object.keys(groups).sort().map(catName => {
+                    const items = groups[catName];
+                    // 检查该分类下是否所有项都被选中
+                    const isAllChecked = items.every(item => mountedWbNames.includes(item.name));
+                    
+                    const itemsHtml = items.map(wb => `
+                        <label class="inline-label" style="margin-left: 20px; font-weight: normal;">
+                            <input type="checkbox" class="wb-individual-checkbox" data-category="${catName}" value="${wb.name}" ${mountedWbNames.includes(wb.name) ? 'checked' : ''}> ${wb.name}
+                        </label>
+                    `).join('');
+
+                    return `
+                        <div class="wb-mount-category-group" style="margin-bottom: 10px; border-bottom: 1px solid #f0f0f0; padding-bottom: 5px;">
+                            <label class="inline-label">
+                                <input type="checkbox" class="wb-category-select-all" data-target-category="${catName}" ${isAllChecked ? 'checked' : ''}> 
+                                <b style="color: var(--primary-color);">${catName}</b>
+                            </label>
+                            <div class="wb-category-items">${itemsHtml}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
 
             // START: 新增正则挂载列表渲染
             const regexListContainer = document.getElementById('mounted-regex-list');
@@ -27999,24 +28110,35 @@ elements.userPersonaSelect.innerHTML = '<option value="无">无</option>';
                 disbandBtn.textContent = (relationship.groupStatus === 'disbanded') ? '恢复群聊' : '解散群聊';
                 disbandBtn.classList.toggle('danger', relationship.groupStatus !== 'disbanded');
             }
-            // --- 新增：为回溯历史按钮绑定事件 ---
-            const viewBranchesBtn = document.getElementById('view-history-branches-btn');
-            // 先移除旧的监听器，防止重复绑定
-            const newBtn = viewBranchesBtn.cloneNode(true);
-            viewBranchesBtn.parentNode.replaceChild(newBtn, viewBranchesBtn);
-            // 在新的克隆按钮上添加事件
-            newBtn.addEventListener('click', () => {
-                showBranchHistoryModal(chatState.chatId);
-            });
 
-            // 【核心新增】回填自动总结间隔
-            const autoSummaryInput = document.getElementById('auto-summary-interval');
-            if (autoSummaryInput) {
-                autoSummaryInput.value = info.autoSummaryInterval || '';
-            }
+            // 【核心新增：处理世界书分类全选联动】
+            // 将事件绑定在容器上，利用事件冒泡处理点击
+            wbListContainer.onclick = (e) => {
+                const catCheckbox = e.target.closest('.wb-category-select-all');
+                if (catCheckbox) {
+                    const catName = catCheckbox.dataset.targetCategory;
+                    const isChecked = catCheckbox.checked;
+                    // 找到该分类下所有的个体勾选框
+                    const children = wbListContainer.querySelectorAll(`.wb-individual-checkbox[data-category="${catName}"]`);
+                    children.forEach(cb => cb.checked = isChecked);
+                    return;
+                }
+
+                // 如果点击的是个体勾选框，反向检查分类全选框的状态
+                const indCheckbox = e.target.closest('.wb-individual-checkbox');
+                if (indCheckbox) {
+                    const catName = indCheckbox.dataset.category;
+                    const parentAll = wbListContainer.querySelector(`.wb-category-select-all[data-target-category="${catName}"]`);
+                    if (parentAll) {
+                        const allSiblings = Array.from(wbListContainer.querySelectorAll(`.wb-individual-checkbox[data-category="${catName}"]`));
+                        parentAll.checked = allSiblings.every(cb => cb.checked);
+                    }
+                }
+            };
 
             navigateTo('chat-info');
         }
+
 
 function enterMultiSelectMode(initialMessageId) { 
     isMultiSelectMode = true; 
@@ -38974,6 +39096,11 @@ async function handleRemoveMember() {
         });
 
         loadWorldBook(); renderWorldBook();
+        // 【核心新增】绑定导入酒馆世界书按钮事件
+        const importStWbBtn = document.getElementById('import-st-lorebook-btn');
+        if (importStWbBtn) {
+            importStWbBtn.addEventListener('click', importSillyTavernLorebook);
+        }
         loadApiSettings(); renderApiProfiles();
         userPersonaManager.init();
         dynamicsManager.init();
