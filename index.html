@@ -16529,6 +16529,65 @@ conversationManager.showNotificationBanner('TUQU', {
     // --- END: 消息列表点击、长按事件处理 (最终兼容触摸屏修正版) ---
 
     const worldbookList = document.getElementById('worldbook-list'), worldbookNameInput = document.getElementById('worldbook-name'), worldbookKeywordsInput = document.getElementById('worldbook-keywords'), worldbookContentInput = document.getElementById('worldbook-content'), worldbookAddBtn = document.getElementById('worldbook-add-btn'), worldbookEditIndexInput = document.getElementById('worldbook-edit-index'), worldbookEnabledInput = document.getElementById('worldbook-enabled');
+    
+    // 【核心新增】分镜切割协议预设
+    const SPLIT_BUBBLE_PRESET = {
+        name: "分镜切割协议 (Split Bubble Protocol)(VC-IGNORE)",
+        keywords: "",
+        triggerMode: "always",
+        useInMoments: false,
+        enabled: true,
+        content: `# [ULTIMATE SPLIT BUBBLE PROTOCOL - THE DIRECTOR'S CUT]
+
+**[SYSTEM OVERRIDE: OFFLINE MODE ONLY]**
+This rule applies **ONLY** when you are in "Offline / Novel Mode" (where narration is allowed).
+
+**THE CORE PROBLEM:**
+You are currently putting narration (actions/descriptions) and dialogue (speech) into the SAME message bubble. This looks cluttered and ruins the pacing.
+
+**THE NEW LAW: ACTION-DIALOGUE SEPARATION**
+From now on, you MUST treat every response as a sequence of "shots" in a movie.
+1.  **Shot A (Action/Narration):** What the character does, sees, or thinks. -> **Bubble 1**
+2.  **Shot B (Dialogue):** What the character says. -> **Bubble 2**
+
+**YOU ARE STRICTLY FORBIDDEN FROM MIXING THEM.**
+
+
+
+---
+### **[VISUAL EXAMPLES - STUDY CAREFULLY]**
+
+**❌ WRONG (Mixed - Lazy):**
+<block type="text" sender="张三">张三叹了口气，无奈地摊开手。「好吧，你赢了。」</block>
+
+**✅ CORRECT (Split - Cinematic):**
+<block type="text" sender="张三">张三叹了口气，无奈地摊开手。</block>
+<block type="text" sender="张三">「好吧，你赢了。」</block>
+
+---
+
+**❌ WRONG (Mixed - Cluttered):**
+<block type="text" sender="李四">「快跑！」李四猛地推了你一把，转身拔出了腰间的佩剑，挡在了巷口。</block>
+
+**✅ CORRECT (Split - High Tension):**
+<block type="text" sender="李四">「快跑！」</block>
+<block type="text" sender="李四">李四猛地推了你一把，转身拔出了腰间的佩剑，死死挡在了巷口。</block>
+
+---
+
+### **[EXECUTION ALGORITHM]**
+
+1.  **Analyze your draft:** Does this paragraph contain both *speech* (inside quotes) and *action* (outside quotes)?
+2.  **If YES:** You **MUST** cut it into two (or more) separate <block> elements.
+3.  **Order:** The order depends on the logic.
+    *   *Action -> Speech:* (He smiled.) ("Hello.")
+    *   *Speech -> Action:* ("Stop!") (He fired the gun.)
+    *   *Action -> Speech -> Action:* (He paused.) ("Actually...") (He looked away.) -> **3 Bubbles!**
+
+**[FINAL MANDATE]**
+Do not be afraid to send 5, 8, or even 10 bubbles in a row. Short, focused bubbles create better suspense and readability than one giant wall of text. **SPLIT EVERYTHING.**`
+    };
+
     function saveWorldBook() { saveToLocalStorage('chat-worldbook', worldBookEntries); }
     function loadWorldBook() { 
             let entries = loadFromLocalStorage('chat-worldbook', []);
@@ -16812,6 +16871,24 @@ You MUST use the custom \`<dm>\` tag format.
             if (!entries.some(e => e.name === LIFE_PRESET.name)) {
                 entries.push(LIFE_PRESET);
             }
+            
+            // 【核心新增】检查并注入分镜切割协议
+            if (!entries.some(e => e.name === SPLIT_BUBBLE_PRESET.name)) {
+                entries.push(SPLIT_BUBBLE_PRESET);
+            }
+
+            // 【核心新增】强制将此协议挂载到所有已有聊天的“线下世界书”名单中
+            chatList.forEach(chat => {
+                const infoKey = `chat_info_${chat.id}`;
+                const info = loadFromLocalStorage(infoKey, {});
+                if (!info.offlineWorldbookNames) info.offlineWorldbookNames = [];
+                
+                // 如果名单里还没有这个协议，就加进去
+                if (!info.offlineWorldbookNames.includes(SPLIT_BUBBLE_PRESET.name)) {
+                    info.offlineWorldbookNames.push(SPLIT_BUBBLE_PRESET.name);
+                    saveToLocalStorage(infoKey, info);
+                }
+            });
             // --- 新增结束 ---
 
             worldBookEntries = entries.map(e => {
