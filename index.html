@@ -519,7 +519,10 @@
     padding: 10px 18px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); 
     width: -moz-fit-content; width: fit-content;
     min-width: 30px;
-    white-space: pre-wrap; 
+    /* 修改这里：normal 会自动合并多余的空格和换行 */
+    white-space: normal; 
+    /* 增加这一行，确保长单词能换行 */
+    word-break: break-word; 
 }
     /* 核心修复：针对 .9图气泡的 iOS 专属性能补丁 */
     #page-conversation .message-main-content {
@@ -11361,15 +11364,21 @@ if ('serviceWorker' in navigator) {
                         list: list 
                     }, '*');
                 }
-            } else if (event.data && event.data.type === 'REQUEST_WORLDBOOK_LIST') {
-                // 【核心新增】响应兔区对世界书列表的请求
-                // 发送所有启用的世界书，并标记哪些是“兔区必读”
+                        } else if (event.data.type === 'REQUEST_WORLDBOOK_LIST') {
+                // 【核心修复】响应兔区对世界书列表的请求
+                // 绝对不进行任何过滤，显示所有条目
                 const wbListData = worldBookEntries
-                    .filter(entry => entry.enabled) // 只发送已启用的
                     .map(entry => ({ 
                         name: entry.name, 
-                        required: entry.useInTuqu // 标记是否为必读
-                    }));
+                        // 只有当它既是“启用”状态，又是“兔区必读”时，才标记为必读
+                        required: (entry.enabled && entry.useInTuqu) 
+                    }))
+                    // 排序：必读的排在最前面，其他的按名称排序
+                    .sort((a, b) => {
+                        if (a.required && !b.required) return -1;
+                        if (!a.required && b.required) return 1;
+                        return a.name.localeCompare(b.name, 'zh-CN');
+                    });
 
                 const tuquIframe = document.querySelector('#tab-content-tuqu iframe');
                 if (tuquIframe) {
@@ -11379,6 +11388,8 @@ if ('serviceWorker' in navigator) {
                     }, '*');
                 }
             }
+
+
 
     });
     
@@ -12164,13 +12175,17 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
 
                         // ... (上文代码) ...
 
-            // --- START: 重新注入聊天记录上下文 (修复版) ---
+            // --- START: 重新注入聊天记录上下文 (大容量兼容版) ---
             let chatHistoryForPrompt = '';
             if (targetChatId) {
                 const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
                 
-                // 【核心修复】加载历史记录时，增加数据库回退检查
+                // 【核心修复】增加数据库回退检查，确保主动发消息时不会失忆
                 let sourceMessages = loadFromLocalStorage(`conversation_${targetChatId}`, []);
+                if (sourceMessages.length === 0) {
+                    const dbData = await imageStore.getItem(`conversation_${targetChatId}`);
+                    if (dbData) sourceMessages = dbData;
+                }
                 if (sourceMessages.length === 0) {
                     try {
                         // 如果LS为空，尝试从数据库读取，这里不能用 await，因为外层没有 async (或者用 .then)
@@ -13068,14 +13083,17 @@ if (isGroupPersona) {
                 return `Post #${i + 1} (ID: ${post.id}) by ${authorLabel} [Posted at: ${pTimeStr}] ${privacyInfo}: "${contentDescription}" ${imageInfo}\n  Recent Comments:\n${commentsPreview || '  - No comments yet.'}`;
             }).join('\n\n');
             
-            // --- START: 需求 1 & 2 的核心修改 - 加载聊天记录 (数据库修复版) ---
+            // --- START: 需求 1 & 2 的核心修改 - 加载聊天记录 (大容量兼容版) ---
             let chatHistoryForPrompt = '';
-            // 【【【【【【 核心修复：重新启用并强化聊天记录加载逻辑 】】】】】】
-            if (contextChatId) { // 仅当上下文聊天ID存在时才加载
+            if (contextChatId) { 
                 const memoryLength = parseInt(contextChatInfo.memoryLength || 100, 10);
                 
-                // 【关键修复】优先读缓存，缓存没有读数据库
+                // 【关键修复】增加数据库回退检查
                 let sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                if (sourceMessages.length === 0) {
+                    const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
+                    if (dbData) sourceMessages = dbData;
+                }
                 if (sourceMessages.length === 0) {
                     try {
                         const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
@@ -13493,13 +13511,17 @@ This API call is an opportunity for you to live your social life. You **MUST** p
             // 【第四步：为发朋友圈的行为，也注入上下文】
             console.log(`[诊断日志] 角色 "${senderName}": 决定主动发布一条朋友圈...`);
             
-            // --- START: 核心修正 - 为发帖行为注入完整的聊天历史上下文 (数据库修复版) ---
+            // --- START: 核心修正 - 为发帖行为注入完整的聊天历史上下文 (大容量兼容版) ---
             let chatHistoryForPrompt = '';
-            if (contextChatId) { // contextChatId 是在函数开头部分根据角色身份智能确定的
+            if (contextChatId) { 
                 const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
                 
-                // 【关键修复】优先读缓存，缓存没有读数据库
+                // 【关键修复】增加数据库回退检查
                 let sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                if (sourceMessages.length === 0) {
+                    const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
+                    if (dbData) sourceMessages = dbData;
+                }
                 if (sourceMessages.length === 0) {
                     try {
                         const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
@@ -13752,13 +13774,17 @@ You are **STRICTLY FORBIDDEN** from using any name that is NOT in the lists abov
                 });
             }
 
-            // 2. 新增：读取并格式化最近的聊天记录上下文 (数据库修复版)
+            // 2. 新增：读取并格式化最近的聊天记录上下文 (大容量兼容版)
             let chatHistoryForTuqu = '';
             if (contextChatId) {
                 const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
                 
-                // 【关键修复】优先读缓存，缓存没有读数据库
+                // 【关键修复】增加数据库回退检查
                 let sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                if (sourceMessages.length === 0) {
+                    const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
+                    if (dbData) sourceMessages = dbData;
+                }
                 if (sourceMessages.length === 0) {
                     try {
                         const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
@@ -14038,7 +14064,13 @@ You have total freedom to decide the engagement level based on the content's nat
   \`[tuqu_complex_action: {"type":"new_topic", "board":"BoardName", "author":"Pseudonym", "location":"Location", "subject":"Title", "content":"Body", "water_army": [{"author":"Pseudonym1", "location":"Loc1", "content":"Text1"}, {"author":"Pseudonym2", "location":"Loc2", "content":"Text2"}]}]\`
 
 - To COMMENT on an existing post:
-  \`[tuqu_complex_action: {"type":"comment", "postId":"post_id", "author":"Pseudonym", "location":"Location", "content":"Text", "water_army": [{"author":"Pseudonym1", "location":"Loc1", "content":"Text1"}]}]\`
+  \`[tuqu_complex_action: {"type":"comment", "postId":"post_id", "author":"Pseudonym", "location":"Location", "content":"Text", "water_army": [{"author":"Pseudonym1", "location":"RandomCity1", "content":"Text1"}, {"author":"Pseudonym2", "location":"RandomCity2", "content":"Text2"}]}]\`
+  **CRITICAL IP LAW:** Every entry in \`water_army\` MUST have a **DIFFERENT** location. Do NOT repeat the same city.
+
+**[LENGTH ENCOURAGEMENT - GO DEEP]**
+You are encouraged to write **substantial, detailed content**.
+- **Main Post:** Aim for **300-800+ characters** if possible. Tell a full story, describe the details, express strong emotions. Do not be brief.
+- **Comments:** Mix short reactions with long, analytical paragraphs.
 
 - To QUOTE a specific floor:
   \`[tuqu_complex_action: {"type":"comment", "postId":"post_id", "author":"Pseudonym", "location":"Location", "content":"Your reply", "quote": {"floor": 1, "author": "OriginalPoster", "text": "The original text"}}] \`
@@ -14261,10 +14293,18 @@ You are part of a diverse internet ecosystem. **DO NOT be repetitive.**
 
 **[STRICT JSON FORMAT REQUIRED]**
 
-\`[tuqu_complex_action: {"type":"new_topic", "board":"${lockedBoard || 'BoardName'}", "subject":"Title Here", "content":"Body Content", "author":"Pseudonym", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}, ... ]}]\`
+**[IP DIVERSITY MANDATE]**
+Inside the \`water_army\` array, every single comment MUST have a **DIFFERENT, RANDOM** location.
+*   ❌ WRONG: All "Beijing".
+*   ✅ RIGHT: "Beijing", "Shanghai", "Guangzhou", "Chengdu", "IP: Unknown".
+
+**[LENGTH ENCOURAGEMENT]**
+Do not write one-liners. Try to write **rich, dramatic, and descriptive** posts (300+ words preferred for topics). Make the forum feel alive with detailed storytelling.
+
+\`[tuqu_complex_action: {"type":"new_topic", "board":"${lockedBoard || 'BoardName'}", "subject":"Title Here", "content":"Body Content (Longer is better)", "author":"Pseudonym", "location":"City", "water_army": [{"author":"ReplyName1", "location":"RandomCity1", "content":"Reply1"}, {"author":"ReplyName2", "location":"RandomCity2", "content":"Reply2"} ]}]\`
 
 For a COMMENT:
-\`[tuqu_complex_action: {"type":"comment", "postId":"TargetPostID", "content":"Your Comment", "author":"Pseudonym", "location":"City", "water_army": [{"author":"ReplyName1", "location":"City1", "content":"Reply1"}, ... ]}]\`
+\`[tuqu_complex_action: {"type":"comment", "postId":"TargetPostID", "content":"Your Comment (Detailed)", "author":"Pseudonym", "location":"City", "water_army": [{"author":"ReplyName1", "location":"RandomCity1", "content":"Reply1"}, {"author":"ReplyName2", "location":"RandomCity2", "content":"Reply2"} ]}]\`
 
 ${TUQU_MEDIA_PROTOCOL}
 
@@ -14345,13 +14385,17 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                 });
             }
 
-            // 2. 新增：读取并格式化最近的聊天记录上下文 (数据库修复版)
+            // 2. 新增：读取并格式化最近的聊天记录上下文 (大容量兼容版)
             let chatHistoryForTuqu = '';
             if (contextChatId) {
                 const memoryLength = parseInt(contextChatInfo.memoryLength || 20, 10);
                 
-                // 【关键修复】优先读缓存，缓存没有读数据库
+                // 【关键修复】增加数据库回退检查
                 let sourceMessages = loadFromLocalStorage(`conversation_${contextChatId}`, []);
+                if (sourceMessages.length === 0) {
+                    const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
+                    if (dbData) sourceMessages = dbData;
+                }
                 if (sourceMessages.length === 0) {
                     try {
                         const dbData = await imageStore.getItem(`conversation_${contextChatId}`);
@@ -14566,11 +14610,19 @@ You decide if your post receives immediate attention based on its impact.
 
 You MUST output using this EXACT JSON structure.
 
+**[IP DIVERSITY MANDATE]**
+Inside the \`water_army\` array, every single comment MUST have a **DIFFERENT, RANDOM** location. Do NOT repeat the same IP.
+
+**[LENGTH ENCOURAGEMENT]**
+You are a writer. **Write A LOT.** 
+- For Fan Fiction: Aim for **1000+ characters**.
+- For Gossip: Aim for **500+ characters** of detailed analysis.
+
 For a NEW TOPIC:
-\`[tuqu_complex_action: {"type":"new_topic", "board":"${lockedBoard}", "subject":"Title Here", "content":"[YOUR STORY UPDATE / INCOMPLETE GOSSIP HERE]", "author":"Pseudonym", "location":"City", "water_army": [{"author":"Reader1", "location":"City1", "content":"Comment1"}, ... ]}]\`
+\`[tuqu_complex_action: {"type":"new_topic", "board":"${lockedBoard}", "subject":"Title Here", "content":"[YOUR LONG STORY UPDATE / GOSSIP HERE]", "author":"Pseudonym", "location":"City", "water_army": [{"author":"Reader1", "location":"RandomCity1", "content":"Comment1"}, {"author":"Reader2", "location":"RandomCity2", "content":"Comment2"} ]}]\`
 
 For a COMMENT (if you are continuing a thread):
-\`[tuqu_complex_action: {"type":"comment", "postId":"TargetPostID", "content":"[YOUR STORY UPDATE / INCOMPLETE GOSSIP HERE]", "author":"LZ", "location":"City", "water_army": [{"author":"Reader1", "location":"City1", "content":"Comment1"}, ... ]}]\`
+\`[tuqu_complex_action: {"type":"comment", "postId":"TargetPostID", "content":"[YOUR LONG STORY UPDATE / GOSSIP HERE]", "author":"LZ", "location":"City", "water_army": [{"author":"Reader1", "location":"RandomCity1", "content":"Comment1"}, {"author":"Reader2", "location":"RandomCity2", "content":"Comment2"} ]}]\`
 
 ${TUQU_MEDIA_PROTOCOL}
 
@@ -14845,7 +14897,14 @@ Setting: ${extraOptions.worldview || "Standard reality"}
 **[STRICT JSON FORMAT REQUIRED]**
 You MUST output using this EXACT JSON structure.
 
-\`[tuqu_complex_action: {"type":"comment", "postId":"${targetPost.id}", "content":"[YOUR CHOSEN SCENARIO CONTENT HERE]", "author":"[Creative ID based on Protocol]", "location":"[Dynamic Location based on Protocol]", "water_army": [{"author":"[Creative ID]", "location":"[Dynamic Location]", "content":"Reply1"}, {"author":"[Creative ID]", "location":"[Dynamic Location]", "content":"Reply2"}]}]\`
+**[IP DIVERSITY MANDATE]**
+Inside the \`water_army\` array, every single comment MUST have a **DIFFERENT, RANDOM** location. Do NOT repeat the same IP.
+
+**[LENGTH ENCOURAGEMENT]**
+The user clicked "Update" because they want to read. **Do not disappoint them.**
+Write a **substantial, satisfying update**. Avoid short, lazy responses.
+
+\`[tuqu_complex_action: {"type":"comment", "postId":"${targetPost.id}", "content":"[YOUR LONG CHOSEN SCENARIO CONTENT HERE]", "author":"[Creative ID based on Protocol]", "location":"[Dynamic Location based on Protocol]", "water_army": [{"author":"[Creative ID]", "location":"RandomCity1", "content":"Reply1"}, {"author":"[Creative ID]", "location":"RandomCity2", "content":"Reply2"}]}]\`
 
 ${TUQU_MEDIA_PROTOCOL}
 
@@ -15651,11 +15710,14 @@ conversationManager.showNotificationBanner('TUQU', {
                                             postId: newPostId, 
                                             content: parseTuquMedia(c.content), 
                                             author: c.author, 
-                                            location: data.location 
+                                            // 【核心修复】改为 c.location (使用水军自己的地址)
+                                            location: c.location 
                                         }, '*');
                                     }, 500 * (index + 1));
                                 });
                             }
+
+
                         } else if (data.type === 'comment') {
                             if (forbiddenNames.includes(data.author)) data.author = "匿名网友";
                             
@@ -19390,7 +19452,7 @@ let isLoadingMore = false;
                 return;
             }
 
-            // --- 逻辑 B: 处理开场白切换 (智能存档 + 占位符替换) ---
+            // --- 逻辑 B: 处理开场白切换 (数据库安全保存版) ---
             const greetingItem = e.target.closest('.identity-greeting-item');
             if (greetingItem) {
                 const branchId = greetingItem.dataset.branchId;
@@ -19403,22 +19465,19 @@ let isLoadingMore = false;
                     if (confirmed) {
                         document.getElementById('identity-menu-overlay').classList.add('hidden');
                         
-                        // 1. 获取当前聊天绑定的用户名
                         const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
                         const userName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
 
-                        // 2. 【核心修改】智能存档逻辑
+                        // 1. 获取当前主线（增加数据库回退检查，确保能读到大记录）
                         const mainConversationKey = `conversation_${chatId}`;
-                        const currentMainMessages = loadFromLocalStorage(mainConversationKey, []);
+                        let currentMainMessages = loadFromLocalStorage(mainConversationKey, []);
+                        if (currentMainMessages.length === 0) {
+                            const dbData = await imageStore.getItem(mainConversationKey);
+                            if (dbData) currentMainMessages = dbData;
+                        }
                         
-                        // 读取“来源标记”和“初始长度”
                         const sourceBranchId = sessionStorage.getItem(`source_branch_${chatId}`);
                         const sourceLength = parseInt(sessionStorage.getItem(`source_length_${chatId}`) || 0, 10);
-                        
-                        // 判断是否需要存档：
-                        // 条件A: 没有来源标记（说明是原始主线，或者是刷新页面后丢失了标记）
-                        // 条件B: 有来源标记，但是消息长度增加了（说明聊了新天）
-                        // 条件C: 有来源标记，但是来源ID和当前要切去的目标ID不一致（防止切同一个分支时重复存档，虽然UI上一般不会点同一个）
                         const needsArchive = !sourceBranchId || (currentMainMessages.length > sourceLength);
 
                         if (needsArchive && currentMainMessages.length > 0) {
@@ -19430,10 +19489,10 @@ let isLoadingMore = false;
                             saveToLocalStorage(branchHistoryKey, branches);
                             window.showNotification("检测到剧情变动，当前进度已自动存档。");
                         } else {
-                            window.showNotification("检测到当前剧本无内容增长，已执行无缝切换。");
+                            window.showNotification("内容未增长，已执行无缝切换。");
                         }
 
-                        // 处理占位符替换
+                        // 2. 处理新剧本占位符
                         const processedMessages = targetBranch.messages.map(msg => {
                             if (msg.text && typeof msg.text === 'string') {
                                 let newText = msg.text.replace(/{{user}}/g, userName).replace(/\buser\b/g, userName);
@@ -19442,24 +19501,35 @@ let isLoadingMore = false;
                             return msg;
                         });
 
-                        saveToLocalStorage(mainConversationKey, processedMessages);
+                        // 3. 【核心修复】：使用大容量安全保存逻辑
+                        try {
+                            localStorage.setItem(mainConversationKey, JSON.stringify(processedMessages));
+                            await imageStore.removeItem(mainConversationKey);
+                        } catch (e) {
+                            await imageStore.setItem(mainConversationKey, processedMessages);
+                            localStorage.removeItem(mainConversationKey);
+                        }
+                        
                         sessionStorage.setItem(`source_branch_${chatId}`, branchId);
                         sessionStorage.setItem(`source_length_${chatId}`, processedMessages.length);
 
-                        // 重置状态
+                        // 4. 重置状态
                         const statuses = loadFromLocalStorage('app_character_statuses', {});
                         const currentChat = chatList.find(c => c.id === chatId);
-                        if (currentChat && currentChat.type !== '群聊') { delete statuses[currentChat.name]; delete chatInfo.ai_remarks; delete chatInfo.ai_remark_for_user; }
+                        if (currentChat && currentChat.type !== '群聊') { 
+                            delete statuses[currentChat.name]; 
+                            delete chatInfo.ai_remarks; 
+                            delete chatInfo.ai_remark_for_user; 
+                        }
                         saveToLocalStorage('app_character_statuses', statuses);
                         saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
-
-                        conversationManager.open(chatId);
 
                         conversationManager.open(chatId);
                     }
                 }
                 return;
             }
+
 
 
             // --- 【核心新增 2：模式一键切换逻辑】 ---
@@ -23364,14 +23434,42 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
                 const profile = apiProfiles[parseInt(profileIndexStr)];
                 if (!profile || !profile.key || !profile.url || !profile.model) throw new Error("API configuration is incomplete.");
 
-                // --- 开始构建完整的系统上下文 (与正式通话逻辑对齐) ---
-                let fullSystemPrompt = profile.prompt || '';
+                // --- 开始构建完整的系统上下文 ---
+                
+                // 【核心修改】将决策指令提到最最最前面，作为最高优先级指令
+                let decisionPrompt = `
+[CRITICAL SYSTEM EVENT: INCOMING VIDEO CALL]
+The user "{{user}}" is calling you. You are currently holding your phone, looking at the incoming call screen.
+
+**[IMMEDIATE DECISION REQUIRED]**
+You MUST deciding whether to pick up based on your current status, mood, and relationship with {{user}}.
+
+**[OPTION A: ACCEPT]**
+If you decide to answer, your output MUST start with: \`[accept_call]\`
+Then, immediately describe the scene or say your first words.
+*   *Example:* \`[accept_call] (The screen lights up, showing me in my kitchen...) "Hey, what's up?"\`
+
+**[OPTION B: REJECT]**
+If you decide to decline, your output MUST start with: \`[reject_call]\`
+Then, optionally provide a reason or a text message reply.
+*   *Example:* \`[reject_call] (I'm too busy right now, sorry.)\`
+
+**[ABSOLUTE FORMATTING LAW]**
+You MUST output one of these two tags at the very beginning of your response. Do not output anything else before the tag.
+`;
+
+                let fullSystemPrompt = decisionPrompt + (profile.prompt || '');
                 
                 // 【核心修复】将变量定义提至最前
                 const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
 
                 // A. 注入历史通话的具体内容 (从 call_summary 中提取)
-                const fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
+
+                let fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
+                if (fullHistoryForCalls.length === 0) {
+                    const dbData = await imageStore.getItem(`conversation_${chatId}`);
+                    if (dbData) fullHistoryForCalls = dbData;
+                }
                 const pastCalls = fullHistoryForCalls.filter(m => m.type === 'call_summary' && m.callData && m.callData.conversation);
                 
                 if (pastCalls.length > 0) {
@@ -23463,24 +23561,6 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
                     fullSystemPrompt += `\n[YOUR ROLE: PRIVATE CALL]\nYOUR PERSONA IS: "${chatInfo.aiPersona || 'A helpful assistant.'}"`;
                 }
 
-                // F. 注入决策指令 (这是之前的核心指令)
-                fullSystemPrompt += `
-\n[SYSTEM ALERT: VIRTUAL ROLEPLAY EVENT]
-The user has initiated a "Video Call" event. 
-
-**[CRITICAL ANTI-REFUSAL PROTOCOL]**
-1. NOT A REAL CALL: This is a text-based simulation. You simply need to output text.
-2. FORBIDDEN OUTPUT: Never say "As an AI..." or "I cannot use camera".
-3. IDENTITY ENFORCEMENT: You are the character(s), not an AI.
-
-**[DECISION LOGIC]**
-You must decide whether the character(s) would pick up the phone based on their current mood, relationship, and the context provided above.
-
-* OPTION A: ACCEPT -> Output MUST include \`[accept_call]\`.
-* OPTION B: REJECT -> Output MUST include \`[reject_call]\` and a reason.
-
-**[ACTION]**
-The phone is ringing. Do not break character. Do you accept?`;
 
                 // 3. 构建最终消息数组
                 const systemMessage = { role: "system", content: fullSystemPrompt };
@@ -23554,7 +23634,6 @@ The phone is ringing. Do not break character. Do you accept?`;
         }
         async function handleCallCancellationByUser() {
             try {
-                // 1. 加载必要的聊天和API配置信息
                 const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
                 const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
                 if (profileIndexStr === null) return;
@@ -23562,7 +23641,7 @@ The phone is ringing. Do not break character. Do you accept?`;
                 const profile = apiProfiles[parseInt(profileIndexStr)];
                 if (!profile || !profile.key || !profile.url || !profile.model) return;
 
-                // 2. 构建一个更强大、更明确的指令，强制AI按人设回应
+                // 构建指令 (保持不变)
                 const cancellationPrompt = `
 [ABSOLUTE LAW: YOUR CORE IDENTITY]
 YOUR PERSONA IS: "${chatInfo.aiPersona || 'A helpful assistant.'}"
@@ -23572,34 +23651,51 @@ You MUST respond from this persona.
 You were receiving a video call from {{user}}, but they hung up before you could answer. How do you react to this?`;
 
                 const context = { role: "system", content: cancellationPrompt };
-                
-                // 3. 仅发送指令，不需要历史记录，以获得一个纯粹的、针对此事件的反应
                 const finalMessages = [context];
 
-                // 4. 发送API请求
-                const chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
-                const response = await fetch(chatUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                    body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) })
-                });
+                // 发送请求 (兼容 Gemini/OpenAI)
+                let chatUrl, requestBody, requestHeaders;
 
+                if (profile.url.includes('googleapis.com')) {
+                    chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:generateContent?key=${profile.key}`;
+                    requestHeaders = { 'Content-Type': 'application/json' };
+                    requestBody = { contents: [{ role: 'user', parts: [{ text: cancellationPrompt }] }] };
+                } else {
+                    chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
+                    requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
+                    requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
+                }
+
+                const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody) });
                 if (!response.ok) return;
                 
                 const data = await response.json();
-                const aiReaction = data.choices[0]?.message?.content;
+                let aiReaction;
 
-                // 5. 将AI的反应作为一条新消息添加到聊天中
-                if (aiReaction && aiReaction.trim()) {
-                    const reactionText = aiReaction.replace(/\[.*?\]/g, '').trim();
-                    if (reactionText) {
-                       await addMessage({ type: 'text', side: 'received', text: reactionText });
-                    }
+                if (profile.url.includes('googleapis.com')) {
+                    aiReaction = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                } else {
+                    aiReaction = data.choices?.[0]?.message?.content;
                 }
+
+                // 【核心修复】清洗思考内容
+                if (aiReaction) {
+                    aiReaction = aiReaction
+                        .replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '')
+                        .trim();
+                }
+
+                // 【核心修复】使用主解析器处理，确保能正确解析 <block> 或纯文本
+                if (aiReaction && aiReaction.trim()) {
+                    // 调用全局的解析函数，它会自动处理格式、保存到数据库并刷新UI
+                    await conversationManager.processAIResponseLine(aiReaction, chatState.chatId);
+                }
+
             } catch(error) {
                 console.error("Failed to get AI reaction to call cancellation:", error);
             }
         }
+
 
 
         async function handleCallRejectionByUser(callerChatId) {
@@ -23824,6 +23920,9 @@ You are the Director. If multiple characters react to the rejection, generate a 
 
             // 3. 恢复换行符
             line = line.replace(/__NEWLINE__/g, '\n');
+            
+            // 新增：强制剔除每一行开头和结尾的空白字符（防止缩进导致的空白）
+            line = line.split('\n').map(l => l.trim()).join('\n');
 
             // 4. 【核心修复】终极空值拦截
             // 移除所有不可见字符（空格、换行、制表符）后，如果长度为0，直接终止
@@ -23868,8 +23967,9 @@ You are the Director. If multiple characters react to the rejection, generate a 
 
 
             // --- 终极净化步骤 ---
-            if (chatContent.startsWith('<div') && chatContent.endsWith('</div>')) {
-                chatContent = chatContent.replace(/(\r\n|\n|\r)/gm, "");
+            if (chatContent.includes('<div') || chatContent.includes('<snippet')) {
+                // 不仅移除换行，还要移除标签之间的多余缩进空格
+                chatContent = chatContent.replace(/>\s+</g, '><').replace(/(\r\n|\n|\r)/gm, "").trim();
             }
             // --- 净化结束 ---
             
@@ -24515,13 +24615,20 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
             // 同步模拟时间
             simulatedCurrentTime = msgData.timestamp;
 
-            // 【核心修复：空消息拦截】
+            // 【核心修复：空消息拦截 & 标签清洗】
             if (msgData.type === 'text') {
-                const cleanText = (msgData.text || '').replace(/\s/g, '');
+                let rawText = msgData.text || '';
+                
+                // 1. 拦截空消息
+                const cleanText = rawText.replace(/\s/g, '');
                 if (cleanText.length === 0) {
                     console.warn("[System] Blocked empty text message.");
                     return;
                 }
+
+                // 2. 【核心新增】清洗 <br> 标签 (不区分大小写)
+                // 彻底替换为空字符串，不留任何痕迹
+                msgData.text = rawText.replace(/<br\s*\/?>/gi, '');
             }
 
             // =================================================================
@@ -28582,6 +28689,14 @@ actionMenu.addEventListener('click', async (e) => {
 
         case 'video_call':
             if (await customConfirm(`确定要向“${chatState.chatName}”发起视频通话吗？`)) {
+                
+                // 【核心修复】发起新呼叫前，强制清理旧状态
+                if (callAttemptState.closeUI) {
+                    callAttemptState.closeUI();
+                }
+                callAttemptState.callId = null;
+                callAttemptState.closeUI = null;
+
                 const callId = `call_${Date.now()}`;
 
                 const closeUI = showCallingUI({
@@ -28591,11 +28706,10 @@ actionMenu.addEventListener('click', async (e) => {
                     onDecline: async () => { // 当用户点击“取消”时
                         await addMessage({ type: 'system', side: 'system', text: '通话已取消' });
                         
-                        // 标记为已取消，防止后续逻辑执行
+                        // 标记为已取消
                         callAttemptState.callId = null; 
                         callAttemptState.closeUI = null;
                         
-                        // 新增：通知AI，让它做出反应
                         await handleCallCancellationByUser();
                     }
                 });
@@ -28604,10 +28718,14 @@ actionMenu.addEventListener('click', async (e) => {
                 callAttemptState.closeUI = closeUI;
 
                 try {
-                    // 等待API的回复
                     const aiResponse = await handleOutgoingCallAttempt(callId);
                     
-                    // 如果aiResponse为null，说明在请求过程中用户已经取消了，直接退出
+                    // 【核心修复】这里增加一个判断：如果 ID 不匹配，说明这是旧请求的回调，直接忽略
+                    if (callAttemptState.callId !== callId) {
+                        console.log("Ignored response from cancelled/superseded call.");
+                        return;
+                    }
+
                     if (aiResponse === null) {
                         return;
                     }
@@ -28621,12 +28739,22 @@ actionMenu.addEventListener('click', async (e) => {
                     if (aiResponse.includes('[accept_call]')) {
                         // 情况一：AI接听
                         await addMessage({ type: 'system', side: 'system', text: '对方已接听' });
-                        videoCallManager.startCall(chatState.chatId, 'user', { autoGreet: true }); // <--- 核心修改在这里
+                        
+                        // 提取 AI 的开场白 (去掉指令)
+                        const greetingText = aiResponse.replace('[accept_call]', '').trim();
+                        
+                        // 启动通话，并传入开场白 (如果有)
+                        // 注意：把 autoGreet 设为 false，因为我们已经拿到开场白了，不需要再请求一次
+                        videoCallManager.startCall(chatState.chatId, 'user', { 
+                            autoGreet: false, 
+                            initialGreeting: greetingText 
+                        });
                     } else {
                         // 情况二：AI拒接
                         const rejectionText = aiResponse.replace('[reject_call]', '').trim();
+                        // 如果拒接理由里包含指令，尝试解析一下 (比如发了条消息解释)
                         if (rejectionText) {
-                            await addMessage({ type: 'text', side: 'received', text: rejectionText });
+                            await conversationManager.processAIResponseLine(rejectionText, chatState.chatId);
                         }
                         await addMessage({ type: 'system', side: 'system', text: '对方未接听' });
                     }
@@ -29891,9 +30019,15 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
 
             const branchToRestore = branches[branchToRestoreIndex];
             const mainConversationKey = `conversation_${chatId}`;
+            
+            // 1. 获取当前主线（增加数据库回退检查）
             let currentMainMessages = loadFromLocalStorage(mainConversationKey, []);
+            if (currentMainMessages.length === 0) {
+                const dbData = await imageStore.getItem(mainConversationKey);
+                if (dbData) currentMainMessages = dbData;
+            }
 
-            // 1. 【强制存档】：历史恢复属于重大操作，无论是否有新内容都生成存档
+            // 2. 强制存档
             if (currentMainMessages.length > 0) {
                 const lastMessage = currentMainMessages[currentMainMessages.length - 1];
                 const previewText = lastMessage ? (lastMessage.text || `[${lastMessage.type}]`).substring(0, 20) + '...' : '空分支';
@@ -29901,7 +30035,7 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
                 branches.unshift(newBranchToSave); 
             }
 
-            // 2. 处理名字替换
+            // 3. 处理名字替换
             const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
             const userName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
             const restoredMessages = branchToRestore.messages.map(msg => {
@@ -29912,14 +30046,19 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
                 return msg;
             });
 
-            // 3. 保存为主线并【抹除开场白来源标记】
-            saveToLocalStorage(mainConversationKey, restoredMessages);
+            // 4. 【核心修复】：使用大容量安全保存逻辑
+            try {
+                localStorage.setItem(mainConversationKey, JSON.stringify(restoredMessages));
+                await imageStore.removeItem(mainConversationKey);
+            } catch (e) {
+                await imageStore.setItem(mainConversationKey, restoredMessages);
+                localStorage.removeItem(mainConversationKey);
+            }
             
-            // 【核心修改】：恢复历史后，它不再被视为某个“开场白变体”，而是一个独立的时间线
             sessionStorage.removeItem(`source_branch_${chatId}`);
             sessionStorage.removeItem(`source_length_${chatId}`);
 
-            // 4. 清理并刷新
+            // 5. 清理并刷新
             branches.splice(branches.findIndex(b => b.id === branchId), 1);
             if (branches.length > 20) branches = branches.slice(0, 20);
             saveToLocalStorage(branchHistoryKey, branches);
@@ -40594,7 +40733,11 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             updateDialogueDisplay();
             
             // --- 核心新增的逻辑在这里 ---
-            if (options.autoGreet) {
+            if (options.initialGreeting) {
+                // 如果传入了开场白，直接显示
+                addAiDialogue(options.initialGreeting);
+            } else if (options.autoGreet) {
+                // 否则才去请求
                 const greetingPrompt = initiator === 'user'
                     ? `[System instruction: You just answered a video call from {{user}}. What is the very first thing you say? Be natural and in-character.]`
                     : `[System instruction: You were video calling {{user}} and they just picked up. What is the very first thing you say? Be natural and in-character.]`;
@@ -40682,14 +40825,24 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
 
                 // --- 1. 构建 Prompt (终极修正版：包含基础设定 + 历史通话详情) ---
                 
-                // A. 注入 API 设置中的基础 System Prompt
-                let fullSystemPrompt = profile.prompt || '';
+                // A. 注入并清洗基础 System Prompt
+                // 【核心修复】：注入心理引擎但彻底切除状态更新和拍一拍协议
+                let videoCallPsychEngine = ULTIMATE_PSYCHOLOGICAL_ENGINE
+                    .replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "")
+                    .replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "")
+                    .replace(/\*\*\[PRESET CONFIGURATION PROTOCOL[\s\S]*?(?=---)/g, "")
+                    .replace(/\*\*\[ULTIMATE STATUS PROTOCOL[\s\S]*?(?=---)/g, "");
 
-                // 【核心修复】提前定义变量
+                let fullSystemPrompt = videoCallPsychEngine + (profile.prompt || '');
+
                 const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
 
-                // B. 注入所有历史通话的具体内容 (从 call_summary 中提取)
-                const fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
+                // B. 注入所有历史通话的具体内容 (增加数据库回退检查)
+                let fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
+                if (fullHistoryForCalls.length === 0) {
+                    const dbData = await imageStore.getItem(`conversation_${chatId}`);
+                    if (dbData) fullHistoryForCalls = dbData;
+                }
                 const pastCalls = fullHistoryForCalls.filter(m => m.type === 'call_summary' && m.callData && m.callData.conversation);
                 
                 if (pastCalls.length > 0) {
@@ -40786,9 +40939,17 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const systemMessage = { role: "system", content: fullSystemPrompt };
                 const finalMessages = [systemMessage];
 
+                // --- 【核心修复：回复时读取大容量聊天记录】 ---
                 const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
-                const recentChatHistory = memoryLength > 0 ? loadFromLocalStorage(`conversation_${chatId}`, []).slice(-memoryLength) : loadFromLocalStorage(`conversation_${chatId}`, []);
-                // 【核心修复】传入 chatId 确保后台运行正常
+                
+                // 增加数据库回退检查
+                let fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+                if (fullHistory.length === 0) {
+                    const dbData = await imageStore.getItem(`conversation_${chatId}`);
+                    if (dbData) fullHistory = dbData;
+                }
+                
+                const recentChatHistory = memoryLength > 0 ? fullHistory.slice(-memoryLength) : fullHistory;
                 const apiPayloadHistory = await conversationManager.prepareApiPayload(recentChatHistory, chatId);
                 finalMessages.push(...apiPayloadHistory);
 
@@ -40900,105 +41061,137 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             try {
                 const chatId = callState.chatId;
                 const chat = chatList.find(c => c.id === chatId);
-                if (!chat) throw new Error("Chat not found for video call.");
-                
+                if (!chat) throw new Error("Chat not found.");
+
                 const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
                 const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
-                if (profileIndexStr === null) throw new Error("No API config for this chat.");
+                if (profileIndexStr === null) throw new Error("No API config.");
                 const profile = apiProfiles[parseInt(profileIndexStr)];
-                if (!profile) throw new Error("API profile not found.");
 
-                let directorNotes = `[ABSOLUTE LAW: LANGUAGE REQUIREMENT]\nYou MUST respond in **Simplified Chinese (简体中文)**.\n\n[SCENE: VIDEO CALL - DIRECTOR'S NOTES]\nYou are in a live video call. Your response should be an alternative to your previous one, based on the user's last message.`;
-                
+                // --- 【核心修复：注入全量上下文并清洗指令】 ---
+                let videoCallPsychEngine = ULTIMATE_PSYCHOLOGICAL_ENGINE
+                    .replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "")
+                    .replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "")
+                    .replace(/\*\*\[PRESET CONFIGURATION PROTOCOL[\s\S]*?(?=---)/g, "")
+                    .replace(/\*\*\[ULTIMATE STATUS PROTOCOL[\s\S]*?(?=---)/g, "");
+
+                let fullSystemPrompt = videoCallPsychEngine + (profile.prompt || '');
+                const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+
+                // 1. 注入前情提要
+                if (chatInfo.preamble) fullSystemPrompt = `[Preamble]\n${chatInfo.preamble}\n\n` + fullSystemPrompt;
+
+                // 2. 注入历史通话记录 (增加数据库检查)
+                let fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
+                if (fullHistoryForCalls.length === 0) {
+                    const dbData = await imageStore.getItem(`conversation_${chatId}`);
+                    if (dbData) fullHistoryForCalls = dbData;
+                }
+                const pastCalls = fullHistoryForCalls.filter(m => m.type === 'call_summary' && m.callData && m.callData.conversation);
+                if (pastCalls.length > 0) {
+                    fullSystemPrompt += `\n\n[HISTORY: PAST VIDEO CALL TRANSCRIPTS]\n`;
+                    pastCalls.forEach((callMsg, idx) => {
+                        fullSystemPrompt += `\n--- Call #${idx + 1} ---\n`;
+                        callMsg.callData.conversation.forEach(d => {
+                            const dName = d.sender === '{{user}}' ? userNameForPrompt : d.sender;
+                            fullSystemPrompt += `${dName}: ${d.text}\n`;
+                        });
+                    });
+                }
+
+                // 3. 注入用户人设
+                if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
+                    const persona = userPersonas.find(p => p.name === chatInfo.userPersonaName);
+                    if (persona) fullSystemPrompt += `\n\n[User Persona for "${userNameForPrompt}"]\n${persona.description}`;
+                }
+                if (chatInfo.myPersona) fullSystemPrompt += `\n\n[Supplementary User Persona]\n${chatInfo.myPersona}`;
+
+                // 4. 注入角色人设 (群聊/单聊)
                 if (chat.type === '群聊') {
-                    const groupMembers = loadFromLocalStorage(`chat_members_${chatId}`, []);
-                    const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
-                    const allAiActors = groupMembers.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
-                    let groupPersonasPrompt = `\n\n[YOUR ROLES: GROUP CHAT]\nThis is a group video call. You are playing ALL of the following characters:\n`;
+                    const formalMembers = loadFromLocalStorage(`chat_members_${chatId}`, []);
+                    const groupPersonasData = chatInfo.groupPersonas || [];
+                    const protagonistNames = groupPersonasData.map(p => p.name);
+                    const allPotentialAiEntities = [...new Set([...formalMembers, ...protagonistNames])];
+                    const allAiActors = allPotentialAiEntities.filter(name => name !== '{{user}}' && name !== userNameForPrompt);
+                    let groupPersonasPrompt = `\n\n[YOUR ROLES: GROUP CHAT]\nYou play all AI characters in this group call.\n`;
                     allAiActors.forEach(actorName => {
-                         let persona = '(No persona defined)';
-                         const isNpc = npcList.includes(actorName);
-                        if (isNpc) { persona = (npcSettings.personas && npcSettings.personas[actorName]) || persona; } 
-                        else { const memberChat = chatList.find(c => c.name === actorName); if(memberChat) { const memberInfo = loadFromLocalStorage(`chat_info_${memberChat.id}`, {}); persona = memberInfo.aiPersona || persona; } }
+                        let persona = '';
+                        const isNpc = npcList.includes(actorName);
+                        const protagonistPersona = groupPersonasData.find(p => p.name === actorName);
+                        if (protagonistPersona) persona = protagonistPersona.description || '';
+                        else if (isNpc) {
+                            const rawNpcData = (npcSettings.personas && npcSettings.personas[actorName]);
+                            persona = (typeof rawNpcData === 'object') ? rawNpcData.description : rawNpcData;
+                        }
                         groupPersonasPrompt += `- **${actorName}**: ${persona}\n`;
                     });
-                     groupPersonasPrompt += `\n**RESPONSE FORMAT EXAMPLE:** \`(屏幕上...) 角色A: "..." 角色B: "..."\``;
-                    directorNotes += groupPersonasPrompt;
+                    fullSystemPrompt += groupPersonasPrompt;
                 } else {
-                    directorNotes += `\n\n[YOUR ROLE: PRIVATE CALL]\nYOUR PERSONA IS: "${chatInfo.aiPersona || 'A helpful assistant.'}"`;
+                    fullSystemPrompt += `\n\n[Your Character Persona]\n${chatInfo.aiPersona || ''}`;
                 }
-                
-                const sceneInstruction = { role: "system", content: directorNotes };
-                const finalMessages = [sceneInstruction];
 
-                callState.conversation.forEach(msg => { 
-                    finalMessages.push({
-                        role: msg.sender === '{{user}}' ? 'user' : 'assistant',
-                        content: msg.text
+                // 5. 注入关联NPC
+                const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${chatId}`, []);
+                if (associatedNpcNames.length > 0) {
+                    fullSystemPrompt += '\n\n[Associated NPCs]\n';
+                    associatedNpcNames.forEach(name => {
+                        const rawData = (npcSettings.personas && npcSettings.personas[name]);
+                        const persona = (typeof rawData === 'object') ? rawData.description : rawData;
+                        fullSystemPrompt += `- **${name}**: ${persona}\n`;
                     });
+                }
+
+                // 6. 注入世界书 (排除 VC-IGNORE)
+                const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${chatId}`, []);
+                worldBookEntries.filter(wb => mountedWbNames.includes(wb.name) && wb.enabled).forEach(entry => {
+                    if (entry.name.includes('(VC-IGNORE)')) return;
+                    fullSystemPrompt += `\n\n[World Book: ${entry.name}]\n${entry.content}`;
                 });
 
-                // --- API 请求逻辑 (Gemini/OpenAI 兼容修正) ---
-                let chatUrl, requestBody, requestHeaders;
+                fullSystemPrompt += `\n\n[SCENE: VIDEO CALL - REGENERATION]\nYou are in a live video call. Provide an alternative response. End with \`[hang_up_call]\` to hang up.`;
+                fullSystemPrompt = fullSystemPrompt.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, chatInfo.remark || chat.name);
 
+                const finalMessages = [{ role: "system", content: fullSystemPrompt }];
+
+                // 7. 注入主聊天记录 (增加数据库检查)
+                const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
+                const apiPayloadHistory = await conversationManager.prepareApiPayload(fullHistoryForCalls.slice(-memoryLength), chatId);
+                finalMessages.push(...apiPayloadHistory);
+
+                // 8. 注入当前通话记录
+                callState.conversation.forEach(msg => {
+                    finalMessages.push({ role: msg.sender === '{{user}}' ? 'user' : 'assistant', content: msg.text });
+                });
+
+                // --- API 请求 ---
+                let chatUrl, requestBody, requestHeaders;
                 if (profile.url.includes('googleapis.com')) {
                     chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:generateContent?key=${profile.key}`;
                     requestHeaders = { 'Content-Type': 'application/json' };
-                    
-                    const systemInstruction = finalMessages.find(m => m.role === 'system');
-                    const contents = finalMessages
-                        .filter(m => m.role !== 'system')
-                        .map(msg => ({
-                            role: msg.role === 'assistant' ? 'model' : 'user',
-                            parts: [{ text: msg.content }]
-                        }));
-                        
-                    requestBody = { contents };
-                    if (systemInstruction) {
-                        requestBody.system_instruction = { parts: [{ text: systemInstruction.content }] };
-                    }
-                    if (profile.temperature !== undefined) {
-                        requestBody.generationConfig = { temperature: profile.temperature };
-                    }
+                    const contents = finalMessages.filter(m => m.role !== 'system').map(msg => ({ role: msg.role === 'assistant' ? 'model' : 'user', parts: [{ text: msg.content }] }));
+                    requestBody = { contents, system_instruction: { parts: [{ text: fullSystemPrompt }] } };
                 } else {
                     chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
                     requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
-                    // 【注意】这里必须用 finalMessages
                     requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
                 }
 
-                const response = await fetch(chatUrl, {
-                    method: 'POST',
-                    headers: requestHeaders,
-                    body: JSON.stringify(requestBody)
-                });
-
-                if (!response.ok) throw new Error('API request failed');
-                
+                const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody) });
                 const data = await response.json();
-                let aiResponse;
-                if (profile.url.includes('googleapis.com')) {
-                    aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                } else {
-                    aiResponse = data.choices?.[0]?.message?.content;
-                }
-                
-                // 【核心修复】先清洗思考，再处理挂断标签
+                let aiResponse = profile.url.includes('googleapis.com') ? data.candidates?.[0]?.content?.parts?.[0]?.text : data.choices?.[0]?.message?.content;
+
                 if (aiResponse) {
                     aiResponse = aiResponse.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '').trim();
                     aiResponse = aiResponse.replace('[hang_up_call]', '').trim();
-                }
-
-                if (aiResponse) {
                     addAiDialogue(aiResponse);
                 }
-
             } catch (error) {
-                console.error("Video call AI regeneration error:", error);
+                console.error(error);
             } finally {
                 typingIndicator.classList.add('hidden');
             }
         }
+
         // --- END: 新增函数 ---
         async function getInitialAiGreeting(contextPrompt) {
             try {
@@ -41015,14 +41208,23 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
 
                 // --- 1. 构建一个包含所有所需信息的完整 System Prompt (终极修正版) ---
                 
-                // A. 注入 API 设置中的基础 System Prompt
-                let fullSystemPrompt = profile.prompt || '';
+                // A. 注入并清洗基础 System Prompt
+                let videoCallPsychEngine = ULTIMATE_PSYCHOLOGICAL_ENGINE
+                    .replace(/(?:###|\*\*)\s*Directive Eight:[\s\S]*?(?=(?:###|\*\*)\s*Directive Nine)/g, "")
+                    .replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "")
+                    .replace(/\*\*\[PRESET CONFIGURATION PROTOCOL[\s\S]*?(?=---)/g, "")
+                    .replace(/\*\*\[ULTIMATE STATUS PROTOCOL[\s\S]*?(?=---)/g, "");
 
-                // 【核心修复】提前定义变量，确保下方的 pastCalls 循环可以正常访问它
+                let fullSystemPrompt = videoCallPsychEngine + (profile.prompt || '');
+
                 const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
 
-                // B. 注入所有历史通话的具体内容 (从 call_summary 中提取)
-                const fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
+                // B. 注入所有历史通话的具体内容 (增加数据库回退检查)
+                let fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
+                if (fullHistoryForCalls.length === 0) {
+                    const dbData = await imageStore.getItem(`conversation_${chatId}`);
+                    if (dbData) fullHistoryForCalls = dbData;
+                }
                 const pastCalls = fullHistoryForCalls.filter(m => m.type === 'call_summary' && m.callData && m.callData.conversation);
                 
                 if (pastCalls.length > 0) {
@@ -41147,9 +41349,17 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const finalMessages = [systemMessage];
 
                 // <<< 核心修改2：注入主聊天记录的上下文 >>>
+            // --- 【核心修复：接通时读取大容量聊天记录】 ---
             const memoryLength = parseInt(chatInfo.memoryLength || 20, 10);
-            const recentChatHistory = memoryLength > 0 ? loadFromLocalStorage(`conversation_${chatId}`, []).slice(-memoryLength) : loadFromLocalStorage(`conversation_${chatId}`, []);
-            // 【核心修复】传入 chatId 确保后台运行正常
+            
+            // 增加数据库回退检查
+            let fullHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
+            if (fullHistory.length === 0) {
+                const dbData = await imageStore.getItem(`conversation_${chatId}`);
+                if (dbData) fullHistory = dbData;
+            }
+            
+            const recentChatHistory = memoryLength > 0 ? fullHistory.slice(-memoryLength) : fullHistory;
             const apiPayloadHistory = await conversationManager.prepareApiPayload(recentChatHistory, chatId);
             finalMessages.push(...apiPayloadHistory);
 
@@ -41201,6 +41411,13 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             // =================================================================
             // =================== END: GEMINI COMPATIBILITY BLOCK =================
             // =================================================================
+
+            if (aiResponse) {
+                // 【核心修复】清洗所有思考标签 (<think> 和 <thought>)
+                aiResponse = aiResponse
+                    .replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '')
+                    .trim();
+            }
 
             if (aiResponse && aiResponse.trim()) {
                 addAiDialogue(aiResponse.trim());

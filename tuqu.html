@@ -92,7 +92,7 @@
         #page-list .topic-list-table th { background-color: var(--jj-blue-header); padding: 8px 5px; font-size: 12px; font-weight: normal; }
         #page-list .topic-list-table td { background-color: var(--jj-pink-bg); padding: 8px 5px; font-size: 12px; border-top: 1px solid #FFFFFF; }
         #page-list .topic-title { word-break: break-all; }
-        #page-list .topic-time, #page-list .topic-replies { text-align: center; white-space: nowrap; }
+        #page-list .topic-time, #page-list .topic-replies { text-align: center; white-space: normal; }
         #page-list .topic-author { 
             width: 18%; 
             text-align: center; 
@@ -1196,7 +1196,7 @@ html, body {
                         ${badgeHtml}
                     </td>
                     <td class="topic-author">${topic.author}<br><small style="color:#999;font-size:10px;">${topic.location || '未知'}</small></td>
-                    <td class="topic-time">${topic.timestamp}</td>
+                    <td class="topic-time">${topic.timestamp.replace(' ', '<br>')}</td>
                     <td class="topic-replies">${topic.replies}</td>
                 </tr>`}).join('');
 
