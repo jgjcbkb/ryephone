@@ -8195,6 +8195,18 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 <label for="dynamics-tuqu-api">兔区 API</label>
                                 <select id="dynamics-tuqu-api" class="modal-input modal-select"></select>
                             </div>
+                            <!-- 【核心新增】兔区动态上下文开关 -->
+                            <div class="form-group-toggle" style="padding: 10px 15px;">
+                                <label for="dynamics-tuqu-exclude-context" class="toggle-label" style="font-size: 14px;">主动在兔区发帖时不参考其他帖子</label>
+                                <label class="switch" style="width: 40px; height: 24px;">
+                                    <input type="checkbox" id="dynamics-tuqu-exclude-context">
+                                    <span class="slider" style="border-radius: 24px;"></span>
+                                </label>
+                            </div>
+                            <style>
+                                #dynamics-tuqu-exclude-context + .slider:before { height: 18px; width: 18px; left: 3px; bottom: 3px; }
+                                #dynamics-tuqu-exclude-context:checked + .slider:before { transform: translateX(16px); }
+                            </style>
                             <p class="form-hint" style="padding: 0 15px 15px;">为不同模块指定特定的 API 配置。若选“跟随全局”，则使用 API 设置中激活的配置。</p>
                         </div>
   
@@ -11267,7 +11279,7 @@ if ('serviceWorker' in navigator) {
                 });
             } else if (event.data && event.data.type === 'EXIT_TUQU') {
             navigateTo('home');
-        } else if (event.data && event.data.type === 'MANUAL_TRIGGER_TUQU') {
+                    } else if (event.data && event.data.type === 'MANUAL_TRIGGER_TUQU') {
                 const mode = event.data.mode;
                 
                 if (mode === 'post') {
@@ -11295,13 +11307,15 @@ if ('serviceWorker' in navigator) {
                         if (charName) {
                             triggerProactiveAI(null, charName, 'specific_post_interaction', null, {
                                 worldview: worldview,
-                                targetPost: targetPost // 传递帖子对象
+                                targetPost: targetPost, // 传递帖子对象
+                                selectedWorldbooks: event.data.selectedWorldbooks // 【核心修复】传递勾选的世界书
                             });
                         } else {
-                            // 核心修改：路人模式也需要接收 worldview 设定，否则 AI 不知道按什么背景更新
+                            // 路人模式
                             triggerProactiveAI(null, 'Anonymous_System', 'specific_post_interaction', null, {
                                 worldview: worldview,
-                                targetPost: targetPost // 传递帖子对象
+                                targetPost: targetPost, // 传递帖子对象
+                                selectedWorldbooks: event.data.selectedWorldbooks // 【核心修复】传递勾选的世界书
                             });
                         }
                     } else {
@@ -11316,16 +11330,19 @@ if ('serviceWorker' in navigator) {
                         triggerProactiveAI(null, event.data.charName, 'themed_tuqu_interaction', board, {
                             worldview: event.data.worldview,
                             boardRules: event.data.boardRules,
-                            includeContext: event.data.includeContext // <--- 核心新增：透传勾选状态
+                            includeContext: event.data.includeContext,
+                            selectedWorldbooks: event.data.selectedWorldbooks // 【核心修复】传递勾选的世界书
                         });
                     } else {
                         // 随机模式下，传递抓取到的全站版块数据
                         triggerProactiveAI(null, 'Anonymous_System', 'pure_tuqu_interaction', board, {
                             allBoards: event.data.allBoards,
-                            includeContext: event.data.includeContext // <--- 核心新增：透传勾选状态
+                            includeContext: event.data.includeContext,
+                            selectedWorldbooks: event.data.selectedWorldbooks // 【核心修复】传递勾选的世界书
                         });
                     }
                 }
+
 
             } else if (event.data && event.data.type === 'REQUEST_CHARACTER_LIST') {
                 // 响应角色列表请求
@@ -11342,6 +11359,23 @@ if ('serviceWorker' in navigator) {
                     tuquIframe.contentWindow.postMessage({ 
                         type: 'RESPONSE_CHARACTER_LIST', 
                         list: list 
+                    }, '*');
+                }
+            } else if (event.data && event.data.type === 'REQUEST_WORLDBOOK_LIST') {
+                // 【核心新增】响应兔区对世界书列表的请求
+                // 发送所有启用的世界书，并标记哪些是“兔区必读”
+                const wbListData = worldBookEntries
+                    .filter(entry => entry.enabled) // 只发送已启用的
+                    .map(entry => ({ 
+                        name: entry.name, 
+                        required: entry.useInTuqu // 标记是否为必读
+                    }));
+
+                const tuquIframe = document.querySelector('#tab-content-tuqu iframe');
+                if (tuquIframe) {
+                    tuquIframe.contentWindow.postMessage({ 
+                        type: 'RESPONSE_WORLDBOOK_LIST', 
+                        list: wbListData 
                     }, '*');
                 }
             }
@@ -13752,17 +13786,31 @@ You are **STRICTLY FORBIDDEN** from using any name that is NOT in the lists abov
 
             // 3. 获取兔区数据摘要
             let tuquWorldBookContent = '';
+            // 【核心修改】从 extraOptions 中提取本次手动选择的世界书名单，如果没有则为空数组
+            const selectedWbs = extraOptions.selectedWorldbooks || [];
+
             worldBookEntries.forEach(entry => {
-                if (entry.enabled && entry.useInTuqu) {
+                // 1. 基础条件：条目必须是启用的
+                if (!entry.enabled) return;
+
+                // 2. 核心逻辑：满足以下任一条件即包含
+                // A. 该条目被标记为“兔区使用” (useInTuqu === true) -> 必读
+                // B. 该条目在本次手动选择列表里 (selectedWbs 包含它) -> 选读
+                if (entry.useInTuqu || selectedWbs.includes(entry.name)) {
                     tuquWorldBookContent += `\n\n[World Book for Tuqu: ${entry.name}]\n${entry.content}`;
                 }
             });
 
-                        // 2. 获取兔区数据摘要 (全版块最新10贴 + 全楼层)
-            const tuquData = globalTuquData || {};
-            let allPosts = [];
 
-            // 步骤 A: 收集所有版块的帖子，打平成一个大数组
+                        // 2. 获取兔区数据摘要
+            let tuquContext = "";
+            
+            // 【核心修改】只有当 includeContext 不为 false 时，才执行抓取逻辑
+            if (extraOptions.includeContext !== false) {
+                const tuquData = globalTuquData || {};
+                let allPosts = [];
+
+                // 步骤 A: 收集所有版块的帖子，打平成一个大数组
             for (const board in tuquData) {
                 if (Array.isArray(tuquData[board])) {
                     tuquData[board].forEach(post => {
@@ -13853,6 +13901,10 @@ You are **STRICTLY FORBIDDEN** from using any name that is NOT in the lists abov
                     tuquContext += `--- No Replies Yet ---\n`;
                 }
             });
+            } else {
+                // 如果被禁用，给 AI 一个明确的提示，让它自由发挥
+                tuquContext = "\n[TUQU FORUM CONTEXT]\n(The forum is currently quiet or you are focusing on creating a brand new topic. Please generate content based on your own persona and the board rules.)\n";
+            }
 
             const tuquInstruction = `
 # [ULTIMATE DIRECTIVE: TUQU FORUM ECOSYSTEM SIMULATION - PRO MAX]
@@ -14127,8 +14179,13 @@ Constraint: Output ONLY the [tuqu_complex_action] command. No chat text.`
             }
 
             let tuquWorldBookContent = '';
+            // 【核心修改】从 extraOptions 中提取本次手动选择的世界书名单
+            const selectedWbs = extraOptions.selectedWorldbooks || [];
+
             worldBookEntries.forEach(entry => {
-                if (entry.enabled && entry.useInTuqu) {
+                if (!entry.enabled) return;
+                // 逻辑：必读 OR 手动选中
+                if (entry.useInTuqu || selectedWbs.includes(entry.name)) {
                     tuquWorldBookContent += `\n\n[World Book for Tuqu: ${entry.name}]\n${entry.content}`;
                 }
             });
@@ -14156,7 +14213,7 @@ You MUST generate a \`location\` based on the **Story Setting/Worldview**.
 *   **REQUIRED:** Creative IDs (e.g., "Philosopher of Sleep", "Just Passing By", "Eating Melons").
 
 **[3. USER ERASURE & ANTI-IMITATION]**
-*   **ABSOLUTE BAN:** You are **STRICTLY FORBIDDEN** from mentioning or interacting with `{{user}}`. 
+*   **ABSOLUTE BAN:** You are **STRICTLY FORBIDDEN** from mentioning or interacting with \`{{user}}\`. 
 *   **NO MIMICRY:** Do NOT copy the user's way of speaking. Do NOT use the user's previous message formats. Imitation is the lowest form of creativity. Be a unique netizen with your own voice.
 
 
@@ -14333,8 +14390,13 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
             }
 
             let tuquWorldBookContent = '';
+            // 【核心修改】从 extraOptions 中提取本次手动选择的世界书名单
+            const selectedWbs = extraOptions.selectedWorldbooks || [];
+
             worldBookEntries.forEach(entry => {
-                if (entry.enabled && entry.useInTuqu) {
+                if (!entry.enabled) return;
+                // 逻辑：必读 OR 手动选中
+                if (entry.useInTuqu || selectedWbs.includes(entry.name)) {
                     tuquWorldBookContent += `\n\n[World Book for Tuqu: ${entry.name}]\n${entry.content}`;
                 }
             });
@@ -14659,8 +14721,13 @@ ${chatHistoryForTuqu || 'No recent history.'}
             }
 
             let tuquWorldBookContent = '';
+            // 【核心修改】从 extraOptions 中提取本次手动选择的世界书名单
+            const selectedWbs = extraOptions.selectedWorldbooks || [];
+
             worldBookEntries.forEach(entry => {
-                if (entry.enabled && entry.useInTuqu) {
+                if (!entry.enabled) return;
+                // 逻辑：必读 OR 手动选中
+                if (entry.useInTuqu || selectedWbs.includes(entry.name)) {
                     tuquWorldBookContent += `\n\n[World Book for Tuqu: ${entry.name}]\n${entry.content}`;
                 }
             });
@@ -33563,7 +33630,8 @@ checkMomentsUpdates(); // <--- 新增这一行
         let universalTimer = null;
         const defaults = {
     globalInterval: 15,
-    rateLimit: 2, // <--- 新增这一行
+    rateLimit: 2,
+    tuquExcludeContext: false, // 【核心新增】默认不排除上下文
     perCharacter: {}
 };
 
@@ -33592,6 +33660,14 @@ checkMomentsUpdates(); // <--- 新增这一行
             msgSelect.value = settings.msgProfile || 'global';
             momentsSelect.value = settings.momentsProfile || 'global';
             tuquSelect.value = settings.tuquProfile || 'global';
+
+            // 【核心新增】初始化并绑定上下文开关
+            const excludeToggle = document.getElementById('dynamics-tuqu-exclude-context');
+            excludeToggle.checked = settings.tuquExcludeContext || false;
+            excludeToggle.onchange = () => {
+                settings.tuquExcludeContext = excludeToggle.checked;
+                saveSettings();
+            };
 
             // 绑定保存事件
             [msgSelect, momentsSelect, tuquSelect].forEach(sel => {
@@ -34368,9 +34444,13 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                                 proactiveApiCallTimestamps.push(Date.now());
                                 
                                 console.log(`[Dynamics] ${charName} 决定去兔区发帖/回帖`);
-                                // 【核心修改】移除 await
-                                triggerProactiveAI(chat.id, charName, 'tuqu_interaction');
+                                // 【核心修改】传入 includeContext 参数
+                                triggerProactiveAI(chat.id, charName, 'tuqu_interaction', null, { 
+                                    includeContext: !settings.tuquExcludeContext 
+                                });
                             }
+
+
                             continue; 
                         }
                     }
@@ -36425,9 +36505,13 @@ fileInput.style.display = 'none';
                                 proactiveApiCallTimestamps.push(Date.now());
 
                                 console.log(`NPC Dynamics: Triggering Tuqu action for ${charName}`);
-                                // 【核心修改】移除 await
-                                triggerProactiveAI(null, charName, 'tuqu_interaction');
+                                // 【核心修改】从 dynamicsManager 的设置中读取全局开关
+                                const dynSettings = loadFromLocalStorage('app-dynamics-settings', {});
+                                triggerProactiveAI(null, charName, 'tuqu_interaction', null, { 
+                                    includeContext: !dynSettings.tuquExcludeContext 
+                                });
                             }
+
                         }
                     }
                 }

@@ -602,6 +602,12 @@ html, body {
             <label style="font-size: 12px; color: #888; display: block; margin-bottom: 5px;">输入世界观/设定 (可选)：</label>
             <textarea id="trigger-worldview" placeholder="例如：假如角色是皇上 / 假如这是末世背景..." rows="3"></textarea>
             
+            <!-- 【新增】临时挂载世界书 -->
+            <label style="font-size: 12px; color: #888; display: block; margin-bottom: 5px;">选择本次使用的世界书 (可选)：</label>
+            <div id="trigger-worldbook-list" style="max-height: 100px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 8px; margin-bottom: 15px; background: #fafafa;">
+                <p style="font-size: 12px; color: #999; text-align: center; margin: 5px 0;">正在加载世界书...</p>
+            </div>
+
             <!-- 【核心修改】增加 ID 容器以便 JS 控制显隐 -->
             <div id="trigger-context-group">
                 <label style="display:flex; align-items:center; margin-bottom:15px; font-size:12px; color:#333; cursor:pointer;">
@@ -688,6 +694,9 @@ html, body {
             const select = document.getElementById('trigger-char-select');
             select.innerHTML = '<option value="">随机路人</option>';
             
+            // 【新增】请求世界书列表
+            window.parent.postMessage({ type: 'REQUEST_WORLDBOOK_LIST' }, '*');
+            
             modal.style.display = 'flex';
         }
 
@@ -762,7 +771,9 @@ html, body {
             const select = document.getElementById('trigger-char-select');
             document.getElementById('trigger-modal-title').innerText = `更新当前帖子`;
             
+            // 【核心修改】同时请求角色列表和世界书列表
             window.parent.postMessage({ type: 'REQUEST_CHARACTER_LIST' }, '*');
+            window.parent.postMessage({ type: 'REQUEST_WORLDBOOK_LIST' }, '*');
             
             modal.style.display = 'flex';
         }
@@ -790,7 +801,11 @@ html, body {
 
             const select = document.getElementById('trigger-char-select');
             document.getElementById('trigger-modal-title').innerText = `在“${currentBoardTitle}”催更`;
+            
+            // 【核心修改】同时请求角色列表和世界书列表
             window.parent.postMessage({ type: 'REQUEST_CHARACTER_LIST' }, '*');
+            window.parent.postMessage({ type: 'REQUEST_WORLDBOOK_LIST' }, '*');
+            
             modal.style.display = 'flex';
         }
 
@@ -799,7 +814,7 @@ html, body {
             document.getElementById('board-trigger-modal').style.display = 'none';
         }
 
-        // 接收父窗口发来的角色列表
+        // 接收父窗口发来的角色列表和世界书列表
         window.addEventListener('message', function(event) {
             if (event.data.type === 'RESPONSE_CHARACTER_LIST') {
                 // 【核心修改】如果是随机模式，忽略发来的列表，保持“随机路人”
@@ -815,8 +830,32 @@ html, body {
                     select.appendChild(opt);
                 });
                 select.value = currentVal;
+            } 
+            // 【核心新增】处理世界书列表的返回
+            else if (event.data.type === 'RESPONSE_WORLDBOOK_LIST') {
+                const listContainer = document.getElementById('trigger-worldbook-list');
+                const wbList = event.data.list; // 注意：现在这是一个对象数组 {name, required}
+                
+                if (!wbList || wbList.length === 0) {
+                    listContainer.innerHTML = '<p style="font-size: 12px; color: #999; text-align: center; margin: 5px 0;">没有可用的世界书</p>';
+                    return;
+                }
+
+                listContainer.innerHTML = wbList.map(item => {
+                    // 如果是必读(required)，则强制勾选并禁用(不可取消)，并加粗显示
+                    const isChecked = item.required ? 'checked disabled' : '';
+                    const labelStyle = item.required ? 'font-weight:bold; color:#ff4d4f;' : 'color:#333;';
+                    const suffix = item.required ? ' (必读)' : '';
+                    
+                    return `
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 13px; ${labelStyle} cursor: pointer;">
+                        <input type="checkbox" class="trigger-wb-checkbox" value="${item.name}" ${isChecked}> ${item.name}${suffix}
+                    </label>
+                `}).join('');
             }
         });
+
+
 
 
         // 确认提交催更指令
@@ -825,6 +864,9 @@ html, body {
             const worldview = document.getElementById('trigger-worldview').value.trim();
             // 获取是否发送上下文的勾选状态
             const includeContext = document.getElementById('trigger-include-context').checked;
+            
+            // 【核心新增】获取选中的世界书条目名称数组
+            const selectedWbs = Array.from(document.querySelectorAll('.trigger-wb-checkbox:checked')).map(cb => cb.value);
             
             // 获取版规 (如果是随机模式，使用通用规则或空)
             const rules = currentTriggerMode === 'random' ? "General Forum Rules" : getBoardRules(currentBoardTitle);
@@ -838,7 +880,8 @@ html, body {
                     charName: charName,
                     worldview: worldview,
                     boardRules: rules,
-                    includeContext: includeContext // 新增参数
+                    includeContext: includeContext,
+                    selectedWorldbooks: selectedWbs // 【核心新增】
                 }, '*');
             } else if (currentTriggerMode === 'random') {
                 // 新增：发送随机更新指令
@@ -847,7 +890,8 @@ html, body {
                     mode: 'random', 
                     charName: charName,
                     worldview: worldview,
-                    includeContext: includeContext // 新增参数
+                    includeContext: includeContext,
+                    selectedWorldbooks: selectedWbs // 【核心新增】
                 }, '*');
             } else {
                 // 发送版块催更指令 (原有逻辑)
@@ -858,13 +902,15 @@ html, body {
                     charName: charName,
                     worldview: worldview,
                     boardRules: rules,
-                    includeContext: includeContext // 新增参数
+                    includeContext: includeContext,
+                    selectedWorldbooks: selectedWbs // 【核心新增】
                 }, '*');
             }
 
             closeTriggerModal();
             alert('指令已发出，太太们正在提笔...');
         }
+
 
 
         function saveForumData() { 
