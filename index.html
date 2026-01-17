@@ -19390,40 +19390,93 @@ let isLoadingMore = false;
                 return;
             }
 
-            // --- 逻辑 B: 处理开场白切换 (带自动存档) ---
+            // --- 逻辑 B: 处理开场白切换 (智能存档 + 占位符替换) ---
             const greetingItem = e.target.closest('.identity-greeting-item');
             if (greetingItem) {
                 const branchId = greetingItem.dataset.branchId;
                 const branchHistoryKey = `chat_branches_${chatId}`;
                 let branches = loadFromLocalStorage(branchHistoryKey, []);
                 const targetBranch = branches.find(b => b.id === branchId);
+                
                 if (targetBranch) {
-                    const confirmed = await conversationManager.customConfirm(`切换到 "${targetBranch.name}" 吗？\n当前进度将存档。`, '剧本切换');
+                    const confirmed = await conversationManager.customConfirm(`切换到 "${targetBranch.name}" 吗？\n如有新对话，当前进度将自动存档。`, '剧本切换');
                     if (confirmed) {
                         document.getElementById('identity-menu-overlay').classList.add('hidden');
+                        
+                        // 1. 获取当前聊天绑定的用户名
+                        const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                        const userName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+
+                        // 2. 【核心修改】智能存档逻辑
                         const mainConversationKey = `conversation_${chatId}`;
                         const currentMainMessages = loadFromLocalStorage(mainConversationKey, []);
-                        if (currentMainMessages.length > 0) {
+                        
+                        // 读取“来源标记”和“初始长度”
+                        const sourceBranchId = sessionStorage.getItem(`source_branch_${chatId}`);
+                        const sourceLength = parseInt(sessionStorage.getItem(`source_length_${chatId}`) || 0, 10);
+                        
+                        // 判断是否需要存档：
+                        // 条件A: 没有来源标记（说明是原始主线，或者是刷新页面后丢失了标记）
+                        // 条件B: 有来源标记，但是消息长度增加了（说明聊了新天）
+                        // 条件C: 有来源标记，但是来源ID和当前要切去的目标ID不一致（防止切同一个分支时重复存档，虽然UI上一般不会点同一个）
+                        const needsArchive = !sourceBranchId || (currentMainMessages.length > sourceLength);
+
+                        if (needsArchive && currentMainMessages.length > 0) {
                             const lastMsg = currentMainMessages[currentMainMessages.length - 1];
                             const preview = lastMsg ? (lastMsg.text || `[${lastMsg.type}]`).substring(0, 30) + '...' : '空对话';
-                            const archiveBranch = { id: `branch_auto_${Date.now()}`, name: `存档: ${new Date().toLocaleString()}`, timestamp: Date.now(), messages: currentMainMessages, preview: preview };
+                            
+                            const archiveBranch = { 
+                                id: `branch_auto_${Date.now()}`, 
+                                name: `存档: ${new Date().toLocaleString()}`, 
+                                timestamp: Date.now(), 
+                                messages: currentMainMessages, 
+                                preview: preview 
+                            };
                             branches.unshift(archiveBranch);
                             if (branches.length > 20) branches = branches.slice(0, 20);
                             saveToLocalStorage(branchHistoryKey, branches);
+                            console.log("[剧本切换] 检测到新内容，已执行自动存档。");
+                        } else {
+                            console.log("[剧本切换] 内容未变动，跳过存档。");
                         }
-                        saveToLocalStorage(mainConversationKey, targetBranch.messages);
+
+                        // 3. 处理新剧本中的 {{user}} 和 user 占位符
+                        const processedMessages = targetBranch.messages.map(msg => {
+                            if (msg.text && typeof msg.text === 'string') {
+                                // 核心修改：使用正则同时匹配 {{user}} 和 单独的 user (单词边界)
+                                // \buser\b 确保只匹配独立的 user 单词，防止误伤 username 等词
+                                let newText = msg.text.replace(/{{user}}/g, userName);
+                                newText = newText.replace(/\buser\b/g, userName);
+                                return { ...msg, text: newText };
+                            }
+                            return msg;
+                        });
+
+                        // 4. 保存并标记新状态
+                        saveToLocalStorage(mainConversationKey, processedMessages);
+                        
+                        // 【关键】打上新的标记：记录当前主线来自哪个分支，以及初始长度
+                        sessionStorage.setItem(`source_branch_${chatId}`, branchId);
+                        sessionStorage.setItem(`source_length_${chatId}`, processedMessages.length);
+
+                        // 5. 重置状态
                         const statuses = loadFromLocalStorage('app_character_statuses', {});
-                        const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
                         const currentChat = chatList.find(c => c.id === chatId);
-                        if (currentChat && currentChat.type !== '群聊') { delete statuses[currentChat.name]; delete chatInfo.ai_remarks; delete chatInfo.ai_remark_for_user; }
+                        if (currentChat && currentChat.type !== '群聊') { 
+                            delete statuses[currentChat.name]; 
+                            delete chatInfo.ai_remarks; 
+                            delete chatInfo.ai_remark_for_user; 
+                        }
                         saveToLocalStorage('app_character_statuses', statuses);
                         saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
-                        conversationManager.customAlert('剧本已切换，旧进度已存档。');
+
+                        conversationManager.customAlert(`剧本已切换！已自动将“{{user}}”替换为“${userName}”。`);
                         conversationManager.open(chatId);
                     }
                 }
                 return;
             }
+
 
             // --- 【核心新增 2：模式一键切换逻辑】 ---
             if (e.target.id === 'identity-mode-toggle') {
@@ -29859,40 +29912,50 @@ async function showBranchHistoryModal(chatId) {
 
             // **1. 自动保存当前时间线为一个新分支 (避免数据丢失)**
             if (currentMainMessages.length > 0) {
-                // --- 新增：提前生成预览文本 ---
                 const lastMessage = currentMainMessages[currentMainMessages.length - 1];
                 const previewText = lastMessage ? (lastMessage.text || `[${lastMessage.type}]`).substring(0, 20) + '...' : '空分支';
 
                 const newBranchToSave = {
                     id: `branch_${Date.now()}`,
-                    // 新分支的分叉点，逻辑上是我们要恢复的老分支的分叉点
                     branchedFromId: branchToRestore.branchedFromId, 
                     timestamp: Date.now(),
-                    messages: currentMainMessages, // 保存完整的当前对话
-                    preview: previewText // 将预览文本一并存入
+                    messages: currentMainMessages, 
+                    preview: previewText
                 };
-                branches.unshift(newBranchToSave); // 存入历史
+                branches.unshift(newBranchToSave); 
             }
 
-            // **2. 彻底替换主线**
-            // 直接使用分支的完整消息快照作为新的主线
-            const restoredMessages = branchToRestore.messages;
+            // **2. 【核心修改】处理恢复数据中的名字替换**
+            // 获取当前聊天绑定的用户名
+            const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+            const userName = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+
+            // 遍历并替换
+            const restoredMessages = branchToRestore.messages.map(msg => {
+                if (msg.text && typeof msg.text === 'string') {
+                    // 同时替换 {{user}} 和 user
+                    let newText = msg.text.replace(/{{user}}/g, userName);
+                    newText = newText.replace(/\buser\b/g, userName);
+                    return { ...msg, text: newText };
+                }
+                return msg;
+            });
+
+            // 保存处理后的数据为主线
             saveToLocalStorage(mainConversationKey, restoredMessages);
 
             // **3. 清理工作**
-            // 从历史记录中移除已被恢复的分支
             branches.splice(branches.findIndex(b => b.id === branchId), 1);
-            // 限制分支总数并保存
             if (branches.length > 20) {
                 branches = branches.slice(0, 20);
             }
             saveToLocalStorage(branchHistoryKey, branches);
 
-            await customAlert('历史分支已成功恢复！即将刷新聊天界面。');
+            await customAlert(`历史分支已恢复！已自动将“{{user}}”和“user”替换为“${userName}”。`);
             
-            // 重新打开聊天以加载全新的主线
             open(chatId);
         }
+
         async function renameBranch(chatId, branchId, closeModalCallback) {
             const branchHistoryKey = `chat_branches_${chatId}`;
             let branches = loadFromLocalStorage(branchHistoryKey, []);
