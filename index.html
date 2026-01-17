@@ -19263,7 +19263,6 @@ let isLoadingMore = false;
                 const list = document.getElementById('identity-list-container');
                 if (!menu || !list) return;
 
-                // 1. 获取当前聊天上下文
                 const currentChatId = conversationManager.getCurrentChatId();
                 const currentChat = chatList.find(c => c.id === currentChatId);
                 const chatInfo = loadFromLocalStorage(`chat_info_${currentChatId}`, {});
@@ -19271,7 +19270,45 @@ let isLoadingMore = false;
 
                 menu.classList.remove('hidden');
 
-                // 2. 准备所有可能的原始身份池
+                // --- 【核心新增 1：模式切换与导演耳麦 UI】 ---
+                const isOffline = chatInfo.mode === 'offline';
+                const controlPanelHtml = `
+                    <div style="margin-bottom: 20px; background: #f8f9fa; border-radius: 16px; padding: 15px; border: 1px solid #eee;">
+                        <!-- 模式切换 -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 14px; font-weight: bold; color: #333;">当前模式: ${isOffline ? '线下 (写小说)' : '线上 (发微信)'}</span>
+                            <button id="identity-mode-toggle" style="padding: 6px 12px; background: ${isOffline ? '#007aff' : '#28a745'}; color: white; border: none; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                                切换为${isOffline ? '线上' : '线下'}
+                            </button>
+                        </div>
+                        <!-- 导演耳麦 -->
+                        <div style="position: relative;">
+                            <textarea id="identity-whisper-input" placeholder="导演耳麦：输入悄悄话指挥 AI 下一步动作 (不留记录)..." style="width: 100%; height: 60px; background: white; border: 1px solid #ddd; border-radius: 10px; padding: 8px; font-size: 13px; box-sizing: border-box; resize: none;"></textarea>
+                            <button id="identity-whisper-send" style="position: absolute; right: 8px; bottom: 8px; background: #333; color: white; border: none; border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer;">指挥</button>
+                        </div>
+                    </div>
+                `;
+
+                // --- 加载开场白分支 ---
+                const branches = loadFromLocalStorage(`chat_branches_${currentChatId}`, []);
+                let branchesHtml = "";
+                if (branches.length > 0) {
+                    branchesHtml = `
+                        <div style="margin-bottom: 20px;">
+                            <div style="font-size: 12px; color: #8e8e93; margin-bottom: 10px; padding-left: 5px; font-weight: bold; letter-spacing: 1px;">剧本存档 (点击切换)</div>
+                            <div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; -webkit-overflow-scrolling: touch;">
+                                ${branches.map(b => `
+                                    <div class="identity-greeting-item" data-branch-id="${b.id}" style="flex: 0 0 140px; background: #f2f2f7; border-radius: 12px; padding: 10px; cursor: pointer; border: 1px solid #e5e5ea;">
+                                        <div style="font-size: 11px; font-weight: bold; color: #007aff; margin-bottom: 4px;">${escapeHtml(b.name || '未命名分支')}</div>
+                                        <div style="font-size: 10px; color: #666; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3;">${escapeHtml(b.preview || '无预览内容')}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // --- 准备身份列表 ---
                 const allUserPersonas = userPersonas.map(p => ({ name: p.name, type: '用户人设', avatar: p.avatar }));
                 const allNpcs = npcList.map(name => {
                     const npcData = (npcSettings.personas && npcSettings.personas[name]) || {};
@@ -19282,63 +19319,20 @@ let isLoadingMore = false;
                     .map(name => ({ name: name, type: '角色', avatar: null }));
 
                 let identities = [];
-                let helpText = "";
-
                 if (isGroup) {
-                    // --- 情况 A: 群聊逻辑 (全维度身份扫描) ---
-                    // 1. 获取正式成员
                     const groupMembers = loadFromLocalStorage(`chat_members_${currentChatId}`, []);
-                    
-                    // 2. 获取群聊主角名单
                     const protagonists = (chatInfo.groupPersonas || []).map(p => p.name);
-                    
-                    // 3. 获取备注中的群演名单 (支持中英文逗号和空格)
                     const ensemble = (chatInfo.remark || '').split(/[,，\s]+/).filter(Boolean);
-                    
-                    // 4. 合并所有潜在身份并去重
                     const allPotentialNames = [...new Set([...groupMembers, ...protagonists, ...ensemble])];
-
-                    identities = [
-                        { name: '{{user}}', type: '原本的用户', avatar: myAvatar },
-                        ...allUserPersonas.filter(p => allPotentialNames.includes(p.name)),
-                        ...allNpcs.filter(n => allPotentialNames.includes(n.name)),
-                        ...allDynamicChars.filter(d => allPotentialNames.includes(d.name))
-                    ];
-
-                    // 5. 补全那些“仅存在于群聊人设或备注中”但在全局列表里还没建立实体的角色
-                    allPotentialNames.forEach(name => {
-                        if (name !== '{{user}}' && !identities.some(id => id.name === name)) {
-                            identities.push({ name: name, type: '群聊角色', avatar: null });
-                        }
-                    });
-
-                    helpText = `
-                        <div style="background:#f8f9fa; border:1px solid #e9ecef; color:#495057; padding:12px; border-radius:8px; font-size:12px; margin-bottom:15px; line-height:1.6;">
-                            <strong>群聊身份切换指引：</strong><br>
-                            您可以变身为群成员、群聊主角或备注中定义的群演角色。切换后，您发送的消息将以该角色身份呈现。
-                        </div>
-                    `;
-
+                    identities = [{ name: '{{user}}', type: '原本的用户', avatar: myAvatar }, ...allUserPersonas.filter(p => allPotentialNames.includes(p.name)), ...allNpcs.filter(n => allPotentialNames.includes(n.name)), ...allDynamicChars.filter(d => allPotentialNames.includes(d.name))];
+                    allPotentialNames.forEach(name => { if (name !== '{{user}}' && !identities.some(id => id.name === name)) identities.push({ name: name, type: '群聊角色', avatar: null }); });
                 } else {
-                    // --- 情况 B: 单聊逻辑 ---
                     const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${currentChatId}`, []);
-                    
-                    // 过滤：仅显示勾选关联的 NPC
-                    identities = [
-                        { name: '{{user}}', type: '原本的用户', avatar: myAvatar },
-                        ...allNpcs.filter(n => associatedNpcNames.includes(n.name))
-                    ];
-
-                    helpText = `
-                        <div style="background:#f8f9fa; border:1px solid #e9ecef; color:#495057; padding:12px; border-radius:8px; font-size:12px; margin-bottom:15px; line-height:1.6;">
-                            <strong>身份切换提示：</strong><br>
-                            若不以当前用户身份进行互动，可切换至已关联的 NPC 身份进行对话。
-                        </div>
-                    `;
+                    identities = [{ name: '{{user}}', type: '原本的用户', avatar: myAvatar }, ...allNpcs.filter(n => associatedNpcNames.includes(n.name))];
                 }
 
-                // 3. 渲染列表
-                list.innerHTML = helpText + identities.map((id, index) => `
+                // 3. 渲染最终列表
+                list.innerHTML = controlPanelHtml + branchesHtml + `<div style="font-size: 12px; color: #8e8e93; margin-bottom: 10px; padding-left: 5px; font-weight: bold; letter-spacing: 1px;">变身身份</div>` + identities.map((id, index) => `
                     <div class="identity-item ${chatState.currentIdentity === id.name ? 'active' : ''}" data-name="${escapeHtml(id.name)}">
                         <div class="avatar-mini" id="id-avatar-item-${index}"></div>
                         <div class="name-info">
@@ -19349,29 +19343,24 @@ let isLoadingMore = false;
                     </div>
                 `).join('');
 
-                // 4. 异步加载头像 (多级联动查找)
+                // 4. 异步加载头像
                 identities.forEach((id, index) => {
                     const el = list.querySelector(`#id-avatar-item-${index}`);
                     if (!el) return;
-
                     let avatarToSet = id.avatar;
-
-                    // 如果对象本身没带头像，去群聊主角设置里找
                     if (!avatarToSet && isGroup) {
                         const p = (chatInfo.groupPersonas || []).find(gp => gp.name === id.name);
                         if (p && p.avatar) avatarToSet = p.avatar;
                     }
-
-                    // 如果还没找到，去全局 NPC 设置里找
                     if (!avatarToSet) {
                         const npcData = (npcSettings.personas && npcSettings.personas[id.name]);
                         if (npcData && npcData.avatar) avatarToSet = npcData.avatar;
                     }
-
                     setImageSrc(el, avatarToSet || generateDefaultAvatar(id.name));
                 });
-
             }
+
+
 
 
             // 绑定事件
@@ -19383,27 +19372,100 @@ let isLoadingMore = false;
             window.addEventListener('touchend', onEnd);
         })();
 
-        // 3. 选择身份逻辑
-        document.body.addEventListener('click', (e) => {
-            const item = e.target.closest('.identity-item');
-            if (item) {
-                const newId = item.dataset.name;
+        // 3. 导演控制台逻辑 (变身 + 剧本 + 模式 + 耳麦)
+        document.body.addEventListener('click', async (e) => {
+            const chatId = conversationManager.getCurrentChatId();
+            if (!chatId) return;
+
+            // --- 逻辑 A: 处理身份变身 ---
+            const identityItem = e.target.closest('.identity-item');
+            if (identityItem) {
+                const newId = identityItem.dataset.name;
                 chatState.currentIdentity = newId;
-                // 保存到当前聊天的特定设置中
-                saveToLocalStorage(`chat_identity_${chatState.chatId}`, newId);
+                saveToLocalStorage(`chat_identity_${chatId}`, newId);
                 updateIdentityDotUI();
                 document.getElementById('identity-menu-overlay').classList.add('hidden');
-                
-                // 提示
                 const displayMsg = newId === '{{user}}' ? '已切回原本身份' : `已变身为: ${newId}`;
                 conversationManager.customAlert(displayMsg);
+                return;
             }
 
-            // 取消按钮
+            // --- 逻辑 B: 处理开场白切换 (带自动存档) ---
+            const greetingItem = e.target.closest('.identity-greeting-item');
+            if (greetingItem) {
+                const branchId = greetingItem.dataset.branchId;
+                const branchHistoryKey = `chat_branches_${chatId}`;
+                let branches = loadFromLocalStorage(branchHistoryKey, []);
+                const targetBranch = branches.find(b => b.id === branchId);
+                if (targetBranch) {
+                    const confirmed = await conversationManager.customConfirm(`切换到 "${targetBranch.name}" 吗？\n当前进度将存档。`, '剧本切换');
+                    if (confirmed) {
+                        document.getElementById('identity-menu-overlay').classList.add('hidden');
+                        const mainConversationKey = `conversation_${chatId}`;
+                        const currentMainMessages = loadFromLocalStorage(mainConversationKey, []);
+                        if (currentMainMessages.length > 0) {
+                            const lastMsg = currentMainMessages[currentMainMessages.length - 1];
+                            const preview = lastMsg ? (lastMsg.text || `[${lastMsg.type}]`).substring(0, 30) + '...' : '空对话';
+                            const archiveBranch = { id: `branch_auto_${Date.now()}`, name: `存档: ${new Date().toLocaleString()}`, timestamp: Date.now(), messages: currentMainMessages, preview: preview };
+                            branches.unshift(archiveBranch);
+                            if (branches.length > 20) branches = branches.slice(0, 20);
+                            saveToLocalStorage(branchHistoryKey, branches);
+                        }
+                        saveToLocalStorage(mainConversationKey, targetBranch.messages);
+                        const statuses = loadFromLocalStorage('app_character_statuses', {});
+                        const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                        const currentChat = chatList.find(c => c.id === chatId);
+                        if (currentChat && currentChat.type !== '群聊') { delete statuses[currentChat.name]; delete chatInfo.ai_remarks; delete chatInfo.ai_remark_for_user; }
+                        saveToLocalStorage('app_character_statuses', statuses);
+                        saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+                        conversationManager.customAlert('剧本已切换，旧进度已存档。');
+                        conversationManager.open(chatId);
+                    }
+                }
+                return;
+            }
+
+            // --- 【核心新增 2：模式一键切换逻辑】 ---
+            if (e.target.id === 'identity-mode-toggle') {
+                const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                const newMode = chatInfo.mode === 'offline' ? 'online' : 'offline';
+                chatInfo.mode = newMode;
+                saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+                
+                // UI 反馈
+                e.target.textContent = `切换为${newMode === 'offline' ? '线上' : '线下'}`;
+                e.target.style.background = newMode === 'offline' ? '#28a745' : '#007aff';
+                e.target.closest('div').querySelector('span').textContent = `当前模式: ${newMode === 'offline' ? '线下 (写小说)' : '线上 (发微信)'}`;
+                
+                window.showNotification(`已切换至${newMode === 'offline' ? '线下' : '线上'}模式`);
+                return;
+            }
+
+            // --- 【核心新增 3：导演耳麦逻辑】 ---
+            if (e.target.id === 'identity-whisper-send') {
+                const input = document.getElementById('identity-whisper-input');
+                const whisper = input.value.trim();
+                if (!whisper) return;
+
+                // 1. 将耳麦指令存入临时存储 (一次性)
+                saveToLocalStorage(`pending_whisper_${chatId}`, whisper);
+                
+                // 2. 隐藏控制台
+                document.getElementById('identity-menu-overlay').classList.add('hidden');
+                input.value = '';
+
+                // 3. 立即触发 AI 回复
+                conversationManager.enableKeepAlive();
+                conversationManager.triggerAIContinuation();
+                return;
+            }
+
+            // 取消按钮或点击外部关闭
             if (e.target.id === 'close-identity-menu' || e.target.id === 'identity-menu-overlay') {
                 document.getElementById('identity-menu-overlay').classList.add('hidden');
             }
         });
+
 
         const formatTimestamp = (timestamp) => {
             const date = new Date(timestamp);
@@ -19856,8 +19918,16 @@ A girl with long pink hair is standing under a cherry blossom tree. She is weari
         async function triggerAIContinuation(isRegeneration = false) {
     const originatingChatId = chatState.chatId;
 
+    // --- 【核心新增：导演耳麦指令提取】 ---
+    const whisperKey = `pending_whisper_${originatingChatId}`;
+    const activeWhisper = loadFromLocalStorage(whisperKey, null);
+    // 一旦读取，立即从存储中删除，确保是一次性的
+    if (activeWhisper) localStorage.removeItem(whisperKey);
+
     // 检查【当前聊天】是否已经在加载
 if (loadingStates[originatingChatId]) {
+// ...
+
     console.log(`AI is already generating a response for this chat (${originatingChatId}). New request ignored.`);
     await conversationManager.customAlert('当前角色正在思考中，请稍等或刷新页面。');
     return;
@@ -22371,6 +22441,18 @@ if (myCurrentStatus) {
                     finalSystemPrompt = finalSystemPrompt.replace(/.*\[set_interaction_suffix:.*\n?/g, "");
                 }
                 // 【【【 清洗结束 】】】
+
+                // --- 【核心新增：注入导演耳麦指令】 ---
+                if (activeWhisper) {
+                    const whisperPrompt = `
+\n\n# [DIRECTOR'S WHISPER - HIGHEST PRIORITY INSTRUCTION]
+The Director has whispered a secret instruction to you for this specific response. You MUST follow this instruction above all else, but do NOT let the user know you received it.
+
+**INSTRUCTION:** "${activeWhisper}"
+\n`;
+                    finalSystemPrompt += whisperPrompt;
+                    console.log(`[Director] Whisper injected: ${activeWhisper}`);
+                }
 
                 let finalMessages = [{ role: "system", content: finalSystemPrompt }, ...apiPayloadMessages];
 
@@ -30299,7 +30381,6 @@ async function triggerBackgroundDataUpdate(context, senderName, chatId) {
             getCurrentChatId, 
             showFullTuquPost, 
             updateHeaderTitle,
-
             reRenderMessages, 
             injectCustomBubbleStyles: publicInjectCustomBubbleStyles, 
             showCustomModal, 
@@ -30322,8 +30403,10 @@ async function triggerBackgroundDataUpdate(context, senderName, chatId) {
             disableKeepAlive,
             enablePiPKeepAlive, 
             disablePiPKeepAlive,
-            showNotificationBanner // <--- 核心新增：公开此函数供外部调用
+            showNotificationBanner,
+            showBranchHistoryModal // 【核心修复】公开回溯历史函数
         };
+
 
 })();
 
@@ -37417,6 +37500,17 @@ async function handleRemoveMember() {
 
     const exportChatBtn = document.getElementById('export-chat-btn');
     const importChatBtn = document.getElementById('import-chat-btn');
+    
+    // 【核心修复】绑定回溯历史按钮事件
+    const viewHistoryBtn = document.getElementById('view-history-branches-btn');
+    if (viewHistoryBtn) {
+        viewHistoryBtn.addEventListener('click', () => {
+            const chatId = conversationManager.getCurrentChatId();
+            if (chatId) {
+                conversationManager.showBranchHistoryModal(chatId);
+            }
+        });
+    }
     const changeMyAvatarBtn = document.getElementById('change-my-avatar-btn');
     const changeContactAvatarBtn = document.getElementById('change-contact-avatar-btn');
     
