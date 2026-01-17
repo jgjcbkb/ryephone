@@ -23174,6 +23174,9 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
                 // --- 开始构建完整的系统上下文 (与正式通话逻辑对齐) ---
                 let fullSystemPrompt = profile.prompt || '';
                 
+                // 【核心修复】将变量定义提至最前
+                const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+
                 // A. 注入历史通话的具体内容 (从 call_summary 中提取)
                 const fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
                 const pastCalls = fullHistoryForCalls.filter(m => m.type === 'call_summary' && m.callData && m.callData.conversation);
@@ -23184,7 +23187,7 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
                         const dateStr = new Date(callMsg.timestamp).toLocaleString();
                         fullSystemPrompt += `\n--- Call Record #${idx + 1} (${dateStr}) ---\n`;
                         callMsg.callData.conversation.forEach(dialogue => {
-                            // 【核心修复】替换剧本中的发送者名字
+                            // 现在这里可以安全使用了
                             const displayName = dialogue.sender === '{{user}}' ? userNameForPrompt : dialogue.sender;
                             fullSystemPrompt += `${displayName}: ${dialogue.text}\n`;
                         });
@@ -23193,10 +23196,10 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
                 }
 
                 // B. 注入基础环境信息
-                const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
                 if (chatInfo.preamble) {
                     fullSystemPrompt += `\n[Preamble - Highest Priority Context]\n${chatInfo.preamble}\n`;
                 }
+
                 if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
                     const persona = userPersonas.find(p => p.name === chatInfo.userPersonaName);
                     if (persona && persona.description) {
@@ -40453,13 +40456,16 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const profileIndexStr = chatInfo.apiConfig ? chatInfo.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
                 if (profileIndexStr === null) throw new Error("No API config for this chat.");
                 
-                const profile = apiProfiles[parseInt(profileIndexStr)];
+                                const profile = apiProfiles[parseInt(profileIndexStr)];
                 if (!profile) throw new Error("API profile not found.");
 
                 // --- 1. 构建 Prompt (终极修正版：包含基础设定 + 历史通话详情) ---
                 
                 // A. 注入 API 设置中的基础 System Prompt
                 let fullSystemPrompt = profile.prompt || '';
+
+                // 【核心修复】提前定义变量
+                const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
 
                 // B. 注入所有历史通话的具体内容 (从 call_summary 中提取)
                 const fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
@@ -40472,7 +40478,7 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                         fullSystemPrompt += `\n--- Call Record #${idx + 1} (${dateStr}) ---\n`;
                         // 遍历该次通话的每一句对话
                         callMsg.callData.conversation.forEach(dialogue => {
-                            // 【核心修复】替换剧本中的发送者名字
+                            // 现在这里安全了
                             const displayName = dialogue.sender === '{{user}}' ? userNameForPrompt : dialogue.sender;
                             fullSystemPrompt += `${displayName}: ${dialogue.text}\n`;
                         });
@@ -40481,11 +40487,11 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 }
 
                 // C. 注入当前通话场景指令
-                fullSystemPrompt += `\n\n[SCENE: VIDEO CALL - DIRECTOR'S NOTES]\nYou are in a live video call. Your world is limited to what you can SEE and HEAR. Your response must be engaging and in-character. To hang up, you MUST end your response with the command \`[hang_up_call]\`.\n`;
+                fullSystemPrompt += `\n\n[SCENE: VIDEO CALL - DIRECTOR'S NOTES]\nYou are in a live video call. Your response must be engaging and in-character. To hang up, you MUST end your response with the command \`[hang_up_call]\`.\n`;
                 fullSystemPrompt += "You MUST respond in Simplified Chinese (简体中文).\n";
 
-                const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
                 if (chatInfo.preamble) {
+
                     fullSystemPrompt += `\n[Preamble - Highest Priority Context]\n${chatInfo.preamble}\n`;
                 }
                 if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
@@ -40791,6 +40797,9 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 // A. 注入 API 设置中的基础 System Prompt
                 let fullSystemPrompt = profile.prompt || '';
 
+                // 【核心修复】提前定义变量，确保下方的 pastCalls 循环可以正常访问它
+                const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
+
                 // B. 注入所有历史通话的具体内容 (从 call_summary 中提取)
                 const fullHistoryForCalls = loadFromLocalStorage(`conversation_${chatId}`, []);
                 const pastCalls = fullHistoryForCalls.filter(m => m.type === 'call_summary' && m.callData && m.callData.conversation);
@@ -40801,7 +40810,7 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                         const dateStr = new Date(callMsg.timestamp).toLocaleString();
                         fullSystemPrompt += `\n--- Call Record #${idx + 1} (${dateStr}) ---\n`;
                         callMsg.callData.conversation.forEach(dialogue => {
-                            // 【核心修复】替换剧本中的发送者名字
+                            // 现在这里可以正常读取到变量了
                             const displayName = dialogue.sender === '{{user}}' ? userNameForPrompt : dialogue.sender;
                             fullSystemPrompt += `${displayName}: ${dialogue.text}\n`;
                         });
@@ -40813,8 +40822,8 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 fullSystemPrompt += `\n\n[SCENE: VIDEO CALL - THE FIRST MOMENT]\n${contextPrompt}\n`;
                 fullSystemPrompt += "You MUST respond in Simplified Chinese (简体中文).\n";
 
-                const userNameForPrompt = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
                 if (chatInfo.preamble) {
+
                     fullSystemPrompt += `\n[Preamble - Highest Priority Context]\n${chatInfo.preamble}\n`;
                 }
                 if (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') {
