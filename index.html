@@ -12232,62 +12232,103 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
             }
             // --- END: 重新注入聊天记录上下文 ---
 
+                        // =================================================================
+            // 【【【 核心新增：注入朋友圈上下文 (主动发消息版) 】】】
             // =================================================================
-// 【【【 核心新增：注入朋友圈上下文 (主动发消息版) 】】】
-// =================================================================
-const aiCharacterName = senderName; 
-const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 5); 
+            const aiCharacterName = senderName; 
+            // 获取朋友圈数据以及认知关系表
+            const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 5); 
 
-let momentsContext = "";
-if (momentsData && momentsData.allVisibleMoments.length > 0) {
-    momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
-    momentsData.allVisibleMoments.forEach((post, i) => {
-         let author = post.userName;
-         
-         // --- 核心修改：对发帖内容进行脱壳处理 ---
-         let rawContent = post.text || post.content || "";
-         // 【核心修复】剥离所有 HTML 标签，仅保留内部文字
-         let content = rawContent.replace(/<[^>]+>/g, '').trim();
-         
-         if (post.image) {
-             if (post.imageDescription) {
-                 content += ` [图片内容: ${post.imageDescription}]`;
-             } else {
-                 content += ` [图片(未描述)]`;
-             }
-         } else if (post.type === 'video' && !content) {
-             content = "[视频]";
-         }
-         
-         if (!content.trim()) content = "[分享]";
+            let momentsContext = "";
+            if (momentsData && momentsData.allVisibleMoments.length > 0) {
+                momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
+                
+                // 1. 建立认知地图，用于快速查找关系
+                // momentsData.knownPeople 包含了基于当前聊天窗口计算出的正确关系
+                const knownMap = new Map(momentsData.knownPeople.map(p => [p.name, p.relationship]));
+                
+                // 2. 获取所有用户人设的名称列表 (用于辅助判断)
+                const allUserPersonaNames = userPersonas.map(p => p.name);
 
-         let interactions = "";
-         if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
-             interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
-         }
-         
-         // 检查评论
-         if (post.comments.length > 0) {
-             const commentsText = post.comments.map(c => {
-                 let rawCommentText = c.text || "";
-                 // 【核心修复】对评论内容也进行脱壳处理，剥离标签保留文字
-                 let cleanCommentText = rawCommentText.replace(/<[^>]+>/g, '').trim();
-                 return `${c.user}: ${cleanCommentText}`; 
-             }).join(' | ');
-             interactions += ` (Comments: ${commentsText})`;
-         }
-         
-         const pDate = new Date(post.timestamp);
-         const pTimeStr = `${pDate.getFullYear()}年${pDate.getMonth() + 1}月${pDate.getDate()}日 ${pDate.getHours().toString().padStart(2, '0')}:${pDate.getMinutes().toString().padStart(2, '0')}`;
+                momentsData.allVisibleMoments.forEach((post, i) => {
+                     let authorLabel = post.userName;
 
-         momentsContext += `Post #${i+1} by ${author} [Posted at: ${pTimeStr}]: "${content}"${interactions}\n`;
-    });
-}
+                     // --- 核心判定逻辑 (同步修复) ---
+                     if (post.userName === aiCharacterName) {
+                         authorLabel = "You (yourself)";
+                     } 
+                     else if (knownMap.has(post.userName)) {
+                         // 只要在认知圈里（包括所有群友、关联NPC、用户），直接显示关系，不标陌生人
+                         authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
+                     } 
+                     else {
+                         // 只有彻底不认识的，才标陌生人
+                         authorLabel = `${post.userName} (【STRANGER / 陌生人】 - This is NOT the person you know)`;
+                     }
+                     
+                     // --- 核心修改：对发帖内容进行脱壳处理 ---
+                     let rawContent = post.text || post.content || "";
+                     // 【核心修复】剥离所有 HTML 标签，仅保留内部文字
+                     let content = rawContent.replace(/<[^>]+>/g, '').trim();
+                     
+                     if (post.image) {
+                         if (post.imageDescription) {
+                             content += ` [图片内容: ${post.imageDescription}]`;
+                         } else {
+                             content += ` [图片(未描述)]`;
+                         }
+                     } else if (post.type === 'video' && !content) {
+                         content = "[视频]";
+                     }
+                     
+                     if (!content.trim()) content = "[分享]";
 
-if (momentsContext) {
+                     let interactions = "";
+                     if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
+                         interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
+                     }
+                     
+                     // 检查评论
+                     if (post.comments.length > 0) {
+                         const commentsText = post.comments.map(c => {
+                             let rawCommentText = c.text || "";
+                             // 【核心修复】对评论内容也进行脱壳处理，剥离标签保留文字
+                             let cleanCommentText = rawCommentText.replace(/<[^>]+>/g, '').trim();
+                             return `${c.user}: ${cleanCommentText}`; 
+                         }).join(' | ');
+                         interactions += ` (Comments: ${commentsText})`;
+                     }
+                     
+                     const pDate = new Date(post.timestamp);
+                     const pTimeStr = `${pDate.getFullYear()}年${pDate.getMonth() + 1}月${pDate.getDate()}日 ${pDate.getHours().toString().padStart(2, '0')}:${pDate.getMinutes().toString().padStart(2, '0')}`;
+
+                     momentsContext += `Post #${i+1} by ${authorLabel} [Posted at: ${pTimeStr}]: "${content}"${interactions}\n`;
+                });
+            }
+
+            if (momentsContext) {
                 finalSystemPrompt += momentsContext;
+                
+                // 【核心新增】主动发消息时的朋友圈反脸盲/反认错协议
+                finalSystemPrompt += `
+---
+[MOMENTS OBSERVATION PROTOCOL - ANTI-CONFUSION LAW]
+**WARNING: DO NOT CONFUSE STRANGERS WITH ACQUAINTANCES.**
+
+1.  **CHECK THE LABEL:** Look carefully at the author label in the Moments list above.
+    *   If it says **"(【STRANGER / 陌生人】...)"**, this person is a **COMPLETE STRANGER**.
+2.  **NAME SIMILARITY TRAP (CRITICAL):** 
+    *   Even if a stranger's name looks very similar to one of your friends (e.g., "Li Si" vs. "Li Si's Fan"), **THEY ARE NOT THE SAME PERSON.**
+    *   Even if they use a nickname like "Baby", "Hubby", or "Wife", **THEY ARE NOT YOUR PARTNER.**
+3.  **BEHAVIOR:** 
+    *   **Do NOT** act familiar with strangers.
+    *   **Do NOT** mention shared memories with strangers.
+    *   **Do NOT** assume a stranger is the user just because they have a similar name.
+---
+`;
             }
             // =================================================================
+
             
             // 【核心新增：注入里程碑记忆】
             const milestoneDataForMsg = loadFromLocalStorage(`app-milestones_${targetChatId}`, []);
@@ -12991,7 +13032,7 @@ if (isGroupPersona) {
                     authorLabel = `YOU (this is your own post)`;
                 } else {
                     // 如果不在认知圈里，就强制打上“陌生人”标签！
-                    authorLabel = `${post.userName} (陌生人)`;
+                    authorLabel = `${post.userName} (【STRANGER / 陌生人】 - This is NOT the person you know)`;
                 }
 
                 const commentsPreview = post.comments.slice(-3).map(c => {
@@ -22262,23 +22303,43 @@ finalSystemPrompt += listenTogetherManager.getAIMusicContext();
 
 // =================================================================
 // 【【【 核心新增：注入朋友圈上下文 】】】
-// 1. 确定我们要观察的用户是谁 (通常是当前聊天的user)
+// 1. 确定我们要观察的用户是谁
 const userPersonaNameToObserve = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
 
 // 2. 获取AI自己的名字 (观察者)
-const aiCharacterName = contactInfo.isGroup ? 'assistant' : chatState.chatName; // 在群聊中，观察者身份模糊，用assistant；单聊用角色名
+const aiCharacterName = contactInfo.isGroup ? 'assistant' : chatState.chatName; 
 
-// 3. 调用改造后的函数，获取朋友圈动态摘要
-// 注意：这里我们复用了 momentsManager.getRecentMomentsForAI
-// 我们稍微调整下它的用法：传入 observerName, observedName, limit
-// 但因为该函数目前只接受一个参数 characterName（作为观察者和被观察者），
-// 我们需要用到它返回的 allVisibleMoments 数据自己拼接，或者稍后微调那个函数。
-// 为了最快生效且不破坏现有逻辑，我们直接获取AI视角的动态。
-
+// 3. 调用函数获取动态
 const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 5); 
-// getRecentMomentsForAI 返回的是对象 { allVisibleMoments, ... }
-// 我们需要把它转换成文本。幸运的是，该函数内部已经有转换逻辑了，只是没返回文本。
-// 建议稍微修改一下 momentsManager.getRecentMomentsForAI 让它返回文本，或者在这里手动拼接。
+
+// --- 【核心修复补丁：强制注入当前聊天上下文中的熟人】 ---
+// 因为群聊时 aiCharacterName 是 'assistant'，它没有任何社交关系，所以必须手动把当前群里的人塞进去
+const currentChatMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
+const currentProtagonists = (chatInfo.groupPersonas || []).map(p => p.name);
+const currentEnsemble = (chatInfo.remark || '').split(/[,，\s]+/).filter(Boolean);
+const currentAssociated = loadFromLocalStorage(`chat_associated_npcs_${chatState.chatId}`, []);
+
+// 合并所有当前上下文中的角色
+const allPeopleInThisChat = [...new Set([
+    ...currentChatMembers, 
+    ...currentProtagonists, 
+    ...currentEnsemble, 
+    ...currentAssociated,
+    chatState.chatName // 单聊对象
+])];
+
+// 强行推入 knownPeople 列表
+// 【修复】加上 const 声明
+const allInCurrentContext = allPeopleInThisChat; 
+allInCurrentContext.forEach(name => {
+    if (name !== '{{user}}' && name !== 'assistant') {
+        momentsData.knownPeople.push({
+            name: name,
+            relationship: `(Known from current chat context)`
+        });
+    }
+});
+// --- 补丁结束 ---
 
 // --- 这里是手动拼接逻辑，确保万无一失 ---
             let momentsContext = "";
@@ -22286,10 +22347,8 @@ const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 
                 momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
                 
                 // 1. 建立认知地图，用于快速查找关系
-                // momentsData.knownPeople 包含了基于当前聊天窗口计算出的正确关系
                 const knownMap = new Map(momentsData.knownPeople.map(p => [p.name, p.relationship]));
-            // 【【【 核心修复：在这里获取所有用户人设的名称列表 】】】
-            const allUserPersonaNames = userPersonas.map(p => p.name);
+                const allUserPersonaNames = userPersonas.map(p => p.name);
 
             momentsData.allVisibleMoments.forEach((post, i) => {
                  let authorLabel = post.userName;
@@ -22297,17 +22356,17 @@ const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 
                  if (post.userName === aiCharacterName) {
                      authorLabel = "You (yourself)";
                  } 
-                 else if (knownMap.has(post.userName) && knownMap.get(post.userName).includes('(the user')) {
-                     authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
-                 } 
-                 else if (allUserPersonaNames.includes(post.userName)) {
-                     authorLabel = `${post.userName} (Stranger/Other User)`;
-                 }
+                 // 【核心修复】只要在 knownMap 里（不管是通过什么途径加进去的），都直接认作熟人，显示关系
                  else if (knownMap.has(post.userName)) {
                      authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
-                 } 
+                 }
+                 // 用户人设如果不明确在群里，也视为普通用户，不标陌生人
+                 else if (allUserPersonaNames.includes(post.userName)) {
+                     authorLabel = `${post.userName} (Other User Persona)`;
+                 }
                  else {
-                     authorLabel = `${post.userName} (Stranger/Other User)`;
+                     // 只有真的完全不认识的，才标记陌生人
+                     authorLabel = `${post.userName} (【STRANGER / 陌生人】 - This is NOT the person you know)`;
                  }
                  
                  // --- 核心修改：对发帖内容进行脱壳处理 ---
@@ -22351,9 +22410,28 @@ const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 
             }
 
 // 4. 如果有动态，就拼接到系统提示词的末尾
-if (momentsContext) {
+            if (momentsContext) {
                 finalSystemPrompt += momentsContext;
+                
+                // 【核心新增】主动发消息时的朋友圈反脸盲/反认错协议
+                finalSystemPrompt += `
+---
+[MOMENTS OBSERVATION PROTOCOL - ANTI-CONFUSION LAW]
+**WARNING: DO NOT CONFUSE STRANGERS WITH ACQUAINTANCES.**
+
+1.  **CHECK THE LABEL:** Look carefully at the author label in the Moments list above.
+    *   If it says **"(【STRANGER / 陌生人】...)"**, this person is a **COMPLETE STRANGER**.
+2.  **NAME SIMILARITY TRAP (CRITICAL):** 
+    *   Even if a stranger's name looks very similar to one of your friends (e.g., "Li Si" vs. "Li Si's Fan"), **THEY ARE NOT THE SAME PERSON.**
+    *   Even if they use a nickname like "Baby", "Hubby", or "Wife", **THEY ARE NOT YOUR PARTNER.**
+3.  **BEHAVIOR:** 
+    *   **Do NOT** act familiar with strangers.
+    *   **Do NOT** mention shared memories with strangers.
+    *   **Do NOT** assume a stranger is the user just because they have a similar name.
+---
+`;
             }
+
 // =================================================================
 
             // 【核心修正：永久注入里程碑协议指令】
@@ -23038,10 +23116,51 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                 }
         
             } catch (error) {
-
-
                 console.error("AI continuation error:", error);
-                await customAlert(`API请求失败:\n\n${error.name}: ${error.message}`, '错误');
+                
+                // --- 【核心修复】错误详情诊断弹窗 ---
+                let errorDetails = error.message || "未知错误";
+                
+                // 尝试提取并美化 JSON 错误信息
+                // 很多 API 报错格式是 "API Error 400: ... Response: { ... }"
+                // 我们尝试提取 "Response:" 后面的部分并格式化
+                if (errorDetails.includes("Response:")) {
+                    const parts = errorDetails.split("Response:");
+                    const header = parts[0];
+                    const body = parts.slice(1).join("Response:"); // 重新组合剩余部分
+                    
+                    try {
+                        const jsonBody = JSON.parse(body.trim());
+                        // 重新拼装成易读格式
+                        errorDetails = `${header}\n\n[详细堆栈]:\n${JSON.stringify(jsonBody, null, 2)}`;
+                    } catch (e) {
+                        // 如果不是JSON，就保持原样
+                    }
+                }
+
+                await conversationManager.showCustomModal({
+                    title: 'API 请求发生错误',
+                    html: `
+                        <div style="text-align: left;">
+                            <p style="color: #d32f2f; font-weight: bold; margin-bottom: 10px;">请截图以下内容进行反馈：</p>
+                            <textarea style="
+                                width: 100%; 
+                                height: 300px; 
+                                font-family: monospace; 
+                                font-size: 12px; 
+                                background: #fff0f0; 
+                                border: 1px solid #ffcdd2; 
+                                border-radius: 8px; 
+                                padding: 10px; 
+                                box-sizing: border-box; 
+                                white-space: pre; 
+                                overflow-x: auto;
+                            " readonly>${escapeHtml(errorDetails)}</textarea>
+                        </div>
+                    `,
+                    buttons: [{ text: '关闭', value: 'close', class: 'secondary' }]
+                });
+
             } finally {
     // 标记【当前聊天】的加载状态为结束
     loadingStates[originatingChatId] = false;
@@ -32386,42 +32505,44 @@ sendCommentBtn.addEventListener('click', () => {
                 }
             } 
             
-            // 【核心修复】：统一查找该角色所属的群聊（无论是主角还是群演）
-            const sourceGroupChat = chatList.find(chat => {
-                if (chat.type !== '群聊') return false;
-                const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                // 检查是否是群聊主角
-                const isProtagonist = info.groupPersonas && info.groupPersonas.some(p => p.name === senderName);
-                // 检查是否是备注中的群演
-                const isEnsemble = info.remark && info.remark.split(/[,，\s]+/).includes(senderName);
-                return isProtagonist || isEnsemble;
-            });
+            // 【核心修复】：遍历所有群聊，只要AI与某人在同一个群（无论是作为成员、主角还是群演），就视为熟人
+            chatList.forEach(chat => {
+                if (chat.type !== '群聊') return;
 
-            if (sourceGroupChat) {
-                // 1. 获取该群聊的详细设置
-                const groupInfo = loadFromLocalStorage(`chat_info_${sourceGroupChat.id}`, {});
-                
-                // 2. 【关键】：将该群聊绑定的“用户人设”强制加入熟人名单
-                if (groupInfo.userPersonaName && groupInfo.userPersonaName !== '无') {
-                    knownPeople.push({ 
-                        name: groupInfo.userPersonaName, 
-                        relationship: `(The User you are talking to in group "${sourceGroupChat.name}")` 
+                const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
+                const members = loadFromLocalStorage(`chat_members_${chat.id}`, []);
+                const protagonists = (info.groupPersonas || []).map(p => p.name);
+                const ensemble = (info.remark || '').split(/[,，\s]+/).filter(Boolean);
+
+                // 汇总该群所有相关人员
+                const allInGroup = [...new Set([...members, ...protagonists, ...ensemble])];
+
+                // 如果 AI (senderName) 在这个群里
+                if (allInGroup.includes(senderName)) {
+                    // 1. 把群里绑定的“用户人设”加入熟人
+                    if (info.userPersonaName && info.userPersonaName !== '无') {
+                        knownPeople.push({ 
+                            name: info.userPersonaName, 
+                            relationship: `(The User in group "${chat.name}")` 
+                        });
+                    }
+
+                    // 2. 把群里其他人加入熟人
+                    allInGroup.forEach(person => {
+                        if (person !== mainUserName && person !== senderName && person !== info.userPersonaName) {
+                            knownPeople.push({ 
+                                name: person, 
+                                relationship: `(a member of your group chat: ${chat.name})` 
+                            });
+                        }
                     });
                 }
+            });
 
-                // 3. 将其他群成员加入名单
-                const members = loadFromLocalStorage(`chat_members_${sourceGroupChat.id}`, []);
-                members.forEach(member => {
-                    // 避免重复添加自己或用户
-                    if (member !== mainUserName && member !== senderName && member !== groupInfo.userPersonaName) {
-                        knownPeople.push({ name: member, relationship: `(a member of your group chat: ${sourceGroupChat.name})` });
-                    }
-                });
-            } else {
-                if (chatForContext) {
-                    const associatedNpcs = loadFromLocalStorage(`chat_associated_npcs_${chatForContext.id}`, []);
-                    associatedNpcs.forEach(npc => knownPeople.push({ name: npc, relationship: `(your associated NPC)` }));
-                }
+            // 补充：如果是单聊角色，把它的关联NPC也加上
+            if (chatForContext) {
+                const associatedNpcs = loadFromLocalStorage(`chat_associated_npcs_${chatForContext.id}`, []);
+                associatedNpcs.forEach(npc => knownPeople.push({ name: npc, relationship: `(your associated NPC)` }));
             }
             
             const socialGraphPrompt = `
@@ -32452,12 +32573,14 @@ ${knownPeople.map(p => `  - ${p.name} ${p.relationship}`).join('\n')}
                 const knownPeopleMap = new Map(knownPeople.map(p => [p.name, p.relationship]));
                 let authorLabel = post.userName;
                 
-                if (knownPeopleMap.has(post.userName)) {
-                    authorLabel = `${post.userName} ${knownPeopleMap.get(post.userName)}`;
-                } else if (post.userName === senderName) {
+                // 【核心逻辑】只要在 knownPeopleMap 里，就直接显示关系，绝不标注陌生人
+                if (post.userName === senderName) {
                     authorLabel = `YOU (this is your own post)`;
+                } else if (knownPeopleMap.has(post.userName)) {
+                    authorLabel = `${post.userName} ${knownPeopleMap.get(post.userName)}`;
                 } else {
-                    authorLabel = `${post.userName} (陌生人)`;
+                    // 只有真的不在任何关系网里，才标记陌生人
+                    authorLabel = `${post.userName} (【STRANGER / 陌生人】 - This is NOT the person you know)`;
                 }
 
                 // 【核心修复】将评论可见深度从 3 条增加到 10 条，确保 AI 不会“看完就忘”
@@ -34457,7 +34580,8 @@ You are responsible for playing every AI character in the "Active Cast" list.`;
                                  authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
                              } 
                              else {
-                                 authorLabel = `${post.userName} (Stranger/Other User)`;
+                                 // 【核心修复】统一陌生人标签格式
+                                 authorLabel = `${post.userName} (【STRANGER / 陌生人】 - This is NOT the person you know)`;
                              }
                              
                              let content = post.text || post.content || ""; 
@@ -34496,8 +34620,23 @@ You are responsible for playing every AI character in the "Active Cast" list.`;
                     }
 
                     if (momentsContext) {
-                        fullContextPrompt += momentsContext;
-                    }
+                finalSystemPrompt += momentsContext;
+                
+                // 【核心新增】朋友圈反脸盲/反认错协议
+                finalSystemPrompt += `
+\n[MOMENTS OBSERVATION PROTOCOL - ANTI-CONFUSION LAW]
+**WARNING: DO NOT CONFUSE STRANGERS WITH ACQUAINTANCES.**
+
+1.  **CHECK THE LABEL:** Look carefully at the author label in the Moments list above.
+    *   If it says **"(【STRANGER / 陌生人】...)"**, this person is a **COMPLETE STRANGER**.
+2.  **NAME SIMILARITY TRAP:** Even if a stranger's name looks very similar to one of your friends (e.g., "Li Si" vs. "Li Si's Fan"), or if they use a nickname like "Baby" or "Hubby", **THEY ARE NOT THE SAME PERSON.**
+3.  **BEHAVIOR:** 
+    *   **Do NOT** act familiar with strangers.
+    *   **Do NOT** mention shared memories with strangers.
+    *   **Do NOT** assume a stranger is the user just because they have a similar name.
+`;
+            }
+
                     // =================================================================
 
                     // 8. 最后，附加“场景通告”指令
