@@ -34682,8 +34682,8 @@ You are responsible for playing every AI character in the "Active Cast" list.`;
 
                     // =================================================================
 
-                    // 8. 最后，附加“场景通告”指令
-                    const scenePrompt = `
+                                                        // 8. 最后，附加“场景通告”指令
+                                    const scenePrompt = `
 # [ULTIMATE DIRECTOR'S BRIEF: SCENE START]
 
 You are the **Group Director** for the chat group named "${group.name}". The group has been quiet for a while, and it's time to bring it back to life.
@@ -34708,24 +34708,52 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
 <block type="text" sender="李四">别提了，头都大了。</block>
 <block type="text" sender="王五">（路过）哟，听起来有八卦？</block>
 `;
-                                    // 最终的 system prompt = 完整的上下文 + 场景执导任务
-                                    const finalSystemPrompt = fullContextPrompt + scenePrompt;
+                                    // 【核心修复】直接赋值给 let 变量，不要重复使用 const 声明，防止语法错误
+                                    finalSystemPrompt = fullContextPrompt + scenePrompt;
 
-                                    const finalMessages = [{ role: "system", content: finalSystemPrompt }];
-                                    const response = await fetch(profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` },
-                                        body: JSON.stringify({ model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) })
-                                    });
+                                    // 【核心修复】增加 User 消息以适配所有模型，并支持 Gemini 格式
+                                    const finalMessages = [
+                                        { role: "system", content: finalSystemPrompt },
+                                        { role: "user", content: "The group is silent. As the Director, start the scene now." }
+                                    ];
 
-                                    if (!response.ok) throw new Error(`API Error ${response.status}`);
+                                    let aiResponse = "";
+                                    let chatUrl, requestBody, requestHeaders;
+
+                                    // 兼容性判断：Gemini vs OpenAI
+                                    if (profile.url.includes('googleapis.com')) {
+                                        chatUrl = `${profile.url.endsWith('/') ? profile.url : profile.url + '/'}models/${profile.model}:generateContent?key=${profile.key}`;
+                                        requestHeaders = { 'Content-Type': 'application/json' };
+                                        const contents = finalMessages.map(msg => ({
+                                            role: msg.role === 'assistant' ? 'model' : 'user',
+                                            parts: [{ text: msg.content }]
+                                        }));
+                                        requestBody = { 
+                                            contents,
+                                            system_instruction: { parts: [{ text: finalSystemPrompt }] }
+                                        };
+                                    } else {
+                                        chatUrl = profile.url.endsWith('/') ? `${profile.url}chat/completions` : `${profile.url}/chat/completions`;
+                                        requestHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${profile.key}` };
+                                        requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
+                                    }
+
+                                    const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody) });
+                                    if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+                                    
                                     const data = await response.json();
-                                    const aiResponse = data.choices[0]?.message?.content;
+                                    if (profile.url.includes('googleapis.com')) {
+                                        aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                                    } else {
+                                        aiResponse = data.choices?.[0]?.message?.content;
+                                    }
 
                                     if (aiResponse && aiResponse.trim()) {
+                                        // 清洗思维链
+                                        const cleanResponse = aiResponse.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '').trim();
                                         const blockRegex = /<block\s+type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/block>/g;
                                         let match;
-                                        while ((match = blockRegex.exec(aiResponse)) !== null) {
+                                        while ((match = blockRegex.exec(cleanResponse)) !== null) {
                                             const sender = match[2];
                                             const content = match[3].trim();
                                             if (content && sender) {
@@ -34733,8 +34761,10 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                                             }
                                         }
                                     }
+
                                 } catch (e) {
-                                    console.error(`[Dynamics Tick] Failed to generate group scene for "${group.name}":`, e);
+                                    // 【核心修改】输出 e.message 才能看到具体的报错文字
+                                    console.error(`[Dynamics Tick] Failed to generate group scene for "${group.name}":`, e.message || e);
                                 }
                                 // config.lastTick = now; // <---这行删掉，前面已经更新过了
                                 // settingsChanged = true; // <---这行删掉
