@@ -34334,10 +34334,14 @@ checkMomentsUpdates(); // <--- 新增这一行
             const now = Date.now();
             let settingsChanged = false;
         
-            const groupChats = chatList.filter(c => c.type === '群聊');
+            // 【核心修改】将所有聊天打乱顺序，确保单聊和群聊有同等的触发机会
+            const shuffledChats = [...chatList].sort(() => Math.random() - 0.5);
         
-            for (const group of groupChats) {
-                const info = loadFromLocalStorage(`chat_info_${group.id}`, {});
+            for (const targetChat of shuffledChats) {
+                // --- 分支 A: 群聊逻辑 ---
+                if (targetChat.type === '群聊') {
+                    const group = targetChat; // 保持变量名一致，无需修改内部代码
+                    const info = loadFromLocalStorage(`chat_info_${group.id}`, {});
         
                 // =================================================================
                 // 核心逻辑：检查【群聊本身】是否设置了动态
@@ -34847,13 +34851,14 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                         }
                     }
                 }
-            }
-        
-            // =================================================================
-            // 【【【【【【 全新、绝对核心的单聊角色检查逻辑 】】】】】】
-            // =================================================================
-            const privateChats = chatList.filter(c => c.type === '私聊');
-            for (const chat of privateChats) {
+            
+            // --- 分支 B: 单聊逻辑 ---
+            } else if (targetChat.type === '私聊') {
+                const chat = targetChat; // 保持变量名一致，无需修改内部代码
+                
+                // =================================================================
+                // 【【【【【【 全新、绝对核心的单聊角色检查逻辑 】】】】】】
+                // =================================================================
                 const charName = chat.name;
                 const charSettings = settings.perCharacter[charName];
 
@@ -34972,9 +34977,10 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                             triggerProactiveAI(chat.id, charName, action);
                         }
                     }
+                                    }
                 }
-            }
-            }
+            } // 结束 else if (私聊)
+            } // 结束 for (shuffledChats)
         
             if (settingsChanged) {
                 saveSettings();
@@ -34982,6 +34988,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
             console.log(`%c[Dynamics Tick]`, 'color: blue; font-weight: bold;', `Check cycle finished.`);
             isTicking = false; // 解锁，允许下一次 tick 运行
         }
+
 
         function init() {
             loadSettings();
