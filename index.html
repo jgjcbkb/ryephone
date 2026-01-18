@@ -1042,6 +1042,11 @@
         padding: 24px; box-sizing: border-box; 
         transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
         position: relative; 
+        /* 【核心修改】高度限制在手机屏幕内的 85%，并强制内部滚动 */
+        max-height: 85% !important;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
     }
     .modal-overlay.visible .modal-box { transform: scale(1); }
     .modal-close-btn { 
@@ -1058,7 +1063,8 @@
         transition: border-color 0.2s, box-shadow 0.2s; 
         background-color: #f7f7f7;
     }
-    .modal-textarea { min-height: 120px; resize: vertical; }
+    /* 【核心修改】弹窗内输入框默认 200px，适合群聊主角等短文 */
+    .modal-textarea { min-height: 200px; resize: vertical; }
     .modal-input:focus, .modal-textarea:focus, .modal-select:focus { 
         border-color: var(--accent-green); box-shadow: 0 0 0 3px rgba(96, 216, 129, 0.2); outline: none; 
     }
@@ -1296,11 +1302,27 @@
     #page-chat-info .form-group label, #page-dynamics .form-group label, #page-appearance .form-group label, #page-npc .form-group label, #page-user-persona .form-group label { display: block; font-weight: 500; color: var(--text-color); font-size: 16px; }
     #page-chat-info .form-group input, #page-chat-info .form-group textarea, #page-chat-info .form-group select,
     #page-dynamics .form-group input, #page-dynamics .form-group textarea, #page-dynamics .form-group select,
-    #page-appearance .form-group input, #page-appearance .form-group textarea, #page-npc .form-group textarea, #page-user-persona .form-group input, #page-user-persona .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 1rem; font-family: inherit; background-color: #f7f7f7; }
+    #page-appearance .form-group input, #page-appearance .form-group textarea, #page-npc .form-group textarea, #page-user-persona .form-group input, #page-user-persona .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 1rem; font-family: inherit; background-color: #f7f7f7; display: block; }
+
+    /* 【核心新增】解决 iOS 上日期/时间输入框宽度缩水、右侧截断及高度不一的问题 */
+    #page-chat-info input[type="date"],
+    #page-chat-info input[type="datetime-local"] {
+        min-width: 100%;
+        min-height: 44px;
+        -webkit-appearance: none; /* 移除 iOS 默认内阴影 */
+    }
     #page-chat-info .form-group input:focus, #page-chat-info .form-group textarea:focus, #page-chat-info .form-group select:focus,
     #page-dynamics .form-group input:focus, #page-dynamics .form-group textarea:focus, #page-dynamics .form-group select:focus,
     #page-appearance .form-group input:focus, #page-appearance .form-group textarea:focus, #page-npc .form-group textarea:focus, #page-user-persona .form-group input:focus, #page-user-persona .form-group textarea:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2); }
-    #page-chat-info .form-group textarea, #page-appearance .form-group textarea, #page-npc .form-group textarea, #page-user-persona .form-group textarea { min-height: 100px; resize: vertical !important; overflow: auto !important; }
+    /* 【核心修改】增加 #page-settings 并将最小高度从 100px 提升到 350px */
+    #page-chat-info .form-group textarea, 
+    #page-appearance .form-group textarea, 
+    #page-npc .form-group textarea, 
+    #page-user-persona .form-group textarea,
+    #page-settings .form-group textarea { min-height: 300px; resize: vertical !important; overflow: auto !important; }
+
+    /* 【核心新增】专门让 NPC 编辑弹窗里的人设框保持 350px 高度 */
+    #npc-editor-persona { min-height: 300px !important; }
     #page-chat-info .form-group select, #page-dynamics .form-group select { -webkit-appearance: none; appearance: none; background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2328a745%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.4-5.4-13z%22%2F%3E%3C%2Fsvg%3E'); background-repeat: no-repeat; background-position: right .9em top 50%; background-size: .65em auto; padding-right: 2.5em; }
     #page-chat-info .form-group select:disabled, #page-dynamics .form-group select:disabled { background-color: #f0f0f0; color: #999; border-color: #ddd; background-image: none; }
     #page-chat-info .segmented-control { display: flex; border: 1px solid var(--primary-color); border-radius: 8px; overflow: hidden; }
@@ -3863,7 +3885,7 @@ input:checked + .slider:before {
 /* --- END: 新增通话记录编辑/删除按钮样式 (永久显示) --- */
 /* --- START: 修正群聊主角人设内容框高度 --- */
 #group-persona-editor-section .user-persona-item-content {
-    max-height: 500px; /* 核心修改：设置一个最大高度，比如80像素 */
+    max-height: 160px; /* 【核心修改】从 500px 降到 80px，让卡片变矮 */
     overflow-y: auto; /* 核心修改：当内容超出时，自动显示垂直滚动条 */
     padding-right: 5px; /* 给滚动条留出一点空间，避免文字贴着滚动条 */
     
@@ -3915,7 +3937,7 @@ input:checked + .slider:before {
     /* 核心修复 1: 确保长字符串被强制截断换行 */
     word-break: break-word; /* 保证单词内部可以换行 */
     
-    max-height: 100px; 
+    max-height: 130px; /* 【核心修改】从 100px 降到 80px，保持全App卡片高度一致 */
     overflow-y: auto;
     
     margin-bottom: 10px; 
@@ -7931,7 +7953,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
     <!-- 自定义年月日输入框 (默认隐藏) -->
     <div id="custom-date-input-group" class="form-group" style="display: none;">
         <label for="custom-date-input">选择日期</label>
-        <input type="date" id="custom-date-input" class="modal-input" style="padding: 10px; background-color: #f7f7f7; font-family: inherit; font-size: 1rem;">
+        <input type="date" id="custom-date-input">
     </div>
 </div>
                             <div class="form-group hidden" id="offline-worldbook-group">
@@ -8018,7 +8040,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 <!-- 【【【在这里插入下面的新代码块】】】 -->
 <div class="form-group">
     <label for="preamble-end-time">前情提要结束时间 (选填)</label>
-    <input type="datetime-local" id="preamble-end-time" class="modal-input" style="padding: 10px; background-color: #f7f7f7; font-family: inherit; font-size: 1rem;">
+    <input type="datetime-local" id="preamble-end-time">
     <p class="form-hint">设置此时间后，AI将明确知道“前情提要”中的事件全部发生在此时刻之前。这有助于AI在长线剧情中理清过去与现在的逻辑关系。</p>
 </div>
                             
@@ -12863,6 +12885,8 @@ You are the protagonist. The audience is waiting. Your life cannot stagnate.
             // 【核心新增】主动消息环境警报
             if (contextChatInfo.mode === 'online') {
                 finalSystemPrompt += `\n\n[SYSTEM ALERT: ENVIRONMENT CHANGE]\nThe mode is ONLINE. You are using a phone. Stop narrating. Start typing short messages.`;
+                // 【核心新增】追加严厉禁令
+                finalSystemPrompt += `\n**【动作描写禁令 (NO NARRATION)】:** 在线上模式(Online Mode)，严禁使用（括号）或 *星号* 来描写动作（如：*抱住你*，(亲吻)）。你只能发送文字消息。`;
             }
 
             
@@ -13751,7 +13775,7 @@ ${timeContext}
             const mediaProtocol = `
 ---
 [STRICT MEDIA PROTOCOL - MOMENTS EDITION]
-You are ENCOURAGED to use emojis and stickers in your Moment text.
+**Usage Rule:** Use emojis and stickers ONLY IF it fits your character's personality and the mood of the post. Do not force it.
 
 **1. AVAILABLE EMOJIS (Inline):**
 [${emojiNamesList}]
@@ -18746,20 +18770,21 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                                         clippedMessages = filteredChat.slice(-milestoneData.clip_count);
                                     }
                                 }
-                                // 【核心修复】：极大增强查重逻辑，防止 AI 针对同一事件重复刷屏
+                                // 【核心修复】：终极查重逻辑 - 宁可错杀不可放过
                                 const isDuplicate = milestones.some(existing => {
-                                    const sameTitle = existing.title.trim() === milestoneData.title.trim();
-                                    const sameContent = existing.content.trim() === (milestoneData.content || "").trim();
-                                    const timeDiff = Date.now() - existing.timestamp;
+                                    // 1. 标题查重：只要标题完全一样，就视为重复（里程碑标题应该是唯一的）
+                                    if (existing.title.trim() === milestoneData.title.trim()) return true;
                                     
-                                    // 判定规则：
-                                    // 1. 标题和内容完全一模一样 -> 绝对重复
-                                    // 2. 标题一样且在 1 小时（3600000ms）内重复出现 -> 视为 AI 抽风，拦截
-                                    return (sameTitle && sameContent) || (sameTitle && timeDiff < 3600000);
+                                    // 2. 内容查重：如果内容的前20个字一样，视为重复（防止AI微调内容刷屏）
+                                    const newContent = (milestoneData.content || "").trim();
+                                    const oldContent = existing.content.trim();
+                                    if (newContent.length > 10 && oldContent.startsWith(newContent.substring(0, 20))) return true;
+                                    
+                                    return false;
                                 });
 
                                 if (isDuplicate) {
-                                    console.log(`[Milestone] Duplicate entry "${milestoneData.title}" ignored.`);
+                                    console.log(`[Milestone] Duplicate entry "${milestoneData.title}" ignored (Strict Check).`);
                                     break;
                                 }
 
@@ -21500,6 +21525,8 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 > 孙尚香: 公瑾！你又在胡闹什么！
 `;
     finalSystemPrompt = basePrompt + '\n\n' + GROUP_CHAT_DIRECTOR_PROMPT;
+    // 【核心新增】群聊线上模式也加上严厉禁令
+    finalSystemPrompt += `\n\n**【动作描写禁令 (NO NARRATION)】:** 在线上模式(Online Mode)，严禁使用（括号）或 *星号* 来描写动作（如：*抱住你*，(亲吻)）。你只能发送文字消息。如果你想表达动作（如转账、拍一拍、修改状态），必须使用系统指令，并且指令必须包裹在独立的 \`<block type="command">\` 中。\n`;
     finalSystemPrompt += ONLINE_COMMAND_INSTRUCTIONS;
 
 } else {
@@ -21519,7 +21546,11 @@ This is your absolute, final, and most important rule. Your entire output MUST b
 
 2. **禁止文学化描写:** 严禁描写“光影”、“空气”、“心跳”。只说你该说的话。
 
-3. **表情包依赖:** 强烈建议在每 1-2 条消息中插入一个 \`[emoji:名字]\` 或 \`[sticker:名字]\`。
+3. **表情包使用 (Persona Dependent):** 是否使用表情包完全取决于你的人设。如果是高冷/严肃角色，可以完全不用；如果是活泼角色，可以适量使用。**不要为了用而用。**
+
+**【单聊格式禁令 (ABSOLUTE BAN)】:** 你现在处于【单聊】模式。你【绝对禁止】在输出的文本开头加上“角色名：”或“你的名字：”。
+**【动作描写禁令 (NO NARRATION)】:** 在线上模式(Online Mode)，严禁使用（括号）或 *星号* 来描写动作（如：*抱住你*，(亲吻)）。你只能发送文字消息。如果你想表达动作（如转账、拍一拍、修改状态），必须使用系统指令，并且指令必须包裹在独立的 \`<block type="command">\` 中。
+
 
 
 ---
@@ -30774,25 +30805,26 @@ window.manualReplaceInTextarea = function(textareaId) {
 };
 
 async function showGroupPersonaEditor(persona = {}, isEditing = false) {
-        // --- 1. 新增的头像UI HTML ---
+        // --- 1. 新增的头像UI HTML (增加包裹容器以支持内部滚动微调) ---
         const avatarHtml = `
-            <div class="form-group">
-                <label>主角头像</label>
-                <div class="avatar-management-row">
-                    <div class="avatar-preview" id="group-persona-avatar-preview"></div>
-                    <div class="form-buttons-spaced" style="flex-grow: 1;">
-                        <button id="group-persona-avatar-link-btn" class="modal-button secondary">链接</button>
-                        <button id="group-persona-avatar-gallery-btn" class="modal-button secondary">本地</button>
+            <div id="group-persona-scroll-wrapper" style="text-align: left;">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label>主角头像</label>
+                    <div class="avatar-management-row">
+                        <div class="avatar-preview" id="group-persona-avatar-preview"></div>
+                        <div class="form-buttons-spaced" style="flex-grow: 1;">
+                            <button id="group-persona-avatar-link-btn" class="btn-primary btn-secondary" style="padding: 8px;">链接</button>
+                            <button id="group-persona-avatar-gallery-btn" class="btn-primary btn-secondary" style="padding: 8px;">本地</button>
+                        </div>
                     </div>
+                    <input type="hidden" id="group-persona-avatar-url">
                 </div>
-                <input type="hidden" id="group-persona-avatar-url">
             </div>
         `;
 
         const result = await conversationManager.showCustomModal({
             title: isEditing ? '编辑主角人设' : '添加主角人设',
             showCloseButton: true,
-            // --- 2. 修改form数组，并将头像HTML作为纯html注入 ---
             html: avatarHtml,
             form: [
                 { 
@@ -46105,8 +46137,10 @@ Before generating a new entry, you MUST review the **[YOUR COLLECTION OF PRECIOU
 
 ---
 
-## **2. THE ARCHIVAL MECHANISM: PRECISION CLIPPING**
-Use \`clip_range\` to extract the dialogue: \`"clip_range": ["Starting Keyword", "Ending Keyword"]\`.
+## **2. THE ARCHIVAL MECHANISM: CLIPPING IS OPTIONAL**
+*   **OPTIONAL:** You do NOT have to clip messages every time.
+*   **WHEN TO CLIP:** Only use \`clip_range\` if the specific dialogue wording is extremely important/memorable.
+*   **WHEN TO SKIP:** If it's just a general event or feeling, **OMIT** the \`clip_range\` field entirely.
 
 ---
 ## **3. THE NARRATIVE SOUL: FIRST-PERSON EMOTION (CRITICAL)**
@@ -46129,7 +46163,7 @@ In the \`content\` field, you MUST follow these psychological rules:
   "title": "[Prefix: Title]",
   "date": "YYYY-MM-DD",
   "content": "[Your deeply personal, first-person emotional record here. NO QUESTIONS. NO SUMMARIES.]",
-  "clip_range": ["Start Keyword", "End Keyword"]
+  "clip_range": ["Start Keyword", "End Keyword"]  <-- REMOVE THIS LINE if not clipping!
 }
 </background_update>
 
