@@ -16092,12 +16092,22 @@ conversationManager.showNotificationBanner('TUQU', {
         chatList.unshift(newChat); 
  
         if (type === '群聊') { 
-    // 直接、忠实地保存您在创建时选择的成员列表，不做任何画蛇添足的增删
-    const initialMembers = [...members]; 
-    saveToLocalStorage(`chat_members_${chatId}`, initialMembers);
-}
+            // 直接、忠实地保存您在创建时选择的成员列表，不做任何画蛇添足的增删
+            const initialMembers = [...members]; 
+            saveToLocalStorage(`chat_members_${chatId}`, initialMembers);
+        }
+
+        // 【核心新增】创建新聊天时，默认勾选分镜协议
+        // 注意：这里我们手动初始化 chat_info
+        const defaultChatInfo = {
+            // 默认把分镜协议的名字加进去
+            offlineWorldbookNames: ["分镜切割协议 (Split Bubble Protocol)(VC-IGNORE)"]
+        };
+        saveToLocalStorage(`chat_info_${chatId}`, defaultChatInfo);
+
         saveChatList();
         renderChatList(); 
+
         
         const visibleModal = document.querySelector('.modal-overlay.visible');
         if (visibleModal) {
@@ -16280,7 +16290,9 @@ conversationManager.showNotificationBanner('TUQU', {
                                     remark: name,
                                     // 【核心修复】将刚才提取到的规则名列表填入，实现自动勾选
                                     enabledRegexes: importedRegexNames, 
-                                    userPersonaName: "无"
+                                    userPersonaName: "无",
+                                    // 【核心新增】导入角色时，默认勾选分镜协议
+                                    offlineWorldbookNames: ["分镜切割协议 (Split Bubble Protocol)(VC-IGNORE)"]
                                 };
 
 
@@ -17077,19 +17089,6 @@ You MUST use the custom \`<dm>\` tag format.
                 entries.push(SPLIT_BUBBLE_PRESET);
             }
 
-            // 【核心新增】强制将此协议挂载到所有已有聊天的“线下世界书”名单中
-            chatList.forEach(chat => {
-                const infoKey = `chat_info_${chat.id}`;
-                const info = loadFromLocalStorage(infoKey, {});
-                if (!info.offlineWorldbookNames) info.offlineWorldbookNames = [];
-                
-                // 如果名单里还没有这个协议，就加进去
-                if (!info.offlineWorldbookNames.includes(SPLIT_BUBBLE_PRESET.name)) {
-                    info.offlineWorldbookNames.push(SPLIT_BUBBLE_PRESET.name);
-                    saveToLocalStorage(infoKey, info);
-                }
-            });
-            // --- 新增结束 ---
 
             worldBookEntries = entries.map(e => {
                 if (typeof e.name === 'undefined') { 
