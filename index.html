@@ -8053,6 +8053,11 @@ body.preview-fullscreen-active #page-conversation .chat-content {
             <button class="copy-btn" onclick="copyToClipboard('chat-summary-content')">复制总结</button>
         </div>
         <textarea id="chat-summary-content" readonly placeholder="还没有生成总结..." style="min-height: 120px; background-color: #f0f0f0;"></textarea>
+        
+        <!-- 【核心新增】官方操作指引 -->
+        <p class="form-hint" style="color: #e67e22; font-weight: 500; margin-top: 8px;">
+            <b>[系统说明]</b> 剧情总结仅作为存档记录。若需 AI 感知总结内容以延续剧情，请点击“复制总结”并将其手动粘贴至上方的<b>“前情提要”</b>输入框内。
+        </p>
     </div>
                                 <div class="form-group" style="flex-direction: row; gap: 10px; padding-bottom: 15px;">
                                     <button id="generate-summary-btn" class="modal-button primary" style="margin: 0;">生成/更新总结</button>
@@ -16683,8 +16688,20 @@ conversationManager.showNotificationBanner('TUQU', {
                                     await imageStore.removeItem(key);
                                 }
                             }
+
+                            // 【核心新增】同步删除该角色的世界书和正则规则
+                            const chatName = chat.name;
+                            worldBookEntries = worldBookEntries.filter(wb => (wb.category !== chatName) && !wb.name.startsWith(chatName + "_"));
+                            await saveWorldBook();
+                            renderWorldBook();
+
+                            if (appearanceSettings.regexReplacements) {
+                                appearanceSettings.regexReplacements = appearanceSettings.regexReplacements.filter(r => (r.category !== chatName) && !r.name.startsWith(chatName + "_"));
+                                appearanceManager.saveSettings();
+                            }
+
                             renderChatList();
-                            await conversationManager.customAlert('聊天及所有备份已彻底删除。');
+                            await conversationManager.customAlert('聊天、关联的世界书及正则规则已彻底删除。');
                         }
                     }
                 }
@@ -23536,12 +23553,22 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
                 const appendedSummaryText = await callApi(chatId, finalMessages, 0.5);
 
                 if (appendedSummaryText) {
-                    // 【核心设计修正 4】: 将新总结追加到旧总结的后面
+                    // 1. 更新内部总结字段（用于追踪进度，不删）
                     const newFullSummary = (existingSummary === '(这是第一份总结)' ? '' : existingSummary + '\n\n') + appendedSummaryText;
-                    
                     chatInfo.chatSummary = newFullSummary;
+
+                    // 2. 【核心新增】同步至前情提要，确保 AI 必读
+                    const currentPreamble = chatInfo.preamble || "";
+                    // 检查是否已经包含该总结，防止重复追加
+                    if (!currentPreamble.includes(appendedSummaryText.substring(0, 20))) {
+                        const syncMarker = "\n\n--- [历史剧情回顾] ---\n";
+                        chatInfo.preamble = currentPreamble + syncMarker + appendedSummaryText;
+                        // 同步更新 UI 上的前情提要文本框
+                        const preambleEl = document.getElementById('chat-preamble');
+                        if (preambleEl) preambleEl.value = chatInfo.preamble;
+                    }
                     
-                    // 【核心修正】: 记录本次总结时的消息条数 (用于切片)
+                    // 3. 记录本次总结时的消息条数 (用于切片)
                     chatInfo.lastSummaryMessageCount = conversationHistory.length; 
                     
                     // 【核心修正】: 记录本次总结时的对话轮数 (用于下次触发判断)
@@ -30120,8 +30147,20 @@ document.addEventListener('click', (e) => { if (messageContextMenu && !messageCo
 
 document.getElementById('delete-contact-btn').addEventListener('click', async () => {
         const chatId = getCurrentChatId();
-        if (await customConfirm(`删除联系人“${chatState.chatName}”？`, '删除联系人')) {
-            await addMessage({type: 'system', side: 'system', text: `你已删除“${chatState.chatName}”。`});
+        const chatName = chatState.chatName; // 提前锁定名字
+        if (await customConfirm(`删除联系人“${chatName}”？`, '删除联系人')) {
+            
+            // 【核心新增】同步删除该角色的世界书和正则规则
+            worldBookEntries = worldBookEntries.filter(wb => (wb.category !== chatName) && !wb.name.startsWith(chatName + "_"));
+            await saveWorldBook();
+            renderWorldBook();
+
+            if (appearanceSettings.regexReplacements) {
+                appearanceSettings.regexReplacements = appearanceSettings.regexReplacements.filter(r => (r.category !== chatName) && !r.name.startsWith(chatName + "_"));
+                appearanceManager.saveSettings();
+            }
+
+            await addMessage({type: 'system', side: 'system', text: `你已删除“${chatName}”。`});
             conversationManager.open(chatId);
         }
     });
@@ -30252,7 +30291,11 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
 
             const result = await showCustomModal({
                 title: '回溯历史',
-                html: `<p style="font-size: 13px; color: #888; text-align: center; margin: -10px 0 15px 0; padding: 0 15px;">最多保留100条存档。</p><div style="max-height: 60vh; overflow-y: auto;">${branchesHtml}</div>`,
+                html: `
+                    <div style="background: #fffbe6; border: 1px solid #ffe58f; border-radius: 8px; padding: 10px; margin: -10px 10px 15px 10px; font-size: 12px; color: #856404; line-height: 1.5;">
+                        <b>系统说明：</b>为优化存储性能，本系统仅保留最近 100 条历史分支。其中标识为“存档”的自动记录将在生成 7 天后被永久清理。请及时为重要剧情节点执行“命名”操作以转为永久保存。
+                    </div>
+                    <div style="max-height: 55vh; overflow-y: auto;">${branchesHtml}</div>`,
                 showCloseButton: true,
                 onRender: (modalDOM, closeModal) => {
 
