@@ -30034,7 +30034,7 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
             // **1. 自动清理逻辑：上限提升到 100 条**
             const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
             const cleanedBranches = branches.filter((branch, index) => {
-                // 【核心修改】保护前 100 条不被删除（原来是 20）
+                // 【核心修改】保护前 100 条不被删除
                 if (index < 100) return true;
 
                 // 如果有名字，且名字【不以】“存档:”开头，说明是手动命名的或开场白变体，永久保留。
@@ -30093,7 +30093,8 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
                         const branchId = button.dataset.branchId;
 
                         if (action === 'view') {
-                            viewBranchDetail(chatId, branchId);
+                            // 【核心修改】查看时传入整个 branches 数组
+                            viewBranchDetail(chatId, branchId, branches);
                         } else if (action === 'restore') {
                             closeModal(); 
                             await restoreBranch(chatId, branchId);
@@ -30108,14 +30109,16 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
         }
 
 
-        async function viewBranchDetail(chatId, branchId) {
-            const branches = loadFromLocalStorage(`chat_branches_${chatId}`, []);
-            const branch = branches.find(b => b.id === branchId);
+
+        async function viewBranchDetail(chatId, branchId, allBranches) {
+            // 1. 查找当前索引
+            const currentIndex = allBranches.findIndex(b => b.id === branchId);
+            const branch = allBranches[currentIndex];
             if (!branch) return;
 
+            // 2. 渲染消息内容
             const messagesHtml = branch.messages.map(msg => {
                 const sender = msg.side === 'sent' ? '你' : (msg.sender || chatState.chatName);
-                // 【核心修复】对内容进行二次转义，确保 <!-- title --> 这种标签能作为文字显示，而不是被浏览器隐藏
                 let rawText = msg.text || `[${msg.type}]`;
                 let safeContent = rawText.replace(/&/g, "&amp;")
                                          .replace(/</g, "&lt;")
@@ -30126,11 +30129,46 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
                 return `<div style="margin-bottom: 15px; white-space: pre-wrap; line-height: 1.6; color: #333;"><strong style="color: ${msg.side === 'sent' ? '#28a745' : '#333'}">${sender}:</strong><br>${safeContent}</div>`;
             }).join('');
 
+            // 3. 构建导航按钮 HTML
+            const hasPrev = currentIndex > 0;
+            const hasNext = currentIndex < allBranches.length - 1;
+            const displayName = branch.name ? escapeHtml(branch.name) : new Date(branch.timestamp).toLocaleString();
+
+            const navHtml = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
+                    <button id="ms-view-prev" class="modal-button secondary" style="width: auto; padding: 5px 12px; margin: 0; font-size: 13px; ${!hasPrev ? 'opacity: 0.3; pointer-events: none;' : ''}">◀ 上一个</button>
+                    <span style="font-size: 12px; color: #8e8e93; font-weight: 600;">${currentIndex + 1} / ${allBranches.length}</span>
+                    <button id="ms-view-next" class="modal-button secondary" style="width: auto; padding: 5px 12px; margin: 0; font-size: 13px; ${!hasNext ? 'opacity: 0.3; pointer-events: none;' : ''}">下一个 ▶</button>
+                </div>
+            `;
+
             await showCustomModal({
-                title: '分支详情',
-                html: `<div style="max-height: 60vh; overflow-y: auto; text-align: left; background: #f9f9f9; border-radius: 8px; padding: 15px;">${messagesHtml}</div>`,
+                title: '查看剧本: ' + (branch.name ? escapeHtml(branch.name) : '存档'),
+                html: `
+                    ${navHtml}
+                    <div style="max-height: 55vh; overflow-y: auto; text-align: left; background: #f9f9f9; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #eee;">
+                        ${messagesHtml}
+                    </div>
+                `,
                 showCloseButton: true,
-                buttons: [{ text: '关闭', value: 'close', class: 'secondary' }]
+                buttons: [{ text: '关闭', value: 'close', class: 'secondary' }],
+                onRender: (modalDOM, closeModal) => {
+                    // 绑定翻页事件
+                    const prevBtn = modalDOM.querySelector('#ms-view-prev');
+                    const nextBtn = modalDOM.querySelector('#ms-view-next');
+
+                    if (hasPrev) {
+                        prevBtn.onclick = () => {
+                            // 无需关闭，直接递归调用自身刷新内容
+                            viewBranchDetail(chatId, allBranches[currentIndex - 1].id, allBranches);
+                        };
+                    }
+                    if (hasNext) {
+                        nextBtn.onclick = () => {
+                            viewBranchDetail(chatId, allBranches[currentIndex + 1].id, allBranches);
+                        };
+                    }
+                }
             });
         }
 
