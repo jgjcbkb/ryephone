@@ -19558,7 +19558,8 @@ let isLoadingMore = false;
                             const preview = lastMsg ? (lastMsg.text || `[${lastMsg.type}]`).substring(0, 30) + '...' : '空对话';
                             const archiveBranch = { id: `branch_auto_${Date.now()}`, name: `存档: ${new Date().toLocaleString()}`, timestamp: Date.now(), messages: currentMainMessages, preview: preview };
                             branches.unshift(archiveBranch);
-                            if (branches.length > 20) branches = branches.slice(0, 20);
+                            // 【核心修复】上限提升到 100，防止切换时删掉你的开场白
+                            if (branches.length > 100) branches = branches.slice(0, 100);
                             saveToLocalStorage(branchHistoryKey, branches);
                             window.showNotification("检测到剧情变动，当前进度已自动存档。");
                         } else {
@@ -23546,8 +23547,10 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
                 preview: previewText
             };
             branches.unshift(newBranch);
-            if (branches.length > 20) { branches = branches.slice(0, 20); }
+            // 【核心修复】上限提升到 100
+            if (branches.length > 100) { branches = branches.slice(0, 100); }
             saveToLocalStorage(branchHistoryKey, branches);
+
         }
 
         // --- 核心修复：同时操作两个“账本” ---
@@ -23568,6 +23571,7 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
             saveConversation();
             triggerAIContinuation(true);
         }
+
 
 // ===== 到这里结束复制 =====
         async function handleOutgoingCallAttempt(callId) {
@@ -25613,13 +25617,16 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                 else if (msg.type === 'text') {
                     const applyRegexAndRender = (rawText) => {
                         const chatId = conversationManager.getCurrentChatId();
-                        if (!chatId) return escapeHtml(rawText).replace(/\n/g, '<br>');
+                        // 统一换行符
+                        const normalizeNL = (t) => t.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                        let processedText = normalizeNL(rawText);
+
+                        if (!chatId) return escapeHtml(processedText).replace(/\n/g, '<br>');
 
                         const info = loadFromLocalStorage(`chat_info_${chatId}`, {});
                         const enabledRegexNames = info.enabledRegexes || [];
-                        let processedText = rawText;
-                        let hasBeenReplaced = false;
 
+                        // 1. 执行正则替换 (如网抑云标签)
                         if (enabledRegexNames.length > 0) {
                             const globalRules = appearanceSettings.regexReplacements || [];
                             for (const ruleName of enabledRegexNames) {
@@ -25627,84 +25634,54 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                                 if (rule && rule.pattern) {
                                     try {
                                         const regex = new RegExp(rule.pattern, rule.flags || 'g');
-                                        const textBefore = processedText;
                                         processedText = processedText.replace(regex, rule.template || '');
-                                        if (textBefore !== processedText) {
-                                            hasBeenReplaced = true;
-                                        }
                                     } catch (e) {
-                                        console.error(`正则规则 "${rule.name}" 在渲染时无效或执行出错:`, e);
+                                        console.error(`正则规则 "${rule.name}" 出错:`, e);
                                     }
                                 }
                             }
                         }
                         
-                        if (hasBeenReplaced) {
-                            // 【核心修复：让弹幕和正则生成的HTML也能显示表情包】
-                            // 在返回正则替换后的HTML之前，最后扫描一遍里面的 [emoji:xx] 或 [sticker:xx]
-                            return processedText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
-                                const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type.toLowerCase());
-                                if (item) {
-                                    if (type.toLowerCase() === 'emoji') {
-                                        // Emoji：加上急救包
-                                        return `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${name}" class="inline-emoji">`;
-                                    } else {
-                                        // 表情包：加上急救包，并限制在弹幕里的尺寸
-                                        return `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${name}" style="max-width: 40px; max-height: 40px; display: inline-block; vertical-align: middle; margin: 0 2px;">`;
-                                    }
-                                }
-                                return match;
-                            });
-                        } else {
-                            // 【核心修复：这里补上了表情包翻译逻辑】
-                            // 1. 先用占位符替换所有的 [sticker:xx] 和 [emoji:xx]
+                        // 2. 处理标签外的文本逻辑 (Markdown + 换行)
+                        // 我们将内容按 HTML 标签切开，只处理非标签部分的格式
+                        let finalResult = processedText.split(/(<[^>]+>)/g).map(part => {
+                            if (part.startsWith('<')) return part; // 标签内部不处理
+
+                            // 2.1 处理表情包占位符 (防止转义)
                             let tempPlaceholders = {};
                             let tempCounter = 0;
-                            
-                            const textWithPlaceholders = rawText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                            const textWithPlaceholders = part.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
                                 type = type.toLowerCase();
                                 const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
                                 if (item) {
-                                    const key = `__MEDIA_${tempCounter++}__`;
-                                    let imgTag = '';
-                                    if (type === 'emoji') {
-                                        // Emoji 也加上急救，以防万一
-                                        imgTag = `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" class="inline-emoji">`;
-                                    } else {
-                                        // 表情包：加上急救指令
-                                        imgTag = `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" style="max-width: 100px; max-height: 100px; display: block; margin: 5px 0; border-radius: 4px;">`;
-                                    }
-                                    tempPlaceholders[key] = imgTag;
+                                    const key = `__MEDIA_INNER_${tempCounter++}__`;
+                                    tempPlaceholders[key] = type === 'emoji' 
+                                        ? `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" class="inline-emoji">`
+                                        : `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" style="max-width: 80px; max-height: 80px; display: inline-block; vertical-align: middle; margin: 0 2px;">`;
                                     return key;
                                 }
-                                // 如果没找到对应表情，就原样返回文字
                                 return match;
                             });
 
-                            // 2. 对剩下的文字进行安全转义 (防止HTML注入)
+                            // 2.2 转义 HTML
                             let safeText = escapeHtml(textWithPlaceholders);
 
-                            // 3. 把占位符还原成图片标签
-                            let textWithImages = safeText;
+                            // 2.3 还原表情包
                             for (const [key, val] of Object.entries(tempPlaceholders)) {
-                                textWithImages = textWithImages.replace(key, val);
-                            }
-                            
-                            // 4. 处理简单的 Markdown (加粗/斜体)
-                            let formattedText = simpleMarkdownToHtml(textWithImages);
-                            
-                            // 5. 处理换行
-                            let finalHtml = formattedText.replace(/\n/g, '<br>');
-
-                            // 如果包含图片，外层包一个 div 确保布局正常
-                            if (Object.keys(tempPlaceholders).length > 0) {
-                                finalHtml = `<div>${finalHtml}</div>`;
+                                safeText = safeText.replace(key, val);
                             }
 
-                            return finalHtml;
-                        }
+                            // 2.4 应用 Markdown (粗体/斜体)
+                            let formatted = simpleMarkdownToHtml(safeText);
 
+                            // 2.5 转换换行符
+                            return formatted.replace(/\n/g, '<br>');
+                        }).join('');
+
+                        return finalResult;
                     };
+
+
 
                     const trimmedText = msg.text.trim();
                     const isGeneratedHtmlBlock = trimmedText.startsWith('<div') || trimmedText.startsWith('<snippet>');
@@ -26269,16 +26246,17 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                     });
                 };
 
-                // 定义 applyRegexAndRender (保持原有的安全转义逻辑)
                 const applyRegexAndRender = (rawText) => {
                         const chatId = conversationManager.getCurrentChatId();
-                        if (!chatId) return escapeHtml(rawText).replace(/\n/g, '<br>');
+                        const normalizeNL = (t) => t.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                        let processedText = normalizeNL(rawText);
+
+                        if (!chatId) return escapeHtml(processedText).replace(/\n/g, '<br>');
 
                         const info = loadFromLocalStorage(`chat_info_${chatId}`, {});
                         const enabledRegexNames = info.enabledRegexes || [];
-                        let processedText = rawText;
-                        let hasBeenReplaced = false;
 
+                        // 1. 正则替换
                         if (enabledRegexNames.length > 0) {
                             const globalRules = appearanceSettings.regexReplacements || [];
                             for (const ruleName of enabledRegexNames) {
@@ -26286,60 +26264,46 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                                 if (rule && rule.pattern) {
                                     try {
                                         const regex = new RegExp(rule.pattern, rule.flags || 'g');
-                                        const textBefore = processedText;
                                         processedText = processedText.replace(regex, rule.template || '');
-                                        if (textBefore !== processedText) {
-                                            hasBeenReplaced = true;
-                                        }
                                     } catch (e) {
-                                        console.error(`正则规则 "${rule.name}" 在渲染时无效或执行出错:`, e);
+                                        console.error(`正则规则 "${rule.name}" 出错:`, e);
                                     }
                                 }
                             }
                         }
                         
-                        if (hasBeenReplaced) {
-                            // 如果触发了正则（如弹幕），生成的 HTML 可能包含 [emoji:xx]，需要替换
-                            return replaceMediaTagsInHtml(processedText);
-                        } else {
-                            // 普通文本处理：占位 -> 转义 -> 还原图片 -> Markdown -> 换行
+                        // 2. 混合渲染逻辑 (Markdown + 换行 + 表情)
+                        let finalResult = processedText.split(/(<[^>]+>)/g).map(part => {
+                            if (part.startsWith('<')) return part;
+
                             let tempPlaceholders = {};
                             let tempCounter = 0;
-                            
-                            const textWithPlaceholders = rawText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                            const textWithPlaceholders = part.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
                                 type = type.toLowerCase();
                                 const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
                                 if (item) {
-                                    const key = `__MEDIA_${tempCounter++}__`;
-                                    let imgTag = '';
-                                    if (type === 'emoji') {
-                                        imgTag = `<img src="${item.url}" alt="${escapeHtml(name)}" class="inline-emoji">`;
-                                    } else {
-                                        imgTag = `<img src="${item.url}" alt="${escapeHtml(name)}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
-                                    }
-                                    tempPlaceholders[key] = imgTag;
+                                    const key = `__MEDIA_DOM_${tempCounter++}__`;
+                                    tempPlaceholders[key] = type === 'emoji' 
+                                        ? `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" class="inline-emoji">`
+                                        : `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
                                     return key;
                                 }
                                 return match;
                             });
 
                             let safeText = escapeHtml(textWithPlaceholders);
-
-                            let textWithImages = safeText;
                             for (const [key, val] of Object.entries(tempPlaceholders)) {
-                                textWithImages = textWithImages.replace(key, val);
+                                safeText = safeText.replace(key, val);
                             }
                             
-                            let formattedText = simpleMarkdownToHtml(textWithImages);
-                            let finalHtml = formattedText.replace(/\n/g, '<br>');
+                            let formatted = simpleMarkdownToHtml(safeText);
+                            return formatted.replace(/\n/g, '<br>');
+                        }).join('');
 
-                            if (Object.keys(tempPlaceholders).length > 0) {
-                                finalHtml = `<div>${finalHtml}</div>`;
-                            }
-
-                            return finalHtml;
-                        }
+                        return finalResult;
                     };
+
+
 
                 let cleanText = msg.text.replace(/<block[^>]*>/g, '').replace(/<\/block>/g, '');
                 const trimmedText = cleanText.trim();
@@ -30067,22 +30031,22 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
             const branchHistoryKey = `chat_branches_${chatId}`;
             let branches = loadFromLocalStorage(branchHistoryKey, []);
 
-            // **1. 自动清理逻辑：只保留手动命名的和七天内的存档**
+            // **1. 自动清理逻辑：上限提升到 100 条**
             const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-            const cleanedBranches = branches.filter(branch => {
-                // 【核心修正】：
-                // 1. 如果有名字，且名字【不以】“存档:”开头，说明是手动命名的或开场白变体，永久保留。
+            const cleanedBranches = branches.filter((branch, index) => {
+                // 【核心修改】保护前 100 条不被删除（原来是 20）
+                if (index < 100) return true;
+
+                // 如果有名字，且名字【不以】“存档:”开头，说明是手动命名的或开场白变体，永久保留。
                 if (branch.name && !branch.name.startsWith('存档:')) {
                     return true;
                 }
-                // 2. 如果是自动生成的“存档”，或者干脆没名字，则只保留七天内的。
+                // 如果是自动生成的“存档”，或者干脆没名字，则只保留七天内的。
                 if (branch.timestamp > sevenDaysAgo) {
                     return true;
                 }
-                // 3. 超过七天的自动存档，直接清理。
                 return false;
             });
-
 
             // 如果清理后数量有变化，则更新存储
             if (cleanedBranches.length !== branches.length) {
@@ -30103,8 +30067,7 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
                     <div style="padding: 12px 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: flex-start;">
                         <div style="flex: 1; min-width: 0; margin-right: 10px;">
                             <div style="font-weight: 600; color: #333; margin-bottom: 4px;">${displayName}</div>
-                            <!-- 核心修改：增加 white-space: pre-wrap 允许换行，并限制最大显示行数 -->
-                            <div style="font-size: 12px; color: #666; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4;">${previewText}</div>
+                            <div style="font-size: 12px; color: #666; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4;">${escapeHtml(previewText)}</div>
                         </div>
                         <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-top: 2px;">
                             <button class="modal-button secondary" data-action="view" data-branch-id="${branch.id}" style="padding: 5px 10px; font-size: 13px;">查看</button>
@@ -30118,7 +30081,7 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
 
             const result = await showCustomModal({
                 title: '回溯历史',
-                html: `<p style="font-size: 13px; color: #888; text-align: center; margin: -10px 0 15px 0; padding: 0 15px;">未命名的分支将在7天后自动清理。</p><div style="max-height: 60vh; overflow-y: auto;">${branchesHtml}</div>`,
+                html: `<p style="font-size: 13px; color: #888; text-align: center; margin: -10px 0 15px 0; padding: 0 15px;">最多保留100条存档。</p><div style="max-height: 60vh; overflow-y: auto;">${branchesHtml}</div>`,
                 showCloseButton: true,
                 onRender: (modalDOM, closeModal) => {
 
@@ -30137,13 +30100,13 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
                         } else if (action === 'delete') {
                             await deleteBranch(chatId, branchId, closeModal);
                         } else if (action === 'rename') {
-                            // **4. 新增：处理命名按钮点击**
                             await renameBranch(chatId, branchId, closeModal);
                         }
                     });
                 }
             });
         }
+
 
         async function viewBranchDetail(chatId, branchId) {
             const branches = loadFromLocalStorage(`chat_branches_${chatId}`, []);
@@ -30152,9 +30115,15 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
 
             const messagesHtml = branch.messages.map(msg => {
                 const sender = msg.side === 'sent' ? '你' : (msg.sender || chatState.chatName);
-                const content = escapeHtml(msg.text || `[${msg.type}]`);
-                // 核心修改：增加 white-space: pre-wrap 确保换行显示，并调整间距
-                return `<div style="margin-bottom: 15px; white-space: pre-wrap; line-height: 1.6;"><strong style="color: ${msg.side === 'sent' ? '#28a745' : '#333'}">${sender}:</strong><br>${content}</div>`;
+                // 【核心修复】对内容进行二次转义，确保 <!-- title --> 这种标签能作为文字显示，而不是被浏览器隐藏
+                let rawText = msg.text || `[${msg.type}]`;
+                let safeContent = rawText.replace(/&/g, "&amp;")
+                                         .replace(/</g, "&lt;")
+                                         .replace(/>/g, "&gt;")
+                                         .replace(/"/g, "&quot;")
+                                         .replace(/'/g, "&#039;");
+
+                return `<div style="margin-bottom: 15px; white-space: pre-wrap; line-height: 1.6; color: #333;"><strong style="color: ${msg.side === 'sent' ? '#28a745' : '#333'}">${sender}:</strong><br>${safeContent}</div>`;
             }).join('');
 
             await showCustomModal({
@@ -30164,6 +30133,8 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
                 buttons: [{ text: '关闭', value: 'close', class: 'secondary' }]
             });
         }
+
+
         
         async function restoreBranch(chatId, branchId) {
             const confirmed = await customConfirm('恢复此分支将覆盖当前时间线，当前进度将强制存档。确定要恢复吗？', '历史回溯');
@@ -30217,12 +30188,15 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
 
             // 5. 清理并刷新
             branches.splice(branches.findIndex(b => b.id === branchId), 1);
-            if (branches.length > 20) branches = branches.slice(0, 20);
+            // 【核心修复】上限提升到 100
+            if (branches.length > 100) branches = branches.slice(0, 100);
             saveToLocalStorage(branchHistoryKey, branches);
 
             window.showNotification("历史恢复成功。当前进度已强制存档，剧本溯源已重置。");
             open(chatId);
+
         }
+
 
 
         async function renameBranch(chatId, branchId, closeModalCallback) {
