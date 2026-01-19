@@ -17262,22 +17262,112 @@ You MUST use the custom \`<dm>\` tag format.
         document.getElementById('worldbook-use-in-tuqu').checked = false;
         document.querySelector('input[name="worldbook-trigger"][value="always"]').checked = true; 
         worldbookEditIndexInput.value = ''; 
+            
         worldbookAddBtn.textContent = '添加条目';
     });
 
     window.app = window.app || {};
-    window.app.editWorldBookEntry = (index) => {
+    
+    // 【核心修改】改为弹窗编辑模式，无需滚动到底部
+        // ... (前面的代码保持不变) ...
+    window.app.editWorldBookEntry = async (index) => {
         const entry = worldBookEntries[index];
-        // 【核心新增】回填分类字段
-        document.getElementById('worldbook-category').value = entry.category || '未分类';
-        worldbookNameInput.value = entry.name; worldbookKeywordsInput.value = entry.keywords; worldbookContentInput.value = entry.content;
-        worldbookEnabledInput.checked = entry.enabled; 
-        document.getElementById('worldbook-use-in-moments').checked = entry.useInMoments || false;
-        document.getElementById('worldbook-use-in-tuqu').checked = entry.useInTuqu || false;
-        document.querySelector(`input[name="worldbook-trigger"][value="${entry.triggerMode}"]`).checked = true;
-        worldbookEditIndexInput.value = index; worldbookAddBtn.textContent = '更新条目';
+        
+        const modalHtml = `
+            <div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 65vh; overflow-y: auto; padding-right: 5px;">
+                <div style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 13px; color: #666; display: block; margin-bottom: 5px;">分类 (Category)</label>
+                        <input type="text" id="edit-wb-category" class="modal-input" value="${escapeHtml(entry.category || '未分类')}" style="margin: 0;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size: 13px; color: #666; display: block; margin-bottom: 5px;">名称 (Name)</label>
+                        <input type="text" id="edit-wb-name" class="modal-input" value="${escapeHtml(entry.name)}" style="margin: 0;">
+                    </div>
+                </div>
+
+                <div>
+                    <label style="font-size: 13px; color: #666; display: block; margin-bottom: 5px;">关键词 (Keywords)</label>
+                    <input type="text" id="edit-wb-keywords" class="modal-input" value="${escapeHtml(entry.keywords || '')}" placeholder="逗号分隔" style="margin: 0;">
+                </div>
+
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label style="font-size: 13px; color: #666;">内容 (Content)</label>
+                        <button class="copy-btn" onclick="copyToClipboard('edit-wb-content')">复制</button>
+                    </div>
+                    <textarea id="edit-wb-content" class="modal-textarea" style="height: 200px; margin: 0;">${escapeHtml(entry.content)}</textarea>
+                </div>
+
+                <div style="border-top: 1px solid #eee; padding-top: 10px;">
+                    <label style="font-size: 13px; color: #666; display: block; margin-bottom: 8px;">触发模式</label>
+                    <div style="display: flex; gap: 20px;">
+                        <label class="inline-label"><input type="radio" name="edit-wb-trigger" value="keyword" ${entry.triggerMode !== 'always' ? 'checked' : ''}> 关键词触发</label>
+                        <label class="inline-label"><input type="radio" name="edit-wb-trigger" value="always" ${entry.triggerMode === 'always' ? 'checked' : ''}> 始终触发</label>
+                    </div>
+                </div>
+
+                <!-- 【核心修改】增加了 margin-bottom: 25px，把底部撑开 -->
+                <div style="background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 25px;">
+                    <label class="inline-label" style="margin-bottom: 5px;"><input type="checkbox" id="edit-wb-enabled" ${entry.enabled ? 'checked' : ''}> <b>启用此条目</b></label>
+                    <div style="display: flex; gap: 15px; margin-top: 5px;">
+                        <label class="inline-label"><input type="checkbox" id="edit-wb-moments" ${entry.useInMoments ? 'checked' : ''}> 朋友圈使用</label>
+                        <label class="inline-label"><input type="checkbox" id="edit-wb-tuqu" ${entry.useInTuqu ? 'checked' : ''}> 兔区使用</label>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // ... (后面的代码保持不变) ...
+
+
+        const result = await conversationManager.showCustomModal({
+            title: '编辑世界书',
+            html: modalHtml,
+            showCloseButton: true,
+            buttons: [
+                { text: '取消', value: 'cancel', class: 'secondary' },
+                { text: '保存修改', value: 'save', class: 'primary' }
+            ]
+        });
+
+        if (result && result.value === 'save') {
+            const modalBox = result.target.closest('.modal-box');
+            
+            const newName = modalBox.querySelector('#edit-wb-name').value.trim();
+            const newContent = modalBox.querySelector('#edit-wb-content').value.trim();
+            
+            if (!newName || !newContent) {
+                alert('名称和内容不能为空！');
+                return;
+            }
+
+            // 查重（排除自己）
+            if (worldBookEntries.some((e, i) => e.name === newName && i !== index)) {
+                alert('该名称已存在，请换一个。');
+                return;
+            }
+
+            // 更新数据
+            worldBookEntries[index] = {
+                name: newName,
+                category: modalBox.querySelector('#edit-wb-category').value.trim() || '未分类',
+                keywords: modalBox.querySelector('#edit-wb-keywords').value.trim(),
+                content: newContent,
+                triggerMode: modalBox.querySelector('input[name="edit-wb-trigger"]:checked').value,
+                enabled: modalBox.querySelector('#edit-wb-enabled').checked,
+                useInMoments: modalBox.querySelector('#edit-wb-moments').checked,
+                useInTuqu: modalBox.querySelector('#edit-wb-tuqu').checked
+            };
+
+            saveWorldBook();
+            renderWorldBook();
+            // alert('修改已保存'); // 可选，如果觉得弹窗太多可以注释掉
+        }
     };
+
     window.app.deleteWorldBookEntry = (index) => { if (confirm('确定删除?')) { worldBookEntries.splice(index, 1); saveWorldBook(); renderWorldBook(); } };
+
         window.app.deleteWorldBookCategory = async (categoryName) => {
         const confirmed = await conversationManager.customConfirm(`确定要删除分类 "${categoryName}" 下的所有世界书条目吗？\n此操作不可撤销。`, '删除分类确认');
         if (confirmed) {
