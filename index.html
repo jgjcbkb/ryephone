@@ -14100,9 +14100,9 @@ When you decide to **COMMENT** on an existing thread, you MUST check the **Autho
     *   **Suggested Themes (Pick One Randomly):**
         *   **Fantasy/Xianxia:** Cultivation sects, demons, gods.
         *   **Modern/Urban:** Office romance, campus enemies-to-lovers,娱乐圈.
-        *   **Sci-Fi/Cyberpunk:** Androids, hackers, dystopian future.
         *   **Historical/Palace:** Emperors, generals, political intrigue.
         *   **Supernatural:** Vampires, werewolves, ghosts.
+    *   **FORBIDDEN THEMES (ABSOLUTE BAN):** You are **STRICTLY FORBIDDEN** from using Cyberpunk (赛博朋克), Interstellar (星际), or Sentinel/Guide (哨向) themes. These are banned.
     *   **Format:** Write a narrative snippet (小说片段) or a plot outline (大纲) set in one of these worlds.
 
 **[FORUM SUBCULTURE DICTIONARY]**
@@ -14350,7 +14350,8 @@ You are part of a diverse internet ecosystem. **DO NOT be repetitive.**
 
 *   **DIVERSITY MANDATE (ANTI-REPETITION):** 
     *   **STOP defaulting to "Found Phone/Chat Log" (捡手机/聊天体).** This trope is overused.
-    *   **PRIORITIZE ALTERNATE UNIVERSES (AU):** You are strongly encouraged to write stories set in different worlds (Fantasy, Sci-Fi, Historical, Supernatural).
+    *   **PRIORITIZE ALTERNATE UNIVERSES (AU):** You are strongly encouraged to write stories set in different worlds (Fantasy, Historical, Supernatural).
+    *   **FORBIDDEN THEMES:** Do NOT use Cyberpunk, Interstellar, or Sentinel/Guide (哨向).
     *   **Content:** Write a narrative snippet (小说片段) or a plot outline (大纲) set in one of these worlds.
 
 **[UPDATED INSTRUCTIONS]**
@@ -14627,9 +14628,10 @@ You are a storyteller, not a programmer. You are **STRICTLY FORBIDDEN** from men
 
 **[THE MISSION]**
 Write the **NEXT CHAPTER** of the story based on:
--   **SETTING (CRITICAL OVERRIDE):** \`${extraOptions.worldview || "Standard reality"}\`.
-    *   **IF AN AU (Alternate Universe) IS SPECIFIED (e.g., "ABO", "Ancient", "Cyberpunk", "Mafia"):**
+    *   **SETTING (CRITICAL OVERRIDE):** \`${extraOptions.worldview || "Standard reality"}\`.
+    *   **IF AN AU (Alternate Universe) IS SPECIFIED (e.g., "ABO", "Ancient", "Mafia", "Campus"):**
         1.  **IGNORE REALITY:** You MUST discard the current "Chat App/Phone" setting. The characters are NOT holding phones. They are inside the AU.
+
         2.  **ADAPT PERSONAS:** Keep the characters' core personalities (souls), but change their jobs, status, and clothes to fit the AU.
         3.  **NO "PICKING UP PHONES":** Unless the AU is modern, do not mention phones. Focus on the environment of the AU.
 -   **SUBJECTS:** Characters from your "LIFE CONTEXT" (Adapted to the new Setting).
@@ -16126,7 +16128,6 @@ conversationManager.showNotificationBanner('TUQU', {
         }
 
         // 【iOS 修复核心】：不再直接创建 input，而是弹出一个专用窗口
-        // 这样可以确保 input.click() 是由用户在这个新窗口上的点击直接触发的
         await conversationManager.showCustomModal({
             title: '导入角色卡',
             html: `
@@ -16134,34 +16135,25 @@ conversationManager.showNotificationBanner('TUQU', {
                     <p style="font-size: 14px; color: #666; margin-bottom: 20px;">
                         支持 SillyTavern 格式的 PNG 图片或 JSON 文件。
                     </p>
-                    <!-- 这个按钮将直接触发文件选择 -->
                     <button id="st-real-upload-btn" class="modal-button primary" style="width: 100%; padding: 12px; font-size: 16px;">
                         点击选择文件
                     </button>
-                    <!-- 隐藏的 input -->
                     <input type="file" id="st-hidden-input" accept="image/png,application/json,.json,.png" style="display:none;">
                 </div>
             `,
             showCloseButton: true,
-            // 这里的 onRender 是关键，它保证了点击事件的同步性
             onRender: (modalDOM, closeModal) => {
                 const btn = modalDOM.querySelector('#st-real-upload-btn');
                 const input = modalDOM.querySelector('#st-hidden-input');
 
-                // 1. 绑定点击：用户点按钮 -> 立即触发 input
-                btn.onclick = () => {
-                    input.click();
-                };
+                btn.onclick = () => { input.click(); };
 
-                // 2. 绑定文件改变：选中文件后开始处理
                 input.onchange = async (e) => {
                     const file = e.target.files[0];
                     if (!file) return;
                     
-                    // 选中文件后，先关闭弹窗，显示加载状态
                     closeModal();
                     
-                    // 给一点延时让弹窗动画跑完
                     setTimeout(async () => {
                         try {
                             let charData = null;
@@ -16191,7 +16183,6 @@ conversationManager.showNotificationBanner('TUQU', {
                                         if (entry.content && entry.content.trim()) {
                                             const hasKeys = entry.keys && Array.isArray(entry.keys) && entry.keys.length > 0;
                                             const entryTitle = entry.comment || entry.name || (hasKeys ? entry.keys[0] : `Entry_${index}`);
-                                            // 【核心修改】导入时自动加上 (VC-IGNORE)
                                             const wbName = `${name}_${entryTitle}(VC-IGNORE)`;
 
                                             if (!worldBookEntries.some(wb => wb.name === wbName)) {
@@ -16200,9 +16191,7 @@ conversationManager.showNotificationBanner('TUQU', {
                                                     category: name,
                                                     keywords: hasKeys ? entry.keys.join(', ') : '',
                                                     content: entry.content,
-                                                    // 核心修复：导入角色卡时也要遵循词条本身的开关状态
                                                     enabled: entry.enabled === true,
-                                                    // 核心修复：遵循蓝灯(constant:true)和绿灯(constant:false)
                                                     triggerMode: entry.constant ? 'always' : 'keyword',
                                                     useInMoments: false,
                                                     useInTuqu: false
@@ -16211,49 +16200,45 @@ conversationManager.showNotificationBanner('TUQU', {
                                             importedWbNames.push(wbName);
                                         }
                                     });
-                                    saveWorldBook();
+                                    // 【核心修复】使用 await 调用新的异步保存函数
+                                    await saveWorldBook();
                                     renderWorldBook();
                                 }
-                                // --- 2.5 处理正则脚本 (针对 1-2-1.json 结构优化) ---
+
+                                // --- 2.5 处理正则脚本 ---
                                 let importedRegexNames = [];
-                                // 路径：data.extensions.regex_scripts
                                 const stRegex = data.extensions && data.extensions.regex_scripts;
-                                
                                 if (stRegex && Array.isArray(stRegex)) {
-                                    // 确保全局正则数组存在
                                     if (!appearanceSettings.regexReplacements) appearanceSettings.regexReplacements = [];
                                     const globalRegexes = appearanceSettings.regexReplacements;
                                     
                                     stRegex.forEach(script => {
-                                        // 使用 JSON 中的 scriptName，并加上角色名前缀防止冲突
                                         const scriptName = `${name}_${script.scriptName || '未命名正则'}`;
-                                        
                                         const newRule = {
                                             name: scriptName,
-                                            // 【核心新增】将分类设为角色名
                                             category: name, 
                                             pattern: script.findRegex || '',
                                             flags: script.regex_flags || 'g', 
                                             template: script.replaceString || '',
                                             enabled: script.disabled === false 
                                         };
-
-
                                         if (newRule.pattern) {
-                                            // 查重：如果全局列表里没有同名的，才添加
                                             if (!globalRegexes.some(r => r.name === scriptName)) {
                                                 globalRegexes.push(newRule);
                                             }
                                             importedRegexNames.push(scriptName);
                                         }
                                     });
-                                    
                                     appearanceSettings.regexReplacements = globalRegexes;
-                                    appearanceManager.saveSettings(); // 立即保存到硬盘
-                                    console.log(`[导入] 已提取 ${importedRegexNames.length} 条正则规则。`);
+                                    // 这里也做个防爆处理
+                                    try {
+                                        localStorage.setItem('app-appearance-settings', JSON.stringify(appearanceSettings));
+                                    } catch(e) {
+                                        console.warn("正则设置过大，保存失败");
+                                    }
                                 }
 
-                                // --- 3. 处理多开场白 ---
+                                // --- 3. 处理多开场白 (大容量防爆处理) ---
                                 let alternateBranches = [];
                                 if (data.alternate_greetings && Array.isArray(data.alternate_greetings)) {
                                     data.alternate_greetings.forEach((greet, i) => {
@@ -16288,13 +16273,11 @@ conversationManager.showNotificationBanner('TUQU', {
                                 const chatInfo = {
                                     aiPersona: fullPersona.trim(),
                                     remark: name,
-                                    // 【核心修复】将刚才提取到的规则名列表填入，实现自动勾选
                                     enabledRegexes: importedRegexNames, 
                                     userPersonaName: "无",
                                     // 【核心新增】导入角色时，默认勾选分镜协议
                                     offlineWorldbookNames: ["分镜切割协议 (Split Bubble Protocol)(VC-IGNORE)"]
                                 };
-
 
                                 saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
                                 
@@ -16302,8 +16285,14 @@ conversationManager.showNotificationBanner('TUQU', {
                                     saveToLocalStorage(`chat_mounted_wb_${chatId}`, importedWbNames);
                                 }
 
+                                // 【核心修复】开场白分支数据可能很大，强制使用安全保存
                                 if (alternateBranches.length > 0) {
-                                    saveToLocalStorage(`chat_branches_${chatId}`, alternateBranches);
+                                    try {
+                                        localStorage.setItem(`chat_branches_${chatId}`, JSON.stringify(alternateBranches));
+                                    } catch (e) {
+                                        console.warn("开场白分支过大，转存至数据库");
+                                        await imageStore.setItem(`chat_branches_${chatId}`, alternateBranches);
+                                    }
                                 }
 
                                 // --- 5. 头像与主线消息 ---
@@ -16321,7 +16310,14 @@ conversationManager.showNotificationBanner('TUQU', {
                                         side: 'received',
                                         timestamp: Date.now()
                                     };
-                                    saveToLocalStorage(`conversation_${chatId}`, [firstMsg]);
+                                    // 【核心修复】第一条消息可能很长，使用安全保存
+                                    const conversationData = [firstMsg];
+                                    try {
+                                        localStorage.setItem(`conversation_${chatId}`, JSON.stringify(conversationData));
+                                    } catch (e) {
+                                        console.warn("首条消息过长，转存至数据库");
+                                        await imageStore.setItem(`conversation_${chatId}`, conversationData);
+                                    }
                                 }
 
                                 renderChatList();
@@ -16329,13 +16325,14 @@ conversationManager.showNotificationBanner('TUQU', {
                             }
                         } catch (err) {
                             console.error(err);
-                            alert("导入失败，请检查文件格式。");
+                            alert("导入失败，请检查文件格式或存储空间。");
                         }
                     }, 100);
                 };
             }
         });
     }
+
     // 【核心新增：单独导入酒馆世界书逻辑 (修正版)】
     async function importSillyTavernLorebook() {
         // 1. 权限检查
@@ -16800,9 +16797,36 @@ From now on, you MUST treat every response as a sequence of "shots" in a movie.
 Do not be afraid to send 5, 8, or even 10 bubbles in a row. Short, focused bubbles create better suspense and readability than one giant wall of text. **SPLIT EVERYTHING.**`
     };
 
-    function saveWorldBook() { saveToLocalStorage('chat-worldbook', worldBookEntries); }
-    function loadWorldBook() { 
+    // 【核心修复】改为异步保存，支持大容量
+    async function saveWorldBook() { 
+        try {
+            // 1. 尝试存入 LocalStorage
+            localStorage.setItem('chat-worldbook', JSON.stringify(worldBookEntries));
+            // 如果成功，清理数据库里的旧备份
+            await imageStore.removeItem('chat-worldbook');
+        } catch (e) {
+            // 2. 如果存不下 (QuotaExceededError)，转存到 IndexedDB
+            console.warn("世界书数据过大，转存至数据库");
+            await imageStore.setItem('chat-worldbook', worldBookEntries);
+            // 清理 LocalStorage 里的残余
+            localStorage.removeItem('chat-worldbook');
+        }
+    }
+    // 【核心修复】改为 async
+    async function loadWorldBook() { 
+            // 1. 尝试从 LS 读取
             let entries = loadFromLocalStorage('chat-worldbook', []);
+            
+            // 2. 如果 LS 为空，尝试从 DB 读取
+            if (!entries || entries.length === 0) {
+                try {
+                    const dbData = await imageStore.getItem('chat-worldbook');
+                    if (dbData) entries = dbData;
+                } catch(e) { console.error(e); }
+            }
+            
+            // ... (后面的代码保持不变) ...
+
             
             // --- 核心新增：内置弹幕世界书 (已修正：禁止 Sticker) ---
             const DANMAKU_PRESET = {
@@ -19118,16 +19142,13 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
             }
         }
 
-        function open(chatId) {
-            // 【核心新增】进入聊天时，清空队列中所有属于该角色的通知
+        // 【核心修复】增加 async 关键字
+        async function open(chatId) {
+            // 1. 清理通知队列
             notificationQueue = notificationQueue.filter(n => n.chatId !== chatId);
 
             timeManager.updateSettingsForChat(chatId); 
-            // ... (原有的逻辑)
-
-
-    relationship = { myStatus: 'normal', contactStatusToMe: 'normal' };
-
+            relationship = { myStatus: 'normal', contactStatusToMe: 'normal' };
 
             const chatInfoData = chatList.find(c => c.id === chatId);
             if (!chatInfoData) return;
@@ -19138,7 +19159,7 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                 renderChatList();
             }
             
-            // 【核心新增：离开当前聊天前，保存草稿】
+            // 保存上一个聊天的草稿
             if (chatState.chatId) {
                 const drafts = loadFromLocalStorage('app_chat_drafts', {});
                 drafts[chatState.chatId] = footerMessageInput.value;
@@ -19151,7 +19172,7 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
             const savedChatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
             updateHeaderTitle(savedChatInfo.remark || chatInfoData.name);
             
-            // 【核心修改：进入新聊天时，读取该角色的草稿】
+            // 读取新聊天的草稿
             const currentDrafts = loadFromLocalStorage('app_chat_drafts', {});
             footerMessageInput.value = currentDrafts[chatId] || ''; 
             footerMessageInput.dispatchEvent(new Event('input'));
@@ -19159,23 +19180,30 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
             actionMenu.classList.remove('active');
             cancelReply();
             
-            // 新增：切换聊天时隐藏并重置 Token 显示
             const usageEl = document.getElementById('token-usage-display');
             if (usageEl) usageEl.style.display = 'none';
 
-            initializeFromStorage(chatId);
+            // 【核心修复】先清空当前消息列表，防止显示上一个人的消息
+            messagesContainer.innerHTML = '';
+            chatState.messages = [];
+
+            // 【核心修复】关键！增加 await，强制等待数据库读取完成
+            await initializeFromStorage(chatId);
+            
+            // 数据准备好后，再跳转页面
             navigateTo('conversation');
 
             if (loadingStates[chatId]) {
-    dynamicDecorationBtn.classList.add('loading');
-} else {
-    dynamicDecorationBtn.classList.remove('loading');
-}
+                dynamicDecorationBtn.classList.add('loading');
+            } else {
+                dynamicDecorationBtn.classList.remove('loading');
+            }
 
             setTimeout(() => {
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }, 50);
         }
+
 
         function saveConversation() {
             if (!chatState.chatId) return;
@@ -19237,30 +19265,39 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
 
 
         // 【核心修改】增加 async 关键字
+        // 【核心修改】增加 async 关键字
         async function initializeFromStorage(chatId) {
-            // 【核心新增：初始化当前身份】
-            // 默认身份为 '{{user}}'
+            // 初始化当前身份
             const currentIdentity = loadFromLocalStorage(`chat_identity_${chatId}`, '{{user}}');
             chatState.currentIdentity = currentIdentity;
             updateIdentityDotUI();
 
-            // 1. 将完整的历史记录加载到我们新的“保险柜”数组中
-            fullMessageHistory = loadFromLocalStorage(`conversation_${chatId}`, []);
-            
-            // 【核心新增】如果 LocalStorage 为空，尝试从 IndexedDB 读取
-            if (fullMessageHistory.length === 0) {
+            // 1. 先尝试从 LocalStorage 读取
+            let lsData = loadFromLocalStorage(`conversation_${chatId}`, null); // 默认值改为 null 以便区分
+
+            // 2. 如果 LS 里没有数据 (null) 或者数据为空数组 ([])，则尝试查数据库
+            // 这样即使 LS 里残留了 "[]" 字符串，也会去数据库再确认一次
+            if (!lsData || lsData.length === 0) {
                 try {
                     const dbData = await imageStore.getItem(`conversation_${chatId}`);
-                    if (dbData && Array.isArray(dbData)) {
+                    if (dbData && Array.isArray(dbData) && dbData.length > 0) {
                         fullMessageHistory = dbData;
-                        console.log(`从数据库加载了聊天记录: ${chatId}`);
+                        console.log(`从数据库加载了聊天记录: ${chatId} (共 ${dbData.length} 条)`);
+                    } else {
+                        // 如果数据库也没数据，那才是真的空
+                        fullMessageHistory = lsData || [];
                     }
-                } catch(e) { console.error("读取聊天数据库失败", e); }
+                } catch(e) { 
+                    console.error("读取聊天数据库失败", e); 
+                    fullMessageHistory = [];
+                }
+            } else {
+                fullMessageHistory = lsData;
             }
 
             const messagesToLoad = 40;
 
-            // 2. 只截取最后40条消息用于初次显示，放入旧的数组
+            // 3. 截取最后40条用于显示
             chatState.messages = fullMessageHistory.slice(-messagesToLoad);
 
             if (chatState.messages.length > 0) {
@@ -19269,8 +19306,10 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                 simulatedCurrentTime = timeManager.getCurrentTimestamp();
             }
             contactInfo.avatarUrl = loadFromLocalStorage(`chat_avatar_${chatId}`, null) || generateDefaultAvatar(chatState.chatName);
-            // 确保状态检查是在完整的历史上进行的
+            
+            // 状态检查
             fullMessageHistory.forEach(msg => { if (msg.side === 'system' && msg.type !== 'time_divider') processSystemMessageForState(msg.text); });
+            
             const savedBg = loadFromLocalStorage(`chat_bg_${chatState.chatId}`, null);
             if (savedBg) {
                 chatContent.style.backgroundImage = `url('${savedBg}')`;
@@ -19278,7 +19317,7 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                 chatContent.style.backgroundImage = '';
             }
 
-            // 核心新增：刷新时从硬盘恢复 Token 显示
+            // 恢复 Token 显示
             const savedTokenUsage = loadFromLocalStorage(`token_usage_${chatId}`, null);
             const usageEl = document.getElementById('token-usage-display');
             const inputVal = document.getElementById('token-input-val');
@@ -19294,6 +19333,7 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
             loadPersonalizationSettings(); loadAutoReplySettings(); 
             reRenderMessages(true);
         }
+
 let isLoadingMore = false;
         async function loadMoreMessages() {
             if (isLoadingMore) return;
