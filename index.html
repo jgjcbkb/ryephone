@@ -25617,16 +25617,13 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                 else if (msg.type === 'text') {
                     const applyRegexAndRender = (rawText) => {
                         const chatId = conversationManager.getCurrentChatId();
-                        // 统一换行符
-                        const normalizeNL = (t) => t.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                        let processedText = normalizeNL(rawText);
-
-                        if (!chatId) return escapeHtml(processedText).replace(/\n/g, '<br>');
+                        if (!chatId) return escapeHtml(rawText).replace(/\n/g, '<br>');
 
                         const info = loadFromLocalStorage(`chat_info_${chatId}`, {});
                         const enabledRegexNames = info.enabledRegexes || [];
+                        let processedText = rawText;
+                        let hasBeenReplaced = false;
 
-                        // 1. 执行正则替换 (如网抑云标签)
                         if (enabledRegexNames.length > 0) {
                             const globalRules = appearanceSettings.regexReplacements || [];
                             for (const ruleName of enabledRegexNames) {
@@ -25634,52 +25631,85 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                                 if (rule && rule.pattern) {
                                     try {
                                         const regex = new RegExp(rule.pattern, rule.flags || 'g');
+                                        const textBefore = processedText;
                                         processedText = processedText.replace(regex, rule.template || '');
+                                        if (textBefore !== processedText) {
+                                            hasBeenReplaced = true;
+                                        }
                                     } catch (e) {
-                                        console.error(`正则规则 "${rule.name}" 出错:`, e);
+                                        console.error(`正则规则 "${rule.name}" 在渲染时无效或执行出错:`, e);
                                     }
                                 }
                             }
                         }
                         
-                        // 2. 处理标签外的文本逻辑 (Markdown + 换行)
-                        // 我们将内容按 HTML 标签切开，只处理非标签部分的格式
-                        let finalResult = processedText.split(/(<[^>]+>)/g).map(part => {
-                            if (part.startsWith('<')) return part; // 标签内部不处理
-
-                            // 2.1 处理表情包占位符 (防止转义)
-                            let tempPlaceholders = {};
-                            let tempCounter = 0;
-                            const textWithPlaceholders = part.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
-                                type = type.toLowerCase();
-                                const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
+                        if (hasBeenReplaced) {
+                            // 【核心修复：让弹幕和正则生成的HTML也能显示表情包】
+                            // 在返回正则替换后的HTML之前，最后扫描一遍里面的 [emoji:xx] 或 [sticker:xx]
+                            return processedText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                                const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type.toLowerCase());
                                 if (item) {
-                                    const key = `__MEDIA_INNER_${tempCounter++}__`;
-                                    tempPlaceholders[key] = type === 'emoji' 
-                                        ? `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" class="inline-emoji">`
-                                        : `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" style="max-width: 80px; max-height: 80px; display: inline-block; vertical-align: middle; margin: 0 2px;">`;
-                                    return key;
+                                    if (type.toLowerCase() === 'emoji') {
+                                        // Emoji：加上急救包
+                                        return `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${name}" class="inline-emoji">`;
+                                    } else {
+                                        // 表情包：加上急救包，并限制在弹幕里的尺寸
+                                        return `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${name}" style="max-width: 40px; max-height: 40px; display: inline-block; vertical-align: middle; margin: 0 2px;">`;
+                                    }
                                 }
                                 return match;
                             });
+                        } else {
+                            // 【核心修复：这里补上了表情包翻译逻辑】
+                            // 1. 先用占位符替换所有的 [sticker:xx] 和 [emoji:xx]
+                            let tempPlaceholders = {};
+                            let tempCounter = 0;
+                            
+                            const textWithPlaceholders = rawText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                                type = type.toLowerCase();
+                                const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
+                                if (item) {
+                                    const key = `__MEDIA_${tempCounter++}__`;
+                                    let imgTag = '';
+                                    if (type === 'emoji') {
+                                        // Emoji 也加上急救，以防万一
+                                        imgTag = `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" class="inline-emoji">`;
+                                    } else {
+                                        // 表情包：加上急救指令
+                                        imgTag = `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" style="max-width: 100px; max-height: 100px; display: block; margin: 5px 0; border-radius: 4px;">`;
+                                    }
+                                    tempPlaceholders[key] = imgTag;
+                                    return key;
+                                }
+                                // 如果没找到对应表情，就原样返回文字
+                                return match;
+                            });
 
-                            // 2.2 转义 HTML
+                            // 2. 对剩下的文字进行安全转义 (防止HTML注入)
                             let safeText = escapeHtml(textWithPlaceholders);
 
-                            // 2.3 还原表情包
+                            // 3. 把占位符还原成图片标签
+                            let textWithImages = safeText;
                             for (const [key, val] of Object.entries(tempPlaceholders)) {
-                                safeText = safeText.replace(key, val);
+                                textWithImages = textWithImages.replace(key, val);
+                            }
+                            
+                            // 4. 处理简单的 Markdown (加粗/斜体)
+                            let formattedText = simpleMarkdownToHtml(textWithImages);
+                            
+                            // 5. 处理换行
+                            let finalHtml = formattedText.replace(/\n/g, '<br>');
+
+                            // 如果包含图片，外层包一个 div 确保布局正常
+                            if (Object.keys(tempPlaceholders).length > 0) {
+                                finalHtml = `<div>${finalHtml}</div>`;
                             }
 
-                            // 2.4 应用 Markdown (粗体/斜体)
-                            let formatted = simpleMarkdownToHtml(safeText);
+                            return finalHtml;
+                        }
 
-                            // 2.5 转换换行符
-                            return formatted.replace(/\n/g, '<br>');
-                        }).join('');
-
-                        return finalResult;
                     };
+
 
 
 
@@ -26246,17 +26276,16 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                     });
                 };
 
+                // 定义 applyRegexAndRender (保持原有的安全转义逻辑)
                 const applyRegexAndRender = (rawText) => {
                         const chatId = conversationManager.getCurrentChatId();
-                        const normalizeNL = (t) => t.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                        let processedText = normalizeNL(rawText);
-
-                        if (!chatId) return escapeHtml(processedText).replace(/\n/g, '<br>');
+                        if (!chatId) return escapeHtml(rawText).replace(/\n/g, '<br>');
 
                         const info = loadFromLocalStorage(`chat_info_${chatId}`, {});
                         const enabledRegexNames = info.enabledRegexes || [];
+                        let processedText = rawText;
+                        let hasBeenReplaced = false;
 
-                        // 1. 正则替换
                         if (enabledRegexNames.length > 0) {
                             const globalRules = appearanceSettings.regexReplacements || [];
                             for (const ruleName of enabledRegexNames) {
@@ -26264,44 +26293,61 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                                 if (rule && rule.pattern) {
                                     try {
                                         const regex = new RegExp(rule.pattern, rule.flags || 'g');
+                                        const textBefore = processedText;
                                         processedText = processedText.replace(regex, rule.template || '');
+                                        if (textBefore !== processedText) {
+                                            hasBeenReplaced = true;
+                                        }
                                     } catch (e) {
-                                        console.error(`正则规则 "${rule.name}" 出错:`, e);
+                                        console.error(`正则规则 "${rule.name}" 在渲染时无效或执行出错:`, e);
                                     }
                                 }
                             }
                         }
                         
-                        // 2. 混合渲染逻辑 (Markdown + 换行 + 表情)
-                        let finalResult = processedText.split(/(<[^>]+>)/g).map(part => {
-                            if (part.startsWith('<')) return part;
-
+                        if (hasBeenReplaced) {
+                            // 如果触发了正则（如弹幕），生成的 HTML 可能包含 [emoji:xx]，需要替换
+                            return replaceMediaTagsInHtml(processedText);
+                        } else {
+                            // 普通文本处理：占位 -> 转义 -> 还原图片 -> Markdown -> 换行
                             let tempPlaceholders = {};
                             let tempCounter = 0;
-                            const textWithPlaceholders = part.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+                            
+                            const textWithPlaceholders = rawText.replace(/\[(emoji|sticker)[:：][^\]]+\]/g, (match, type, name) => {
                                 type = type.toLowerCase();
                                 const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
                                 if (item) {
-                                    const key = `__MEDIA_DOM_${tempCounter++}__`;
-                                    tempPlaceholders[key] = type === 'emoji' 
-                                        ? `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" class="inline-emoji">`
-                                        : `<img src="${item.url}" data-original-src="${item.url}" onerror="window.app.fixLocalImage(this)" alt="${escapeHtml(name)}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+                                    const key = `__MEDIA_${tempCounter++}__`;
+                                    let imgTag = '';
+                                    if (type === 'emoji') {
+                                        imgTag = `<img src="${item.url}" alt="${escapeHtml(name)}" class="inline-emoji">`;
+                                    } else {
+                                        imgTag = `<img src="${item.url}" alt="${escapeHtml(name)}" style="max-width: 60px; max-height: 60px; display: inline-block; vertical-align: middle;">`;
+                                    }
+                                    tempPlaceholders[key] = imgTag;
                                     return key;
                                 }
                                 return match;
                             });
 
                             let safeText = escapeHtml(textWithPlaceholders);
+
+                            let textWithImages = safeText;
                             for (const [key, val] of Object.entries(tempPlaceholders)) {
-                                safeText = safeText.replace(key, val);
+                                textWithImages = textWithImages.replace(key, val);
                             }
                             
-                            let formatted = simpleMarkdownToHtml(safeText);
-                            return formatted.replace(/\n/g, '<br>');
-                        }).join('');
+                            let formattedText = simpleMarkdownToHtml(textWithImages);
+                            let finalHtml = formattedText.replace(/\n/g, '<br>');
 
-                        return finalResult;
+                            if (Object.keys(tempPlaceholders).length > 0) {
+                                finalHtml = `<div>${finalHtml}</div>`;
+                            }
+
+                            return finalHtml;
+                        }
                     };
+
 
 
 
