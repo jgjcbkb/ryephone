@@ -36237,21 +36237,90 @@ function saveSettings() {
             document.getElementById('regex-cancel-btn').style.display = 'none';
         }
 
-        window.app.editRegexRule = (index) => {
+        // 【核心修改】改为弹窗编辑模式，无需滚动到底部
+        window.app.editRegexRule = async (index) => {
             const rule = appearanceSettings.regexReplacements[index];
-            document.getElementById('regex-name').value = rule.name;
-            // 新增：回填分类
-            document.getElementById('regex-category').value = rule.category || '未分类';
-            document.getElementById('regex-pattern').value = rule.pattern;
-            document.getElementById('regex-flags').value = rule.flags;
-            document.getElementById('regex-template').value = rule.template;
-            document.getElementById('regex-enabled').checked = rule.enabled;
-            document.getElementById('regex-edit-index').value = index;
 
-            document.getElementById('regex-form-title').textContent = '编辑规则';
-            document.getElementById('regex-add-btn').textContent = '更新规则';
-            document.getElementById('regex-cancel-btn').style.display = 'inline-block';
+            const modalHtml = `
+                <div style="text-align: left; display: flex; flex-direction: column; gap: 15px; max-height: 65vh; overflow-y: auto; padding-right: 5px;">
+                    <div style="display: flex; gap: 10px;">
+                        <div style="flex: 1;">
+                            <label style="font-size: 13px; color: #666; display: block; margin-bottom: 5px;">分类 (Category)</label>
+                            <input type="text" id="edit-regex-category" class="modal-input" value="${escapeHtml(rule.category || '未分类')}" style="margin: 0;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 13px; color: #666; display: block; margin-bottom: 5px;">名称 (Name)</label>
+                            <input type="text" id="edit-regex-name" class="modal-input" value="${escapeHtml(rule.name)}" style="margin: 0;">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <div style="flex: 3;">
+                            <label style="font-size: 13px; color: #666; display: block; margin-bottom: 5px;">匹配模式 (Pattern)</label>
+                            <input type="text" id="edit-regex-pattern" class="modal-input" value="${escapeHtml(rule.pattern)}" style="margin: 0; font-family: monospace; color: #d32f2f;">
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size: 13px; color: #666; display: block; margin-bottom: 5px;">标志 (Flags)</label>
+                            <input type="text" id="edit-regex-flags" class="modal-input" value="${escapeHtml(rule.flags || 'g')}" style="margin: 0; text-align: center; font-family: monospace;">
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <label style="font-size: 13px; color: #666;">替换模板 (HTML Template)</label>
+                            <button class="copy-btn" onclick="copyToClipboard('edit-regex-template')">复制</button>
+                        </div>
+                        <!-- 使用深色背景编辑器样式 -->
+                        <textarea id="edit-regex-template" class="modal-textarea" style="height: 150px; margin: 0; font-family: monospace; background: #282c34; color: #61afef; border: 1px solid #181a1f;">${escapeHtml(rule.template)}</textarea>
+                    </div>
+
+                    <!-- 【美化】增加了 margin-bottom: 25px，防止挨着按钮 -->
+                    <div style="background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 25px; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 14px; font-weight: 600; color: #333;">启用此规则</span>
+                        <label class="switch">
+                            <input type="checkbox" id="edit-regex-enabled" ${rule.enabled ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            `;
+
+            const result = await conversationManager.showCustomModal({
+                title: '编辑正则规则',
+                html: modalHtml,
+                showCloseButton: true,
+                buttons: [
+                    { text: '取消', value: 'cancel', class: 'secondary' },
+                    { text: '保存修改', value: 'save', class: 'primary' }
+                ]
+            });
+
+            if (result && result.value === 'save') {
+                const modalBox = result.target.closest('.modal-box');
+                
+                const newName = modalBox.querySelector('#edit-regex-name').value.trim();
+                const newPattern = modalBox.querySelector('#edit-regex-pattern').value.trim();
+                
+                if (!newName || !newPattern) {
+                    alert('名称和匹配模式不能为空！');
+                    return;
+                }
+
+                // 更新数据
+                appearanceSettings.regexReplacements[index] = {
+                    name: newName,
+                    category: modalBox.querySelector('#edit-regex-category').value.trim() || '未分类',
+                    pattern: newPattern,
+                    flags: modalBox.querySelector('#edit-regex-flags').value.trim(),
+                    template: modalBox.querySelector('#edit-regex-template').value,
+                    enabled: modalBox.querySelector('#edit-regex-enabled').checked
+                };
+
+                saveSettings();
+                renderRegexList();
+            }
         };
+
 
         window.app.deleteRegexRule = (index) => {
             if (confirm('确定要删除这条规则吗？')) {
