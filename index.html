@@ -22700,16 +22700,12 @@ if (contactInfo.isGroup) {
 finalSystemPrompt += remarkContext;
 // --- 【【【 全新的备注记忆注入代码到这里结束 】】】 ---
                 // --- 【核心新增】注入【用户】的状态感知 ---
-const allStatuses = loadFromLocalStorage('app_character_statuses', {});
+// const allStatuses = ... (这行也不需要了，删掉)
 const chatInfoForStatus = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
 
-// 优先从当前聊天的专属设置中读取用户状态
+// 【核心修复】只读取当前聊天的专属设置，绝对不读取全局状态
+// 这样就实现了每个聊天的状态完全独立
 let myCurrentStatus = chatInfoForStatus.user_status;
-
-// 如果专属设置中没有，再作为备用方案，去全局状态中查找
-if (!myCurrentStatus) {
-    myCurrentStatus = allStatuses[userNameForPrompt] || allStatuses['{{user}}'];
-}
 
 if (myCurrentStatus) {
     finalSystemPrompt += `\n[User's Current Status]\nThe user (${userNameForPrompt}) you are talking to has set their status to: "${myCurrentStatus}". You should be aware of this.\n`;
