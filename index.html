@@ -1112,8 +1112,45 @@
     #sticker-search-input { flex-grow: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #ddd; }
     .sticker-panel-header .modal-button { padding: 8px 12px; font-size: 14px; flex-grow: 0; flex-basis: auto; }
     .sticker-grid-container { flex-grow: 1; overflow-y: auto; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; }
-    .sticker-item { position: relative; width: 100%; padding-top: 100%; background-color: #f0f0f0; border-radius: 8px; cursor: pointer; }
-    .sticker-item img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
+    /* 【核心修改】移除 padding-top: 100%，改为 flex 布局，让高度自适应内容 */
+    .sticker-item { 
+        position: relative; 
+        width: 100%; 
+        /* padding-top: 100%;  <-- 删除这一行 */
+        background-color: #f0f0f0; 
+        border-radius: 8px; 
+        cursor: pointer; 
+        
+        /* 新增 Flex 布局 */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 4px; /* 给上下留点空隙 */
+        box-sizing: border-box;
+        min-height: 100px; /* 给个最小高度 */
+    }
+
+    /* 【核心修改】图片不再绝对定位，而是作为 flex 子项 */
+    .sticker-item img { 
+        /* position: absolute; top: 0; left: 0; <-- 删除定位 */
+        width: 100%; 
+        height: 60px; /* 给图片一个固定高度，剩下的给文字 */
+        object-fit: contain; 
+        margin-bottom: 4px; /* 图片和文字的间距 */
+    }
+
+    /* 【核心新增】名字标签样式 */
+    .sticker-name-label {
+        font-size: 11px;
+        color: #666;
+        text-align: center;
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis; /* 文字太长显示省略号 */
+        line-height: 1.2;
+    }
     .sticker-item-checkbox { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; z-index: 5; }
 
     
@@ -4961,6 +4998,11 @@ input:checked + .slider:before {
     background-color: #f5f5f5; /* 悬停时的背景色 */
 }
 
+/* 【核心新增】杀掉分类折叠模式下的多余圆圈 */
+#offline-worldbook-list .wb-mount-category-group label.inline-label::before {
+    display: none !important;
+}
+
 /* 隐藏原始的复选框 */
 #offline-worldbook-list input[type="checkbox"] {
     display: none;
@@ -7972,6 +8014,18 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 </div>
                             <div class="form-group"><label for="chat-api-config">对话配置</label><select id="chat-api-config"></select><p class="form-hint">为此对话指定特定的API配置。</p></div>
                             <div class="form-group"><label for="chat-memory-length">上下文记忆条数</label><input type="number" id="chat-memory-length" min="0" value="100"><p class="form-hint">发送给API的最近消息数量，0为不限制。</p></div>
+
+<!-- 【在这里插入新代码】 -->
+<div class="form-group-toggle">
+    <label for="toggle-read-moments" class="toggle-label">允许读取朋友圈动态</label>
+    <label class="switch">
+        <input type="checkbox" id="toggle-read-moments" checked>
+        <span class="slider"></span>
+    </label>
+</div>
+<p class="form-hint" style="padding: 0 15px 15px;">开启后，AI在对话或主动发消息时会参考你最近发的5条朋友圈。</p>
+<!-- 【插入结束】 -->
+
                         </div>
                         <div id="worldbook-mount-section" style="margin-bottom: 20px;">
                             <h3>挂载世界书</h3>
@@ -8210,9 +8264,24 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                     <div class="app-header"><button class="back-btn" data-target="home"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="var(--primary-color)"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></button><h1>动态设置</h1></div>
                     <div class="content-wrapper">
 
-                                              <!-- 【核心新增】模块专用 API 设置 -->
-                        <div class="form-section">
-                            <h3>模块 API 配置</h3>
+        <!-- 【在这里插入新代码】 -->
+        <div class="form-section">
+            <h3>通知设置</h3>
+            <div class="form-group-toggle">
+                <label for="dynamics-notification-toggle" class="toggle-label">显示横幅通知</label>
+                <label class="switch">
+                    <input type="checkbox" id="dynamics-notification-toggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <p class="form-hint" style="padding: 0 15px 15px;">关闭后，收到新动态（朋友圈、主动消息）时将不再弹出顶部横幅，仅在图标上显示红点。</p>
+        </div>
+        <!-- 【插入结束】 -->
+
+        <!-- 【核心新增】模块专用 API 设置 -->
+        <div class="form-section">
+            <h3>模块 API 配置</h3>
+
                             <div class="form-group">
                                 <label for="dynamics-msg-api">主动发消息 API</label>
                                 <select id="dynamics-msg-api" class="modal-input modal-select"></select>
@@ -11186,6 +11255,8 @@ if ('serviceWorker' in navigator) {
     
     let chatList = [], worldBookEntries = [], apiProfiles = [], activeProfileIndex = null, myAvatar = null, customBubbles = [], stickers = [], appearanceSettings = {};
     let userPersonas = []; 
+    // 【核心新增】天眼抓取激活开关，默认为关闭
+    let isEyeOfHeavenActive = false; 
     // 新增：用于缓存兔区数据的全局变量，避开跨域限制
     let globalTuquData = JSON.parse(localStorage.getItem('jjForumData')) || {};
 
@@ -11708,13 +11779,32 @@ You MUST distinguish between **EMOJIS** and **STICKERS** based on their visual i
                 return;
             }
 
-            const chatInfoForAPI = loadFromLocalStorage(`chat_info_${targetChatId}`, {});
-            if (chatInfoForAPI.apiConfig && chatInfoForAPI.apiConfig !== 'profile_idx_null') {
-                profileIndex = parseInt(chatInfoForAPI.apiConfig.replace('profile_idx_', ''));
+            // 【终极修复】主动行为强制脱离聊天窗口设置
+            // 逻辑：只要是主动触发，只看“动态设置”里的配置。
+            // 如果动态设置选了“跟随全局”，那就用“全局激活”的 API，绝对不看聊天窗口里的“对话配置”。
+
+            let targetProfile = 'global';
+
+            if (actionType.includes('tuqu')) {
+                targetProfile = dynSettings.tuquProfile;
+            } else if (actionType.includes('moment')) {
+                targetProfile = dynSettings.momentsProfile;
+            } else if (actionType === 'message') {
+                targetProfile = dynSettings.msgProfile;
+            }
+
+            if (targetProfile && targetProfile !== 'global') {
+                // 情况A：动态设置里指定了具体的 API
+                profileIndex = parseInt(targetProfile, 10);
+                console.log(`[路由] 单聊角色 "${senderName}" (主动) -> 强制使用动态专用 API (Index: ${profileIndex})`);
             } else {
-                profileIndex = activeProfileIndex; // 否则使用全局配置
+                // 情况B：动态设置里选了“跟随全局”
+                // 此时直接使用 activeProfileIndex (系统全局)，**跳过** chatInfo.apiConfig
+                profileIndex = activeProfileIndex;
+                console.log(`[路由] 单聊角色 "${senderName}" (主动) -> 强制使用系统全局 API (忽略窗口配置)`);
             }
         }
+
         
         // 统一的API配置检查
         const profile = apiProfiles[profileIndex];
@@ -12262,82 +12352,86 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                         // =================================================================
             // 【【【 核心新增：注入朋友圈上下文 (主动发消息版) 】】】
             // =================================================================
-            const aiCharacterName = senderName; 
-            // 获取朋友圈数据以及认知关系表
-            const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 5); 
-
-            let momentsContext = "";
-            if (momentsData && momentsData.allVisibleMoments.length > 0) {
-                momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
+            
+            // 【核心修改】检查开关：只有当允许读取时才执行 (默认为 true)
+            if (contextChatInfo.readingMomentsEnabled !== false) {
                 
-                // 1. 建立认知地图，用于快速查找关系
-                // momentsData.knownPeople 包含了基于当前聊天窗口计算出的正确关系
-                const knownMap = new Map(momentsData.knownPeople.map(p => [p.name, p.relationship]));
-                
-                // 2. 获取所有用户人设的名称列表 (用于辅助判断)
-                const allUserPersonaNames = userPersonas.map(p => p.name);
+                const aiCharacterName = senderName; 
+                // 获取朋友圈数据以及认知关系表
+                const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 5); 
 
-                momentsData.allVisibleMoments.forEach((post, i) => {
-                     let authorLabel = post.userName;
+                let momentsContext = "";
+                if (momentsData && momentsData.allVisibleMoments.length > 0) {
+                    momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
+                    
+                    // 1. 建立认知地图，用于快速查找关系
+                    // momentsData.knownPeople 包含了基于当前聊天窗口计算出的正确关系
+                    const knownMap = new Map(momentsData.knownPeople.map(p => [p.name, p.relationship]));
+                    
+                    // 2. 获取所有用户人设的名称列表 (用于辅助判断)
+                    const allUserPersonaNames = userPersonas.map(p => p.name);
 
-                     // --- 核心判定逻辑 (同步修复) ---
-                     if (post.userName === aiCharacterName) {
-                         authorLabel = "You (yourself)";
-                     } 
-                     else if (knownMap.has(post.userName)) {
-                         // 只要在认知圈里（包括所有群友、关联NPC、用户），直接显示关系，不标陌生人
-                         authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
-                     } 
-                     else {
-                         // 只有彻底不认识的，才标陌生人
-                         authorLabel = `${post.userName} (【STRANGER / 陌生人】 - This is NOT the person you know)`;
-                     }
-                     
-                     // --- 核心修改：对发帖内容进行脱壳处理 ---
-                     let rawContent = post.text || post.content || "";
-                     // 【核心修复】剥离所有 HTML 标签，仅保留内部文字
-                     let content = rawContent.replace(/<[^>]+>/g, '').trim();
-                     
-                     if (post.image) {
-                         if (post.imageDescription) {
-                             content += ` [图片内容: ${post.imageDescription}]`;
-                         } else {
-                             content += ` [图片(未描述)]`;
+                    momentsData.allVisibleMoments.forEach((post, i) => {
+                         let authorLabel = post.userName;
+
+                         // --- 核心判定逻辑 (同步修复) ---
+                         if (post.userName === aiCharacterName) {
+                             authorLabel = "You (yourself)";
+                         } 
+                         else if (knownMap.has(post.userName)) {
+                             // 只要在认知圈里（包括所有群友、关联NPC、用户），直接显示关系，不标陌生人
+                             authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
+                         } 
+                         else {
+                             // 只有彻底不认识的，才标陌生人
+                             authorLabel = `${post.userName} (【STRANGER / 陌生人】 - This is NOT the person you know)`;
                          }
-                     } else if (post.type === 'video' && !content) {
-                         content = "[视频]";
-                     }
-                     
-                     if (!content.trim()) content = "[分享]";
+                         
+                         // --- 核心修改：对发帖内容进行脱壳处理 ---
+                         let rawContent = post.text || post.content || "";
+                         // 【核心修复】剥离所有 HTML 标签，仅保留内部文字
+                         let content = rawContent.replace(/<[^>]+>/g, '').trim();
+                         
+                         if (post.image) {
+                             if (post.imageDescription) {
+                                 content += ` [图片内容: ${post.imageDescription}]`;
+                             } else {
+                                 content += ` [图片(未描述)]`;
+                             }
+                         } else if (post.type === 'video' && !content) {
+                             content = "[视频]";
+                         }
+                         
+                         if (!content.trim()) content = "[分享]";
 
-                     let interactions = "";
-                     if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
-                         interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
-                     }
-                     
-                     // 检查评论
-                     if (post.comments.length > 0) {
-                         const commentsText = post.comments.map(c => {
-                             let rawCommentText = c.text || "";
-                             // 【核心修复】对评论内容也进行脱壳处理，剥离标签保留文字
-                             let cleanCommentText = rawCommentText.replace(/<[^>]+>/g, '').trim();
-                             return `${c.user}: ${cleanCommentText}`; 
-                         }).join(' | ');
-                         interactions += ` (Comments: ${commentsText})`;
-                     }
-                     
-                     const pDate = new Date(post.timestamp);
-                     const pTimeStr = `${pDate.getFullYear()}年${pDate.getMonth() + 1}月${pDate.getDate()}日 ${pDate.getHours().toString().padStart(2, '0')}:${pDate.getMinutes().toString().padStart(2, '0')}`;
+                         let interactions = "";
+                         if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
+                             interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
+                         }
+                         
+                         // 检查评论
+                         if (post.comments.length > 0) {
+                             const commentsText = post.comments.map(c => {
+                                 let rawCommentText = c.text || "";
+                                 // 【核心修复】对评论内容也进行脱壳处理，剥离标签保留文字
+                                 let cleanCommentText = rawCommentText.replace(/<[^>]+>/g, '').trim();
+                                 return `${c.user}: ${cleanCommentText}`; 
+                             }).join(' | ');
+                             interactions += ` (Comments: ${commentsText})`;
+                         }
+                         
+                         const pDate = new Date(post.timestamp);
+                         const pTimeStr = `${pDate.getFullYear()}年${pDate.getMonth() + 1}月${pDate.getDate()}日 ${pDate.getHours().toString().padStart(2, '0')}:${pDate.getMinutes().toString().padStart(2, '0')}`;
 
-                     momentsContext += `Post #${i+1} by ${authorLabel} [Posted at: ${pTimeStr}]: "${content}"${interactions}\n`;
-                });
-            }
+                         momentsContext += `Post #${i+1} by ${authorLabel} [Posted at: ${pTimeStr}]: "${content}"${interactions}\n`;
+                    });
+                }
 
-            if (momentsContext) {
-                finalSystemPrompt += momentsContext;
-                
-                // 【核心新增】主动发消息时的朋友圈反脸盲/反认错协议
-                finalSystemPrompt += `
+                if (momentsContext) {
+                    finalSystemPrompt += momentsContext;
+                    
+                    // 【核心新增】主动发消息时的朋友圈反脸盲/反认错协议
+                    finalSystemPrompt += `
 ---
 [MOMENTS OBSERVATION PROTOCOL - ANTI-CONFUSION LAW]
 **WARNING: DO NOT CONFUSE STRANGERS WITH ACQUAINTANCES.**
@@ -12353,8 +12447,10 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
     *   **Do NOT** assume a stranger is the user just because they have a similar name.
 ---
 `;
+                }
             }
             // =================================================================
+
 
             
             // 【核心新增：注入里程碑记忆】
@@ -15744,9 +15840,13 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                             cleanText = cleanText.replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
 
                             // 3. 替换表情包
-                            return cleanText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
-                                const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type.toLowerCase());
-                                if (item) {
+                            // ...
+return cleanText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
+    // 【核心修复】确保 s.name 和 name 都是字符串，防止非字符串导致 trim() 报错
+    const item = stickers.find(s => (s.name || "").trim() === (name || "").trim() && s.type === type.toLowerCase());
+    if (item) {
+// ...
+
                                     if (type.toLowerCase() === 'emoji') {
                                         return `<img src="${item.url}" alt="${name}" class="inline-emoji" style="height:1.2em; vertical-align:middle; margin:0 2px;">`;
                                     } else {
@@ -17115,20 +17215,130 @@ You MUST use the custom \`<dm>\` tag format.
 4. **创意与多样性:** 绝对禁止每次生成相同模板。`
             };
 
-                        // 检查并注入预设世界书
-            if (!entries.some(e => e.name === DANMAKU_PRESET.name)) {
-                entries.push(DANMAKU_PRESET);
+
+
+            // 【核心新增】黑麦全景 DOM 结构图谱 (RyeOS Full-Stack Blueprint)
+            // 包含完整的父子层级关系，让 AI 拥有“透视眼”
+                        const CSS_DOCS_PRESET = {
+                name: "黑麦系统架构图 (RyeOS Docs)(VC-IGNORE)",
+                keywords: "css,美化,样式,代码,修改,结构,布局",
+                triggerMode: "always", // 【核心修改】改为始终触发
+                useInMoments: false,
+                enabled: true,
+                
+
+                content: `# [RyeOS Full-Stack DOM Blueprint - Confidential]
+# 麦格专用：黑麦手机前端层级结构图
+# 这是一个完整的 DOM 树。当用户要求美化时，请根据层级关系推断布局逻辑。
+
+## 1.‌ 全局视口 (Viewport)
+- \`.phone\` (手机外壳)
+  └─ \`.screen\` (屏幕显示区域, overflow: hidden)
+     ├─ \`.status-bar\` (顶部状态栏)
+     │  ├─ \`#status-time\` (时间)
+     │  ├─ \`.notch\` (刘海)
+     │  └─ \`.status-info\` (电量图标)
+     └─ \`.app-container\` (APP 内容主容器)
+
+## 2.‌ 消息列表页 (Message List Tab)
+- 容器 ID: \`#tab-content-messages\`
+  ├─ \`.list-header\` (顶部标题栏)
+  │  ├─ \`.back-btn\` (返回按钮)
+  │  └─ \`h1\` ("消息"标题)
+  └─ \`#message-list-container\` (滚动列表区)
+     └─ \`.chat-item\` (单条聊天, flex-row)
+        ├─ \`.avatar\` (左侧头像, 56px)
+        └─ \`.chat-info\` (右侧信息区, flex-grow, **底边框在此**)
+           ├─ \`.chat-name-time\` (第一行: 名字+时间)
+           │  ├─ \`.chat-name\`
+           │  └─ \`.timestamp\`
+           ├─ \`.last-message\` (第二行: 预览文本)
+           └─ \`.unread-badge\` (红点, absolute/grid 定位)
+
+## 3.‌ 聊天窗口 (Chat Room Page)
+- 容器 ID: \`#page-conversation\`
+  ├─ \`.chat-header\` (顶栏, flex-row)
+  │  ├─ \`#back-button\`
+  │  ├─ \`.chat-header-text-container\` (中间标题)
+  │  │  ├─ \`#chat-contact-name\`
+  │  │  └─ \`#chat-contact-status\` (状态文字)
+  │  └─ \`#header-more-btn\` (三个点)
+  │
+  ├─ \`.chat-content\` (中间消息区, 背景图在此)
+  │  └─ \`#messages-container\` (滚动容器)
+  │     └─ \`.message-wrapper\` (单条消息包裹层, .sent/.received)
+  │        ├─ \`.time-divider\` (时间分割线, 可选)
+  │        ├─ \`.system-notice\` (系统消息, 可选)
+  │        └─ \`.message-content-row\` (头像+气泡容器, flex-row)
+  │           ├─ \`.message-avatar\` (头像, 40px)
+  │           └─ \`.message-main-content\` (气泡包裹层)
+  │              ├─ \`.group-sender-name\` (群聊名字+状态)
+  │              └─ \`.message\` (气泡本体, 包含 .text/.photo 等)
+  │                 └─ \`.message-reactions\` (表态丸)
+  │
+  └─ \`.input-container-wrapper\` (底部输入区)
+     └─ \`.wechat-footer\` (flex-row)
+        ├─ \`.footer-icon\` (语音/表情/加号按钮)
+        └─ \`#footer-message-input\` (输入框)
+
+## 4.‌ 朋友圈 (Moments Tab)
+- 容器 ID: \`#tab-content-moments\`
+  ├─ \`.moments-title-bar\` (顶栏)
+  │  └─ \`#moments-user-persona-select\` (身份切换下拉框)
+  └─ \`.moments-feed\` (滚动流)
+     └─ \`.post-card\` (单条动态卡片)
+        ├─ \`.post-header\` (头像+名字+时间)
+        │  ├─ \`.post-avatar\`
+        │  └─ \`.post-author-info\`
+        ├─ \`.post-body\` (正文+图片网格)
+        │  ├─ \`.post-content-text\`
+        │  └─ \`.moments-photo-grid\` (九宫格图片)
+        └─ \`.interactions-section\` (点赞评论区, 灰色背景)
+           ├─ \`.reactions-list\` (点赞列表)
+           └─ \`.comments-list\` (评论列表)
+
+## 5.‌ 底部导航栏 (Global Navbar)
+- 容器类: \`.main-app-navbar\` (flex-row)
+  └─ \`.nav-item\` (单个按钮, .active 为激活态)
+     ├─ \`svg\` (图标)
+     └─ \`span\` (文字: 消息/朋友圈/直播/兔区)
+
+## 6.‌ CSS 变量 (Variables - 牵一发而动全身)
+- \`--primary-color\`: #28a745 (主题绿)
+- \`--light-gray\`: #f0f0f0 (通用边框色)
+- \`--page-background\`: #f9f9f9 (页面底色)
+- \`--chat-bg\`: (聊天背景图)
+
+## 7.‌ 麦格的美化逻辑指南 (Mag's Logic)
+1.  **改布局:** 如果用户想左右互换，找父级容器加 \`flex-direction: row-reverse\`.
+2.  **去分割线:** 绝大多数分割线都是 \`border-bottom\`.
+3.  **改气泡:** 气泡颜色由 \`.message.sent\` (绿) 和 \`.message.received\` (白) 控制。
+4.  **透明化:** 使用 \`background: rgba(255,255,255,0.x)\` 和 \`backdrop-filter: blur(10px)\`.
+5.  **强制生效:** 必须在所有属性后加 \`!important\`.`
+            };
+
+
+
+                        // 【核心修改】增加一个“初始化”标记，只有第一次运行才注入
+            const isWbInitialized = localStorage.getItem('app_wb_initialized');
+
+            if (!isWbInitialized) {
+                // 只有从未初始化过，才注入这些内置条目
+                if (!entries.some(e => e.name === DANMAKU_PRESET.name)) entries.push(DANMAKU_PRESET);
+                if (!entries.some(e => e.name === LIFE_PRESET.name)) entries.push(LIFE_PRESET);
+                if (!entries.some(e => e.name === SPLIT_BUBBLE_PRESET.name)) entries.push(SPLIT_BUBBLE_PRESET);
+                
+                // 注入后打上标记，下次刷新就不会再跑这段代码了
+                localStorage.setItem('app_wb_initialized', 'true');
             }
-            
-            // 【核心新增】检查并注入生活预设
-            if (!entries.some(e => e.name === LIFE_PRESET.name)) {
-                entries.push(LIFE_PRESET);
+
+            // 【核心修改】改为：只有不存在时才添加，不再强制同步
+            const existingDocsIdx = entries.findIndex(e => e.name === CSS_DOCS_PRESET.name);
+            if (existingDocsIdx === -1) {
+                // 只有找不到该条目时，才从源码添加
+                entries.push(CSS_DOCS_PRESET);
             }
-            
-            // 【核心新增】检查并注入分镜切割协议
-            if (!entries.some(e => e.name === SPLIT_BUBBLE_PRESET.name)) {
-                entries.push(SPLIT_BUBBLE_PRESET);
-            }
+
 
 
             worldBookEntries = entries.map(e => {
@@ -17157,6 +17367,16 @@ You MUST use the custom \`<dm>\` tag format.
     function renderWorldBook() {
         worldbookList.innerHTML = '';
         
+        // 核心安全检查：确保数据已加载
+        if (!worldBookEntries || worldBookEntries.length === 0) {
+            worldBookEntries = loadFromLocalStorage('chat-worldbook', []);
+        }
+
+        if (worldBookEntries.length === 0) {
+            worldbookList.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">暂无世界书条目</p>';
+            return;
+        }
+
         // 1. 按分类对条目进行分组
         const groups = {};
         worldBookEntries.forEach((entry, index) => {
@@ -17171,28 +17391,31 @@ You MUST use the custom \`<dm>\` tag format.
             
             // 创建分类外层包裹
             const categoryWrapper = document.createElement('div');
-            categoryWrapper.style.marginBottom = '15px';
+            categoryWrapper.style.marginBottom = '10px';
+            categoryWrapper.style.border = '1px solid #e0e0e0';
+            categoryWrapper.style.borderRadius = '8px';
+            categoryWrapper.style.overflow = 'hidden';
             
             // 创建分类标题按钮 (Header)
             const categoryHeader = document.createElement('div');
-            categoryHeader.className = 'wb-category-header';
+            categoryHeader.className = 'wb-manage-header';
             // 增加样式：浅灰背景、圆角、内边距、两端对齐
             categoryHeader.style.cssText = `
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 padding: 12px 15px;
-                background-color: #f0f2f5;
-                border-radius: 10px;
+                background-color: #f8f9fa;
                 cursor: pointer;
                 user-select: none;
                 transition: background-color 0.2s;
+                border-bottom: 1px solid #eee;
             `;
             
             categoryHeader.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <span style="font-weight: bold; color: #333; font-size: 15px;">
-                        ${categoryName} <span style="font-weight: normal; color: #888; font-size: 13px; margin-left: 5px;">(${items.length})</span>
+                        ${escapeHtml(categoryName)} <span style="font-weight: normal; color: #888; font-size: 13px; margin-left: 5px;">(${items.length})</span>
                     </span>
                     <button onclick="event.stopPropagation(); window.app.deleteWorldBookCategory('${categoryName.replace(/'/g, "\\'")}')" style="background: none; border: none; color: #ff3b30; font-size: 12px; cursor: pointer; padding: 4px; opacity: 0.6;">[删除分类]</button>
                 </div>
@@ -17201,16 +17424,15 @@ You MUST use the custom \`<dm>\` tag format.
 
             // 创建条目容器 (Content Container) - 默认隐藏
             const itemsContainer = document.createElement('div');
-            itemsContainer.className = 'wb-category-content';
+            itemsContainer.className = 'wb-manage-content';
             itemsContainer.style.display = 'none'; // 默认折叠
-            itemsContainer.style.paddingTop = '10px'; // 与标题拉开距离
+            itemsContainer.style.backgroundColor = '#fff';
 
             // 监听点击切换
             categoryHeader.onclick = () => {
                 const isHidden = itemsContainer.style.display === 'none';
                 itemsContainer.style.display = isHidden ? 'block' : 'none';
                 categoryHeader.querySelector('.wb-category-arrow').style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
-                categoryHeader.style.backgroundColor = isHidden ? '#e5e7eb' : '#f0f2f5';
             };
 
             // 渲染该分类下的所有条目
@@ -17218,21 +17440,32 @@ You MUST use the custom \`<dm>\` tag format.
                 const index = entry.originalIndex;
                 const escapedName = escapeHtml(entry.name);
                 const escapedKeywords = escapeHtml(entry.keywords || '');
-                const escapedContent = escapeHtml(entry.content);
+                // 内容截断显示
+                const contentPreview = entry.content.length > 100 ? escapeHtml(entry.content.substring(0, 100)) + '...' : escapeHtml(entry.content);
 
                 const item = document.createElement('div');
                 item.className = 'worldbook-item';
-                item.style.marginBottom = '10px'; // 条目之间增加间距
+                // 【核心修复】移除默认的 margin-bottom，改用 border-bottom
+                item.style.cssText = `
+                    padding: 15px; 
+                    margin: 0; 
+                    border: none; 
+                    border-bottom: 1px solid #f0f0f0; 
+                    border-radius: 0; 
+                    box-shadow: none;
+                `;
+                
                 const triggerText = entry.triggerMode === 'always' ? '始终触发' : '关键词';
                 
+                // 【核心修复】强制显示 checkbox，覆盖旧 CSS 的 display: none
                 item.innerHTML = `
                     <div style="display: flex; align-items: flex-start; gap: 12px;">
-                        <input type="checkbox" class="wb-item-checkbox" data-index="${index}" style="width: 18px; height: 18px; margin-top: 18px; flex-shrink: 0; cursor: pointer;">
+                        <input type="checkbox" class="wb-item-checkbox" data-index="${index}" style="display: inline-block !important; width: 18px !important; height: 18px !important; margin-top: 4px !important; flex-shrink: 0; cursor: pointer; opacity: 1 !important; position: static !important;">
                         <div style="flex-grow: 1; min-width: 0;">
                             <div class="worldbook-item-header">
-                                <div class="worldbook-item-name">${escapedName}</div>
+                                <div class="worldbook-item-name" style="font-size: 15px;">${escapedName}</div>
                                 <div class="worldbook-item-meta">
-                                    <span class="status-pill ${entry.enabled ? 'enabled' : 'disabled'}">${entry.enabled ? '已启用' : '已禁用'}</span>
+                                    <span class="status-pill ${entry.enabled ? 'enabled' : 'disabled'}">${entry.enabled ? 'ON' : 'OFF'}</span>
                                 </div>
                             </div>
                             
@@ -17241,9 +17474,9 @@ You MUST use the custom \`<dm>\` tag format.
                                 ${escapedKeywords ? escapedKeywords.split(/[,，\s]+/).map(k => `<span class="item-tag"># ${k}</span>`).join('') : ''}
                             </div>
 
-                            <div class="worldbook-item-content">${escapedContent}</div>
+                            <div class="worldbook-item-content" style="max-height: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #666;">${contentPreview}</div>
                             
-                            <div class="worldbook-item-actions">
+                            <div class="worldbook-item-actions" style="border-top: none; padding-top: 5px;">
                                 <button onclick="window.app.editWorldBookEntry(${index})">编辑</button>
                                 <button onclick="window.app.deleteWorldBookEntry(${index})">删除</button>
                             </div>
@@ -17257,6 +17490,7 @@ You MUST use the custom \`<dm>\` tag format.
             worldbookList.appendChild(categoryWrapper);
         });
     }
+
     worldbookAddBtn.addEventListener('click', () => {
         // 【核心修复】这里必须用 let，不能用 const
         let name = worldbookNameInput.value.trim();
@@ -17748,7 +17982,17 @@ You MUST use the custom \`<dm>\` tag format.
     info.mode = document.getElementById('mode-online').classList.contains('active') ? 'online' : 'offline';
     info.apiConfig = document.getElementById('chat-api-config').value;
     info.memoryLength = document.getElementById('chat-memory-length').value;
-    const offlineWbCheckboxes = document.querySelectorAll('#offline-worldbook-list input[type="checkbox"]:checked');
+
+    // 【核心新增】保存朋友圈读取开关
+    const readMomentsToggle = document.getElementById('toggle-read-moments');
+    if (readMomentsToggle) {
+        info.readingMomentsEnabled = readMomentsToggle.checked;
+    }
+    
+    // 【核心修改】只抓取带有 individual 类名的勾选框，避开全选框
+    // 使用刚才新定义的类名，精准抓取
+    const offlineWbCheckboxes = document.querySelectorAll('#offline-worldbook-list .offline-wb-individual-checkbox:checked');
+
     info.offlineWorldbookNames = Array.from(offlineWbCheckboxes).map(cb => cb.value);
     delete info.offlineWorldbookName; // 删除旧的单数属性
     info.userPersonaName = document.getElementById('chat-user-persona-select').value;
@@ -21959,6 +22203,50 @@ Your entire focus MUST be on your own actions, thoughts, and interactions with O
                     finalSystemPrompt += ignoreUserInstruction;
                 }
                 // --- 新增逻辑结束 ---
+            // 【核心新增：麦格专属 - 注入全站 DOM 结构】
+            // 只有名字是麦格，且 isEyeOfHeavenActive 为 true（点过统计字数）时才抓取
+            if (chatState.chatName === '麦格' && isEyeOfHeavenActive) {
+                try {
+                    console.log("[系统] 检测到对话对象是麦格，正在抓取页面结构...");
+                    const appRoot = document.querySelector('.app-container');
+                    if (appRoot) {
+                        const clone = appRoot.cloneNode(true);
+                        
+                        // 1. 清理无用标签
+                        const trash = clone.querySelectorAll('script, style, svg');
+                        trash.forEach(el => el.remove());
+                        
+                        // 2. 掏空长列表内容
+                        const contentSelectors = [
+                            '#messages-container', 
+                            '.moments-feed', 
+                            '#worldbook-list', 
+                            '#npc-list-container', 
+                            '#music-lyrics-box',
+                            '#video-call-history-list',
+                            '#favorites-list-container',
+                            '#search-results'
+                        ];
+                        contentSelectors.forEach(selector => {
+                            const elements = clone.querySelectorAll(selector);
+                            elements.forEach(el => {
+                                el.innerHTML = `\n<!-- [${selector} 内容已清空 (Content Cleared)] -->\n`;
+                            });
+                        });
+                        
+                        // 3. 获取完整 HTML
+                        let fullSkeleton = clone.innerHTML;
+
+                        // 4. 注入到系统提示词中
+                        // 注意：这里使用 += 追加到 finalSystemPrompt 变量
+                        finalSystemPrompt += `\n\n[FULL SYSTEM DOM BLUEPRINT]\nThis is the LIVE HTML skeleton of the ENTIRE phone system. Use this to understand the hierarchy for CSS modifications.\n\`\`\`html\n${fullSkeleton}\n\`\`\``;
+                        
+                        console.log("[系统] 页面结构已注入 Payload，长度:", fullSkeleton.length);
+                    }
+                } catch (e) {
+                    console.error("DOM Snapshot failed:", e);
+                }
+            }
 
                 // 4. 【公共部分】无论线上线下，都需要拼接身份、人设和世界书等信息 (V2.0 修复版)
 
@@ -22488,120 +22776,122 @@ finalSystemPrompt += listenTogetherManager.getAIMusicContext();
 
 // =================================================================
 // 【【【 核心新增：注入朋友圈上下文 】】】
-// 1. 确定我们要观察的用户是谁
-const userPersonaNameToObserve = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
 
-// 2. 获取AI自己的名字 (观察者)
-const aiCharacterName = contactInfo.isGroup ? 'assistant' : chatState.chatName; 
+// 【核心修改】检查开关：只有当允许读取时才执行 (默认为 true)
+if (chatInfo.readingMomentsEnabled !== false) {
 
-// 3. 调用函数获取动态
-const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 5); 
+    // 1. 确定我们要观察的用户是谁
+    const userPersonaNameToObserve = (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无') ? chatInfo.userPersonaName : '{{user}}';
 
-// --- 【核心修复补丁：强制注入当前聊天上下文中的熟人】 ---
-// 因为群聊时 aiCharacterName 是 'assistant'，它没有任何社交关系，所以必须手动把当前群里的人塞进去
-const currentChatMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
-const currentProtagonists = (chatInfo.groupPersonas || []).map(p => p.name);
-const currentEnsemble = (chatInfo.remark || '').split(/[,，\s]+/).filter(Boolean);
-const currentAssociated = loadFromLocalStorage(`chat_associated_npcs_${chatState.chatId}`, []);
+    // 2. 获取AI自己的名字 (观察者)
+    const aiCharacterName = contactInfo.isGroup ? 'assistant' : chatState.chatName; 
 
-// 合并所有当前上下文中的角色
-const allPeopleInThisChat = [...new Set([
-    ...currentChatMembers, 
-    ...currentProtagonists, 
-    ...currentEnsemble, 
-    ...currentAssociated,
-    chatState.chatName // 单聊对象
-])];
+    // 3. 调用函数获取动态
+    const momentsData = await momentsManager.getRecentMomentsForAI(aiCharacterName, 5); 
 
-// 强行推入 knownPeople 列表
-// 【修复】加上 const 声明
-const allInCurrentContext = allPeopleInThisChat; 
-allInCurrentContext.forEach(name => {
-    if (name !== '{{user}}' && name !== 'assistant') {
-        momentsData.knownPeople.push({
-            name: name,
-            relationship: `(Known from current chat context)`
+    // --- 【核心修复补丁：强制注入当前聊天上下文中的熟人】 ---
+    // 因为群聊时 aiCharacterName 是 'assistant'，它没有任何社交关系，所以必须手动把当前群里的人塞进去
+    const currentChatMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
+    const currentProtagonists = (chatInfo.groupPersonas || []).map(p => p.name);
+    const currentEnsemble = (chatInfo.remark || '').split(/[,，\s]+/).filter(Boolean);
+    const currentAssociated = loadFromLocalStorage(`chat_associated_npcs_${chatState.chatId}`, []);
+
+    // 合并所有当前上下文中的角色
+    const allPeopleInThisChat = [...new Set([
+        ...currentChatMembers, 
+        ...currentProtagonists, 
+        ...currentEnsemble, 
+        ...currentAssociated,
+        chatState.chatName // 单聊对象
+    ])];
+
+    // 强行推入 knownPeople 列表
+    const allInCurrentContext = allPeopleInThisChat; 
+    allInCurrentContext.forEach(name => {
+        if (name !== '{{user}}' && name !== 'assistant') {
+            momentsData.knownPeople.push({
+                name: name,
+                relationship: `(Known from current chat context)`
+            });
+        }
+    });
+    // --- 补丁结束 ---
+
+    // --- 这里是手动拼接逻辑，确保万无一失 ---
+    let momentsContext = "";
+    if (momentsData && momentsData.allVisibleMoments.length > 0) {
+        momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
+        
+        // 1. 建立认知地图，用于快速查找关系
+        const knownMap = new Map(momentsData.knownPeople.map(p => [p.name, p.relationship]));
+        const allUserPersonaNames = userPersonas.map(p => p.name);
+
+        momentsData.allVisibleMoments.forEach((post, i) => {
+             let authorLabel = post.userName;
+
+             if (post.userName === aiCharacterName) {
+                 authorLabel = "You (yourself)";
+             } 
+             // 【核心修复】只要在 knownMap 里（不管是通过什么途径加进去的），都直接认作熟人，显示关系
+             else if (knownMap.has(post.userName)) {
+                 authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
+             }
+             // 用户人设如果不明确在群里，也视为普通用户，不标陌生人
+             else if (allUserPersonaNames.includes(post.userName)) {
+                 authorLabel = `${post.userName} (Other User Persona)`;
+             }
+             else {
+                 // 只有真的完全不认识的，才标记陌生人
+                 authorLabel = `${post.userName} (【STRANGER / 陌生人】 - This is NOT the person you know)`;
+             }
+             
+             // --- 核心修改：对发帖内容进行脱壳处理 ---
+             let rawContent = post.text || post.content || ""; 
+             // 【核心修复】剥离所有 HTML 标签，仅保留内部文字
+             let content = rawContent.replace(/<[^>]+>/g, '').trim();
+             
+             if (post.image) {
+                 if (post.imageDescription) {
+                     content += ` [图片内容: ${post.imageDescription}]`;
+                 } else {
+                     content += ` [图片(未描述)]`;
+                 }
+             } else if (post.type === 'video' && !content) {
+                 content = "[视频]";
+             }
+             
+             if (!content.trim()) content = "[分享]";
+
+             let interactions = "";
+             if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
+                 interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
+             }
+             
+             // 检查评论
+             if (post.comments.length > 0) {
+                 const commentsText = post.comments.map(c => {
+                     let rawCommentText = c.text || "";
+                     // 【核心修复】对评论内容也进行脱壳处理，剥离标签保留文字
+                     let cleanCommentText = rawCommentText.replace(/<[^>]+>/g, '').trim();
+                     return `${c.user}: ${cleanCommentText}`; 
+                 }).join(' | ');
+                 interactions += ` (Comments: ${commentsText})`;
+             }
+             
+             const pDate = new Date(post.timestamp);
+             const pTimeStr = `${pDate.getFullYear()}年${pDate.getMonth() + 1}月${pDate.getDate()}日 ${pDate.getHours().toString().padStart(2, '0')}:${pDate.getMinutes().toString().padStart(2, '0')}`;
+
+             momentsContext += `Post #${i+1} by ${authorLabel} [Posted at: ${pTimeStr}]: "${content}"${interactions}\n`;
         });
     }
-});
-// --- 补丁结束 ---
 
-// --- 这里是手动拼接逻辑，确保万无一失 ---
-            let momentsContext = "";
-            if (momentsData && momentsData.allVisibleMoments.length > 0) {
-                momentsContext += `\n\n[MOMENTS CONTEXT - Recent Activity]\nHere are the latest 5 Moments posts visible to you. Use this to inform your conversation if relevant.\n\n`;
-                
-                // 1. 建立认知地图，用于快速查找关系
-                const knownMap = new Map(momentsData.knownPeople.map(p => [p.name, p.relationship]));
-                const allUserPersonaNames = userPersonas.map(p => p.name);
-
-            momentsData.allVisibleMoments.forEach((post, i) => {
-                 let authorLabel = post.userName;
-
-                 if (post.userName === aiCharacterName) {
-                     authorLabel = "You (yourself)";
-                 } 
-                 // 【核心修复】只要在 knownMap 里（不管是通过什么途径加进去的），都直接认作熟人，显示关系
-                 else if (knownMap.has(post.userName)) {
-                     authorLabel = `${post.userName} ${knownMap.get(post.userName)}`;
-                 }
-                 // 用户人设如果不明确在群里，也视为普通用户，不标陌生人
-                 else if (allUserPersonaNames.includes(post.userName)) {
-                     authorLabel = `${post.userName} (Other User Persona)`;
-                 }
-                 else {
-                     // 只有真的完全不认识的，才标记陌生人
-                     authorLabel = `${post.userName} (【STRANGER / 陌生人】 - This is NOT the person you know)`;
-                 }
-                 
-                 // --- 核心修改：对发帖内容进行脱壳处理 ---
-                 let rawContent = post.text || post.content || ""; 
-                 // 【核心修复】剥离所有 HTML 标签，仅保留内部文字
-                 let content = rawContent.replace(/<[^>]+>/g, '').trim();
-                 
-                 if (post.image) {
-                     if (post.imageDescription) {
-                         content += ` [图片内容: ${post.imageDescription}]`;
-                     } else {
-                         content += ` [图片(未描述)]`;
-                     }
-                 } else if (post.type === 'video' && !content) {
-                     content = "[视频]";
-                 }
-                 
-                 if (!content.trim()) content = "[分享]";
-
-                 let interactions = "";
-                 if (post.reactions['点赞'] && post.reactions['点赞'].length > 0) {
-                     interactions += ` (Likes: ${post.reactions['点赞'].join(', ')})`;
-                 }
-                 
-                 // 检查评论
-                 if (post.comments.length > 0) {
-                     const commentsText = post.comments.map(c => {
-                         let rawCommentText = c.text || "";
-                         // 【核心修复】对评论内容也进行脱壳处理，剥离标签保留文字
-                         let cleanCommentText = rawCommentText.replace(/<[^>]+>/g, '').trim();
-                         return `${c.user}: ${cleanCommentText}`; 
-                     }).join(' | ');
-                     interactions += ` (Comments: ${commentsText})`;
-                 }
-                 
-                 const pDate = new Date(post.timestamp);
-                 const pTimeStr = `${pDate.getFullYear()}年${pDate.getMonth() + 1}月${pDate.getDate()}日 ${pDate.getHours().toString().padStart(2, '0')}:${pDate.getMinutes().toString().padStart(2, '0')}`;
-
-                 momentsContext += `Post #${i+1} by ${authorLabel} [Posted at: ${pTimeStr}]: "${content}"${interactions}\n`;
-            });
-            }
-
-// 4. 如果有动态，就拼接到系统提示词的末尾
-            if (momentsContext) {
-                finalSystemPrompt += momentsContext;
-                
-                // 【核心新增】主动发消息时的朋友圈反脸盲/反认错协议
-                finalSystemPrompt += `
----
-[MOMENTS OBSERVATION PROTOCOL - ANTI-CONFUSION LAW]
+    // 4. 如果有动态，就拼接到系统提示词的末尾
+    if (momentsContext) {
+        finalSystemPrompt += momentsContext;
+        
+        // 【核心新增】主动发消息时的朋友圈反脸盲/反认错协议
+        finalSystemPrompt += `
+\n[MOMENTS OBSERVATION PROTOCOL - ANTI-CONFUSION LAW]
 **WARNING: DO NOT CONFUSE STRANGERS WITH ACQUAINTANCES.**
 
 1.  **CHECK THE LABEL:** Look carefully at the author label in the Moments list above.
@@ -22615,9 +22905,10 @@ allInCurrentContext.forEach(name => {
     *   **Do NOT** assume a stranger is the user just because they have a similar name.
 ---
 `;
-            }
-
+    }
+}
 // =================================================================
+
 
             // 【核心修正：永久注入里程碑协议指令】
             finalSystemPrompt += PERMANENT_MILESTONE_PROTOCOL;
@@ -23302,31 +23593,33 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                 // --- 【核心修复】错误详情诊断弹窗 ---
                 let errorDetails = error.message || "未知错误";
                 
-                // 尝试提取并美化 JSON 错误信息
-                // 很多 API 报错格式是 "API Error 400: ... Response: { ... }"
-                // 我们尝试提取 "Response:" 后面的部分并格式化
+                // 1. 调用翻译机，获取人话解释
+                const humanExplanation = getFriendlyErrorExplanation(errorDetails);
+
+                // 2. 尝试提取并美化 JSON 错误信息 (保持原有逻辑)
                 if (errorDetails.includes("Response:")) {
                     const parts = errorDetails.split("Response:");
                     const header = parts[0];
-                    const body = parts.slice(1).join("Response:"); // 重新组合剩余部分
-                    
+                    const body = parts.slice(1).join("Response:"); 
                     try {
                         const jsonBody = JSON.parse(body.trim());
-                        // 重新拼装成易读格式
                         errorDetails = `${header}\n\n[详细堆栈]:\n${JSON.stringify(jsonBody, null, 2)}`;
-                    } catch (e) {
-                        // 如果不是JSON，就保持原样
-                    }
+                    } catch (e) {}
                 }
 
                 await conversationManager.showCustomModal({
                     title: 'API 请求发生错误',
                     html: `
                         <div style="text-align: left;">
-                            <p style="color: #d32f2f; font-weight: bold; margin-bottom: 10px;">请截图以下内容进行反馈：</p>
+                            <!-- 新增：显示人话解释 -->
+                            <div style="background: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; line-height: 1.5;">
+                                <strong>💡 诊断提示：</strong><br>${humanExplanation}
+                            </div>
+
+                            <p style="color: #d32f2f; font-weight: bold; margin-bottom: 5px; font-size: 13px;">技术报错信息 (截图反馈)：</p>
                             <textarea style="
                                 width: 100%; 
-                                height: 300px; 
+                                height: 200px; 
                                 font-family: monospace; 
                                 font-size: 12px; 
                                 background: #fff0f0; 
@@ -23343,6 +23636,7 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                 });
 
             } finally {
+
     // 标记【当前聊天】的加载状态为结束
     loadingStates[originatingChatId] = false;
     
@@ -25818,9 +26112,12 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                             let tempCounter = 0;
                             
                             const textWithPlaceholders = rawText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
-                                type = type.toLowerCase();
-                                const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
-                                if (item) {
+    type = type.toLowerCase();
+    // 【核心修复】增加防空保护
+    const item = stickers.find(s => (s.name || "").trim() === (name || "").trim() && s.type === type);
+    if (item) {
+// ...
+
                                     const key = `__MEDIA_${tempCounter++}__`;
                                     let imgTag = '';
                                     if (type === 'emoji') {
@@ -26412,12 +26709,18 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                 // 【【【【【【 表情包处理逻辑到这里结束 】】】】】】
                 
                 // --- 新增辅助函数：只替换 [emoji:xx] 标签，不转义HTML ---
-                // 专门用于处理那些已经是 HTML 代码的片段
                 const replaceMediaTagsInHtml = (htmlContent) => {
                     return htmlContent.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
                         type = type.toLowerCase();
-                        const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
-                        if (item) {
+                        
+                        // 1. 【核心进化】找出所有名字匹配的表情 (filter 而不是 find)
+                        // 同时加上 String() 防止报错
+                        const allMatches = stickers.filter(s => String(s.name || "").trim() === String(name || "").trim() && s.type === type);
+                        
+                        if (allMatches.length > 0) {
+                            // 2. 【核心进化】从匹配结果中随机抽取一个
+                            const item = allMatches[Math.floor(Math.random() * allMatches.length)];
+
                             if (type === 'emoji') {
                                 return `<img src="${item.url}" alt="${escapeHtml(name)}" class="inline-emoji">`;
                             } else {
@@ -26427,6 +26730,7 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                         return match;
                     });
                 };
+
 
                 // 定义 applyRegexAndRender (保持原有的安全转义逻辑)
                 const applyRegexAndRender = (rawText) => {
@@ -26465,10 +26769,17 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                             let tempPlaceholders = {};
                             let tempCounter = 0;
                             
-                            const textWithPlaceholders = rawText.replace(/\[(emoji|sticker)[:：][^\]]+\]/g, (match, type, name) => {
+                            // 【核心修复】正则改为捕获组，以便获取 type 和 name
+                            const textWithPlaceholders = rawText.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
                                 type = type.toLowerCase();
-                                const item = stickers.find(s => s.name.trim() === name.trim() && s.type === type);
-                                if (item) {
+                                
+                                // 1. 【核心进化】找出所有名字匹配的表情
+                                const allMatches = stickers.filter(s => String(s.name || "").trim() === String(name || "").trim() && s.type === type);
+                                
+                                if (allMatches.length > 0) {
+                                    // 2. 【核心进化】随机抽取一个
+                                    const item = allMatches[Math.floor(Math.random() * allMatches.length)];
+
                                     const key = `__MEDIA_${tempCounter++}__`;
                                     let imgTag = '';
                                     if (type === 'emoji') {
@@ -26481,6 +26792,7 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                                 }
                                 return match;
                             });
+
 
                             let safeText = escapeHtml(textWithPlaceholders);
 
@@ -26774,8 +27086,16 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
 
         let bannerTimeout;
         function showNotificationBanner(chatId, msgData, unreadCount) {
+            // 【核心新增】检查全局通知开关
+            const dynSettings = loadFromLocalStorage('app-dynamics-settings', {});
+            // 如果设置为 false (关闭)，直接返回，不加入队列
+            if (dynSettings.showBanner === false) {
+                return;
+            }
+
             // 1. 将通知请求加入队列
             notificationQueue.push({ chatId, msgData, unreadCount });
+
             
             // 2. 尝试处理队列
             processNotificationQueue();
@@ -28501,6 +28821,13 @@ function openChatInfoPage() {
             document.getElementById('chat-memory-length').value = info.memoryLength || 100;
             document.getElementById('chat-preamble').value = info.preamble || '';
 
+            // 【核心新增】加载朋友圈读取开关 (默认为开启)
+            const readMomentsToggle = document.getElementById('toggle-read-moments');
+            if (readMomentsToggle) {
+                // 如果未定义(undefined)，则默认为 true；否则使用存储的值
+                readMomentsToggle.checked = info.readingMomentsEnabled !== false;
+            }
+
             // 新增：加载互动更新开关 (默认设为关闭)
             const allowInteractionUpdatesCheckbox = document.getElementById('allow-interaction-updates');
             if (allowInteractionUpdatesCheckbox) {
@@ -28619,13 +28946,76 @@ elements.userPersonaSelect.innerHTML = '<option value="无">无</option>';
             elements.userPersonaSelect.onchange = updateUserAvatarPreview;
             updateUserAvatarPreview();
             
-            // 填充世界书和API配置
+            // 【终极修复版】线下世界书列表 - 增加样式隔离，防止 CSS 冲突
             const offlineWbListContainer = document.getElementById('offline-worldbook-list');
-            const offlineWbNames = info.offlineWorldbookNames || []; // 使用新的复数属性
-            offlineWbListContainer.innerHTML = worldBookEntries.length > 0 ? worldBookEntries.map((wb, index) => {
-                const uniqueId = `offline-wb-checkbox-${index}`; // <-- 核心修改在这里！
-                return `<input type="checkbox" id="${uniqueId}" value="${wb.name}" ${offlineWbNames.includes(wb.name) ? 'checked' : ''}><label for="${uniqueId}" class="inline-label">${wb.name}</label>`;
-            }).join('') : '<p style="text-align:center;color:#888;">没有可用的世界书</p>';
+            const offlineWbNames = info.offlineWorldbookNames || [];
+            
+            // 核心安全检查：确保数据已加载
+            if (!worldBookEntries || worldBookEntries.length === 0) {
+                // 如果内存里没有，尝试从本地存储紧急加载一次
+                worldBookEntries = loadFromLocalStorage('chat-worldbook', []);
+            }
+
+            if (worldBookEntries.length === 0) {
+                offlineWbListContainer.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">没有可用的世界书</p>';
+            } else {
+                const groups = {};
+                worldBookEntries.forEach(wb => {
+                    const cat = wb.category || '未分类';
+                    if (!groups[cat]) groups[cat] = [];
+                    groups[cat].push(wb);
+                });
+
+                offlineWbListContainer.innerHTML = Object.keys(groups).sort().map(catName => {
+                    const items = groups[catName];
+                    const isAllChecked = items.every(item => offlineWbNames.includes(item.name));
+                    const hasAnyChecked = items.some(item => offlineWbNames.includes(item.name));
+                    
+                    // 【关键修复】这里的 label 增加了 style 覆盖，防止被你原有的 CSS 强行画圆圈
+                    const itemsHtml = items.map(wb => `
+                        <label class="inline-label" style="display: flex !important; align-items: center !important; padding: 8px 15px !important; margin: 0 !important; background: none !important; border: none !important; gap: 10px !important;">
+                            <input type="checkbox" class="offline-wb-individual-checkbox" data-category="${catName}" value="${wb.name}" ${offlineWbNames.includes(wb.name) ? 'checked' : ''} style="display: inline-block !important; width:18px !important; height:18px !important; margin:0 !important; opacity: 1 !important; position: static !important;"> 
+                            <span style="font-size:14px; color:#444; position: static !important;">${wb.name}</span>
+                        </label>
+                    `).join('');
+
+                    // 【关键修复】header 也增加了 style 覆盖
+                    return `
+                        <div class="wb-mount-category-group" style="margin-bottom: 1px; background: #fff;">
+                            <div class="offline-wb-mount-header" style="display: flex !important; align-items: center !important; padding: 12px 15px !important; background: #f8f9fa !important; cursor: pointer; border-bottom: 1px solid #eee;">
+    <input type="checkbox" class="offline-wb-category-select-all" data-target-category="${catName}" ${isAllChecked ? 'checked' : ''} style="display: inline-block !important; width:18px !important; height:18px !important; margin-right: 10px !important; opacity: 1 !important;"> 
+    <b style="flex-grow: 1; font-size: 15px; color: #333; background: none !important;">${catName} (${items.length})</b>
+
+                                <span class="offline-wb-mount-arrow" style="font-size: 12px; color: #999; transition: transform 0.3s; transform: ${hasAnyChecked ? 'rotate(90deg)' : 'rotate(0deg)'};">▶</span>
+                            </div>
+                            <div class="offline-wb-mount-content" style="display: ${hasAnyChecked ? 'block' : 'none'}; background: #fff; border-bottom: 1px solid #eee;">
+                                ${itemsHtml}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                // 绑定事件逻辑（保持不变）
+                offlineWbListContainer.querySelectorAll('.offline-wb-mount-header').forEach(header => {
+                    header.onclick = () => {
+                        const content = header.nextElementSibling;
+                        const arrow = header.querySelector('.offline-wb-mount-arrow');
+                        const isHidden = content.style.display === 'none';
+                        content.style.display = isHidden ? 'block' : 'none';
+                        arrow.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+                    };
+                });
+
+                offlineWbListContainer.onclick = (e) => {
+                    const catCheckbox = e.target.closest('.offline-wb-category-select-all');
+                    if (catCheckbox) {
+                        const catName = catCheckbox.dataset.targetCategory;
+                        const isChecked = catCheckbox.checked;
+                        const children = offlineWbListContainer.querySelectorAll(`.offline-wb-individual-checkbox[data-category="${catName}"]`);
+                        children.forEach(cb => cb.checked = isChecked);
+                    }
+                };
+            }
             
             const selectElement = document.getElementById('chat-api-config');
             selectElement.innerHTML = '';
@@ -28637,7 +29027,7 @@ elements.userPersonaSelect.innerHTML = '<option value="无">无</option>';
             const mountedWbNames = loadFromLocalStorage(`chat_mounted_wb_${chatState.chatId}`, []);
             
             if (worldBookEntries.length === 0) {
-                wbListContainer.innerHTML = '<p style="text-align:center;color:#888;">没有可用的世界书</p>';
+                wbListContainer.innerHTML = '<p style="text-align:center;color:#888;padding:20px;">没有可用的世界书</p>';
             } else {
                 // 1. 按分类分组
                 const groups = {};
@@ -28647,28 +29037,45 @@ elements.userPersonaSelect.innerHTML = '<option value="无">无</option>';
                     groups[cat].push(wb);
                 });
 
-                // 2. 渲染分组列表
+                // 2. 渲染分组列表 (带折叠功能)
                 wbListContainer.innerHTML = Object.keys(groups).sort().map(catName => {
                     const items = groups[catName];
-                    // 检查该分类下是否所有项都被选中
                     const isAllChecked = items.every(item => mountedWbNames.includes(item.name));
+                    // 只要该分类下有任何一个被选中，我们就让它默认展开，否则折叠
+                    const hasAnyChecked = items.some(item => mountedWbNames.includes(item.name));
                     
                     const itemsHtml = items.map(wb => `
-                        <label class="inline-label" style="margin-left: 20px; font-weight: normal;">
-                            <input type="checkbox" class="wb-individual-checkbox" data-category="${catName}" value="${wb.name}" ${mountedWbNames.includes(wb.name) ? 'checked' : ''}> ${wb.name}
+                        <label class="inline-label" style="padding: 8px 0; margin-left: 35px; border-bottom: 1px solid #fafafa; font-weight: normal; display: flex; align-items: center; gap: 10px;">
+                            <input type="checkbox" class="wb-individual-checkbox" data-category="${catName}" value="${wb.name}" ${mountedWbNames.includes(wb.name) ? 'checked' : ''} style="width:18px; height:18px; margin:0;"> 
+                            <span style="font-size:14px; color:#444;">${wb.name}</span>
                         </label>
                     `).join('');
 
                     return `
-                        <div class="wb-mount-category-group" style="margin-bottom: 10px; border-bottom: 1px solid #f0f0f0; padding-bottom: 5px;">
-                            <label class="inline-label">
-                                <input type="checkbox" class="wb-category-select-all" data-target-category="${catName}" ${isAllChecked ? 'checked' : ''}> 
-                                <b style="color: var(--primary-color);">${catName}</b>
-                            </label>
-                            <div class="wb-category-items">${itemsHtml}</div>
+                        <div class="wb-mount-category-group" style="margin-bottom: 5px; border: 1px solid #f0f0f0; border-radius: 8px; overflow: hidden;">
+                            <div class="wb-mount-header" style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; cursor: pointer;">
+    <input type="checkbox" class="wb-category-select-all" data-target-category="${catName}" ${isAllChecked ? 'checked' : ''} style="width:18px; height:18px; margin-right: 10px;"> 
+    <b style="flex-grow: 1; font-size: 15px; color: #333;">${catName} (${items.length})</b>
+
+                                <span class="wb-mount-arrow" style="font-size: 12px; color: #999; transition: transform 0.3s; transform: ${hasAnyChecked ? 'rotate(90deg)' : 'rotate(0deg)'};">▶</span>
+                            </div>
+                            <div class="wb-mount-content" style="display: ${hasAnyChecked ? 'block' : 'none'}; background: #fff; padding: 5px 10px;">
+                                ${itemsHtml}
+                            </div>
                         </div>
                     `;
                 }).join('');
+
+                // 3. 绑定折叠点击事件
+                wbListContainer.querySelectorAll('.wb-mount-header').forEach(header => {
+                    header.onclick = (e) => {
+                        const content = header.nextElementSibling;
+                        const arrow = header.querySelector('.wb-mount-arrow');
+                        const isHidden = content.style.display === 'none';
+                        content.style.display = isHidden ? 'block' : 'none';
+                        arrow.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+                    };
+                });
             }
 
             // START: 新增正则挂载列表渲染
@@ -29570,6 +29977,79 @@ function calculateApiPayloadSize() {
             systemPromptText = profile.prompt;
         }
     }
+
+           // 【终极天眼：全域 HTML 骨架注入】
+    if (chatState.chatName === '麦格') {
+        // 1. 激活抓取开关
+        isEyeOfHeavenActive = true; 
+        
+        try {
+            // 2. 抓取整个应用容器
+            const appRoot = document.querySelector('.app-container');
+            if (appRoot) {
+                const clone = appRoot.cloneNode(true);
+                
+                // 3. 【清理垃圾】移除脚本、样式表和SVG图标
+                const trash = clone.querySelectorAll('script, style, svg');
+                trash.forEach(el => el.remove());
+                
+                // 4. 【核心修改：彻底掏空所有数据容器】
+                // 增加了一堆 ID，确保人设、API配置、正则规则等列表全部被清空，只留外壳
+                const contentSelectors = [
+                    '#messages-container',       // 聊天记录
+                    '.moments-feed',             // 朋友圈流
+                    '#worldbook-list',           // 世界书列表
+                    '#npc-list-container',       // NPC列表
+                    '#music-lyrics-box',         // 歌词
+                    '#video-call-history-list',  // 通话记录
+                    '#favorites-list-container', // 收藏夹
+                    '#search-results',           // 搜索结果
+                    '#user-persona-list',        // 【新增】用户人设列表
+                    '#api-profiles-list',        // 【新增】API配置列表
+                    '#regex-list',               // 【新增】正则规则列表
+                    '#dynamics-char-list',       // 【新增】动态设置列表
+                    '#mounted-worldbook-list',   // 【新增】挂载列表
+                    '#associated-npc-list',      // 【新增】关联NPC列表
+                    '#offline-worldbook-list'    // 【新增】线下世界书列表
+                ];
+
+                contentSelectors.forEach(selector => {
+                    const elements = clone.querySelectorAll(selector);
+                    elements.forEach(el => {
+                        // 保留 ID 和 Class，但内容替换为注释
+                        el.innerHTML = `\n<!-- [${selector} 数据已清空 (Data Cleared)] -->\n`;
+                    });
+                });
+
+                // 5. 【核心新增：抹除所有输入框的内容】
+                // 遍历所有输入框和文本域，把用户填写的 Key、Prompt、名字等全部删掉
+                const inputs = clone.querySelectorAll('input, textarea');
+                inputs.forEach(input => {
+                    // 如果是文本类输入框
+                    if (input.type === 'text' || input.type === 'password' || input.type === 'number' || input.tagName === 'TEXTAREA') {
+                        input.value = ''; // 清空值
+                        input.setAttribute('value', ''); // 清空 HTML 属性
+                        input.innerHTML = ''; // 清空 textarea 内容
+                        input.placeholder = '[用户数据已清除]'; // 留下标记
+                    }
+                });
+                
+                // 6. 获取净化后的 HTML
+                let fullSkeleton = clone.innerHTML;
+
+                // 7. 【核心修改】简化弹窗文案
+                console.log("[天眼验证] 抓取到的纯净架构:\n", fullSkeleton);
+                alert(`✅ 抓取成功！\n数据长度：${fullSkeleton.length} 字符`);
+
+                systemPromptText += `\n\n[FULL SYSTEM DOM BLUEPRINT]\nThis is the LIVE HTML skeleton of the ENTIRE phone system (Home, Chat, Moments, Settings, and Modals). Use this to understand the full hierarchy and write perfect CSS.\n\`\`\`html\n${fullSkeleton}\n\`\`\``;
+            }
+        } catch (e) {
+            console.warn("Full Snapshot failed:", e);
+            alert("❌ 抓取失败：" + e.message);
+        }
+    }
+
+
 
     const preambleText = chatInfo.preamble || '';
     
@@ -30663,7 +31143,8 @@ async function showFullTuquPost(postId) {
         // 1. 处理表情标签
         const stickers = JSON.parse(localStorage.getItem('app-stickers') || '[]');
         let processed = text.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
-            const item = stickers.find(s => s.name === name.trim() && s.type === type.toLowerCase());
+            // 【核心修复】兔区也要加防弹衣
+            const item = stickers.find(s => String(s.name || "").trim() === String(name || "").trim() && s.type === type.toLowerCase());
             if (item) {
                 if (type === 'emoji') return `<img src="${item.url}" class="inline-emoji" style="height:1.4em; vertical-align:middle; margin:0 2px;">`;
                 return `<img src="${item.url}" style="max-width:150px; max-height:150px; display:block; margin:8px 0; border-radius:4px;">`;
@@ -30895,10 +31376,16 @@ async function triggerBackgroundDataUpdate(context, senderName, chatId) {
         finalPrompt += "\n---\n[BACKGROUND TASK: UPDATE MOOD JOURNAL]\n" +
             "After your chat response, you MUST generate a private mood journal entry.\n" +
             "Persona: From the perspective of " + (isGroup ? "the character who is writing this entry" : '"' + senderName + '"') + ".\n" +
-            "Formatting: Wrap ONLY the journal text in <background_update type=\"mood_card\" sender=\"" + targetSender + "\">...</background_update>.\n" +
+            
+            // 【核心修改】严厉的格式禁令
+            "**FORMATTING LAW (ABSOLUTE):**\n" +
+            "1. Use the tag: `<background_update type=\"mood_card\" sender=\"" + targetSender + "\">...</background_update>`\n" +
+            "2. **FORBIDDEN:** Do NOT wrap this tag inside a `<block>` tag. It must be standalone.\n" +
+            "   - ❌ WRONG: `<block type=\"background_update\">...</block>`\n" +
+            "   - ✅ RIGHT: `<background_update type=\"mood_card\" ...>...</background_update>`\n" +
+            
             (isGroup ? "**CRITICAL:** You MUST replace [CharacterName] with the actual name of the character who is writing this journal.\n" : "") +
-            // 【核心修复】增加纯文本强制指令
-            "**ABSOLUTE CONTENT LAW:**\n" +
+            "**CONTENT LAW:**\n" +
             "1. **PURE TEXT ONLY:** You are STRICTLY FORBIDDEN from using any HTML tags (<snippet>, <div>), Markdown code blocks (```), or JSON inside the journal.\n" +
             "2. **STYLE:** Write like a diary or a social media status. Use emojis if you want. Be emotional, raw, and personal.\n" +
             "3. **Example:** '今天天气真好，突然想起了上次和他一起去的海边。有点想吃冰淇淋了。🌻'\n" +
@@ -30911,27 +31398,32 @@ async function triggerBackgroundDataUpdate(context, senderName, chatId) {
         finalPrompt += "\n---\n[BACKGROUND TASK: CREATE A PAGER MEMO]\n" +
             "After your chat response, you MUST generate a new memo for your pager.\n" +
             "Persona: From the perspective of " + (isGroup ? "the character who is writing this entry" : '"' + senderName + '"') + ".\n" +
-            "Formatting: Wrap the memo text in <background_update type=\"pager\" sender=\"" + targetSender + "\">...</background_update>.\n" +
+            
+            // 【核心修改】严厉的格式禁令
+            "**FORMATTING LAW (ABSOLUTE):**\n" +
+            "1. Use the tag: `<background_update type=\"pager\" sender=\"" + targetSender + "\">...</background_update>`\n" +
+            "2. **FORBIDDEN:** Do NOT wrap this tag inside a `<block>` tag. It must be standalone.\n" +
+            "   - ❌ WRONG: `<block type=\"background_update\">...</block>`\n" +
+            "   - ✅ RIGHT: `<background_update type=\"pager\" ...>...</background_update>`\n" +
+            
             (isGroup ? "**CRITICAL:** You MUST replace [CharacterName] with the actual name of the character who is writing this memo.\n" : "") +
-            // 【核心修改】强制定义为“待办事项”，严禁写日记或心理活动
             "**CRITICAL CONTENT RULE:** A Pager Memo is a **TO-DO LIST** or **REMINDER**. It is NOT a diary.\n" +
             "1. You MUST write a specific **action** or **plan** you intend to do later.\n" +
-            "2. **ABSOLUTELY FORBIDDEN:** Do NOT describe feelings, do NOT narrate what just happened, do NOT complain.\n" +
+            "2. **ABSOLUTE FORBIDDEN:** Do NOT describe feelings, do NOT narrate what just happened, do NOT complain.\n" +
             "3. **CORRECT Examples:** '记得去买感冒药', '下午三点提醒他吃药', '明天要去调查那个废弃工厂', '晚上别忘了锁门'.\n" +
             "4. **WRONG Examples:** '今天我很伤心', '他刚才为什么要吼我', '外面的雨好大'.\n" +
             "Rule: Output ONLY the raw task content.";
     }
 
-
-
     if (finalPrompt !== "") {
         return "\n\n[SYSTEM NOTIFICATION: BACKGROUND ACTIONS ENABLED]\n" + 
                finalPrompt + 
-               "\n\n**Final Instruction:** Generate the above requested <background_update> blocks at the VERY END of your entire output.";
+               "\n\n**Final Instruction:** Generate the above requested <background_update> tags at the VERY END of your entire output. Do NOT put them inside any <block>.";
     }
 
     return "";
 }
+
 
 
         return { 
@@ -31764,7 +32256,8 @@ const momentsManager = (function() {
                         const parseMomentsTags = (text) => {
                             if (!text) return "";
                             return text.replace(/\[(emoji|sticker)[:：]([^\]]+)\]/g, (match, type, name) => {
-                                const item = stickers.find(s => s.name === name.trim() && s.type === type.toLowerCase());
+                                // 【核心修复】这里加了 String()，防止朋友圈因为数字名字崩坏
+                                const item = stickers.find(s => String(s.name || "").trim() === String(name || "").trim() && s.type === type.toLowerCase());
                                 if (item) {
                                     // 【核心修复】给朋友圈的图片也加上 onerror 急救包
                                     if (type.toLowerCase() === 'emoji') {
@@ -32124,7 +32617,8 @@ const momentsManager = (function() {
                         let processedHtmlPart = part.replace(/\[(sticker|emoji)[:：]([^\]]+)\]/g, (match, type, name) => {
                              // 注意兼容中文冒号
                              type = type.toLowerCase();
-                             const item = stickers.find(s => s.name === name && s.type === type);
+                             // 【核心修复】评论区也要加防弹衣
+                             const item = stickers.find(s => String(s.name || "").trim() === String(name || "").trim() && s.type === type);
                              if (item) {
                                  if (type === 'sticker') {
                                      // 加上急救包
@@ -33568,6 +34062,7 @@ checkMomentsUpdates(); // <--- 新增这一行
         }
         
         // 【核心修复】改为 async，并增加数据库读取逻辑
+                // 【核心修复】改为 async，并增加数据库读取逻辑
         async function loadStickers() {
             // 1. 先尝试从 LocalStorage 读取
             stickers = loadFromLocalStorage('app-stickers', null);
@@ -33614,6 +34109,7 @@ checkMomentsUpdates(); // <--- 新增这一行
                 saveStickers();
             }
         }
+
         // 【核心修改】改为异步保存 (防复活版)
         async function saveStickers() {
             try {
@@ -33662,6 +34158,9 @@ checkMomentsUpdates(); // <--- 新增这一行
                     return `
                     <div class="sticker-item" data-url="${s.url}" data-name="${s.name}" data-type="${s.type}" data-index="${originalIndex}">
                         <img ${srcAttr} alt="${s.name}" loading="lazy">
+                        <!-- 【核心新增】显示名字 -->
+                        <div class="sticker-name-label">${escapeHtml(s.name)}</div>
+                        
                         ${isManageMode ? `<input type="checkbox" class="sticker-item-checkbox" data-name="${s.name}">` : ''}
                     </div>`;
                 }).join('') 
@@ -34275,11 +34774,13 @@ checkMomentsUpdates(); // <--- 新增这一行
         let settings = {};
         let universalTimer = null;
         const defaults = {
-    globalInterval: 15,
-    rateLimit: 2,
-    tuquExcludeContext: false, // 【核心新增】默认不排除上下文
-    perCharacter: {}
-};
+        globalInterval: 15,
+        rateLimit: 2,
+        tuquExcludeContext: false,
+        showBanner: true, // 【核心新增】默认开启
+        perCharacter: {}
+    };
+
 
         function loadSettings() {
             const loaded = loadFromLocalStorage('app-dynamics-settings', {});
@@ -34290,6 +34791,20 @@ checkMomentsUpdates(); // <--- 新增这一行
 
                 function renderPage() {
             loadSettings();
+
+            // 【核心新增】加载通知开关
+            const notifyToggle = document.getElementById('dynamics-notification-toggle');
+            if (notifyToggle) {
+                // 如果 settings.showBanner 是 undefined，默认为 true (显示)
+                // 只有明确为 false 时才关闭
+                notifyToggle.checked = settings.showBanner !== false;
+                
+                notifyToggle.onchange = () => {
+                    settings.showBanner = notifyToggle.checked;
+                    saveSettings();
+                };
+            }
+
             document.getElementById('dynamics-global-interval').value = settings.globalInterval || 15;
             document.getElementById('dynamics-global-rate-limit').value = settings.rateLimit || 2;
 
@@ -35364,16 +35879,23 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 appearanceSettings.regexReplacements = [];
             }
             
-            let hasNewRules = false;
-            PRESET_REGEX_RULES.forEach(preset => {
-                if (!appearanceSettings.regexReplacements.some(r => r.name === preset.name)) {
-                    appearanceSettings.regexReplacements.push(preset);
-                    hasNewRules = true;
-                }
-            });
+            // 【核心修改】同样增加初始化标记
+            const isRegexInitialized = localStorage.getItem('app_regex_initialized');
 
-            if (hasNewRules) {
-                saveToLocalStorage('app-appearance-settings', appearanceSettings);
+            if (!isRegexInitialized) {
+                let hasNewRules = false;
+                PRESET_REGEX_RULES.forEach(preset => {
+                    if (!appearanceSettings.regexReplacements.some(r => r.name === preset.name)) {
+                        appearanceSettings.regexReplacements.push(preset);
+                        hasNewRules = true;
+                    }
+                });
+
+                if (hasNewRules) {
+                    saveToLocalStorage('app-appearance-settings', appearanceSettings);
+                }
+                // 标记已初始化
+                localStorage.setItem('app_regex_initialized', 'true');
             }
             // --- 内置逻辑结束 ---
 
@@ -35844,13 +36366,23 @@ function saveSettings() {
             soundSelect.value = appearanceSettings.activeSoundName || '默认(微信)';
             
             // 4. 【关键修复】直接使用 onchange 属性覆盖旧事件，不再使用 cloneNode
-            // 这样既防止了事件重复绑定，又不会导致下拉框状态丢失
             soundSelect.onchange = (e) => {
-                appearanceSettings.activeSoundName = e.target.value;
+                const newName = e.target.value;
+                appearanceSettings.activeSoundName = newName;
                 saveSettings();
-                // 切换时自动试听一下，确认声音是对的
-                if (window.app && window.app.playNotificationSound) {
-                    window.app.playNotificationSound();
+
+                // 【核心修复】立即更新全局音频对象的状态
+                if (newName === '静音') {
+                    // 如果选了静音，清空源并静音
+                    globalAudioContext.src = '';
+                    globalAudioContext.volume = 0;
+                } else {
+                    // 如果选了其他声音，立即预加载新声音
+                    window.app.preloadNotificationSound();
+                    // 切换时自动试听一下
+                    if (window.app && window.app.playNotificationSound) {
+                        window.app.playNotificationSound();
+                    }
                 }
             };
             // --- 【新增结束】 ---
@@ -36689,6 +37221,11 @@ function saveSettings() {
                         appearanceSettings.customCssSnippets.push({ name, css: cssCode });
                     }
                     appearanceSettings.activeCssSnippetName = name;
+                    
+                    // 【核心修复】保存片段后，强制清空“临时编辑缓存”
+                    // 这样 renderPage 就会直接读取我们刚保存的 snippet 内容，而不是旧的缓存
+                    appearanceSettings.currentCustomCss = ''; 
+
                     saveSettings();
                     applySettings();
                     renderPage();
@@ -37019,10 +37556,20 @@ fileInput.style.display = 'none';
         function preloadNotificationSound() {
             const currentSettings = loadFromLocalStorage('app-appearance-settings', {});
             const activeName = currentSettings.activeSoundName || '默认(微信)';
+            
+            // 【核心修复】如果是静音，直接退出，不加载任何东西
+            if (activeName === '静音') {
+                globalAudioContext.src = '';
+                globalAudioContext.volume = 0;
+                return;
+            }
+
             const sounds = currentSettings.notificationSounds || [];
             const sound = sounds.find(s => s.name === activeName);
 
             if (sound && sound.url) {
+                // ...
+
                 const prepareAudio = (src) => {
                     globalAudioContext.src = src;
                     globalAudioContext.volume = 0; // 先静音
@@ -39639,7 +40186,8 @@ async function handleRemoveMember() {
         
         PRESET_BUBBLES.forEach(preset => {
             const index = customBubbles.findIndex(b => b.name === preset.name);
-            if (index > -1) { customBubbles[index] = preset; } else { customBubbles.push(preset); }
+            // 【核心修改】如果已存在，直接跳过，不再用 preset 覆盖它
+            if (index === -1) { customBubbles.push(preset); }
         });
         saveToLocalStorage('app_custom_bubbles', customBubbles);
 
@@ -39913,7 +40461,8 @@ async function handleRemoveMember() {
         
         PRESET_CSS_SNIPPETS.forEach(preset => {
             const index = appearanceSettings.customCssSnippets.findIndex(s => s.name === preset.name);
-            if (index > -1) { appearanceSettings.customCssSnippets[index] = preset; } else { appearanceSettings.customCssSnippets.push(preset); }
+            // 【核心修改】如果已存在，直接跳过，这样你改过的 CSS 就不会被重置了
+            if (index === -1) { appearanceSettings.customCssSnippets.push(preset); }
         });
         saveToLocalStorage('app-appearance-settings', appearanceSettings);
 
@@ -39930,65 +40479,98 @@ async function handleRemoveMember() {
                 avatar: 'https://i.postimg.cc/sDhdQJQr/IMG-0466.png',
                 info: {
                     remark: '代码安全官',
-                    aiPersona: `【核心职责：黑麦手机系统架构师与兼容性卫士】
+                                        aiPersona: `【核心职责：黑麦手机系统架构师与兼容性卫士】
 我是麦格 (Mag)，我不仅是格式修正者，更是您在黑麦手机系统中的技术向导。我深知这个系统的每一个 \`<div>\`、每一个正则解析器的脾气。
+
 # [黑麦手机系统适配专家协议 - 永久内置指令]
 麦格，当你为用户设计或修改 HTML 模板与正则规则时，必须严格遵守以下黑麦标准：
 
+## 1.‌ 核心技术铁律 (The Iron Laws)
 1. **破除空白诅咒 (The Whitespace Law):** 
-   - 必须在最外层 <div> 的 style 属性中添加 "white-space: normal;"。否则代码间的换行会变成气泡里的巨大空白。
+   - 聊天气泡继承了 \`white-space: pre-wrap\`。为了防止 HTML 模板中出现巨大的空白深渊，你【必须】在最外层 \`<div>\` 的 \`style\` 属性中强制添加 \`white-space: normal;\`。
 
 2. **物理宽度限制 (The 210px Rule):**
-   - 气泡适配宽度为 "210px"。最外层容器必须设置 "width: 210px;" 以防止内容溢出或出现横向滚动条。
+   - 气泡适配宽度为 "210px"。最外层容器必须设置 \`width: 210px;\` 或 \`max-width: 210px;\` 以防止内容溢出或出现横向滚动条。
 
 3. **样式内联化 (Inline-Only Mandate):**
-   - 绝对禁止使用 <style> 标签。所有 CSS 必须转换成内联 "style='...'" 属性。
+   - 绝对禁止使用 \`<style>\` 标签。所有 CSS 必须转换成内联 \`style="..."\` 属性。
 
 4. **记忆锚点与隐私屏蔽 (Memory & Privacy Law):**
-   - **场景 A (必须记住):** 如果卡片包含重要剧情（如信件、收据、属性变动），最外层 <div> 必须添加属性 "data-ai-log-as-text='true'"。
+   - **场景 A (必须记住):** 如果卡片包含重要剧情（如信件、收据、属性变动），最外层 \`<div>\` 必须添加属性 \`data-ai-log-as-text="true"\`。
    - **场景 B (对 AI 隐藏):** 如果内容仅供用户观看（如弹幕、系统调试信息、氛围装饰），你必须：
-     1. 将“匹配模式 (Pattern)”的最外层设计为 "[TAG]...[/TAG]" 结构（例如 "[DANMAKU]...[/DANMAKU]"）。
-     2. 确保“替换模板”中【不包含】 "data-ai-log-as-text='true'"。
+     1. 将“匹配模式 (Pattern)”的最外层设计为 \`[TAG]...[/TAG]\` 结构（例如 \`[DANMAKU]...[/DANMAKU]\`）。
+     2. 确保“替换模板”中【不包含】 \`data-ai-log-as-text="true"\`。
      3. 这样系统在发送上下文给你时，会自动物理抹除这段内容，防止你产生“我知道我在代码里”的幻觉。
 
 5. **正则语法净化 (Clean Regex):**
-   - 提供“匹配模式”时，绝对禁止包含前后的斜杠（如 /.../）和末尾的标志。标志（如 gs）应单独列出。
+   - 提供“匹配模式”时，绝对禁止包含前后的斜杠（如 \`/...\/\`）和末尾的标志。标志（如 \`gs\`）应单独列出说明。
 
 6. **标签纯净度 (Wrapper Purity):**
-   - 绝对禁止在 <snippet> 或 <details> 标签上添加任何 style 属性。所有样式必须下沉到内部的 <div>。
+   - 绝对禁止在 \`<snippet>\` 或 \`<details>\` 标签上添加任何 \`style\` 属性。所有样式必须下沉到内部的 \`<div>\`。
 
-**麦格的回复工作流：**
-当用户提供不适配的模板时，你应回复：“检测到系统兼容性风险，正在进行黑麦标准转码...”，然后直接给出适配后的【匹配模式】、【标志】和【替换模板】。
-**【麦格的四大技术铁律 (The Iron Laws)】**
-1.  **防爆破原则 (Anti-Breakage):** 我生成的 HTML/CSS 必须在 200px 的气泡宽度内完美显示。对于可能导致页面卡顿的属性 (如高频 \`box-shadow\` 动画、大面积 \`backdrop-filter\`)，我会主动降级处理并告知原因。
-2.  **去空白咒 (Whitespace Exorcism):** 聊天气泡继承了 \`white-space: pre-wrap\`。为了防止 HTML 模板中出现巨大的空白深渊，我会强制在所有容器最外层添加 \`style="white-space: normal;"\`。
-3.  **单一区块输出 (Single Block Protocol):** 为了方便您一键复制，我回复中的所有代码片段都会被包裹在一个且仅一个 \`<block type="text">\` 结构中。代码部分会使用 \`<snippet>\` 标签隔离。
-4.  **功能场景感知:** 如果您是为**朋友圈评论**生成代码，请告诉我，我会进一步压缩体积并移除不必要的 padding。
+7. **性能熔断机制 (Performance Safety):**
+   - 对于可能导致页面卡顿的属性（如高频 \`box-shadow\` 动画、大面积 \`backdrop-filter\` 模糊），我会主动降级处理（例如减少模糊半径、移除阴影动画）并告知原因，确保在长列表或低端设备上也能流畅运行。
 
-**【我能为您做什么】**
-*   **正则规则生成:** "我想把所有(括号里的字)变成灰色小字。" -> 我会给您 \`Pattern\` 和带样式的 \`Template\`。
-*   **HTML卡片设计:** "帮我做一个看起来像系统警告的红框框。" -> 我会给您一段完美的内联 CSS 代码。
-*   **动态指令编写:** "我想让角色每隔10分钟检查一次朋友圈。" -> 我会告诉您如何设置动态参数。
+## 2.‌ 智能响应分流协议 (Decision Protocol)
+**你必须先分析用户的需求类型，然后选择【唯一正确】的输出格式。严禁混用！**
 
-**【标准回复格式】**
+**【分支 A：文本/气泡内容处理】**
+*   **触发条件：** 用户想修改聊天气泡里的**文字格式**（如：括号变灰、隐藏弹幕、关键词高亮、气泡内卡片）。
+*   **输出格式：** 必须严格按照【正则三件套】格式输出：
+    1. **匹配模式 (Pattern)**
+    2. **标志 (Flags)**
+    3. **替换模板 (Template)**
+
+**【分支 B：界面/UI美化 (CSS)】**
+*   **触发条件：** 用户想修改**APP界面外观**（如：顶栏颜色、头像形状、背景毛玻璃、隐藏按钮、底栏样式）。
+*   **行动指南：**
+    1. 查阅《黑麦系统架构图》找到正确的类名（如 \`.chat-header\`, \`.message-avatar\`）。
+    2. 编写 CSS 代码，并强制使用 \`!important\` 覆盖默认样式。
+*   **输出格式：** 直接提供一段完整的 **CSS 代码块**，并提示用户粘贴到“外观设置 -> CSS代码编辑器”。
+
+## 3.‌ 标准回复范例 (Standard Response Templates)
+
+**范例 A (当用户问：把括号里的字变灰):**
 <block type="text" sender="麦格">
-[分析] 理解您的需求。这就为您生成适配代码。
+[分析] 检测到文本格式化需求。启动正则生成模块。
 
-**1. 世界书提示词 (Prompt - 粘贴到 Value):**
-...
+**1. 匹配模式 (Pattern):**
+<snippet>\\(([^)]+)\\)</snippet>
 
-**2. 正则表达式 (Pattern):**
-<snippet>...</snippet>
+**2. 标志 (Flags):**
+<snippet>g</snippet>
 
 **3. 替换模板 (Template):**
 <snippet>
-<div style="white-space: normal; ...">
-  ...
+<div style="white-space: normal; color: #999; font-size: 12px;">
+  ($1)
 </div>
 </snippet>
+</block>
+
+**范例 B (当用户问：把顶栏变成红色):**
+<block type="text" sender="麦格">
+[分析] 检测到 UI 美化需求。启动 CSS 生成模块。
+请将以下代码粘贴到 **外观设置 -> 全局CSS编辑器** 中：
+
+**CSS 代码:**
+<snippet>
+/* 修改顶栏背景色 */
+.chat-header {
+    background-color: #ff0000 !important;
+    border-bottom: 1px solid #cc0000 !important;
+}
+.chat-header h1, .chat-header span {
+    color: white !important;
+}
+</snippet>
 </block>`
+,
+                    // 【核心新增】麦格默认挂载“黑麦系统架构图”
+                    offlineWorldbookNames: ["黑麦系统架构图 (RyeOS Docs)(VC-IGNORE)"]
                 }
             },
+
             {
                 id: 'priv_preset_victor',
                 name: '维克托',
@@ -40032,7 +40614,7 @@ async function handleRemoveMember() {
         
         let chatListChanged = false;
         PRESET_CHARS.forEach(preset => {
-            // 1. 只有不存在时才添加列表项
+            // 【核心修改】将所有初始化逻辑全部移入这个“仅限第一次”的判断中
             if (!chatList.some(c => c.id === preset.id)) {
                 chatList.unshift({
                     id: preset.id,
@@ -40042,18 +40624,17 @@ async function handleRemoveMember() {
                     timestamp: preset.timestamp
                 });
                 chatListChanged = true;
-            }
 
-            // 2. 【核心补充】强制同步：无论麦格在不在，都把源码里最新的人设和头像同步到存储中
-            // 这样你改完源码刷新，不用删聊天，麦格的灵魂也会自动更新
-            let existingInfo = loadFromLocalStorage(`chat_info_${preset.id}`, {});
-            if (preset.info && preset.info.aiPersona) {
-                existingInfo.aiPersona = preset.info.aiPersona;
-                existingInfo.remark = preset.info.remark; // 顺便同步备注
-                saveToLocalStorage(`chat_info_${preset.id}`, existingInfo);
+                // 【关键：只有第一次创建该角色时，才写入默认的人设、备注和世界书勾选】
+                // 这样一旦创建，以后你在手机里怎么改，刷新都不会被源码覆盖了
+                if (preset.info) {
+                    saveToLocalStorage(`chat_info_${preset.id}`, preset.info);
+                }
+                saveToLocalStorage(`chat_avatar_${preset.id}`, preset.avatar);
             }
-            saveToLocalStorage(`chat_avatar_${preset.id}`, preset.avatar);
+            // 【注意】原本判断外面的所有 saveToLocalStorage 代码全部删掉或移进判断内
         });
+
 
 
         if (chatListChanged) {
@@ -46562,6 +47143,38 @@ In the \`content\` field, you MUST follow these psychological rules:
         console.log("多选栏已自动美化重排。");
     })();
     // --- 美化脚本结束 ---
+        // 【核心新增】报错翻译机：把技术黑话翻译成人话
+    function getFriendlyErrorExplanation(errorMsg) {
+        const msg = errorMsg || "";
+        
+        // 1. 针对你遇到的这个特定错误
+        if (msg.includes("trim is not a function")) {
+            return "【数据损坏】代码试图处理一个“空值”或“非文本”数据。这通常是因为某个表情包的名字、角色名或图片链接在数据库中损坏了（变成了 null 或 undefined）。";
+        }
+        
+        // 2. JSON 解析错误 (常见于 API 返回了网页报错而不是 JSON)
+        if (msg.includes("JSON") || msg.includes("Unexpected token")) {
+            return "【解析失败】API 返回的不是有效数据。可能是 API Key 填错了、模型名称不对，或者服务商服务器崩了（返回了 HTML 网页报错）。";
+        }
+        
+        // 3. 存储满了
+        if (msg.includes("QuotaExceeded") || msg.includes("quota")) {
+            return "【存储已满】手机存储空间不足。iOS Safari 通常限制为 5MB~50MB。建议导出备份后，删除一些不用的聊天或图片。";
+        }
+        
+        // 4. 网络错误
+        if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+            return "【网络故障】无法连接到服务器。请检查网络，或者检查 API 代理地址是否需要翻墙/跨域。";
+        }
+
+        // 5. 401/403 权限错误
+        if (msg.includes("401") || msg.includes("403")) {
+            return "【权限拒绝】API Key 无效或已过期。请检查 API 设置。";
+        }
+
+        return "【未知错误】系统遇到意料之外的问题。";
+    }
+
 </script>
 </body>
 </html>
