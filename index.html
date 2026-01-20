@@ -103,17 +103,21 @@
 
     .code-block-wrapper {
         position: relative;
-        /* 确保背景色足够深，与普通气泡区分开 */
-        background: #1e1e1e !important; 
+        background: #1e1e1e !important;
         border-radius: 10px;
-        margin: 10px 0;
-        padding: 35px 0 0 0 !important; 
+        /* 核心修改：上下间距10px，左右自动居中 */
+        margin: 10px auto !important; 
+        /* 核心修改：锁定宽度为黑麦标准气泡宽度，防止忽长忽短 */
+        width: 210px !important; 
+        padding: 35px 0 0 0 !important;
         border: 1px solid #333;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         overflow: hidden;
-        /* 确保它不会继承父级的文字颜色 */
-        color: #d4d4d4 !important; 
+        color: #d4d4d4 !important;
+        /* 确保在 flex 容器中也能居中 */
+        align-self: center; 
     }
+
 
 
     .code-content {
@@ -23688,11 +23692,12 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
             } catch (error) {
                 console.error("AI continuation error:", error);
                 
-                // --- 【核心修复】错误详情诊断弹窗 ---
-                let errorDetails = error.message || "未知错误";
+                // 核心修改：如果 error 包含 response 对象（部分高级 fetch 封装），尝试读取 body
+                let errorDetails = error.message || "Unknown Error";
                 
-                // 1. 调用翻译机，获取人话解释
+                // 如果是 HTTP 状态错误，翻译机现在能根据 HTTP_STATUS_XXX 准确识别
                 const humanExplanation = getFriendlyErrorExplanation(errorDetails);
+
 
                 // 2. 尝试提取并美化 JSON 错误信息 (保持原有逻辑)
                 if (errorDetails.includes("Response:")) {
@@ -23789,7 +23794,8 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
 
             if (!response.ok) {
                 const errorBody = await response.text();
-                throw new Error(`API Error ${response.status}: ${errorBody}`);
+                // 核心修改：确保错误字符串中包含状态码，方便翻译机识别
+                throw new Error(`HTTP_STATUS_${response.status}: ${errorBody}`);
             }
             const data = await response.json();
 
@@ -23801,13 +23807,14 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
             if (profile.url.includes('googleapis.com')) {
                 const candidate = data.candidates?.[0];
                 if (candidate) {
-                    // 【核心修复 1: 捕获并分析 Gemini 的安全拦截】
+                    // 核心修改：捕获 Gemini 特有的安全拒绝原因
                     if (candidate.finishReason && candidate.finishReason !== "STOP") {
-                        throw new Error(`Gemini API 提前终止，原因: ${candidate.finishReason}. 这通常意味着内容被安全策略拦截。`);
+                        throw new Error(`GEMINI_SAFETY_REFUSAL: ${candidate.finishReason}`);
                     }
                     aiResponse = candidate.content?.parts?.[0]?.text;
                 }
-            } else {
+            }
+ else {
                 const choice = data.choices?.[0];
                 if (choice) {
                     // 【核心修复 2: 捕获并分析 OpenAI 的内容过滤器】
@@ -47254,36 +47261,77 @@ In the \`content\` field, you MUST follow these psychological rules:
     })();
     // --- 美化脚本结束 ---
         // 【核心新增】报错翻译机：把技术黑话翻译成人话
-    function getFriendlyErrorExplanation(errorMsg) {
+        function getFriendlyErrorExplanation(errorMsg) {
         const msg = errorMsg || "";
         
-        // 1. 针对你遇到的这个特定错误
-        if (msg.includes("trim is not a function")) {
-            return "【数据损坏】代码试图处理一个“空值”或“非文本”数据。这通常是因为某个表情包的名字、角色名或图片链接在数据库中损坏了（变成了 null 或 undefined）。";
+        // --- 1. 身份与账户 (401, 403) ---
+        if (msg.includes("401") || msg.includes("Unauthorized") || msg.includes("invalid_api_key")) {
+            return "【身份验证失败】API Key 错误或已失效。请检查 Key 是否多填了空格或少拷了字符。";
         }
-        
-        // 2. JSON 解析错误 (常见于 API 返回了网页报错而不是 JSON)
-        if (msg.includes("JSON") || msg.includes("Unexpected token")) {
-            return "【解析失败】API 返回的不是有效数据。可能是 API Key 填错了、模型名称不对，或者服务商服务器崩了（返回了 HTML 网页报错）。";
+        if (msg.includes("account_deactivated")) {
+            return "【账户已封禁】你的 API 账户已被服务商禁用，请登录官网查看原因。";
         }
-        
-        // 3. 存储满了
-        if (msg.includes("QuotaExceeded") || msg.includes("quota")) {
-            return "【存储已满】手机存储空间不足。iOS Safari 通常限制为 5MB~50MB。建议导出备份后，删除一些不用的聊天或图片。";
+        if (msg.includes("403") || msg.includes("PermissionDenied") || msg.includes("Location not supported")) {
+            return "【访问受限】你的 IP 地址不在服务商的支持范围内（常见于大陆直连 Gemini/OpenAI）。请更换代理节点。";
         }
-        
-        // 4. 网络错误
+
+        // --- 2. 额度与频率 (429) ---
+        if (msg.includes("insufficient_quota") || msg.includes("insufficient_balance") || msg.includes("billing_hard_limit_reached")) {
+            return "【余额不足】API 额度已耗尽或信用卡扣款失败。请给账户充值。";
+        }
+        if (msg.includes("429") || msg.includes("rate_limit") || msg.includes("Too Many Requests")) {
+            return "【发送过快】触发了频率限制。如果你是免费账户，请调慢对话速度，或者升级为付费计划。";
+        }
+
+        // --- 3. 内容拦截与安全 (AI 特有) ---
+        if (msg.includes("safety") || msg.includes("HARM_CATEGORY") || msg.includes("finish_reason: content_filter")) {
+            return "【安全拦截】AI 拒绝回答。刚才的对话可能被系统判定为包含敏感、暴力或色情内容。";
+        }
+        if (msg.includes("RECITATION") || msg.includes("copyright")) {
+            return "【版权拦截】AI 认为你在要求它背诵受版权保护的内容（如书籍原文），因此拒绝输出。";
+        }
+
+        // --- 4. 请求参数与模型 (400, 404, 413, 422) ---
+        if (msg.includes("404") || msg.includes("model_not_found")) {
+            return "【模型不存在】找不到该模型。请确认“API设置”里的模型名称是否填错，或该模型是否对你开放。";
+        }
+        if (msg.includes("413") || msg.includes("context_length_exceeded") || msg.includes("maximum context length")) {
+            return "【上下文超长】对话记录太长了，超过了模型能记住的极限。请调小“记忆条数”或清空当前聊天。";
+        }
+        if (msg.includes("400") || msg.includes("Invalid request") || msg.includes("422")) {
+            return "【参数错误】发送的数据格式不对。可能是 API 地址填错了（比如把 Chat 地址填成了模型地址），或模型不支持当前参数。";
+        }
+
+        // --- 5. 网络、超时与代理 (504, 524, Cloudflare) ---
+        if (msg.includes("504") || msg.includes("524") || msg.includes("timeout") || msg.includes("Deadline Exceeded")) {
+            return "【请求超时】服务器响应太慢。可能是你的网络太卡，或者 AI 公司现在压力太大，没能在 60 秒内回话。";
+        }
+        if (msg.includes("Cloudflare") || msg.includes("Ray ID") || msg.includes("error code: 52")) {
+            return "【防火墙拦截】请求被 Cloudflare 拦截。这通常是因为你使用的中转站开启了高强度防御，或者你的请求被判定为攻击。";
+        }
         if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
-            return "【网络故障】无法连接到服务器。请检查网络，或者检查 API 代理地址是否需要翻墙/跨域。";
+            return "【网络断开】手机无法连接到服务器。请检查是否开启了飞行模式，或者你的代理软件是否掉线了。";
         }
 
-        // 5. 401/403 权限错误
-        if (msg.includes("401") || msg.includes("403")) {
-            return "【权限拒绝】API Key 无效或已过期。请检查 API 设置。";
+        // --- 6. 服务器故障 (500, 502, 503) ---
+        if (msg.includes("500") || msg.includes("Internal Server Error")) {
+            return "【服务商崩溃】AI 公司服务器内部报错。通常是因为他们正在升级系统，请稍后再试。";
+        }
+        if (msg.includes("502") || msg.includes("503") || msg.includes("Bad Gateway") || msg.includes("Service Unavailable")) {
+            return "【线路中断】中转站或服务商网关报错。这通常是临时的线路抖动，刷新页面重试即可。";
         }
 
-        return "【未知错误】系统遇到意料之外的问题。";
+        // --- 7. 本地存储与浏览器错误 ---
+        if (msg.includes("QuotaExceeded") || msg.includes("quota") || msg.includes("storage full")) {
+            return "【手机存储已满】无法保存新消息。iOS 的 5MB 限制已到。请删除一些不用的聊天、小说或清空图片缓存。";
+        }
+        if (msg.includes("trim is not a function") || msg.includes("undefined")) {
+            return "【系统逻辑错误】代码处理了空数据。请尝试刷新页面，或检查是否有角色名/人设被误删了。";
+        }
+
+        return "【未知错误】系统遇到意料之外的问题。建议截图报错信息联系开发者。";
     }
+
 
 </script>
 </body>
