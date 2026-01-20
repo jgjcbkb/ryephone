@@ -75,6 +75,71 @@
     .copy-btn:active {
         transform: scale(0.95);
     }
+
+
+    /* 按钮样式：放在右上角，不遮挡内容 */
+    .inline-copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        padding: 4px 12px;
+        font-size: 11px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.1);
+        color: #abb2bf;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        backdrop-filter: blur(4px);
+        z-index: 5;
+    }
+
+    .inline-copy-btn:hover {
+        background: #28a745;
+        color: white;
+        border-color: #28a745;
+    }
+
+    .code-block-wrapper {
+        position: relative;
+        /* 确保背景色足够深，与普通气泡区分开 */
+        background: #1e1e1e !important; 
+        border-radius: 10px;
+        margin: 10px 0;
+        padding: 35px 0 0 0 !important; 
+        border: 1px solid #333;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        overflow: hidden;
+        /* 确保它不会继承父级的文字颜色 */
+        color: #d4d4d4 !important; 
+    }
+
+
+    .code-content {
+        font-family: 'SF Mono', 'Fira Code', monospace !important;
+        font-size: 13px !important;
+        color: #61afef !important;
+        line-height: 1.5 !important;
+        /* 核心修改：强制不换行，开启横向滚动 */
+        white-space: pre !important; 
+        overflow-x: auto;
+        display: block;
+        padding: 0 12px 12px 12px; /* 内部留白 */
+        /* 适配移动端滑动流畅度 */
+        -webkit-overflow-scrolling: touch; 
+    }
+
+    /* 美化代码块的横向滚动条 */
+    .code-content::-webkit-scrollbar {
+        height: 4px;
+    }
+    .code-content::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+    }
+
+
     
     html, body { 
         margin: 0; padding: 0; background-color: #f0f2f5; 
@@ -11464,11 +11529,11 @@ if ('serviceWorker' in navigator) {
                 }
                         } else if (event.data.type === 'REQUEST_WORLDBOOK_LIST') {
                 // 【核心修复】响应兔区对世界书列表的请求
-                // 绝对不进行任何过滤，显示所有条目
+                // 增加 category 字段，以便兔区进行分类折叠
                 const wbListData = worldBookEntries
                     .map(entry => ({ 
                         name: entry.name, 
-                        // 只有当它既是“启用”状态，又是“兔区必读”时，才标记为必读
+                        category: entry.category || '未分类', // 【核心新增】
                         required: (entry.enabled && entry.useInTuqu) 
                     }))
                     // 排序：必读的排在最前面，其他的按名称排序
@@ -16068,6 +16133,39 @@ conversationManager.showNotificationBanner('TUQU', {
 
     // 【核心急救包：专门修复裂开的本地表情包】
     window.app = window.app || {};
+    // 新增：气泡内代码一键复制功能
+    window.app.copySnippet = function(btn) {
+        const wrapper = btn.parentElement;
+        const codeEl = wrapper.querySelector('.code-content');
+        // 如果找不到 .code-content，就尝试取 wrapper 的文本（排除掉按钮文字）
+        let textToCopy = codeEl ? codeEl.innerText : wrapper.innerText.replace('复制', '').replace('成功', '');
+        textToCopy = textToCopy.trim().replace(/^\n+|\n+$/g, '');
+
+
+
+        
+        const textArea = document.createElement("textarea");
+        textArea.value = textToCopy;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            btn.textContent = '成功';
+            btn.style.backgroundColor = '#28a745';
+            btn.style.color = 'white';
+        } catch (err) {
+            btn.textContent = '失败';
+        }
+        document.body.removeChild(textArea);
+        setTimeout(() => {
+            btn.textContent = '复制';
+            btn.style.backgroundColor = '';
+            btn.style.color = '';
+        }, 2000);
+    };
+
     window.app.fixLocalImage = function(img) {
         const originalUrl = img.dataset.originalSrc;
         // 只有当图片真的裂了，且我们有备份地址时才修复
@@ -26180,9 +26278,18 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                                 if (safeHtmlText) {
                                     finalHtml += `<div style="white-space: pre-wrap; word-wrap: break-word;">${safeHtmlText}</div>`;
                                 }
-                            } else {
-                                finalHtml += part;
-                            }
+                                                } else {
+                        // 核心修改：增加身份判定，只有麦格的消息才变身“专业代码块”
+                        const isMag = (msg.sender === '麦格') || (msg.side === 'received' && chatState.chatName === '麦格');
+                        
+                        if (isMag) {
+                            finalHtml += `<div class="code-block-wrapper"><code class="code-content">${part}</code><button class="inline-copy-btn" onclick="window.app.copySnippet(this)">复制</button></div>`;
+                        } else {
+                            // 其他角色（如维克托、生活片段）保持原始 HTML 渲染，互不干扰
+                            finalHtml += part; 
+                        }
+                    }
+
                         }
                         if (msg.replyTo) {
                              const originalMsg = chatState.messages.find(m => m.id === msg.replyTo);
@@ -35152,6 +35259,9 @@ checkMomentsUpdates(); // <--- 新增这一行
                                 console.log(`%c[Dynamics Action - Group Scene]`, 'color: #8e44ad; font-weight: bold;', `Group "${group.name}" is triggering a multi-character scene. Available actors: [${uniqueSpeakers.join(', ')}]`);
 
                                 try {
+                                    // 【核心修复】在最开头先声明这个变量，防止后面报错
+                                    let finalSystemPrompt = '';
+
                                     const profileIndexStr = info.apiConfig ? info.apiConfig.replace('profile_idx_', '') : (activeProfileIndex !== null ? String(activeProfileIndex) : null);
                                     if (profileIndexStr === null) throw new Error("No API config for this chat.");
                                     const profile = apiProfiles[parseInt(profileIndexStr)];
@@ -35449,7 +35559,7 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
 <block type="text" sender="李四">别提了，头都大了。</block>
 <block type="text" sender="王五">（路过）哟，听起来有八卦？</block>
 `;
-                                    // 【核心修复】直接赋值给 let 变量，不要重复使用 const 声明，防止语法错误
+                                    // 【核心修复】去掉前面的 let，直接赋值（因为上面已经声明过了）
                                     finalSystemPrompt = fullContextPrompt + scenePrompt;
 
                                     // 【核心修复】增加 User 消息以适配所有模型，并支持 Gemini 格式

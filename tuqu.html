@@ -212,12 +212,66 @@
         .tuqu-modal { background: white; width: 85%; max-width: 320px; border-radius: 15px; padding: 20px; box-sizing: border-box; }
         .tuqu-modal h3 { margin: 0 0 15px 0; font-size: 16px; text-align: center; color: #333; }
         .tuqu-modal select, .tuqu-modal textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 15px; box-sizing: border-box; font-family: inherit; }
-        .tuqu-modal .btns { display: flex; gap: 10px; }
-        .tuqu-modal button { flex: 1; padding: 10px; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
-        .tuqu-modal .btn-cancel { background: #eee; color: #666; }
-        .tuqu-modal .btn-confirm { background: #ff4d4f; color: white; }
-   
-        /* 新增：数字角标样式 */
+        
+        /* 【核心修改】增加世界书列表高度 */
+        #trigger-worldbook-list {
+            max-height: 250px !important; /* 从 100px 增加到 250px */
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 0 !important; /* 清空内边距以适配折叠栏 */
+            margin-bottom: 15px;
+            background: #fafafa;
+        }
+
+        /* 【核心新增】世界书折叠组样式 */
+        .wb-group { border-bottom: 1px solid #eee; }
+        .wb-group:last-child { border-bottom: none; }
+        .wb-header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 10px; background: #f8f9fa; cursor: pointer; user-select: none;
+        }
+        /* 【核心新增】标题栏勾选框样式 */
+        .wb-header input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            cursor: pointer;
+        }
+        .wb-header b { font-size: 13px; color: #333; flex-grow: 1; }
+        .wb-header .arrow { font-size: 10px; color: #999; transition: transform 0.3s; }
+        .wb-content { display: none; padding: 5px 10px; background: #fff; }
+        .wb-content.show { display: block; }
+        .wb-header.active .arrow { transform: rotate(90deg); }
+
+        /* 【核心修复】恢复按钮的精美药丸样式 */
+        .tuqu-modal .btns { 
+            display: flex; 
+            gap: 10px; 
+            margin-top: 5px; 
+        }
+        .tuqu-modal button { 
+            flex: 1; 
+            padding: 12px; /* 增加一点高度，更大气 */
+            border: none; 
+            border-radius: 25px; /* 完美的圆角药丸形 */
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 14px;
+            transition: opacity 0.2s;
+        }
+        .tuqu-modal button:active {
+            opacity: 0.8;
+        }
+        .tuqu-modal .btn-cancel { 
+            background: #f0f0f0; 
+            color: #666; 
+        }
+        .tuqu-modal .btn-confirm { 
+            background: #ff4d4f; 
+            color: white; 
+            box-shadow: 0 4px 10px rgba(255, 77, 79, 0.2); /* 增加一点发光感 */
+        }
         .jj-badge { display: inline-block; background-color: #ff4d4f; color: white; font-size: 11px; font-weight: bold; padding: 0 6px; height: 18px; line-height: 18px; border-radius: 9px; margin-left: 8px; vertical-align: middle; min-width: 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); border: 1px solid #fff; }
     
         /* --- 适配黑麦手机的 Iframe 样式 --- */
@@ -831,27 +885,58 @@ html, body {
                 });
                 select.value = currentVal;
             } 
-            // 【核心新增】处理世界书列表的返回
+            // 【核心新增】处理世界书列表的返回 (支持分类折叠)
             else if (event.data.type === 'RESPONSE_WORLDBOOK_LIST') {
                 const listContainer = document.getElementById('trigger-worldbook-list');
-                const wbList = event.data.list; // 注意：现在这是一个对象数组 {name, required}
+                const wbList = event.data.list; 
                 
                 if (!wbList || wbList.length === 0) {
-                    listContainer.innerHTML = '<p style="font-size: 12px; color: #999; text-align: center; margin: 5px 0;">没有可用的世界书</p>';
+                    listContainer.innerHTML = '<p style="font-size: 12px; color: #999; text-align: center; padding: 10px;">没有可用的世界书</p>';
                     return;
                 }
 
-                listContainer.innerHTML = wbList.map(item => {
-                    // 如果是必读(required)，则强制勾选并禁用(不可取消)，并加粗显示
-                    const isChecked = item.required ? 'checked disabled' : '';
-                    const labelStyle = item.required ? 'font-weight:bold; color:#ff4d4f;' : 'color:#333;';
-                    const suffix = item.required ? ' (必读)' : '';
+                // 1. 按分类分组
+                const groups = wbList.reduce((acc, item) => {
+                    const cat = item.category || '未分类';
+                    if (!acc[cat]) acc[cat] = [];
+                    acc[cat].push(item);
+                    return acc;
+                }, {});
+
+                // 2. 渲染分类折叠 HTML
+                listContainer.innerHTML = Object.keys(groups).sort().map(catName => {
+                    const items = groups[catName];
+                    const hasRequired = items.some(i => i.required);
                     
+                    const itemsHtml = items.map(item => {
+                        const isChecked = item.required ? 'checked disabled' : '';
+                        const labelStyle = item.required ? 'font-weight:bold; color:#ff4d4f;' : 'color:#333;';
+                        const suffix = item.required ? ' (必读)' : '';
+                        return `
+                            <label style="display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 13px; ${labelStyle} cursor: pointer; border-bottom: 1px solid #fafafa;">
+                                <input type="checkbox" class="trigger-wb-checkbox" value="${item.name}" ${isChecked}> ${item.name}${suffix}
+                            </label>
+                        `;
+                    }).join('');
+
                     return `
-                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 13px; ${labelStyle} cursor: pointer;">
-                        <input type="checkbox" class="trigger-wb-checkbox" value="${item.name}" ${isChecked}> ${item.name}${suffix}
-                    </label>
-                `}).join('');
+                        <div class="wb-group">
+                            <div class="wb-header" onclick="if(event.target.type !== 'checkbox'){ this.classList.toggle('active'); this.nextElementSibling.classList.toggle('show'); }">
+                                <input type="checkbox" class="wb-cat-select-all" data-cat="${catName}" onclick="toggleWbCategory(this)">
+                                <b>${catName} (${items.length})</b>
+                                <span class="arrow">▶</span>
+                            </div>
+                            <div class="wb-content ${hasRequired ? 'show' : ''}">
+                                ${itemsHtml}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                // 如果有必读项，对应的分类头也要设为 active 状态
+                listContainer.querySelectorAll('.wb-content.show').forEach(content => {
+                    content.previousElementSibling.classList.add('active');
+                });
             }
         });
 
@@ -1778,6 +1863,16 @@ html, body {
             }
             // 通知父窗口重置高度
             window.parent.postMessage({ type: 'RESET_IFRAME_HEIGHT' }, '*');
+        }
+        // 【核心新增】处理分类全选逻辑
+        function toggleWbCategory(checkbox) {
+            const catName = checkbox.dataset.cat;
+            const group = checkbox.closest('.wb-group');
+            // 找到该分类下所有非必读（未禁用）的勾选框
+            const children = group.querySelectorAll('.trigger-wb-checkbox:not(:disabled)');
+            children.forEach(cb => {
+                cb.checked = checkbox.checked;
+            });
         }
 
     </script>
