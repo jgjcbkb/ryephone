@@ -22259,11 +22259,22 @@ Your entire focus MUST be on your own actions, thoughts, and interactions with O
                         // 3. 获取完整 HTML
                         let fullSkeleton = clone.innerHTML;
 
-                        // 4. 注入到系统提示词中
+                        // --- 【核心新增】抓取全站 CSS 样式 ---
+                        let fullCssContent = "";
+                        // 遍历 head 里所有的 style 标签（包含 index.html 的主样式）
+                        document.querySelectorAll('head style').forEach(styleTag => {
+                            fullCssContent += styleTag.innerHTML + "\n";
+                        });
+                        // ------------------------------------
+
+                        // 4. 注入到系统提示词中 (同时注入 HTML 和 CSS)
                         // 注意：这里使用 += 追加到 finalSystemPrompt 变量
-                        finalSystemPrompt += `\n\n[FULL SYSTEM DOM BLUEPRINT]\nThis is the LIVE HTML skeleton of the ENTIRE phone system. Use this to understand the hierarchy for CSS modifications.\n\`\`\`html\n${fullSkeleton}\n\`\`\``;
+                        finalSystemPrompt += `\n\n[FULL SYSTEM DOM BLUEPRINT]\nThis is the LIVE HTML skeleton.\n\`\`\`html\n${fullSkeleton}\n\`\`\``;
                         
-                        console.log("[系统] 页面结构已注入 Payload，长度:", fullSkeleton.length);
+                        // 【核心新增】把 CSS 也发给 AI
+                        finalSystemPrompt += `\n\n[FULL SYSTEM CSS STYLES]\nThis is the ACTUAL CSS currently applied. Use this to know the exact colors, dimensions, and class names.\n\`\`\`css\n${fullCssContent}\n\`\`\``;
+                        
+                        console.log("[系统] 页面结构与CSS已注入 Payload。HTML长度:", fullSkeleton.length, "CSS长度:", fullCssContent.length);
                     }
                 } catch (e) {
                     console.error("DOM Snapshot failed:", e);
@@ -26866,8 +26877,19 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                                 finalHtml += `<div style="white-space: pre-wrap; word-wrap: break-word;">${safeHtmlText}</div>`;
                             }
                         } else {
-                            // 奇数部分是 <snippet> 里的 HTML，【核心修复】也要检查里面的 emoji
-                            finalHtml += replaceMediaTagsInHtml(part);
+                            // 奇数部分是 <snippet> 里的 HTML
+                            let innerContent = replaceMediaTagsInHtml(part);
+
+                            // 【核心修复】同步 createMessageElement 的逻辑：
+                            // 只有麦格的消息才变身“专业代码块”并带复制按钮
+                            const isMag = (msg.sender === '麦格') || (msg.side === 'received' && chatState.chatName === '麦格');
+                            
+                            if (isMag) {
+                                finalHtml += `<div class="code-block-wrapper"><code class="code-content">${innerContent}</code><button class="inline-copy-btn" onclick="window.app.copySnippet(this)">复制</button></div>`;
+                            } else {
+                                // 其他角色保持原始 HTML 渲染
+                                finalHtml += innerContent; 
+                            }
                         }
                     }
                     
@@ -30024,7 +30046,8 @@ function calculateApiPayloadSize() {
                 const clone = appRoot.cloneNode(true);
                 
                 // 3. 【清理垃圾】移除脚本、样式表和SVG图标
-                const trash = clone.querySelectorAll('script, style, svg');
+                // 【修改】保留 style，只删 script 和 svg
+                const trash = clone.querySelectorAll('script, svg');
                 trash.forEach(el => el.remove());
                 
                 // 4. 【核心修改：彻底掏空所有数据容器】
