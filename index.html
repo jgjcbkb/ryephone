@@ -36613,70 +36613,76 @@ function saveSettings() {
 // ===== 新版本的 showCssManagerModal 函数到这里结束 =====
         
         async function showAddFontModal() {
-            // 1. 先询问来源
+            // 1. 弹出询问来源的窗口
             const result = await conversationManager.showCustomModal({
                 title: '添加新字体',
                 text: '请选择字体来源：',
                 buttons: [
-                    { text: '本地上传 (自动命名)', value: 'upload', class: 'primary' },
-                    { text: '输入链接 (手动命名)', value: 'url', class: 'secondary' },
+                    { text: '本地上传', value: 'upload', class: 'primary' },
+                    { text: '输入链接', value: 'url', class: 'secondary' },
                     { text: '取消', value: 'cancel', class: 'secondary' }
-                ]
+                ],
+                // 【核心修复】：利用 onRender 在按钮渲染瞬间植入隐藏控件
+                onRender: (modalDOM, closeModal) => {
+                    const uploadBtn = modalDOM.querySelector('button[data-value="upload"]');
+                    if (uploadBtn) {
+                        // 1. 创建真实的文件输入框
+                        const fileInput = document.createElement('input');
+                        fileInput.type = 'file';
+                        fileInput.accept = '.ttf,.otf,.woff,.woff2';
+                        // 2. 把它变成透明的，并铺满整个按钮
+                        fileInput.style.cssText = `
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            width: 100%;
+                            height: 100%;
+                            opacity: 0;
+                            cursor: pointer;
+                            z-index: 10;
+                        `;
+                        
+                        // 3. 确保按钮可以承载绝对定位的子元素
+                        uploadBtn.style.position = 'relative';
+                        uploadBtn.style.overflow = 'hidden';
+                        uploadBtn.appendChild(fileInput);
+
+                        // 4. 监听这个隐藏控件的变化
+                        fileInput.onchange = async (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+
+                            // 选好文件后，立刻关闭弹窗
+                            closeModal();
+
+                            // 执行保存逻辑
+                            let fontName = file.name.replace(/\.[^/.]+$/, "");
+                            let finalName = fontName;
+                            let count = 1;
+                            while (savedFonts.some(f => f.name === finalName)) {
+                                finalName = `${fontName}_${count}`;
+                                count++;
+                            }
+
+                            const dbKey = `font-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+                            try {
+                                await imageStore.setItem(dbKey, file);
+                                savedFonts.push({ name: finalName, url: `indexeddb:${dbKey}` });
+                                activeFontName = finalName;
+                                saveSettings();
+                                await applySettings();
+                                renderPage();
+                                await conversationManager.customAlert(`字体 "${finalName}" 已添加并应用！`);
+                            } catch (err) {
+                                alert('保存失败: ' + err.message);
+                            }
+                        };
+                    }
+                }
             });
 
-            if (!result || result.value === 'cancel' || result.value === 'close') return;
-
-            if (result.value === 'upload') {
-                // --- 逻辑 A: 本地上传 (iOS 兼容性修复版) ---
-                const fileInput = document.createElement('input');
-                fileInput.type = 'file';
-                fileInput.style.display = 'none'; // 保持隐藏
-                fileInput.accept = '.ttf,.otf,.woff,.woff2';
-                
-                // 【核心修复】：必须将 input 插入到页面里，苹果手机才会允许弹出选择框
-                document.body.appendChild(fileInput);
-
-                fileInput.onchange = async (e) => {
-                    const file = e.target.files[0];
-                    if (!file) {
-                        if (fileInput.parentElement) document.body.removeChild(fileInput);
-                        return;
-                    }
-
-                    // 【关键】：自动获取文件名（去掉后缀）
-                    let fontName = file.name.replace(/\.[^/.]+$/, "");
-                    
-                    // 检查重名并自动加数字后缀，防止覆盖
-                    let finalName = fontName;
-                    let count = 1;
-                    while (savedFonts.some(f => f.name === finalName)) {
-                        finalName = `${fontName}_${count}`;
-                        count++;
-                    }
-
-                    const dbKey = `font-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-                    try {
-                        await imageStore.setItem(dbKey, file);
-                        savedFonts.push({ name: finalName, url: `indexeddb:${dbKey}` });
-                        activeFontName = finalName;
-                        saveSettings();
-                        await applySettings();
-                        renderPage();
-                        await conversationManager.customAlert(`字体 "${finalName}" 已添加并应用！`);
-                    } catch (err) {
-                        alert('保存失败: ' + err.message);
-                    } finally {
-                        // 任务完成，移除控件
-                        if (fileInput.parentElement) document.body.removeChild(fileInput);
-                    }
-                };
-                
-                // 触发点击
-                fileInput.click();
-
-            } else if (result.value === 'url') {
-
-                // --- 逻辑 B: 输入链接（保持手动命名） ---
+            // 2. 处理“输入链接”的分支 (因为 upload 已经在 onRender 里处理了，这里只需处理 url)
+            if (result && result.value === 'url') {
                 const fontName = await conversationManager.showContentInputModal({ 
                     title: '字体命名', 
                     placeholder: '为这个云端字体起个名字' 
@@ -36704,6 +36710,7 @@ function saveSettings() {
                 }
             }
         }
+
         
                 // --- 【修复版：字体管理器 (带滚动 + 编辑内容)】 ---
         async function showFontManagerModal() {
