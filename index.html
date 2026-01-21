@@ -544,11 +544,9 @@
         flex-direction: column; 
         max-width: 100%; 
         position: relative;
-        /* 核心修复：限制重绘区域，防止整页重排 */
+        /* 【核心优化】iOS 性能救星：只保留 layout 限制，绝对不要加 transform */
         contain: layout;
-        /* 强制开启独立合成层 */
-        transform: translate3d(0, 0, 0);
-        -webkit-transform: translate3d(0, 0, 0);
+        /* 删除 transform: translate3d... 以释放 iOS 显存 */
     }
     #page-conversation .message-wrapper.selected::after { content: ''; position: absolute; top:0; left: 0; width: 100%; height: 100%; background-color: rgba(40, 167, 69, 0.2); border-radius: 8px; pointer-events: none;}
     #page-conversation .message-wrapper.sent { align-items: flex-end; }
@@ -572,16 +570,14 @@
         line-height: 1.5; 
         word-wrap: break-word; 
         position: relative; 
-        /* 核心修复：强制开启硬件加速，解决 iOS 文字渲染延迟 */
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
-        /* 告诉浏览器这个元素会经常变动，提前分配资源 */
-        will-change: transform;
-        /* 防止渲染时的闪烁 */
-        -webkit-backface-visibility: hidden;
-        backface-visibility: hidden;
-        /* 强制优先渲染文本内容 */
+        
+        /* 【核心优化】iOS 性能救星：全部删除！ */
+        /* 不要 transform，不要 will-change，不要 backface-visibility */
+        /* 这些属性在长列表中是 iOS 的毒药 */
+
+        /* 仅保留这个，让文字出得快一点 */
         text-rendering: optimizeSpeed;
+        -webkit-font-smoothing: antialiased;
     }
     #page-conversation .message.text, #page-conversation .message.voice { 
     max-width: 230px; /* 这里的数值现在只是一个默认参考值 */
@@ -596,13 +592,9 @@
     /* 核心修复：针对 .9图气泡的 iOS 专属性能补丁 */
     #page-conversation .message-main-content {
         position: relative;
-        /* 强制文字图层与边框图层合并渲染，防止文字消失 */
-        -webkit-transform-style: preserve-3d;
-        transform-style: preserve-3d;
-        /* 提高渲染优先级 */
+        /* 【核心优化】移除 preserve-3d，它会消耗大量内存 */
         z-index: 1;
-        /* 解决 border-image 导致的渲染延迟 */
-        will-change: transform, opacity;
+        /* 移除 will-change，让浏览器自己决定 */
     }
 
     /* 针对 iOS 的文字图层稳定性补丁 */
