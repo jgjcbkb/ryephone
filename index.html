@@ -25898,6 +25898,19 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                 if (shouldShowAvatar) {
                     const avatarDiv = document.createElement('div');
                     avatarDiv.className = 'message-avatar';
+                    
+                    // --- 新增：将角色名字绑定到头像节点，供头像框CSS识别 ---
+                    let attrName = "";
+                    if (msg.side === 'sent') {
+                        attrName = msg.sender || (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无' ? chatInfo.userPersonaName : '{{user}}');
+                    } else {
+                        attrName = msg.sender || chatState.chatName;
+                    }
+                    avatarDiv.setAttribute('data-name', attrName);
+                    // --- 新增结束 ---
+
+                    // 核心修复：定义一个通用的头像解析器
+
 
                     // 核心修复：定义一个通用的头像解析器，确保单聊、NPC、群聊主角头像能全局同步
                     const resolveAvatar = (name) => {
@@ -26550,6 +26563,19 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
                 if (shouldShowAvatar) {
                     const avatarDiv = document.createElement('div');
                     avatarDiv.className = 'message-avatar';
+                    
+                    // --- 新增：将角色名字绑定到头像节点，供头像框CSS识别 ---
+                    let attrName = "";
+                    if (msg.side === 'sent') {
+                        attrName = msg.sender || (chatInfo.userPersonaName && chatInfo.userPersonaName !== '无' ? chatInfo.userPersonaName : '{{user}}');
+                    } else {
+                        attrName = msg.sender || chatState.chatName;
+                    }
+                    avatarDiv.setAttribute('data-name', attrName);
+                    // --- 新增结束 ---
+
+                    // 核心修复：定义一个通用的头像解析器
+
 
                     // 核心修复：使用与 createMessageElement 完全一致的通用解析逻辑
                     const resolveAvatar = (name) => {
