@@ -8092,7 +8092,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
         <span class="slider"></span>
     </label>
 </div>
-<p class="form-hint" style="padding: 0 15px 15px;">开启后，AI在对话或主动发消息时会参考你最近发的5条朋友圈。</p>
+<p class="form-hint" style="padding: 0 15px 15px;">启用后，AI 将在生成对话或主动交互时，自动检索并参考最近 5 条朋友圈动态内容。</p>
 <!-- 【插入结束】 -->
 
                         </div>
@@ -8343,7 +8343,7 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                     <span class="slider"></span>
                 </label>
             </div>
-            <p class="form-hint" style="padding: 0 15px 15px;">关闭后，收到新动态（朋友圈、主动消息）时将不再弹出顶部横幅，仅在图标上显示红点。</p>
+            <p class="form-hint" style="padding: 0 15px 15px;">关闭后，系统将停用顶部横幅通知，新动态仅通过应用图标红点进行提醒。</p>
         </div>
         <!-- 【插入结束】 -->
 
@@ -8919,7 +8919,16 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 
                         <div class="static-overlay">
                             <div class="top-bar"><div class="timer-assembly"><span id="call-timer-vc">00:00</span></div></div>
-                            <div class="self-view-container"><div class="self-view user_avatar" id="self-view-avatar-vc"></div></div>
+                            <div class="self-view-container" style="position: absolute; top: 45px; right: 20px; width: 20%; aspect-ratio: 9 / 16; z-index: 50;">
+    <div class="self-view user_avatar" id="self-view-avatar-vc" style="width: 100%; height: 100%; border-radius: 25px; background-size: cover; background-position: center;"></div>
+    <video id="user-camera-stream" autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; border-radius: 25px; display: none; position: absolute; top: 0; left: 0; z-index: 2; transform: scaleX(-1);"></video>
+    
+    <!-- 切换前后镜头按钮 (美化版图标) -->
+    <button id="vc-switch-camera-btn" style="position: absolute; bottom: 5px; right: 5px; width: 32px; height: 32px; border-radius: 50%; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.3); color: white; cursor: pointer; z-index: 100; display: none; align-items: center; justify-content: center; padding: 0; pointer-events: auto;">
+        <svg viewBox="0 0 24 24" fill="white" width="20" height="20"><path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/></svg>
+    </button>
+</div>
+
                         </div>
 
                         <!-- 修改后 -->
@@ -8951,9 +8960,24 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                     <div class="modal-overlay" id="video-call-reply-modal">
                         <div class="modal-window">
                             <textarea id="video-call-reply-input" placeholder="想对我说什么..."></textarea>
-                            <div class="reply-actions">
-                                <button class="reply-button cancel">取消</button>
-                                <button class="reply-button send" id="video-call-send-btn">发送</button>
+                            
+                            <!-- 图片预览区 -->
+                            <div id="vc-reply-img-preview" style="display: none; margin-bottom: 15px; position: relative; width: fit-content;">
+                                <img src="" style="max-height: 100px; border-radius: 8px; border: 1px solid #ddd;">
+                                <div id="vc-clear-img-btn" style="position: absolute; top: -8px; right: -8px; background: #ff3b30; color: white; border-radius: 50%; width: 20px; height: 20px; text-align: center; line-height: 18px; font-size: 12px; cursor: pointer; font-weight: bold;">×</div>
+                            </div>
+
+                            <div class="reply-actions" style="justify-content: space-between; align-items: center;">
+                                <!-- 新增：手动截图按钮 -->
+                                <button id="vc-manual-capture-btn" style="background: #e8f5e9; border: 1px solid #28a745; color: #28a745; border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/><path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+                                    截取画面
+                                </button>
+
+                                <div style="display: flex; gap: 12px;">
+                                    <button class="reply-button cancel">取消</button>
+                                    <button class="reply-button send" id="video-call-send-btn">发送</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -17319,105 +17343,7 @@ You MUST use the custom \`<dm>\` tag format.
 
 
 
-            // 【核心新增】黑麦全景 DOM 结构图谱 (RyeOS Full-Stack Blueprint)
-            // 包含完整的父子层级关系，让 AI 拥有“透视眼”
-                        const CSS_DOCS_PRESET = {
-                name: "黑麦系统架构图 (RyeOS Docs)(VC-IGNORE)",
-                keywords: "css,美化,样式,代码,修改,结构,布局",
-                triggerMode: "always", // 【核心修改】改为始终触发
-                useInMoments: false,
-                enabled: true,
-                
-
-                content: `# [RyeOS Full-Stack DOM Blueprint - Confidential]
-# 麦格专用：黑麦手机前端层级结构图
-# 这是一个完整的 DOM 树。当用户要求美化时，请根据层级关系推断布局逻辑。
-
-## 1.‌ 全局视口 (Viewport)
-- \`.phone\` (手机外壳)
-  └─ \`.screen\` (屏幕显示区域, overflow: hidden)
-     ├─ \`.status-bar\` (顶部状态栏)
-     │  ├─ \`#status-time\` (时间)
-     │  ├─ \`.notch\` (刘海)
-     │  └─ \`.status-info\` (电量图标)
-     └─ \`.app-container\` (APP 内容主容器)
-
-## 2.‌ 消息列表页 (Message List Tab)
-- 容器 ID: \`#tab-content-messages\`
-  ├─ \`.list-header\` (顶部标题栏)
-  │  ├─ \`.back-btn\` (返回按钮)
-  │  └─ \`h1\` ("消息"标题)
-  └─ \`#message-list-container\` (滚动列表区)
-     └─ \`.chat-item\` (单条聊天, flex-row)
-        ├─ \`.avatar\` (左侧头像, 56px)
-        └─ \`.chat-info\` (右侧信息区, flex-grow, **底边框在此**)
-           ├─ \`.chat-name-time\` (第一行: 名字+时间)
-           │  ├─ \`.chat-name\`
-           │  └─ \`.timestamp\`
-           ├─ \`.last-message\` (第二行: 预览文本)
-           └─ \`.unread-badge\` (红点, absolute/grid 定位)
-
-## 3.‌ 聊天窗口 (Chat Room Page)
-- 容器 ID: \`#page-conversation\`
-  ├─ \`.chat-header\` (顶栏, flex-row)
-  │  ├─ \`#back-button\`
-  │  ├─ \`.chat-header-text-container\` (中间标题)
-  │  │  ├─ \`#chat-contact-name\`
-  │  │  └─ \`#chat-contact-status\` (状态文字)
-  │  └─ \`#header-more-btn\` (三个点)
-  │
-  ├─ \`.chat-content\` (中间消息区, 背景图在此)
-  │  └─ \`#messages-container\` (滚动容器)
-  │     └─ \`.message-wrapper\` (单条消息包裹层, .sent/.received)
-  │        ├─ \`.time-divider\` (时间分割线, 可选)
-  │        ├─ \`.system-notice\` (系统消息, 可选)
-  │        └─ \`.message-content-row\` (头像+气泡容器, flex-row)
-  │           ├─ \`.message-avatar\` (头像, 40px)
-  │           └─ \`.message-main-content\` (气泡包裹层)
-  │              ├─ \`.group-sender-name\` (群聊名字+状态)
-  │              └─ \`.message\` (气泡本体, 包含 .text/.photo 等)
-  │                 └─ \`.message-reactions\` (表态丸)
-  │
-  └─ \`.input-container-wrapper\` (底部输入区)
-     └─ \`.wechat-footer\` (flex-row)
-        ├─ \`.footer-icon\` (语音/表情/加号按钮)
-        └─ \`#footer-message-input\` (输入框)
-
-## 4.‌ 朋友圈 (Moments Tab)
-- 容器 ID: \`#tab-content-moments\`
-  ├─ \`.moments-title-bar\` (顶栏)
-  │  └─ \`#moments-user-persona-select\` (身份切换下拉框)
-  └─ \`.moments-feed\` (滚动流)
-     └─ \`.post-card\` (单条动态卡片)
-        ├─ \`.post-header\` (头像+名字+时间)
-        │  ├─ \`.post-avatar\`
-        │  └─ \`.post-author-info\`
-        ├─ \`.post-body\` (正文+图片网格)
-        │  ├─ \`.post-content-text\`
-        │  └─ \`.moments-photo-grid\` (九宫格图片)
-        └─ \`.interactions-section\` (点赞评论区, 灰色背景)
-           ├─ \`.reactions-list\` (点赞列表)
-           └─ \`.comments-list\` (评论列表)
-
-## 5.‌ 底部导航栏 (Global Navbar)
-- 容器类: \`.main-app-navbar\` (flex-row)
-  └─ \`.nav-item\` (单个按钮, .active 为激活态)
-     ├─ \`svg\` (图标)
-     └─ \`span\` (文字: 消息/朋友圈/直播/兔区)
-
-## 6.‌ CSS 变量 (Variables - 牵一发而动全身)
-- \`--primary-color\`: #28a745 (主题绿)
-- \`--light-gray\`: #f0f0f0 (通用边框色)
-- \`--page-background\`: #f9f9f9 (页面底色)
-- \`--chat-bg\`: (聊天背景图)
-
-## 7.‌ 麦格的美化逻辑指南 (Mag's Logic)
-1.  **改布局:** 如果用户想左右互换，找父级容器加 \`flex-direction: row-reverse\`.
-2.  **去分割线:** 绝大多数分割线都是 \`border-bottom\`.
-3.  **改气泡:** 气泡颜色由 \`.message.sent\` (绿) 和 \`.message.received\` (白) 控制。
-4.  **透明化:** 使用 \`background: rgba(255,255,255,0.x)\` 和 \`backdrop-filter: blur(10px)\`.
-5.  **强制生效:** 必须在所有属性后加 \`!important\`.`
-            };
+            
 
 
 
@@ -17434,12 +17360,6 @@ You MUST use the custom \`<dm>\` tag format.
                 localStorage.setItem('app_wb_initialized', 'true');
             }
 
-            // 【核心修改】改为：只有不存在时才添加，不再强制同步
-            const existingDocsIdx = entries.findIndex(e => e.name === CSS_DOCS_PRESET.name);
-            if (existingDocsIdx === -1) {
-                // 只有找不到该条目时，才从源码添加
-                entries.push(CSS_DOCS_PRESET);
-            }
 
 
 
@@ -37604,9 +37524,10 @@ function saveSettings() {
             document.getElementById('global-css-import-btn').addEventListener('click', () => {
                 const fileInput = document.createElement('input');
                 fileInput.type = 'file';
-                fileInput.accept = '.txt'; // 只接受 .txt 文件
-                fileInput.multiple = true; // 允许选择多个文件
-fileInput.style.display = 'none';
+                // 【核心修改】：放开限制，支持 .txt, .css 和 .zip
+                fileInput.accept = '.txt,.css,.zip'; 
+                fileInput.multiple = true; 
+                fileInput.style.display = 'none';
 
                 fileInput.onchange = async (e) => {
                     const files = e.target.files;
@@ -37615,48 +37536,64 @@ fileInput.style.display = 'none';
                     let newCount = 0;
                     let updatedCount = 0;
 
-                    for (const file of files) {
-                        const reader = new FileReader();
-                        // 使用 Promise 来处理异步读取
-                        const content = await new Promise((resolve, reject) => {
-                            reader.onload = (event) => resolve(event.target.result);
-                            reader.onerror = (error) => reject(error);
-                            reader.readAsText(file);
-                        });
-
-                        // 从文件名中提取片段名称
-                        const name = file.name.replace(/\.txt$/, '').trim();
-                        const css = content;
-
+                    // 内部辅助函数：处理单个片段的保存逻辑
+                    const processSnippet = (name, css) => {
                         if (name && css) {
                             const existingIndex = appearanceSettings.customCssSnippets.findIndex(s => s.name === name);
                             if (existingIndex > -1) {
-                                // 覆盖同名片段
                                 appearanceSettings.customCssSnippets[existingIndex].css = css;
                                 updatedCount++;
                             } else {
-                                // 添加新片段
                                 appearanceSettings.customCssSnippets.push({ name, css });
                                 newCount++;
                             }
+                        }
+                    };
+
+                    for (const file of files) {
+                        try {
+                            if (file.name.toLowerCase().endsWith('.zip')) {
+                                // --- 处理 ZIP 压缩包 ---
+                                const zip = await JSZip.loadAsync(file);
+                                for (const [filename, zipEntry] of Object.entries(zip.files)) {
+                                    // 只处理非目录且后缀为 .txt 或 .css 的文件
+                                    if (!zipEntry.dir && (filename.toLowerCase().endsWith('.txt') || filename.toLowerCase().endsWith('.css'))) {
+                                        const content = await zipEntry.async("string");
+                                        const cleanName = filename.split('/').pop().replace(/\.(txt|css)$/i, '').trim();
+                                        processSnippet(cleanName, content);
+                                    }
+                                }
+                            } else {
+                                // --- 处理单个 .txt 或 .css 文件 ---
+                                const content = await new Promise((resolve, reject) => {
+                                    const reader = new FileReader();
+                                    reader.onload = (event) => resolve(event.target.result);
+                                    reader.onerror = (error) => reject(error);
+                                    reader.readAsText(file);
+                                });
+                                const cleanName = file.name.replace(/\.(txt|css)$/i, '').trim();
+                                processSnippet(cleanName, content);
+                            }
+                        } catch (err) {
+                            console.error(`处理文件 ${file.name} 出错:`, err);
                         }
                     }
 
                     if (newCount > 0 || updatedCount > 0) {
                         saveSettings();
-                        applySettings(); // 重新应用设置以防万一
-                        renderPage();  // 刷新下拉列表
+                        applySettings();
+                        renderPage();
                         await conversationManager.customAlert(`导入完成！\n新增 ${newCount} 个片段。\n更新 ${updatedCount} 个片段。`);
                     } else {
-                        await conversationManager.customAlert('没有导入任何有效的文件。');
+                        await conversationManager.customAlert('未能识别有效内容，请确保文件是 .txt, .css 或包含它们的 .zip 包。');
                     }
-
-                    document.body.removeChild(fileInput);
+                    if (fileInput.parentElement) document.body.removeChild(fileInput);
                 };
 
                 document.body.appendChild(fileInput);
                 fileInput.click();
             });
+
 
             // ========================================================================
             // ================= 【【【 新增逻辑结束 】】】 ==========================
@@ -41929,6 +41866,31 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
 
             callerNameEl.textContent = contactName;
             setImageSrc(selfAvatarEl, myAvatar);
+
+            // 新增：尝试开启摄像头
+            const videoEl = document.getElementById('user-camera-stream');
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+                    .then(stream => {
+                        videoEl.srcObject = stream;
+                        videoEl.style.display = 'block';
+                        
+                        // 默认前置摄像头开启镜像
+                        videoEl.style.transform = 'scaleX(-1)';
+
+                        // 显示切换按钮
+                        const btn = document.getElementById('vc-switch-camera-btn');
+                        btn.style.display = 'flex';
+                        btn.style.visibility = 'visible';
+                        
+                        callState.localStream = stream; 
+                    })
+
+                    .catch(err => {
+                        console.warn("无法开启摄像头: ", err);
+                        videoEl.style.display = 'none';
+                    });
+            }
             
             if (initiator === 'user') {
                  callState.conversation.push({ sender: '{{user}}', text: '（发起通话）', timestamp: Date.now() });
@@ -41982,9 +41944,20 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 side: 'system',
                 text: `通话结束，时长 ${duration}`,
                 callData: callData
-            }, callState.chatId); // <<< 修复1：明确指定通话记录的归属
+            }, callState.chatId);
+
+            // 新增：关闭摄像头
+            if (callState.localStream) {
+                callState.localStream.getTracks().forEach(track => track.stop());
+                const videoEl = document.getElementById('user-camera-stream');
+                if (videoEl) {
+                    videoEl.srcObject = null;
+                    videoEl.style.display = 'none';
+                }
+            }
             
             callState.active = false;
+
             conversationManager.open(callState.chatId); // <<< 修复2：跳转到正确的聊天页面
         }
 
@@ -42011,9 +41984,17 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             prevBtn.disabled = index === 0;
             nextBtn.disabled = index >= dialogues.length - 1;
         }
-        async function addUserReply(text) {
-            callState.conversation.push({ sender: '{{user}}', text: text, timestamp: Date.now() });
+        // 修改：接收第二个参数 imageBase64
+        async function addUserReply(text, imageBase64 = null) {
+            // 【核心修改】直接保存图片数据 imgData
+            callState.conversation.push({ 
+                sender: '{{user}}', 
+                text: text, 
+                timestamp: Date.now(),
+                imgData: imageBase64 // 如果有截图，直接存 Base64，没有则是 null
+            });
             showDanmaku(text);
+
 
             const typingIndicator = page.querySelector('.typing-indicator-vc');
             dialogueTextEl.textContent = '...';
@@ -42068,9 +42049,15 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                     fullSystemPrompt += `[END OF PREVIOUS CALLS]\n`;
                 }
 
-                // C. 注入当前通话场景指令
+                // C. 注入当前通话场景指令 (含图片描述协议)
                 fullSystemPrompt += `\n\n[SCENE: VIDEO CALL - DIRECTOR'S NOTES]\nYou are in a live video call. Your response must be engaging and in-character. To hang up, you MUST end your response with the command \`[hang_up_call]\`.\n`;
                 fullSystemPrompt += "You MUST respond in Simplified Chinese (简体中文).\n";
+
+                // 【核心修改】删除了图片描述协议，只保留一句简单的提示
+                fullSystemPrompt += `
+[IMAGE PROTOCOL]
+If the user sends an image/screenshot, simply react to it naturally in your dialogue. Do NOT generate any description tags.
+`;
 
                 if (chatInfo.preamble) {
 
@@ -42161,9 +42148,36 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const apiPayloadHistory = await conversationManager.prepareApiPayload(recentChatHistory, chatId);
                 finalMessages.push(...apiPayloadHistory);
 
-                callState.conversation.forEach(msg => {
+                // 新增：截取当前视频帧函数
+                const captureFrame = () => {
+                    const v = document.getElementById('user-camera-stream');
+                    if (v && v.style.display !== 'none') {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = v.videoWidth;
+                        canvas.height = v.videoHeight;
+                        canvas.getContext('2d').drawImage(v, 0, 0);
+                        return canvas.toDataURL('image/jpeg', 0.5);
+                    }
+                    return null;
+                };
+                const currentFrame = captureFrame();
+
+                callState.conversation.forEach((msg, idx) => {
+                    const isLastMessage = (idx === callState.conversation.length - 1);
                     const role = msg.sender === '{{user}}' ? 'user' : 'assistant';
-                    finalMessages.push({ role, content: msg.text });
+                    
+                    // 核心修改：如果是用户发的最后一条消息，且截到了图，则带上图片
+                    if (role === 'user' && isLastMessage && currentFrame) {
+                        finalMessages.push({
+                            role: "user",
+                            content: [
+                                { type: "text", text: msg.text + " (Note: You can see my current camera frame attached to this message.)" },
+                                { type: "image_url", image_url: { url: currentFrame } }
+                            ]
+                        });
+                    } else {
+                        finalMessages.push({ role, content: msg.text });
+                    }
                 });
 
                 // --- 2. API 请求逻辑 (Gemini/OpenAI 兼容修正) ---
@@ -42366,10 +42380,46 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 const apiPayloadHistory = await conversationManager.prepareApiPayload(fullHistoryForCalls.slice(-memoryLength), chatId);
                 finalMessages.push(...apiPayloadHistory);
 
-                // 8. 注入当前通话记录
-                callState.conversation.forEach(msg => {
-                    finalMessages.push({ role: msg.sender === '{{user}}' ? 'user' : 'assistant', content: msg.text });
+                // 8. 注入当前通话记录 (带摄像头截图逻辑)
+                // 新增：截取当前视频帧函数
+                const captureFrame = () => {
+                    const v = document.getElementById('user-camera-stream');
+                    // 必须确保视频元素存在、可见且有宽度
+                    if (v && v.style.display !== 'none' && v.videoWidth > 0) {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = v.videoWidth;
+                        canvas.height = v.videoHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(v, 0, 0);
+                        // 压缩为 JPEG 格式，质量 0.6，防止 Token 爆炸
+                        return canvas.toDataURL('image/jpeg', 0.6);
+                    }
+                    return null;
+                };
+                
+                // 移除旧的自动截图逻辑，直接使用传入的 imageBase64
+
+                callState.conversation.forEach((msg, idx) => {
+                    const role = msg.sender === '{{user}}' ? 'user' : 'assistant';
+                    
+                    // 【核心修改】根据 hasSnapshot 标记判断是否携带图片
+                    // 并且直接使用 currentFrame (因为是实时截取的)，或者你可以透传 imageBase64
+                    if (role === 'user' && msg.hasSnapshot && currentFrame) {
+                        finalMessages.push({
+                            role: "user",
+                            content: [
+                                // 提示 AI 这张图是用户在视频通话中展示的
+                                { type: "text", text: msg.text + " (Note: The user manually captured and sent this frame from their camera feed. React to what you see.)" },
+                                { type: "image_url", image_url: { url: currentFrame } }
+                            ]
+                        });
+                    } else {
+                        // 普通文本消息
+                        finalMessages.push({ role: role, content: msg.text });
+                    }
                 });
+
+
 
                 // --- API 请求 ---
                 let chatUrl, requestBody, requestHeaders;
@@ -42389,11 +42439,32 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 let aiResponse = profile.url.includes('googleapis.com') ? data.candidates?.[0]?.content?.parts?.[0]?.text : data.choices?.[0]?.message?.content;
 
                 if (aiResponse) {
+                    // 1. 清洗思考标签
                     aiResponse = aiResponse.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '').trim();
-                    aiResponse = aiResponse.replace('[hang_up_call]', '').trim();
-                    addAiDialogue(aiResponse);
+                    
+                    // 【核心修改】删除了提取 <video_call_img_desc> 和回填 msg.text 的所有逻辑
+                    // 现在什么都不用做，直接处理挂断或显示即可
+
+                    // 4. 处理挂断指令
+
+                    if (aiResponse.includes('[hang_up_call]')) {
+                        const lastWords = aiResponse.replace('[hang_up_call]', '').trim();
+                        if (lastWords) {
+                            addAiDialogue(lastWords); 
+                        }
+                        endCall();
+                        return; 
+                    }
+
+                    // 5. 显示 AI 回复 (此时 aiResponse 里的标签已经被第2步删干净了)
+                    if (aiResponse && aiResponse.trim()) {
+                        addAiDialogue(aiResponse.trim());
+                    }
                 }
+
+
             } catch (error) {
+
                 console.error(error);
             } finally {
                 typingIndicator.classList.add('hidden');
@@ -42694,6 +42765,11 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                         </div>
                     `;
 
+                    // 【核心新增】检查是否有图片数据
+                    const imgHtml = msg.imgData 
+                        ? `<img src="${msg.imgData}" style="max-width: 150px; border-radius: 8px; margin-top: 5px; display: block; border: 1px solid rgba(255,255,255,0.2);">` 
+                        : '';
+
                     entry.innerHTML = `
                         <div class="call-history-content">
                             <!-- 按钮被移动到最前面 -->
@@ -42703,6 +42779,7 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                             <div class="call-history-bubble-wrapper">
                                 <div class="call-history-bubble">
                                     <p class="call-history-text">${msg.text}</p>
+                                    ${imgHtml} <!-- 在这里插入图片 -->
                                 </div>
                                 <div class="call-history-timestamp">${formatCallTime(msg.timestamp)}</div>
                             </div>
@@ -42837,13 +42914,78 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
                 }
             });
 
-            replyModal.querySelector('.cancel').addEventListener('click', () => replyModal.classList.remove('visible'));
+            // 截图逻辑变量
+            let currentVcImageBase64 = null;
+            const vcCaptureBtn = document.getElementById('vc-manual-capture-btn');
+            const vcImgPreviewBox = document.getElementById('vc-reply-img-preview');
+            const vcImgPreviewImg = vcImgPreviewBox.querySelector('img');
+            const vcClearImgBtn = document.getElementById('vc-clear-img-btn');
+
+            // 绑定截图按钮
+            vcCaptureBtn.addEventListener('click', () => {
+                const videoEl = document.getElementById('user-camera-stream');
+                
+                // 检查摄像头是否开启
+                if (!videoEl || videoEl.style.display === 'none' || videoEl.videoWidth === 0) {
+                    alert("无法截图：摄像头未开启或未授权。");
+                    return;
+                }
+
+                // 执行截图
+                const canvas = document.createElement('canvas');
+                canvas.width = videoEl.videoWidth;
+                canvas.height = videoEl.videoHeight;
+                const ctx = canvas.getContext('2d');
+                // 核心修改：根据 transform 样式判断
+                // 如果是前置(scaleX(-1))，截图时需要翻转回来才是正的
+                // 如果是后置(scaleX(1))，直接截取就是正的
+                
+                const isMirrored = videoEl.style.transform.includes('scaleX(-1)');
+                
+                if (isMirrored) {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
+                
+                ctx.drawImage(videoEl, 0, 0);
+
+
+                
+                // 存为 Base64
+                currentVcImageBase64 = canvas.toDataURL('image/jpeg', 0.6);
+                
+                // 显示预览
+                vcImgPreviewImg.src = currentVcImageBase64;
+                vcImgPreviewBox.style.display = 'block';
+            });
+
+            // 清除截图
+            vcClearImgBtn.addEventListener('click', () => {
+                currentVcImageBase64 = null;
+                vcImgPreviewBox.style.display = 'none';
+            });
+
+            // 取消按钮
+            replyModal.querySelector('.cancel').addEventListener('click', () => {
+                replyModal.classList.remove('visible');
+                currentVcImageBase64 = null;
+                vcImgPreviewBox.style.display = 'none';
+            });
             
+            // 发送按钮
             document.getElementById('video-call-send-btn').addEventListener('click', () => {
                 const input = replyModal.querySelector('#video-call-reply-input');
-                if (input.value.trim()) {
-                    addUserReply(input.value.trim());
+                const text = input.value.trim();
+                
+                // 只要有文字或者有图片，就可以发送
+                if (text || currentVcImageBase64) {
+                    // 传入文本和图片数据
+                    addUserReply(text, currentVcImageBase64);
+                    
+                    // 清空状态
                     input.value = '';
+                    currentVcImageBase64 = null;
+                    vcImgPreviewBox.style.display = 'none';
                 }
                 replyModal.classList.remove('visible');
             });
@@ -42865,11 +43007,49 @@ const nextBtn = page.querySelector('#vc-bottom-next-btn');
             const changeBgBtn = document.getElementById('change-vc-bg-btn');
             if(changeBgBtn) changeBgBtn.addEventListener('click', handleChangeBackground);
             
-            const vcRegenerateBtn = page.querySelector('#vc-regenerate-btn');
-            vcRegenerateBtn.addEventListener('click', async (e) => {
-                e.stopPropagation(); 
-                await regenerateLastAiDialogue(); 
-            });
+            // 【核心修复】切换前后摄像头逻辑
+            const switchBtn = document.getElementById('vc-switch-camera-btn');
+            let currentFacingMode = 'user'; // 默认为前置 'user'，后置为 'environment'
+
+            const handleSwitchCamera = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // 1. 停止当前视频流
+                if (callState.localStream) {
+                    callState.localStream.getTracks().forEach(track => track.stop());
+                }
+
+                // 2. 切换模式
+                currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+                
+                // 3. 重新获取视频流
+                const videoEl = document.getElementById('user-camera-stream');
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: currentFacingMode }, 
+                        audio: false 
+                    });
+                    
+                    videoEl.srcObject = stream;
+                    videoEl.style.display = 'block';
+                    callState.localStream = stream;
+
+                    // 4. 自动调整镜像：前置开启镜像，后置关闭镜像
+                    if (currentFacingMode === 'user') {
+                        videoEl.style.transform = 'scaleX(-1)';
+                    } else {
+                        videoEl.style.transform = 'scaleX(1)';
+                    }
+
+                } catch (err) {
+                    console.error("切换摄像头失败:", err);
+                    alert("切换失败，请检查摄像头权限。");
+                }
+            };
+
+            switchBtn.addEventListener('click', handleSwitchCamera);
+            switchBtn.addEventListener('touchend', handleSwitchCamera);
         }
 
         return { init, startCall, showHistoryModal };
