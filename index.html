@@ -36627,35 +36627,21 @@ function saveSettings() {
             if (!result || result.value === 'cancel' || result.value === 'close') return;
 
             if (result.value === 'upload') {
-                // --- 逻辑 A: 本地上传 (iOS 修复版) ---
+                // --- 逻辑 A: 本地上传 (iOS 兼容性修复版) ---
                 const fileInput = document.createElement('input');
                 fileInput.type = 'file';
+                fileInput.style.display = 'none'; // 保持隐藏
+                fileInput.accept = '.ttf,.otf,.woff,.woff2';
                 
-                // 【核心修复 1】iOS 对 .ttf/.woff 识别很差，改为 '*' 允许选择所有文件
-                // 用户在“文件”APP里自己选字体文件即可
-                fileInput.accept = '*'; 
-                
-                // 隐藏它
-                fileInput.style.display = 'none';
+                // 【核心修复】：必须将 input 插入到页面里，苹果手机才会允许弹出选择框
+                document.body.appendChild(fileInput);
 
                 fileInput.onchange = async (e) => {
                     const file = e.target.files[0];
                     if (!file) {
-                        // 清理 DOM
-                        document.body.removeChild(fileInput);
+                        if (fileInput.parentElement) document.body.removeChild(fileInput);
                         return;
                     }
-
-                    // 简单的后缀检查，防止用户选错图片或视频
-                    const fileName = file.name.toLowerCase();
-                    if (!fileName.endsWith('.ttf') && !fileName.endsWith('.otf') && !fileName.endsWith('.woff') && !fileName.endsWith('.woff2')) {
-                        alert('格式错误！请选择 .ttf, .otf, .woff 或 .woff2 格式的字体文件。');
-                        document.body.removeChild(fileInput);
-                        return;
-                    }
-
-                    // 正在处理提示
-                    await conversationManager.customAlert(`正在处理字体：${file.name}，请稍候...`);
 
                     // 【关键】：自动获取文件名（去掉后缀）
                     let fontName = file.name.replace(/\.[^/.]+$/, "");
@@ -36676,24 +36662,20 @@ function saveSettings() {
                         saveSettings();
                         await applySettings();
                         renderPage();
-                        
-                        // 移除 input
-                        document.body.removeChild(fileInput);
-                        
                         await conversationManager.customAlert(`字体 "${finalName}" 已添加并应用！`);
                     } catch (err) {
-                        document.body.removeChild(fileInput);
                         alert('保存失败: ' + err.message);
+                    } finally {
+                        // 任务完成，移除控件
+                        if (fileInput.parentElement) document.body.removeChild(fileInput);
                     }
                 };
-
-                // 【核心修复 2】iOS 必须把 input 真的加到页面上才能触发点击
-                document.body.appendChild(fileInput);
                 
                 // 触发点击
                 fileInput.click();
 
             } else if (result.value === 'url') {
+
                 // --- 逻辑 B: 输入链接（保持手动命名） ---
                 const fontName = await conversationManager.showContentInputModal({ 
                     title: '字体命名', 
@@ -36722,7 +36704,6 @@ function saveSettings() {
                 }
             }
         }
-
         
                 // --- 【修复版：字体管理器 (带滚动 + 编辑内容)】 ---
         async function showFontManagerModal() {
@@ -44738,9 +44719,18 @@ const cloudBackupManager = (function() {
     }
 
     async function performBackup(isAuto = false) {
+        // 【核心新增 1】备份开始时，强制启动后台保活 (播放静音音频)
+        // 这能防止你切屏去回微信时，浏览器把上传任务杀掉
+        if (typeof conversationManager !== 'undefined') {
+            conversationManager.enableKeepAlive();
+            console.log("☁️ 云端备份：已启动后台保活模式");
+        }
+
         var info = getRepoInfo();
         if (!info) {
             if (!isAuto) alert("请先填写仓库链接和Token！");
+            // 失败也要记得关掉保活
+            if (typeof conversationManager !== 'undefined') conversationManager.disableKeepAlive();
             return;
         }
 
@@ -44759,7 +44749,8 @@ const cloudBackupManager = (function() {
             const APP_DATA_PREFIXES = [ 
                 'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
                 'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
-                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_' 
+                'tuqu_', 'token_usage_', 'blacklist_reply_count_',
+                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_' 
             ];
 
             // 1. 准备文本数据和图片引用列表
@@ -44795,12 +44786,13 @@ const cloudBackupManager = (function() {
                 }
             }
 
-            for (const chat of chatListForBackup) {
-                const convKey = `conversation_${chat.id}`;
-                if (!allTextData[convKey]) {
-                    const convDb = await imageStore.getItem(convKey);
-                    // 注意：从数据库读出来的是对象，要转成字符串才能上传到 GitHub 的 data.json
-                    if (convDb) allTextData[convKey] = JSON.stringify(convDb);
+            if (chatListForBackup) {
+                for (const chat of chatListForBackup) {
+                    const convKey = `conversation_${chat.id}`;
+                    if (!allTextData[convKey]) {
+                        const convDb = await imageStore.getItem(convKey);
+                        if (convDb) allTextData[convKey] = JSON.stringify(convDb);
+                    }
                 }
             }
 
@@ -44812,6 +44804,20 @@ const cloudBackupManager = (function() {
             if (!allTextData['app-stickers']) {
                 const stickersDb = await imageStore.getItem('app-stickers');
                 if (stickersDb) allTextData['app-stickers'] = JSON.stringify(stickersDb);
+            }
+
+            // 【核心新增】捞取小说内容
+            const bookshelf = loadFromLocalStorage('app_novel_bookshelf', []);
+            for (const book of bookshelf) {
+                try {
+                    const bookContent = await imageStore.getItem(`novel_data_${book.id}`);
+                    if (bookContent) {
+                        // 注意：小说内容是对象，需要转字符串
+                        allTextData[`novel_data_${book.id}`] = JSON.stringify(bookContent);
+                    }
+                } catch (e) {
+                    console.warn(`Failed to export novel content for ${book.title}`, e);
+                }
             }
 
             // 2. 获取 GitHub 上已有的文件列表（用于获取 SHA）
@@ -44848,8 +44854,8 @@ const cloudBackupManager = (function() {
                 if (statusEl) statusEl.textContent = `正在同步图片 (${count}/${total})...`;
                 
                 const blobSha = getSha(existingBlobs, blobKey);
-                // 如果 GitHub 上已经有这个文件且 SHA 存在，理论上可以跳过（此处为了绝对安全选择覆盖或根据逻辑跳过）
-                // 这里我们简单处理：获取本地数据，如果本地有，就上传
+                
+                // 检查本地是否有这个图片
                 const blob = await imageStore.getItem(blobKey);
                 if (blob) {
                     const base64 = await new Promise(resolve => {
@@ -44890,8 +44896,15 @@ const cloudBackupManager = (function() {
                 statusEl.textContent = `❌ 备份失败: ${e.message}`;
             }
             if (!isAuto) alert("备份失败: " + e.message);
+        } finally {
+            // 【核心新增 2】无论成功还是失败，最后都要关闭后台保活，释放资源
+            if (typeof conversationManager !== 'undefined') {
+                conversationManager.disableKeepAlive();
+                console.log("☁️ 云端备份：保活已关闭");
+            }
         }
     }
+
     async function performRestore() {
         var info = getRepoInfo();
         if (!info) return alert("请先填写仓库链接和Token！");
