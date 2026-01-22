@@ -19639,7 +19639,8 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
             
             const savedBg = loadFromLocalStorage(`chat_bg_${chatState.chatId}`, null);
             if (savedBg) {
-                chatContent.style.backgroundImage = `url('${savedBg}')`;
+                // 使用强大的 setImageSrc 自动处理 URL 或 indexeddb 引用
+                await setImageSrc(chatContent, savedBg);
             } else {
                 chatContent.style.backgroundImage = '';
             }
@@ -30115,12 +30116,56 @@ headerMoreBtn.addEventListener('click', async () => {
                 break;
 
             case 'change_bg':
-                const url = await showContentInputModal({title: '更换背景', placeholder: '请输入新的背景图片链接'});
-                if (url && url.trim() !== '') { 
-                    const img = new Image(); 
-                    img.onload = () => { chatContent.style.backgroundImage = `url('${url.trim()}')`; saveToLocalStorage(`chat_bg_${chatState.chatId}`, url.trim()); customAlert('背景已成功更换。'); }; 
-                    img.onerror = () => { customAlert('图片链接无效，无法加载背景。'); }; 
-                    img.src = url.trim(); 
+                // 1. 弹出选择框，让用户选本地还是链接
+                const bgChoice = await showCustomModal({
+                    title: '更换聊天背景',
+                    buttons: [
+                        { text: '本地上传', value: 'local', class: 'primary' },
+                        { text: '链接导入', value: 'link', class: 'secondary' },
+                        { text: '取消', value: 'cancel', class: 'secondary' }
+                    ]
+                });
+
+                if (!bgChoice || bgChoice.value === 'cancel' || bgChoice.value === 'close') return;
+
+                if (bgChoice.value === 'link') {
+                    // --- 链接导入逻辑 ---
+                    const url = await showContentInputModal({title: '更换背景', placeholder: '请输入新的背景图片链接'});
+                    if (url && url.trim() !== '') { 
+                        const img = new Image(); 
+                        img.onload = () => { 
+                            chatContent.style.backgroundImage = `url('${url.trim()}')`; 
+                            saveToLocalStorage(`chat_bg_${chatState.chatId}`, url.trim()); 
+                            customAlert('背景已成功更换。'); 
+                        }; 
+                        img.onerror = () => { customAlert('图片链接无效，无法加载背景。'); }; 
+                        img.src = url.trim(); 
+                    }
+                } else {
+                    // --- 本地上传逻辑 (适配苹果手机) ---
+                    const fileInput = document.createElement('input');
+                    fileInput.type = 'file';
+                    fileInput.accept = 'image/*';
+                    fileInput.onchange = async (e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+
+                        const dbKey = `chat-bg-${chatState.chatId}-${Date.now()}`;
+                        const indexedDbRef = `indexeddb:${dbKey}`;
+                        try {
+                            // 存入 IndexedDB
+                            await imageStore.setItem(dbKey, file);
+                            // 保存引用到本地存储
+                            saveToLocalStorage(`chat_bg_${chatState.chatId}`, indexedDbRef);
+                            // 立即应用到当前界面
+                            await setImageSrc(chatContent, indexedDbRef);
+                            customAlert('本地背景已成功应用！');
+                        } catch (error) {
+                            console.error(error);
+                            alert("图片保存失败，请检查存储空间。");
+                        }
+                    };
+                    fileInput.click();
                 }
                 break;
 
