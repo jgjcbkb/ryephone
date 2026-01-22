@@ -10402,28 +10402,49 @@ if ('serviceWorker' in navigator) {
         }
 
         async function handleImportDefaultCover() {
-            const confirmed = await conversationManager.customConfirm('是否要从本地导入一张图片作为“全局默认封面”？\n(当歌曲没有自带封面时将显示此图)');
-            if (!confirmed) return;
+            // 核心修复：iOS 不允许在长按的异步回调中直接触发 file.click()
+            // 我们必须先弹出一个确认框，利用“透明插件法”让用户的第二次点击来触发相册
+            await conversationManager.showCustomModal({
+                title: '设置默认封面',
+                text: '是否要从本地导入一张图片作为“全局默认封面”？\n(当歌曲没有自带封面时将显示此图)',
+                buttons: [
+                    { text: '选择图片', value: 'upload', class: 'primary' },
+                    { text: '取消', value: 'cancel', class: 'secondary' }
+                ],
+                onRender: (modalDOM, closeModal) => {
+                    const uploadBtn = modalDOM.querySelector('button[data-value="upload"]');
+                    if (uploadBtn) {
+                        // 核心修复：在“选择图片”按钮上覆盖一个完全透明的 input
+                        const fileInput = document.createElement('input');
+                        fileInput.type = 'file';
+                        fileInput.accept = 'image/*';
+                        fileInput.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:10;';
+                        
+                        uploadBtn.style.position = 'relative';
+                        uploadBtn.style.overflow = 'hidden';
+                        uploadBtn.appendChild(fileInput);
 
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = 'image/*';
-            fileInput.onchange = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
+                        // 用户点击按钮时，实际上点到了 input，iOS 100% 允许弹出相册
+                        fileInput.onchange = async (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            
+                            closeModal(); // 选完文件后关闭弹窗
 
-                const dbKey = `music-default-cover-${Date.now()}`;
-                try {
-                    await imageStore.setItem(dbKey, file);
-                    customDefaultCover = `indexeddb:${dbKey}`;
-                    saveToLocalStorage('app_music_default_cover', customDefaultCover);
-                    renderPlayer(); // 立即刷新显示
-                    alert('全局默认封面设置成功！');
-                } catch (err) {
-                    alert('保存失败: ' + err.message);
+                            const dbKey = `music-default-cover-${Date.now()}`;
+                            try {
+                                await imageStore.setItem(dbKey, file);
+                                customDefaultCover = `indexeddb:${dbKey}`;
+                                saveToLocalStorage('app_music_default_cover', customDefaultCover);
+                                renderPlayer(); // 刷新播放器显示
+                                window.showNotification('全局默认封面已更新');
+                            } catch (err) {
+                                alert('保存失败: ' + err.message);
+                            }
+                        };
+                    }
                 }
-            };
-            fileInput.click();
+            });
         }
 
         function toggleLyricsView() { isLyricsView = !isLyricsView; widget.querySelector('.music-flip-container').classList.toggle('show-lyrics', isLyricsView); }
@@ -10625,19 +10646,16 @@ if ('serviceWorker' in navigator) {
             const listHtml = playlist.length > 0 ? playlist.map((s, i) => `<div class="music-list-item ${i === currentIndex ? 'active' : ''}" data-index="${i}"><div class="music-list-item-info"><span class="music-list-item-title">${s.title}</span><span class="music-list-item-artist">${s.artist}</span></div><div class="music-list-item-actions">${s.type === 'online' ? `<button class="download-playlist-btn" data-index="${i}">下</button>` : ''}<button class="upload-cloud-btn" data-index="${i}" title="上传到云端">云</button><button class="import-cover-btn" data-index="${i}">图</button><button class="import-lrc-btn" data-index="${i}">词</button><button class="delete-song-btn" data-index="${i}">删</button></div></div>`).join('') : '<p>歌单为空</p>';
             await conversationManager.showCustomModal({ 
                 title: `播放列表 (${playlist.length})`,
-                html: `<div style="max-height:300px; overflow-y:auto;">${listHtml}</div><div style="display:flex; gap:10px; margin-top: 15px; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 20px;"><button id="import-local" class="modal-button secondary" style="flex:1;">导入本地</button><button id="import-link" class="modal-button secondary" style="flex:1;">添加链接</button></div>`, 
+                // 核心修改：在下方按钮组中增加了一个 id 为 search-online 的按钮，并调整了布局以容纳三个按钮
+                html: `<div style="max-height:300px; overflow-y:auto;">${listHtml}</div><div style="display:flex; flex-wrap:wrap; gap:10px; margin-top: 15px; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 20px;"><button id="import-local" class="modal-button secondary" style="flex:1; min-width:80px;">导入本地</button><button id="import-link" class="modal-button secondary" style="flex:1; min-width:80px;">添加链接</button><button id="search-online" class="modal-button primary" style="flex:1; min-width:80px;">搜索网络</button></div>`, 
                 buttons: [{ text: '关闭', value: 'close', class: 'secondary' }], 
                 onRender: (dom, close) => {
-                const titleEl = dom.querySelector('.modal-title');
-                if (titleEl) {
-                    let clickCount = 0;
-                    titleEl.style.cursor = 'default';
-                    titleEl.onclick = () => {
-                        clickCount++;
-                        if (clickCount === 7) {
-                            close();
-                            showOnlineSearchModal();
-                        }
+                // 核心修改：删除了原本在 .modal-title 上的 7 次连点逻辑，改为直接监听新按钮的点击
+                const searchOnlineBtn = dom.querySelector('#search-online');
+                if (searchOnlineBtn) {
+                    searchOnlineBtn.onclick = () => {
+                        close(); // 先关闭播放列表弹窗
+                        showOnlineSearchModal(); // 打开搜索弹窗
                     };
                 }
                 dom.querySelectorAll('.music-list-item').forEach(el => el.onclick = (e) => { if(e.target.classList.contains('delete-song-btn') || e.target.classList.contains('import-lrc-btn') || e.target.classList.contains('import-cover-btn') || e.target.classList.contains('upload-cloud-btn') || e.target.classList.contains('download-playlist-btn')) return; currentIndex=parseInt(el.dataset.index); saveState(); loadSong(currentIndex, true); close(); });
