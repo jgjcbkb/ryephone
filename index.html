@@ -35548,10 +35548,17 @@ You are responsible for playing every AI character in the "Active Cast" list.`;
                                         fullContextPrompt += sharedHistoryPrompt + `\n[END OF SHARED MEMORIES]`;
                                     }
 
-                                    // --- 【核心修改】调整顺序：后注入群聊主历史 (群聊消息在后) ---
+                                    // --- 【核心修复】支持从数据库读取大容量历史记录 ---
                                     // 7. 注入主聊天记录上下文
                                     const memoryLength = parseInt(info.memoryLength || 20, 10);
-                                    const sourceMessages = loadFromLocalStorage(`conversation_${group.id}`, []);
+                                    
+                                    // 核心修复：增加数据库回退检查
+                                    let sourceMessages = loadFromLocalStorage(`conversation_${group.id}`, []);
+                                    if (sourceMessages.length === 0) {
+                                        const dbData = await imageStore.getItem(`conversation_${group.id}`);
+                                        if (dbData && Array.isArray(dbData)) sourceMessages = dbData;
+                                    }
+
                                     const recentMessages = memoryLength > 0 ? sourceMessages.slice(-memoryLength) : sourceMessages;
                                     // 【核心修改】传入 group.id，确保后台运行时也能正确识别名字
                                     const apiPayloadMessages = await conversationManager.prepareApiPayload(recentMessages, group.id);
@@ -35683,8 +35690,9 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
 <block type="text" sender="李四">别提了，头都大了。</block>
 <block type="text" sender="王五">（路过）哟，听起来有八卦？</block>
 `;
-                                    // 【核心修复】去掉前面的 let，直接赋值（因为上面已经声明过了）
-                                    finalSystemPrompt = fullContextPrompt + scenePrompt;
+                                    // 【终极修复】绝对禁止直接用 "=" 号！这会把之前注入的朋友圈(finalSystemPrompt)全部抹除！
+                                    // 我们必须把包含人设/记录的 fullContextPrompt，加上包含朋友圈的 finalSystemPrompt，再加上最后的任务指令
+                                    finalSystemPrompt = fullContextPrompt + finalSystemPrompt + scenePrompt; 
 
                                     // 【核心修复】增加 User 消息以适配所有模型，并支持 Gemini 格式
                                     const finalMessages = [
