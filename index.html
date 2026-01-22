@@ -16074,7 +16074,19 @@ conversationManager.showNotificationBanner('TUQU', {
             }
         }
     } catch (e) {
-        console.error(`[诊断日志] 角色 "${senderName}": 在执行AI触发器时遇到严重错误:`, e.message, e.stack);
+        let errorReason = e.message;
+        
+        // 翻译浏览器的“哑巴”报错
+        if (errorReason === 'Load failed' || errorReason === 'Failed to fetch') {
+            errorReason += " \n【可能原因】：\n1. API地址是 http 而不是 https（被浏览器拦截）。\n2. 跨域(CORS)被拦截。\n3. 网络断开或VPN不稳定。\n4. 手机锁屏导致网络挂起。";
+        }
+        
+        console.error(`[诊断日志] 角色 "${senderName}" 触发失败。\n错误信息: ${errorReason}\n当前使用的 API 配置索引: ${activeProfileIndex}`);
+        
+        // 如果是前台调试，弹个窗让用户知道挂了
+        if (!document.hidden) {
+            // window.showNotification(`⚠️ ${senderName} 想要行动但网络失败了`);
+        }
     } finally {
         // 【核心新增】无论成功还是报错，最后都要关闭保活，释放音频通道
         conversationManager.disableKeepAlive();
