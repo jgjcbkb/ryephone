@@ -10504,6 +10504,7 @@ if ('serviceWorker' in navigator) {
                     // 可以在这里加个 console.log 方便调试
                     console.log(`正在为《${song.title}》获取最新链接...`);
                     
+                    // 严格按照 GD 文档：types=url, source=[SOURCE], id=[TRACK ID]
                     const urlApi = `https://music-api.gdstudio.xyz/api.php?types=url&source=${song.apiSource}&id=${song.apiId}`;
                     const response = await fetch(urlApi);
                     const data = await response.json();
@@ -10581,7 +10582,8 @@ if ('serviceWorker' in navigator) {
         
         async function addSongByKeyword(keyword, senderName, targetChatId) {
             try {
-                // 1. 尝试 GD 源
+                // 1. 尝试 GD 源 (默认使用 netease，文档推荐的稳定源)
+                // 严格按照 GD 文档：types=search, source=netease, name=[KEYWORD], count=1
                 const searchUrl = `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(keyword)}&count=1`;
                 const response = await fetch(searchUrl);
                 const results = await response.json();
@@ -10589,11 +10591,17 @@ if ('serviceWorker' in navigator) {
                 if (results && results.length > 0) {
                     // GD 有结果，使用 GD
                     const s = results[0];
+                    
+                    // 严格按照 GD 文档获取详情：
+                    // URL 用 id (track_id)
+                    // Pic 用 pic_id
+                    // Lyric 用 lyric_id
                     const [urlRes, picRes, lyricRes] = await Promise.all([
                         fetch(`https://music-api.gdstudio.xyz/api.php?types=url&source=${s.source}&id=${s.id}`).then(r => r.json()),
                         fetch(`https://music-api.gdstudio.xyz/api.php?types=pic&source=${s.source}&id=${s.pic_id}`).then(r => r.json()),
                         fetch(`https://music-api.gdstudio.xyz/api.php?types=lyric&source=${s.source}&id=${s.lyric_id}`).then(r => r.json())
                     ]);
+                    
                     if (urlRes.url) {
                         const newSong = {
                             title: s.name,
@@ -10990,17 +10998,17 @@ if ('serviceWorker' in navigator) {
                                 }));
                             } else {
                                 // --- GD 音乐台搜索逻辑 ---
-                                // 将 count 设置为 100
-                                const res = await fetch(`https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(keyword)}&count=100`);
+                                // 严格按照 GD 文档：types=search, source=netease, name=[KEYWORD], count=20 (文档建议默认20，我们用20保证速度)
+                                const res = await fetch(`https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(keyword)}&count=20`);
                                 const json = await res.json();
 
                                 results = (json || []).map(s => ({
                                     name: s.name,
                                     artist: Array.isArray(s.artist) ? s.artist.join('/') : s.artist,
                                     id: s.id,
-                                    pic: s.pic_id, // GD 的 pic 需要后期解析
+                                    pic: s.pic_id, // 暂存 pic_id，稍后在添加时解析
                                     source: 'gd',
-                                    raw: s
+                                    raw: s // 保存原始对象，包含 lyric_id 等重要信息
                                 }));
                             }
 
@@ -11174,8 +11182,13 @@ if ('serviceWorker' in navigator) {
                                                 } else {
                                                     // 解析 GD
                                                     const s = song.raw;
+                                                    
+                                                    // 严格按照 GD 文档构造请求：
+                                                    // 获取歌曲：types=url, id=[TRACK ID]
                                                     const urlApi = `https://music-api.gdstudio.xyz/api.php?types=url&source=${s.source}&id=${s.id}`;
+                                                    // 获取图片：types=pic, id=[PIC ID]
                                                     const picApi = `https://music-api.gdstudio.xyz/api.php?types=pic&source=${s.source}&id=${s.pic_id}`;
+                                                    // 获取歌词：types=lyric, id=[LYRIC ID]
                                                     const lrcApi = `https://music-api.gdstudio.xyz/api.php?types=lyric&source=${s.source}&id=${s.lyric_id}`;
                                                     
                                                     const [u, p, l] = await Promise.all([fetch(urlApi).then(r=>r.json()), fetch(picApi).then(r=>r.json()), fetch(lrcApi).then(r=>r.json())]);
@@ -12396,6 +12409,79 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                     if (groupInfo.ensemblePersona) {
                          finalSystemPrompt += `\n\n[Additional Context from Your Group Chat "${sourceGroupChat.name}"]\nEnsemble Persona: ${groupInfo.ensemblePersona}`;
                     }
+                }
+
+                // 【核心修复：注入勾选的共享群聊记忆】
+                // 必须重新加载一次当前聊天的配置，确保读取到最新的 sharedGroupHistoryIds
+                const currentChatInfo = loadFromLocalStorage(`chat_info_${targetChatId}`, {});
+                const sharedGroupIds = currentChatInfo.sharedGroupHistoryIds || [];
+
+                if (sharedGroupIds.length > 0) {
+                    let sharedGroupPrompt = `\n\n[CRITICAL CONTEXT: SHARED GROUP MEMORIES]`;
+                    sharedGroupPrompt += `\nYou have access to the following group chat logs. Use them to maintain continuity with "${userNameForPrompt}".\n`;
+
+                    for (const groupId of sharedGroupIds) {
+                        const groupChat = chatList.find(c => c.id === groupId);
+                        if (groupChat) {
+                            // 【核心新增】读取该群聊的人设信息
+                            const groupInfo = loadFromLocalStorage(`chat_info_${groupId}`, {});
+                            sharedGroupPrompt += `\n--- Group Chat: "${groupChat.name}" Context ---`;
+                            
+                            // 1. 注入该群的群聊主角人设
+                            if (groupInfo.groupPersonas && groupInfo.groupPersonas.length > 0) {
+                                sharedGroupPrompt += `\n[Group Protagonists]:`;
+                                groupInfo.groupPersonas.forEach(p => {
+                                    sharedGroupPrompt += `\n- ${p.name}: ${p.description}`;
+                                });
+                            }
+                            
+                            // 2. 注入该群的群演人设
+                            if (groupInfo.ensemblePersona) {
+                                sharedGroupPrompt += `\n[Ensemble Persona]:\n${groupInfo.ensemblePersona}`;
+                            }
+
+                            // 3. 读取该群聊的历史记录
+                            let groupMsgs = loadFromLocalStorage(`conversation_${groupId}`, []);
+                            // 如果 LS 为空，尝试从数据库捞
+                            if (!groupMsgs || groupMsgs.length === 0) {
+                                try {
+                                    const dbData = await imageStore.getItem(`conversation_${groupId}`);
+                                    if (dbData && Array.isArray(dbData)) groupMsgs = dbData;
+                                } catch(e) {}
+                            }
+                            
+                            // 确保 groupMsgs 是数组
+                            if (!Array.isArray(groupMsgs)) groupMsgs = [];
+
+                            // 过滤并截取最近 25 条文本消息
+                            const recentGroupMsgs = groupMsgs
+                                .filter(m => m.type === 'text' && m.side !== 'system')
+                                .slice(-25); // 只取最后25条
+
+                            if (recentGroupMsgs.length > 0) {
+                                sharedGroupPrompt += `\n--- Group Chat: "${groupChat.name}" (Last 25 Messages) ---\n`;
+                                recentGroupMsgs.forEach(m => {
+                                    // 使用相同的清洗逻辑
+                                    let rawText = m.text || '';
+                                    const blockRegex = /(<div[\s\S]*?>[\s\S]*?<\/div>|<details[\s\S]*?>[\s\S]*?<\/details>|<snippet[\s\S]*?>[\s\S]*?<\/snippet>|\[[A-Z_]+\][\s\S]*?\[\/[A-Z_]+\])/g;
+                                    let cleanedText = rawText.replace(blockRegex, (matchedBlock) => {
+                                        if (matchedBlock.includes('data-ai-log-as-text="true"')) {
+                                            const tempDiv = document.createElement('div');
+                                            tempDiv.innerHTML = matchedBlock;
+                                            return tempDiv.textContent.trim();
+                                        }
+                                        return '';
+                                    }).trim();
+
+                                    if (cleanedText) {
+                                        const senderName = m.side === 'sent' ? userNameForPrompt : (m.sender || 'Unknown');
+                                        sharedGroupPrompt += `${senderName}: ${cleanedText}\n`;
+                                    }
+                                });
+                            }
+                        }
+                    }
+                    finalSystemPrompt += sharedGroupPrompt + `\n[END OF GROUP MEMORIES]\n`;
                 }
             }
             
@@ -18137,9 +18223,13 @@ info.myPersona = document.getElementById('my-persona').value.trim();
     const mountedWbNames = Array.from(mountedWbCheckboxes).map(cb => cb.value);
     saveToLocalStorage(`chat_mounted_wb_${currentChatId}`, mountedWbNames);
 
-    // 新增：保存共享私聊记录的成员名单
+    // 新增：保存共享私聊记录的成员名单 (群聊模式用)
     const sharedHistoryCheckboxes = document.querySelectorAll('.shared-history-checkbox:checked');
     info.sharedPrivateHistoryMembers = Array.from(sharedHistoryCheckboxes).map(cb => cb.value);
+
+    // 【核心新增】保存共享群聊记录的ID列表 (单聊模式用)
+    const sharedGroupCheckboxes = document.querySelectorAll('.shared-group-checkbox:checked');
+    info.sharedGroupHistoryIds = Array.from(sharedGroupCheckboxes).map(cb => cb.value);
 
     // START: 新增保存挂载的正则规则
 
@@ -19528,9 +19618,12 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
             const usageEl = document.getElementById('token-usage-display');
             if (usageEl) usageEl.style.display = 'none';
 
-            // 【核心修复】先清空当前消息列表，防止显示上一个人的消息
-            messagesContainer.innerHTML = '';
+            // 【【【 终极防串台修复 】】】
+            // 切换聊天时，必须在任何异步操作之前，立即、强制清空内存中的所有历史记录变量
+            // 防止在加载新数据的空窗期内，旧数据被错误地保存到新 ID 下
+            fullMessageHistory = []; // <--- 加上这一行！这是最关键的！
             chatState.messages = [];
+            messagesContainer.innerHTML = '';
 
             // 【核心修复】关键！增加 await，强制等待数据库读取完成
             await initializeFromStorage(chatId);
@@ -19553,12 +19646,23 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
         function saveConversation() {
             if (!chatState.chatId) return;
 
-    
+            // 【核心修复】保存保护锁
+            // 如果内存中的历史记录为空，且当前并不处于“新创建的空聊天”状态，则禁止保存
+            // 这能防止因为加载失败或加载延迟导致的“数据被清空”事故
+            if ((!fullMessageHistory || fullMessageHistory.length === 0)) {
+                // 只有当这是一个全新的聊天（列表里显示还没有消息）时，才允许保存空数组
+                const currentChatInList = chatList.find(c => c.id === chatState.chatId);
+                if (currentChatInList && currentChatInList.lastMessage !== '可以开始聊天了' && currentChatInList.lastMessage !== '群聊已创建') {
+                    console.warn("[安全拦截] 内存数据为空，阻止了可能导致数据丢失的保存操作。");
+                    return;
+                }
+            }
 
             console.log(`[诊断探针] 1. 开始执行 saveConversation，目标 chat ID: ${chatState.chatId}`);
             
             try {
                 const key = `conversation_${chatState.chatId}`;
+
                 
                 // 【核心修改】智能保存逻辑 (防复活版)
                 try {
@@ -22749,6 +22853,85 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
                     }
                 }
         
+                // --- 【核心新增：注入勾选的共享群聊记忆 (全场景生效)】 ---
+                // 只有在单聊模式下才执行此逻辑
+                if (!contactInfo.isGroup) {
+                    const currentChatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
+                    const sharedGroupIds = currentChatInfo.sharedGroupHistoryIds || [];
+
+                    if (sharedGroupIds.length > 0) {
+                        let sharedGroupPrompt = `\n\n[CRITICAL CONTEXT: SHARED GROUP MEMORIES]`;
+                        sharedGroupPrompt += `\nYou have access to the following group chat logs. Use them to maintain continuity with the events happening in these groups.\n`;
+
+                        for (const groupId of sharedGroupIds) {
+                            const groupChat = chatList.find(c => c.id === groupId);
+                            if (groupChat) {
+                                // 【核心新增】读取该群聊的人设信息
+                                const groupInfo = loadFromLocalStorage(`chat_info_${groupId}`, {});
+                                sharedGroupPrompt += `\n--- Group Chat: "${groupChat.name}" Context ---`;
+                                
+                                // 1. 注入该群的群聊主角人设
+                                if (groupInfo.groupPersonas && groupInfo.groupPersonas.length > 0) {
+                                    sharedGroupPrompt += `\n[Group Protagonists]:`;
+                                    groupInfo.groupPersonas.forEach(p => {
+                                        sharedGroupPrompt += `\n- ${p.name}: ${p.description}`;
+                                    });
+                                }
+                                
+                                // 2. 注入该群的群演人设
+                                if (groupInfo.ensemblePersona) {
+                                    sharedGroupPrompt += `\n[Ensemble Persona]:\n${groupInfo.ensemblePersona}`;
+                                }
+
+                                // 3. 读取该群聊的历史记录
+                                let groupMsgs = loadFromLocalStorage(`conversation_${groupId}`, []);
+                                // 如果 LS 为空，尝试从数据库捞
+                                if (!groupMsgs || groupMsgs.length === 0) {
+                                    try {
+                                        // 注意：这里需要 await，因为外层函数已经是 async 的
+                                        // 但为了不阻塞主线程太久，且考虑到这是在循环里，我们假设 imageStore.getItem 是快速的
+                                        // 或者更稳妥的做法是：如果 LS 没有，就跳过（因为正常聊天时数据应该在 LS 里）
+                                        // 为了保险，我们这里只读 LS，因为正常使用时 LS 应该有数据
+                                    } catch(e) {}
+                                }
+                                
+                                // 确保 groupMsgs 是数组
+                                if (!Array.isArray(groupMsgs)) groupMsgs = [];
+
+                                // 过滤并截取最近 25 条文本消息 (全员消息，不分你我)
+                                const recentGroupMsgs = groupMsgs
+                                    .filter(m => m.type === 'text' && m.side !== 'system')
+                                    .slice(-25); // 只取最后25条
+
+                                if (recentGroupMsgs.length > 0) {
+                                    sharedGroupPrompt += `\n--- Group Chat: "${groupChat.name}" (Last 25 Messages) ---\n`;
+                                    recentGroupMsgs.forEach(m => {
+                                        // 使用相同的清洗逻辑
+                                        let rawText = m.text || '';
+                                        const blockRegex = /(<div[\s\S]*?>[\s\S]*?<\/div>|<details[\s\S]*?>[\s\S]*?<\/details>|<snippet[\s\S]*?>[\s\S]*?<\/snippet>|\[[A-Z_]+\][\s\S]*?\[\/[A-Z_]+\])/g;
+                                        let cleanedText = rawText.replace(blockRegex, (matchedBlock) => {
+                                            if (matchedBlock.includes('data-ai-log-as-text="true"')) {
+                                                const tempDiv = document.createElement('div');
+                                                tempDiv.innerHTML = matchedBlock;
+                                                return tempDiv.textContent.trim();
+                                            }
+                                            return '';
+                                        }).trim();
+
+                                        if (cleanedText) {
+                                            // 【核心修复】显示真实的发送者名字
+                                            const senderName = m.side === 'sent' ? userNameForPrompt : (m.sender || 'Unknown');
+                                            sharedGroupPrompt += `${senderName}: ${cleanedText}\n`;
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                        finalSystemPrompt += sharedGroupPrompt + `\n[END OF GROUP MEMORIES]\n`;
+                    }
+                }
+                // --- 新增结束 ---
+
                 // 拼接世界书 (World Book)
                 // 【【【【【【 全新、绝对正确的修复逻辑从这里开始 】】】】】】
                 if (!contactInfo.isGroup) {
@@ -29375,12 +29558,36 @@ elements.userPersonaSelect.innerHTML = '<option value="无">无</option>';
                 elements.contactAvatarGroup.querySelector('label').textContent = '对方头像';
                 setImageSrc(document.getElementById('contact-avatar-preview'), contactInfo.avatarUrl);
 
-                // 关联NPC (仅单聊显示)
-                // 【【【核心修改1：删除这里的旧代码】】】
-                // elements.npcAssociationSection.classList.remove('hidden');
-                // const npcListContainer = document.getElementById('associated-npc-list');
-                // const associatedNpcNames = loadFromLocalStorage(`chat_associated_npcs_${chatState.chatId}`, []);
-                // npcListContainer.innerHTML = npcList.length > 0 ? npcList.map(npcName => `<label class="inline-label"><input type="checkbox" value="${npcName}" ${associatedNpcNames.includes(npcName) ? 'checked' : ''}> ${npcName}</label>`).join('') : '<p style="text-align:center;color:#888;">没有可关联的NPC</p>';
+                // 【核心修复】单聊模式下：强制将共享容器移动到单聊区域可见的位置
+                // 1. 获取共享容器
+                const sharedSection = document.getElementById('private-history-sharing-section');
+                const sharedListContainer = document.getElementById('shared-history-member-list');
+                
+                // 2. 将容器移动到单聊设置区域 (chat-info-single) 的下方，确保它不被 hidden 类隐藏
+                // 注意：chat-info-single 是单聊专属区域，把它插在后面
+                elements.chatInfoSingleDiv.after(sharedSection);
+
+                // 3. 获取所有群聊列表
+                const allGroupChats = chatList.filter(c => c.type === '群聊');
+                
+                // 4. 获取已保存的共享群聊ID列表
+                const sharedGroupIds = info.sharedGroupHistoryIds || [];
+
+                if (allGroupChats.length > 0) {
+                    sharedSection.style.display = 'block';
+                    // 修改标题为“共享群聊记忆”
+                    sharedSection.querySelector('h3').textContent = '共享群聊记忆';
+                    sharedSection.querySelector('p.form-hint').textContent = '勾选后，AI 在此单聊中将能读取这些群聊最新的 25 条全员消息。';
+
+                    sharedListContainer.innerHTML = allGroupChats.map(group => `
+                        <label class="inline-label" style="margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" class="shared-group-checkbox" value="${group.id}" ${sharedGroupIds.includes(group.id) ? 'checked' : ''} style="width: 18px; height: 18px; margin:0;">
+                            <span style="font-size: 14px; color: #333;">${group.name}</span>
+                        </label>
+                    `).join('');
+                } else {
+                    sharedSection.style.display = 'none';
+                }
             }
             
             // 【【【核心修改2：将关联NPC的渲染逻辑移动到这里，成为通用逻辑】】】
