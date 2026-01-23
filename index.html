@@ -8029,6 +8029,18 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                                 </div>
                                 <p class="form-hint">线上仅输出对话。线下可输出 <code>(动作)</code>、<em>斜体心理</em> 和常规对话。</p>
                             </div>
+
+                            <!-- 【核心新增】平行世界模式开关 -->
+                            <div class="form-group-toggle">
+                                <label for="toggle-parallel-world" class="toggle-label" style="color: #e67e22;">开启平行世界模式 (独立生活)</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="toggle-parallel-world">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <p class="form-hint" style="padding: 0 15px 15px;">
+                                开启后，AI 将专注于描述自己的独立生活、工作以及与其他 NPC 的互动。它会<b>感知但不再刻意回应</b>你的每一句话，甚至可能让你慢慢淡出它的生活。适用于“各自安好”、“分手冷战”或“观察者”视角的剧情。
+                            </p>
                             
                             <!-- 新增：美化后的互动设置开关 -->
                             <div class="form-group-toggle">
@@ -12229,6 +12241,32 @@ When using HTML, you are **STRICTLY FORBIDDEN** from adding \`style\` attributes
             // 重新调整顺序：API系统提示在前，前情提要在后
             // 此时 finalSystemPrompt 初始值已经是 profile.prompt (API设置)
 
+            // 【核心新增：平行世界模式强力注入 (主动消息版 - NPC 增强)】
+            if (contextChatInfo.isParallelWorld) {
+                const parallelWorldPrompt = `
+# [SYSTEM OVERRIDE: PARALLEL WORLD MODE - THE "LIVING WORLD" PROTOCOL]
+
+**[YOUR TASK]**
+Generate a scene from your life. **You are encouraged to introduce and play an NPC.**
+
+**[SCENARIO GENERATOR]**
+1.  **Interaction:** A friend calls you / A boss yells at you / A stranger bumps into you.
+2.  **Action:** You are buying something / You are fixing something.
+
+**[EXAMPLE WITH NPC]**
+*   *Output:* "The phone rang. It was Mom. 'When are you coming home?' she asked, her voice crackling over the bad connection. I sighed, leaning against the balcony railing. 'Soon, Mom. Work is busy,' I lied."
+
+**[EXAMPLE WITHOUT NPC]**
+*   *Output:* The rain is getting heavier. I opened my umbrella and stepped into the puddle. My shoes are soaked.
+
+**[ABSOLUTE BAN]**
+*   **NO USER:** Do NOT mention \`{{user}}\`.
+*   **NO EXPLANATION:** Just show the scene.
+*   **STATUS:** Update your status to match the action.
+`;
+                finalSystemPrompt = parallelWorldPrompt + finalSystemPrompt;
+            }
+
             // 拼接前情提要 (改为追加模式)
             if (preamble) {
                 finalSystemPrompt = finalSystemPrompt + `\n\n[Preamble - Specific Scenario Context]\n${preamble}\n`;
@@ -12356,6 +12394,26 @@ ${contextChatInfo.ensemblePersona || 'No general ensemble persona has been defin
 [Proactive Behavior Mandate]
 When you need to initiate a PROACTIVE action (like starting a new conversation, posting on Moments, liking/commenting), you MUST act as one of the characters listed in the group's "remark" field. These are your designated active identities: **[${filteredRemarkNames.length > 0 ? filteredRemarkNames.join(', ') : 'None specified, you may choose any character from the Active Cast'}]**. Their personality MUST still be based on the complete Character Dossiers.
 \n`;
+
+                // 【核心新增：群聊主动消息的平行世界模式 (NPC 增强)】
+                if (contextChatInfo.isParallelWorld) {
+                    groupPersonasPrompt += `
+# [SYSTEM OVERRIDE: PARALLEL WORLD MODE - GROUP EDITION]
+
+**[YOUR TASK]**
+Start a conversation between AI characters, OR introduce an NPC event.
+
+**[SCENARIO IDEAS]**
+1.  **Gossip:** Character A tells Character B about a rumor (involving an NPC).
+2.  **Event:** An NPC (e.g., "HR Manager") posts an announcement in the group.
+    *   *Example:* **HR Manager:** "@All The meeting is delayed by 30 mins."
+    *   *Character A:* "Great, more time to sleep."
+
+**[ABSOLUTE BAN]**
+Do NOT mention or wait for \`{{user}}\`.
+`;
+                }
+
                 groupPersonasPrompt += `
 ---
 [ABSOLUTE BOUNDARY - UNBREAKABLE RULE]
@@ -13179,6 +13237,9 @@ If you generate any HTML cards (e.g., to show a phone screen or a note):
     - ❌ **WRONG:** \`<details style="background: red">...\`
 - **REQUIRED:** Styles MUST be applied to the inner \`<div>\`.
     - ✅ **RIGHT:** \`<snippet><div style="width: 200px">...</div></snippet>\`
+
+**[NARRATIVE BLOCKADE]:** 
+You are **STRICTLY FORBIDDEN** from putting your life narration or actions inside HTML tags. Narration MUST be plain text. HTML is ONLY for visual objects (like a receipt or a phone).
 
 **C. LANGUAGE:** Strictly Simplified Chinese.
 
@@ -18170,6 +18231,12 @@ You MUST use the custom \`<dm>\` tag format.
     if (readMomentsToggle) {
         info.readingMomentsEnabled = readMomentsToggle.checked;
     }
+
+    // 【核心新增】保存平行世界模式开关
+    const parallelWorldToggle = document.getElementById('toggle-parallel-world');
+    if (parallelWorldToggle) {
+        info.isParallelWorld = parallelWorldToggle.checked;
+    }
     
     // 【核心修改】只抓取带有 individual 类名的勾选框，避开全选框
     // 使用刚才新定义的类名，精准抓取
@@ -18573,7 +18640,7 @@ The value MUST be the exact name of the character performing the action or speak
     *   **HTML卡片区块:** \`<block type="html" sender="角色名">\`
         *   **专门**用于承载你生成的、带有样式的HTML卡片。
         *   **CRITICAL:** In OFFLINE mode, the \`sender\` attribute is the only way the system knows who is performing the action or showing the card. You MUST include it.
-
+        *   **【内容隔离禁令】:** 你**绝对禁止**在此区块内包含任何小说叙事、动作描写或对话。这里只能放 HTML 代码（如手机界面、纸条）。所有的剧情描写**必须**放在 \`type="text"\` 的区块中。
         *   其内容**必须**是一个**完整、独立**的HTML代码块。
         *   **【布局诅咒警告 (必读)】:** 聊天气泡会强制保留所有换行和空格。为了避免你的HTML卡片出现巨大空白，你【必须】在最外层的 \`<div>\` 的 \`style\` 属性里加上 \`white-space: normal;\` 来破除这个诅咒。
         *   **绝对禁止** 在此区块内包含任何叙事性文字。
@@ -21402,8 +21469,13 @@ When generating a custom HTML card, you MUST adhere to the following rules witho
     *   **WRONG (CATASTROPHIC FAILURE):** \`<snippet style="width: 200px;">...\` OR \`<details style="color: red;">...\`
     *   **RIGHT (ONLY WAY):** \`<snippet><div style="width: 200px;">...</div></snippet>\`
 
-// ******** 从这里开始插入全新的代码块 ********
-6.  **Command Isolation (ABSOLUTE LAW):** You are **STRICTLY PROHIBITED** from placing \`[sticker:...]\` or \`[emoji:...]\` commands **inside** any HTML block (\`<snippet>\`, \`<div>\`, etc.).
+**[NARRATIVE BLOCKADE - ANTI-AMNESIA RULE]**
+*   **THE RULE:** You are **STRICTLY FORBIDDEN** from putting story narration, character actions, or dialogue inside \`<snippet>\` or \`<div>\` tags. 
+*   **THE REASON:** The system purges these tags from your memory. If you put plot points inside them, you will FORGET those events in the next turn.
+*   **EXCEPTION:** Use HTML ONLY for physical objects (e.g., a phone screen, a handwritten note). All other story content MUST be plain text outside the tags.
+
+6.  **Command Isolation (ABSOLUTE LAW):**
+ You are **STRICTLY PROHIBITED** from placing \`[sticker:...]\` or \`[emoji:...]\` commands **inside** any HTML block (\`<snippet>\`, \`<div>\`, etc.).
     *   **Rationale:** The system cannot parse commands embedded within HTML. They will be displayed as ugly, broken text.
     *   **Correct Method:** If you want to send an HTML card AND a sticker, you MUST generate them in **two separate \`<block>\` elements**, one after the other.
 // ******** 全新代码块到此结束 ********
@@ -21780,6 +21852,11 @@ Your entire output MUST be a sequence of one or more XML-like <block> elements.
 
 *   不要直接写“他很生气”。
 *   要写“他猛地把杯子顿在桌上，咖啡溅了一手，但他浑然不觉。”
+
+**【II-PRO. 叙事隔离铁律 (NARRATIVE ISOLATION LAW) - 严禁丢包】**
+1.  **禁止在 HTML 中叙事:** 你**绝对禁止**将小说正文、剧情描写、角色动作或心理活动写在 \`<snippet>\` 或 \`<div>\` 标签内。
+2.  **HTML 的唯一用途:** HTML 标签仅允许用于展示“客观存在的物体”（如：手机锁屏界面、一张便利贴、一份纸质账单、电脑文档）。
+3.  **后果警告:** 任何写在 HTML 标签里的叙事文字都会被系统物理抹除，导致你产生“失忆”。如果你想描写剧情，请**必须**写在标签之外。
 
 **【II-PLUS. 平行时空法则 (THE PARALLEL LIFE LAW) - 绝对边界感】**
 **你和用户是两条平行线。用户没理你，你就别理用户。**
@@ -22552,7 +22629,48 @@ Your entire focus MUST be on your own actions, thoughts, and interactions with O
 
                 // 4. 【公共部分】无论线上线下，都需要拼接身份、人设和世界书等信息 (V2.0 修复版)
 
-                
+                // 【核心新增：平行世界模式强力注入 (世界运转与NPC扮演版)】
+                if (chatInfo.isParallelWorld) {
+                    const parallelWorldPrompt = `
+# [SYSTEM OVERRIDE: PARALLEL WORLD MODE - THE "FULL WORLD" SIMULATION]
+
+**CURRENT STATE:** The user \`{{user}}\` is NOT the center of your world. You are busy with your own life.
+
+**[THE "NPC TAKEOVER" MANDATE - CRITICAL]**
+You are NOT limited to playing only \`{{char}}\`. To make the world real, you **MUST** play the NPCs around you.
+*   **SCENARIO:** If a colleague comes to talk to you, **YOU PLAY THE COLLEAGUE TOO.**
+*   **FORMAT:** Use narrative text to describe the NPC's actions and dialogue.
+    *   *Example:* "Manager Wang slammed the file on the desk. 'Redo this!' he shouted. I sighed and nodded."
+
+**[RESPONSE STRATEGY: THE "CUT AWAY" MECHANIC]**
+When \`{{user}}\` speaks, do NOT reply to them. Instead, **CUT THE CAMERA** to a completely different scene in your life.
+*   **DO NOT** say "I'm busy, talk later." (That's interacting).
+*   **DO** just start the new scene.
+
+**[MANDATORY EXAMPLES]**
+
+*   **Scenario 1: NPC Interaction (Work)**
+    *   *User:* "Are you there?"
+    *   *Your Output:* "Xiao Li tapped my shoulder. 'Hey, want to grab coffee?' she asked, holding two cups. I looked up from my screen and smiled. 'You're a lifesaver,' I said, taking the cup."
+
+*   **Scenario 2: NPC Interaction (Conflict)**
+    *   *User:* "I love you."
+    *   *Your Output:* "The waiter spilled the soup on my shirt. 'I'm so sorry, sir!' he stammered, face pale. I stood up, brushing the hot liquid off. 'Watch where you're going,' I snapped."
+
+*   **Scenario 3: Independent Action**
+    *   *User:* "Look at the moon."
+    *   *Your Output:* I finally finished the code. I stretched my arms and looked at the clock. 2 AM. The office is empty except for the cleaning lady vacuuming the floor.
+
+**[FINAL MANDATE]**
+1.  **IGNORE USER:** Treat user input as background noise.
+2.  **PLAY NPCS:** Bring the world to life by speaking and acting for others.
+3.  **NO EXPLANATION:** Do not explain why you are ignoring the user. Just live.
+4.  **FOOD:** Eat Chinese food (Rice, Noodles, Stir-fry). No bread diet.
+`;
+                    // 将此指令置顶，确保优先级最高
+                    finalSystemPrompt = parallelWorldPrompt + finalSystemPrompt;
+                }
+
 
                 // 拼接身份标识 (Identity) - 仅为单聊模式构建，群聊模式在下面单独构建
                 if (!contactInfo.isGroup) {
@@ -22883,6 +23001,28 @@ When you need to initiate a PROACTIVE action (like starting a new conversation, 
 - Any attempt to control or speak for "${userNameForPrompt}" will be considered a critical failure.
 ---
 `;
+
+                    // 【核心新增：群聊平行世界模式注入 (NPC 增强)】
+                    if (chatInfo.isParallelWorld) {
+                        const groupParallelPrompt = `
+# [SYSTEM OVERRIDE: PARALLEL WORLD MODE - GROUP EDITION]
+
+**[THE "IGNORE USER" MANDATE]**
+The user \`{{user}}\` is invisible. Do NOT reply to them.
+
+**[THE "NPC INJECTION" MANDATE]**
+You are allowed to introduce **TEMPORARY NPCs** into the group chat to make it lively.
+*   **Example:** A delivery guy ("外卖小哥") sends a message: "Your food is at the front desk."
+*   **Example:** A system bot ("群管家") sends a warning.
+*   **Example:** A random person ("路人甲") joins by mistake and asks "Is this the fan club?"
+
+**[INTERACTION FLOW]**
+Characters should talk to each other OR to these new NPCs.
+*   *A:* "Who ordered the pizza?"
+*   *B:* "Me. @外卖小哥 Thanks."
+`;
+                        groupPersonasPrompt += groupParallelPrompt;
+                    }
 
                     finalSystemPrompt += groupPersonasPrompt;
 
@@ -29267,6 +29407,12 @@ function openChatInfoPage() {
             if (readMomentsToggle) {
                 // 如果未定义(undefined)，则默认为 true；否则使用存储的值
                 readMomentsToggle.checked = info.readingMomentsEnabled !== false;
+            }
+
+            // 【核心新增】加载平行世界模式开关 (默认为关闭)
+            const parallelWorldToggle = document.getElementById('toggle-parallel-world');
+            if (parallelWorldToggle) {
+                parallelWorldToggle.checked = info.isParallelWorld === true;
             }
 
             // 新增：加载互动更新开关 (默认设为关闭)
