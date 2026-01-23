@@ -11439,6 +11439,8 @@ if ('serviceWorker' in navigator) {
 
             if (event.data && event.data.type === 'FORUM_DATA_SYNC') {
                 globalTuquData = event.data.data;
+                // 【核心新增】同步保存到数据库，防止刷新丢失
+                imageStore.setItem('jjForumData', globalTuquData).catch(e => console.warn("兔区数据同步DB失败", e));
                 console.log('[系统] 兔区数据已同步到主系统。');
             } else if (event.data && event.data.type === 'OPEN_TUQU_SHARE_PICKER') {
 
@@ -16449,13 +16451,22 @@ conversationManager.showNotificationBanner('TUQU', {
     // 【核心修改】支持大容量读取
     async function loadChatList() { 
         chatList = loadFromLocalStorage('app-chat-list', null); 
-        if (!chatList) {
+        // 【核心修复】增加 || chatList.length === 0 判断
+        // 确保即使本地缓存是空的，只要数据库里有数据，也能读出来
+        if (!chatList || chatList.length === 0) {
             try {
                 const dbData = await imageStore.getItem('app-chat-list');
-                chatList = dbData || [];
+                // 如果数据库里有数据，就用数据库的
+                if (dbData && Array.isArray(dbData) && dbData.length > 0) {
+                    chatList = dbData;
+                    console.log("从数据库加载了聊天列表");
+                } else if (!chatList) {
+                    chatList = [];
+                }
             } catch(e) { chatList = []; }
         }
     }
+
     
     function renderChatList() { 
         messageListContainer.innerHTML = '';
@@ -34736,13 +34747,20 @@ checkMomentsUpdates(); // <--- 新增这一行
             // 1. 先尝试从 LocalStorage 读取
             stickers = loadFromLocalStorage('app-stickers', null);
             
-            // 2. 如果 LocalStorage 没有，去 IndexedDB 捞
-            if (!stickers) {
+            // 2. 如果 LocalStorage 没有 或者 是空的，去 IndexedDB 捞
+            // 【核心修复】增加 || stickers.length === 0
+            if (!stickers || stickers.length === 0) {
                 try {
                     const dbData = await imageStore.getItem('app-stickers');
-                    stickers = dbData || [];
+                    if (dbData && dbData.length > 0) {
+                        stickers = dbData;
+                        console.log("从数据库加载了表情包列表");
+                    } else if (!stickers) {
+                        stickers = [];
+                    }
                 } catch(e) { stickers = []; }
             }
+
             
             // 1. 兼容旧数据：补全 type
             stickers.forEach(s => {
@@ -39939,6 +39957,17 @@ async function handleRemoveMember() {
         const encodedSVG = encodeURIComponent(giftSVG).replace(/'/g, '%27').replace(/"/g, '%22');
         const style = document.createElement('style');
 
+        // 【核心新增】尝试从数据库加载兔区数据 (防止LS爆满丢失)
+        if (Object.keys(globalTuquData).length === 0) {
+            try {
+                const dbTuqu = await imageStore.getItem('jjForumData');
+                if (dbTuqu) {
+                    globalTuquData = dbTuqu;
+                    console.log("从数据库加载了兔区数据");
+                }
+            } catch (e) { console.error("读取兔区数据库失败", e); }
+        }
+
         // ============================================================
         // 1. 预设气泡 (Bubbles)
         // ============================================================
@@ -41752,9 +41781,11 @@ async function handleRemoveMember() {
                                 if (key.startsWith('novel_data_') || 
                                     key === 'app_music_playlist' || 
                                     key.startsWith('conversation_') ||
-                                    key === 'moments_feed_data' ||  // 朋友圈
-                                    // key === 'app-stickers' ||    <-- 这一行已经被删除了
-                                    key === 'app-chat-list') {      // 好友/聊天列表
+                                    key === 'moments_feed_data' ||
+                                    key === 'jjForumData' ||        // 兔区数据
+                                    key === 'chat-worldbook' ||     // 【核心新增】世界书
+                                    key === 'app-stickers' ||       // 【核心新增】表情包列表
+                                    key === 'app-chat-list') {
                                     
                                     await imageStore.setItem(key, value);
                                     continue;
@@ -45716,7 +45747,12 @@ const cloudBackupManager = (function() {
                         key === 'app_music_playlist' || 
                         key.startsWith('conversation_') ||
                         key === 'moments_feed_data' ||
-                        key === 'app-chat-list') {
+                        key === 'jjForumData' ||
+                        key === 'app-chat-list' || 
+                        // 【核心新增】把世界书和表情包列表也加进来
+                        key === 'chat-worldbook' ||
+                        key === 'app-stickers') {
+
                         
                         // GitHub 上存的是字符串化的 JSON，存入 DB 前需要解析回对象
                         // 否则读取时会报错
@@ -45856,7 +45892,12 @@ const cloudBackupManager = (function() {
                         key === 'app_music_playlist' || 
                         key.startsWith('conversation_') ||
                         key === 'moments_feed_data' ||
-                        key === 'app-chat-list') {
+                        key === 'jjForumData' ||
+                        key === 'app-chat-list' || 
+                        // 【核心新增】把世界书和表情包列表也加进来
+                        key === 'chat-worldbook' ||
+                        key === 'app-stickers') {
+
                         
                         // GitHub 上存的是字符串化的 JSON，存入 DB 前需要解析回对象
                         // 否则读取时会报错

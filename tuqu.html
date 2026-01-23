@@ -1034,7 +1034,22 @@ html, body {
         // --- 新增：接收来自黑麦手机主系统的指令 ---
         window.addEventListener('message', async function(event) {
             const data = event.data;
-            if (data.type === 'GET_FORUM_DATA') {
+            
+            // 【核心新增】接收父窗口发来的大数据
+            if (data.type === 'FORUM_DATA_RESPONSE') {
+                if (data.data && Object.keys(data.data).length > 0) {
+                    forumData = data.data;
+                    // 尝试存入本地LS作为缓存 (如果存不下就算了，反正内存里有了)
+                    try { localStorage.setItem('jjForumData', JSON.stringify(forumData)); } catch(e){}
+                    
+                    // 立即刷新当前页面
+                    if (document.getElementById('page-home').classList.contains('active')) renderBoardBadges();
+                    if (document.getElementById('page-list').classList.contains('active')) renderTopicList(currentBoardTitle);
+                    if (document.getElementById('page-post').classList.contains('active')) renderPostDetail(currentPostId);
+                }
+            }
+            
+            else if (data.type === 'GET_FORUM_DATA') {
                 window.parent.postMessage({ type: 'FORUM_DATA_RESPONSE', data: forumData }, '*');
             } else if (data.type === 'AI_POST_TOPIC') {
                 currentBoardTitle = data.board;
@@ -1736,6 +1751,9 @@ html, body {
         }
         
         document.addEventListener('DOMContentLoaded', () => {
+             // 【核心新增】启动时向父窗口请求最新数据 (解决LS存不下的问题)
+             window.parent.postMessage({ type: 'GET_FORUM_DATA' }, '*');
+
              renderBoardBadges(); 
 
              // --- 新增：抓取并同步版规数据 ---
