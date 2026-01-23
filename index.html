@@ -9361,7 +9361,12 @@ if ('serviceWorker' in navigator) {
             try {
                 let lat = city.lat, lon = city.lon;
                 if (city.isLocal) {
-                    const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 }));
+                    // 【核心修改】将超时时间从 5000 (5秒) 改为 20000 (20秒)，并允许使用 10分钟内的缓存位置，防止频繁超时
+                    const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { 
+                        timeout: 20000, 
+                        maximumAge: 600000,
+                        enableHighAccuracy: false 
+                    }));
                     lat = position.coords.latitude; lon = position.coords.longitude; city.lat = lat; city.lon = lon;
                 }
                 const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,weathercode&hourly=temperature_2m,weathercode&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=6`;
