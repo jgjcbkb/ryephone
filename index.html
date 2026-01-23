@@ -9361,12 +9361,7 @@ if ('serviceWorker' in navigator) {
             try {
                 let lat = city.lat, lon = city.lon;
                 if (city.isLocal) {
-                    // 【核心修改】将超时时间从 5000 (5秒) 改为 20000 (20秒)，并允许使用 10分钟内的缓存位置，防止频繁超时
-                    const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { 
-                        timeout: 20000, 
-                        maximumAge: 600000,
-                        enableHighAccuracy: false 
-                    }));
+                    const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 }));
                     lat = position.coords.latitude; lon = position.coords.longitude; city.lat = lat; city.lon = lon;
                 }
                 const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature,weathercode&hourly=temperature_2m,weathercode&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=6`;
@@ -13111,6 +13106,19 @@ ${stickerInstructions}
 **[SPECIAL RULE FOR PRIVATE MESSAGES ONLY]**
 - **Multi-Message Splitter:** When using \`[send_private_message: ...]\` OR when actively chatting in a private window, you can use \`|||\` to separate multiple messages.
 - **FORBIDDEN:** Do **NOT** use \`|||\` in Moments comments, group chats, or any other context. It will break the display.
+
+**[PRIVATE MESSAGE FORMATTING LAW - CRITICAL]**
+When using \`[send_private_message: ...]\`, you have TWO options. Choose wisely to avoid syntax errors.
+
+**OPTION A: Simple Text (SAFE & RECOMMENDED)**
+*   **Format:** \`[send_private_message: Message 1 ||| Message 2]\`
+*   **Use this when:** You are sending text, emojis, or simple commands. It is robust and rarely fails.
+
+**OPTION B: Complex JSON (RISKY - USE WITH CAUTION)**
+*   **Format:** \`[send_private_message: {"content": "Your content here"}]\`
+*   **CRITICAL WARNING:** If your content contains HTML tags (like \`<snippet>\`) or quotes, you **MUST** escape them perfectly (e.g., \`\\"\`). If you fail to escape, the message will fail.
+*   **ADVICE:** If you want to send an HTML card in a private message, **USE OPTION A**. Just write the HTML code directly after the colon.
+    *   *Correct:* \`[send_private_message: <snippet>...</snippet> ||| Next message]\`
 **6. Moments & Reply (NEW & ADVANCED):**
 - To post a Moment (describe the image): \`[post_moment: {"type":"text-on-image", "content":"A beautiful sunset..."}]\`
 - **To reply to a specific message, you MUST use this EXACT format:**
@@ -15790,22 +15798,38 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                     try {
                         let messageContent = value.trim();
                         
-                        // 【【【【【【 全新的、增强的JSON解析逻辑 】】】】】】
-                        if (messageContent.startsWith('{') && messageContent.endsWith('}')) {
+                        // 【【【【【【 全新的、增强的JSON解析逻辑 (V2 - 容错版) 】】】】】】
+                        // 只有当看起来像 JSON 且不包含未转义的复杂 HTML 时才尝试 JSON 解析
+                        // 简单的判断：如果包含 <snippet> 且没有被转义，大概率 JSON.parse 会挂
+                        const hasUnescapedHtml = messageContent.includes('<snippet') && !messageContent.includes('\\<snippet');
+
+                        if (messageContent.startsWith('{') && messageContent.endsWith('}') && !hasUnescapedHtml) {
                             try {
+                                // 尝试标准解析
                                 const jsonData = JSON.parse(messageContent);
-                                // 优先检查是否存在 "content" 字段
-                                if (jsonData.content) {
-                                    messageContent = jsonData.content;
-                                } 
-                                // 其次检查是否存在 "text" 字段，作为兼容
-                                else if (jsonData.text) {
-                                    messageContent = jsonData.text;
-                                }
-                                // 如果JSON里有 target 字段，可以忽略，因为我们的路由逻辑会自动处理目标
+                                if (jsonData.content) messageContent = jsonData.content;
+                                else if (jsonData.text) messageContent = jsonData.text;
                             } catch(e) { 
-                                // 解析失败说明它可能不是一个真正的JSON，按纯文本处理
-                                console.warn("[私信解析] 看起来像JSON，但解析失败:", e);
+                                // JSON 解析失败，说明 AI 生成的格式有问题（比如 HTML 引号没转义）
+                                // 此时我们执行“软降级”策略：
+                                // 假设 AI 想发的内容就是 { "content": "..." } 里的 ... 部分
+                                // 我们尝试用正则提取 content 字段的值，而不是强行 parse
+                                console.warn("[私信解析] JSON解析失败，尝试正则提取:", e);
+                                
+                                const contentMatch = messageContent.match(/"content"\s*:\s*"([\s\S]*?)"\s*(?:,|$)/);
+                                if (contentMatch) {
+                                    // 如果提取到了，就用提取的内容
+                                    // 注意：这里需要手动处理一下转义字符，模拟 JSON.parse 的行为
+                                    messageContent = contentMatch[1]
+                                        .replace(/\\"/g, '"')
+                                        .replace(/\\n/g, '\n')
+                                        .replace(/\\\\/g, '\\');
+                                } else {
+                                    // 如果正则也提取不到，那就把整个字符串（包括花括号）都当成消息发出去
+                                    // 这样至少用户能看到内容，而不是报错
+                                    // 或者，我们可以尝试去掉首尾的花括号，作为最后的挣扎
+                                    // messageContent = messageContent; // 保持原样
+                                }
                             }
                         }
                         // 【【【【【【 解析逻辑结束 】】】】】】
@@ -21632,6 +21656,19 @@ ${stickerInstructions}
 **[SPECIAL RULE FOR PRIVATE MESSAGES ONLY]**
 - **Multi-Message Splitter:** When using \`[send_private_message: ...]\` OR when actively chatting in a private window, you can use \`|||\` to separate multiple messages.
 - **FORBIDDEN:** Do **NOT** use \`|||\` in Moments comments, group chats, or any other context. It will break the display.
+
+**[PRIVATE MESSAGE FORMATTING LAW - CRITICAL]**
+When using \`[send_private_message: ...]\`, you have TWO options. Choose wisely to avoid syntax errors.
+
+**OPTION A: Simple Text (SAFE & RECOMMENDED)**
+*   **Format:** \`[send_private_message: Message 1 ||| Message 2]\`
+*   **Use this when:** You are sending text, emojis, or simple commands. It is robust and rarely fails.
+
+**OPTION B: Complex JSON (RISKY - USE WITH CAUTION)**
+*   **Format:** \`[send_private_message: {"content": "Your content here"}]\`
+*   **CRITICAL WARNING:** If your content contains HTML tags (like \`<snippet>\`) or quotes, you **MUST** escape them perfectly (e.g., \`\\"\`). If you fail to escape, the message will fail.
+*   **ADVICE:** If you want to send an HTML card in a private message, **USE OPTION A**. Just write the HTML code directly after the colon.
+    *   *Correct:* \`[send_private_message: <snippet>...</snippet> ||| Next message]\`
 **6. Moments & Reply (NEW & ADVANCED):**
 - To post a Moment (describe the image): \`[post_moment: {"type":"text-on-image", "content":"A beautiful sunset..."}]\`
 - **To reply to a specific message, you MUST use this EXACT format:**
@@ -31879,7 +31916,10 @@ async function triggerBackgroundDataUpdate(context, senderName, chatId) {
     if (finalPrompt !== "") {
         return "\n\n[SYSTEM NOTIFICATION: BACKGROUND ACTIONS ENABLED]\n" + 
                finalPrompt + 
-               "\n\n**Final Instruction:** Generate the above requested <background_update> tags at the VERY END of your entire output. Do NOT put them inside any <block>.";
+               "\n\n**[FORMATTING DEATH PENALTY]**\n" +
+               "1. You MUST close the tag with `</background_update>`. If you forget it, the system will crash.\n" +
+               "2. Generate these tags at the **VERY END** of your output. Do NOT put them inside any `<block>`.\n" +
+               "3. **CHECK YOUR OUTPUT:** Did you type `</background_update>`? If not, type it now.";
     }
 
     return "";
