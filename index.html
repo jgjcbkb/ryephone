@@ -7745,13 +7745,19 @@ body.preview-fullscreen-active #page-conversation .chat-content {
                         <h3>数据管理</h3>
                         <div class="data-management-buttons" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 15px;">
                             <button id="export-all-data-btn" class="data-management-btn" style="margin: 0; width: 100%; height: 45px;">导出全部数据</button>
-                            <button id="import-all-data-btn" class="data-management-btn danger" style="margin: 0; width: 100%; height: 45px;">导入全部数据</button>
+                            <button id="import-all-data-btn" class="data-management-btn danger" style="margin: 0; width: 100%; height: 45px;">覆盖导入 (危险)</button>
+                            
+                            <!-- 【核心新增】合并导入按钮 -->
+                            <button id="merge-all-data-btn" class="data-management-btn" style="grid-column: span 2; margin: 0; width: 100%; height: 45px; background-color: #28a745; color: white; font-weight: bold;">合并导入数据 (安全)</button>
+
                             <button id="convert-catbox-url-btn" class="data-management-btn" style="grid-column: span 2; margin: 0; width: 100%; height: 45px; background-color: #f39c12; color: white; font-weight: bold;">一键转换 Catbox 链接</button>
                             <button id="reset-entire-app-btn" class="data-management-btn danger" style="grid-column: span 2; margin-top: 10px; width: 100%; height: 45px; background-color: #dc3545; color: white; font-weight: bold;">清空全量数据 (重置应用)</button>
                         </div>
-                         <p class="form-hint" style="padding: 0 15px 15px;">导入会覆盖所有现有数据，请谨慎操作！</p>
+                         <p class="form-hint" style="padding: 0 15px 15px;"><b>覆盖导入：</b>会清空当前所有数据，完全替换为备份文件。</p>
+                         <p class="form-hint" style="padding: 0 15px 15px; color: #28a745;"><b>合并导入：</b>保留当前数据，将备份文件中的新数据（如丢失的世界书、聊天记录）追加进来。</p>
                          <p class="form-hint" style="padding: 0 15px 15px; color: #e67e22;"><b>链接转换：</b>一键将所有 catbox.moe 链接替换为国内可用的镜像链接。</p>
-                    </div></div></div>
+                    </div>
+</div></div>
                 <!-- PAGE 5: Conversation -->
                 <div id="page-conversation" class="page">
     <!-- 核心修改：添加 multiple 属性 -->
@@ -45319,8 +45325,7 @@ const cloudBackupManager = (function() {
     }
 
     async function performBackup(isAuto = false) {
-        // 【核心新增 1】备份开始时，强制启动后台保活 (播放静音音频)
-        // 这能防止你切屏去回微信时，浏览器把上传任务杀掉
+        // 【核心新增 1】备份开始时，强制启动后台保活
         if (typeof conversationManager !== 'undefined') {
             conversationManager.enableKeepAlive();
             console.log("☁️ 云端备份：已启动后台保活模式");
@@ -45329,7 +45334,6 @@ const cloudBackupManager = (function() {
         var info = getRepoInfo();
         if (!info) {
             if (!isAuto) alert("请先填写仓库链接和Token！");
-            // 失败也要记得关掉保活
             if (typeof conversationManager !== 'undefined') conversationManager.disableKeepAlive();
             return;
         }
@@ -45356,6 +45360,8 @@ const cloudBackupManager = (function() {
             // 1. 准备文本数据和图片引用列表
             const allTextData = {};
             const blobKeys = new Set();
+            
+            // 【核心修复】只读取，绝不删除！
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
                 if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
@@ -45370,6 +45376,7 @@ const cloudBackupManager = (function() {
             }
 
             // 【核心修复：防丢失补丁】GitHub 备份也要去数据库捞大文件
+            // 注意：这里只做 getItem，绝对不执行 removeItem！
             
             // 1. 捞取音乐
             if (!allTextData['app_music_playlist']) {
@@ -45377,7 +45384,13 @@ const cloudBackupManager = (function() {
                 if (musicDb) allTextData['app_music_playlist'] = JSON.stringify(musicDb);
             }
 
-            // 2. 捞取聊天记录
+            // 2. 捞取世界书 (这是你丢失的数据！)
+            if (!allTextData['chat-worldbook']) {
+                const wbDb = await imageStore.getItem('chat-worldbook');
+                if (wbDb) allTextData['chat-worldbook'] = JSON.stringify(wbDb);
+            }
+
+            // 3. 捞取聊天记录
             let chatListForBackup = JSON.parse(localStorage.getItem('app-chat-list') || 'null');
             if (!chatListForBackup) {
                 chatListForBackup = await imageStore.getItem('app-chat-list') || [];
@@ -45396,7 +45409,7 @@ const cloudBackupManager = (function() {
                 }
             }
 
-            // 【核心修复】捞取朋友圈和表情包
+            // 4. 捞取朋友圈和表情包
             if (!allTextData['moments_feed_data']) {
                 const momentsDb = await imageStore.getItem('moments_feed_data');
                 if (momentsDb) allTextData['moments_feed_data'] = JSON.stringify(momentsDb);
@@ -45406,13 +45419,12 @@ const cloudBackupManager = (function() {
                 if (stickersDb) allTextData['app-stickers'] = JSON.stringify(stickersDb);
             }
 
-            // 【核心新增】捞取小说内容
+            // 5. 捞取小说内容
             const bookshelf = loadFromLocalStorage('app_novel_bookshelf', []);
             for (const book of bookshelf) {
                 try {
                     const bookContent = await imageStore.getItem(`novel_data_${book.id}`);
                     if (bookContent) {
-                        // 注意：小说内容是对象，需要转字符串
                         allTextData[`novel_data_${book.id}`] = JSON.stringify(bookContent);
                     }
                 } catch (e) {
@@ -45433,6 +45445,7 @@ const cloudBackupManager = (function() {
 
             // 3. 上传文本配置文件 (data.json)
             if (statusEl) statusEl.textContent = "正在同步文本数据...";
+            // 核心：使用 unescape(encodeURIComponent(...)) 处理中文乱码
             const jsonContent = btoa(unescape(encodeURIComponent(JSON.stringify(allTextData))));
             const jsonSha = getSha(existingFiles, "data.json");
             
@@ -45446,7 +45459,7 @@ const cloudBackupManager = (function() {
                 })
             });
 
-            // 4. 逐个上传图片 (核心：一张一张处理，防止白屏)
+            // 4. 逐个上传图片
             let count = 0;
             const total = blobKeys.size;
             for (const blobKey of blobKeys) {
@@ -45497,13 +45510,13 @@ const cloudBackupManager = (function() {
             }
             if (!isAuto) alert("备份失败: " + e.message);
         } finally {
-            // 【核心新增 2】无论成功还是失败，最后都要关闭后台保活，释放资源
             if (typeof conversationManager !== 'undefined') {
                 conversationManager.disableKeepAlive();
                 console.log("☁️ 云端备份：保活已关闭");
             }
         }
     }
+
 
     async function performRestore() {
         var info = getRepoInfo();
@@ -45877,11 +45890,168 @@ const cloudBackupManager = (function() {
          const exportBtn = document.getElementById('export-all-data-btn');
          const importBtn = document.getElementById('import-all-data-btn');
          const resetBtn = document.getElementById('reset-entire-app-btn');
+         // 【核心新增】获取合并按钮
+         const mergeBtn = document.getElementById('merge-all-data-btn');
+
          if(exportBtn) exportBtn.addEventListener('click', exportAllData);
          if(importBtn) importBtn.addEventListener('click', importAllData);
          if(resetBtn) resetBtn.addEventListener('click', resetEntireApp);
+         
+         // 【核心新增】绑定合并事件
+         if(mergeBtn) {
+             mergeBtn.addEventListener('click', () => {
+                triggerFileInput(file => {
+                    const reader = new FileReader();
+                    
+                    // 核心修改：根据文件后缀决定读取方式
+                    if (file.name.endsWith('.zip')) {
+                        reader.readAsArrayBuffer(file);
+                    } else {
+                        reader.readAsText(file);
+                    }
+
+                    reader.onload = async (event) => {
+                        try {
+                            let importedRawData;
+                            const isZip = file.name.endsWith('.zip');
+
+                            const confirmed = await conversationManager.customConfirm(
+                                '这将把备份文件中的数据【合并】到当前应用中。如果存在同名数据（如世界书），将保留当前的，只添加新的。确定要继续吗？',
+                                '合并导入确认'
+                            );
+                            if (!confirmed) return;
+
+                            await conversationManager.customAlert("正在解压并合并数据，请稍候...");
+
+                            if (isZip) {
+                                // --- 处理新版 ZIP 备份 ---
+                                const zip = await JSZip.loadAsync(event.target.result);
+                                
+                                // 1. 恢复图片数据到 IndexedDB
+                                const blobFolder = zip.folder("blobs");
+                                if (blobFolder) {
+                                    const blobFiles = [];
+                                    blobFolder.forEach((relativePath, zipEntry) => {
+                                        if (!zipEntry.dir) blobFiles.push(zipEntry);
+                                    });
+                                    
+                                    for (const zipEntry of blobFiles) {
+                                        const blob = await zipEntry.async("blob");
+                                        const fileName = zipEntry.name.split('/').pop();
+                                        // 检查是否已存在，不存在才写入
+                                        const exists = await imageStore.getItem(fileName);
+                                        if (!exists) {
+                                            await imageStore.setItem(fileName, blob);
+                                        }
+                                    }
+                                }
+
+                                // 2. 读取文本数据
+                                const contentFile = zip.file("backup_content.json");
+                                if (!contentFile) throw new Error("压缩包内缺少 backup_content.json");
+                                const contentText = await contentFile.async("string");
+                                importedRawData = JSON.parse(contentText);
+                            } else {
+                                // --- 处理旧版 JSON 备份 ---
+                                const parsedData = JSON.parse(event.target.result);
+                                importedRawData = await rehydrateDataFromPortable(parsedData);
+                            }
+
+                            // 3. 执行智能合并逻辑
+                            let mergedCount = 0;
+
+                            // 辅助函数：数组去重合并
+                            const mergeArrays = (currentArr, newArr, idKey = 'id') => {
+                                const map = new Map();
+                                currentArr.forEach(item => map.set(item[idKey] || JSON.stringify(item), item));
+                                newArr.forEach(item => {
+                                    const key = item[idKey] || JSON.stringify(item);
+                                    if (!map.has(key)) {
+                                        map.set(key, item);
+                                        mergedCount++;
+                                    }
+                                });
+                                return Array.from(map.values());
+                            };
+
+                            for (const key in importedRawData) {
+                                if (Object.prototype.hasOwnProperty.call(importedRawData, key)) {
+                                    let newValue = importedRawData[key];
+                                    
+                                    // 尝试从本地读取现有数据
+                                    let currentValue = localStorage.getItem(key);
+                                    
+                                    // 如果是大容量数据，尝试从数据库读
+                                    if (!currentValue && (key.startsWith('novel_data_') || key === 'app_music_playlist' || key.startsWith('conversation_') || key === 'moments_feed_data' || key === 'app-chat-list')) {
+                                        try {
+                                            const dbVal = await imageStore.getItem(key);
+                                            if (dbVal) currentValue = JSON.stringify(dbVal);
+                                        } catch(e) {}
+                                    }
+
+                                    if (!currentValue) {
+                                        // 如果本地没有这个 key，直接写入
+                                        // 同样执行大容量分流逻辑
+                                        try {
+                                            if (key.startsWith('novel_data_') || key === 'app_music_playlist' || key.startsWith('conversation_') || key === 'moments_feed_data' || key === 'app-chat-list') {
+                                                let parsedValue = newValue;
+                                                if (typeof newValue === 'string') {
+                                                    try { parsedValue = JSON.parse(newValue); } catch(e) {}
+                                                }
+                                                await imageStore.setItem(key, parsedValue);
+                                            } else {
+                                                let valueToStore = (typeof newValue === 'string') ? newValue : JSON.stringify(newValue);
+                                                localStorage.setItem(key, valueToStore);
+                                            }
+                                            mergedCount++;
+                                        } catch (e) { console.error(e); }
+                                    } else {
+                                        // 如果本地已有，尝试合并
+                                        try {
+                                            const currentObj = JSON.parse(currentValue);
+                                            const newObj = (typeof newValue === 'string') ? JSON.parse(newValue) : newValue;
+
+                                            if (Array.isArray(currentObj) && Array.isArray(newObj)) {
+                                                // 数组合并 (如聊天记录、世界书、朋友圈)
+                                                // 世界书特殊处理：用 name 去重
+                                                let idKey = 'id';
+                                                if (key === 'chat-worldbook') idKey = 'name';
+                                                
+                                                const mergedArr = mergeArrays(currentObj, newObj, idKey);
+                                                
+                                                // 保存合并后的数组
+                                                if (key.startsWith('novel_data_') || key === 'app_music_playlist' || key.startsWith('conversation_') || key === 'moments_feed_data' || key === 'app-chat-list' || key === 'chat-worldbook') {
+                                                    await imageStore.setItem(key, mergedArr);
+                                                    localStorage.removeItem(key); // 清理缓存以防万一
+                                                } else {
+                                                    localStorage.setItem(key, JSON.stringify(mergedArr));
+                                                }
+                                            } 
+                                            // 对象合并 (如设置)
+                                            else if (typeof currentObj === 'object' && typeof newObj === 'object') {
+                                                const mergedObj = { ...currentObj, ...newObj }; // 简单合并，保留现有属性
+                                                localStorage.setItem(key, JSON.stringify(mergedObj));
+                                            }
+                                        } catch (e) {
+                                            // 解析失败，说明不是 JSON，跳过合并
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            await conversationManager.customAlert(`合并完成！\n已尝试合并数据，页面即将刷新。`);
+                            location.reload();
+                        } catch (error) {
+                            console.error("Merge failed:", error);
+                            await conversationManager.customAlert(`合并失败: ${error.message}`);
+                        }
+                    };
+                });
+             });
+         }
 
          // 【核心新增：Catbox 链接一键转换逻辑】
+
          const convertBtn = document.getElementById('convert-catbox-url-btn');
          if (convertBtn) {
              convertBtn.addEventListener('click', async () => {
