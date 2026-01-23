@@ -45747,12 +45747,11 @@ const cloudBackupManager = (function() {
                         key === 'app_music_playlist' || 
                         key.startsWith('conversation_') ||
                         key === 'moments_feed_data' ||
-                        key === 'jjForumData' ||
                         key === 'app-chat-list' || 
-                        // 【核心新增】把世界书和表情包列表也加进来
-                        key === 'chat-worldbook' ||
-                        key === 'app-stickers') {
-
+                        // 【↓↓↓ 核心救命补丁：把这三个大户强制加进去！ ↓↓↓】
+                        key === 'jjForumData' ||      // 兔区数据
+                        key === 'chat-worldbook' ||   // 世界书
+                        key === 'app-stickers') {     // 表情包列表
                         
                         // GitHub 上存的是字符串化的 JSON，存入 DB 前需要解析回对象
                         // 否则读取时会报错
@@ -45764,6 +45763,7 @@ const cloudBackupManager = (function() {
                         await imageStore.setItem(key, parsedValue);
                         continue; // 跳过后续的 localStorage 写入
                     }
+
 
                     // 2. 普通小数据存入 localStorage
                     localStorage.setItem(key, value);
@@ -45892,12 +45892,11 @@ const cloudBackupManager = (function() {
                         key === 'app_music_playlist' || 
                         key.startsWith('conversation_') ||
                         key === 'moments_feed_data' ||
-                        key === 'jjForumData' ||
                         key === 'app-chat-list' || 
-                        // 【核心新增】把世界书和表情包列表也加进来
-                        key === 'chat-worldbook' ||
-                        key === 'app-stickers') {
-
+                        // 【↓↓↓ 核心救命补丁：把这三个大户强制加进去！ ↓↓↓】
+                        key === 'jjForumData' ||      // 兔区数据
+                        key === 'chat-worldbook' ||   // 世界书
+                        key === 'app-stickers') {     // 表情包列表
                         
                         // GitHub 上存的是字符串化的 JSON，存入 DB 前需要解析回对象
                         // 否则读取时会报错
@@ -45909,6 +45908,7 @@ const cloudBackupManager = (function() {
                         await imageStore.setItem(key, parsedValue);
                         continue; // 跳过后续的 localStorage 写入
                     }
+
 
                     // 2. 普通小数据存入 localStorage
                     localStorage.setItem(key, value);
