@@ -41561,20 +41561,37 @@ async function handleRemoveMember() {
         'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_'
     ];
 
+    // 【核心修复】给 Base64 转换函数穿上防弹衣，防止坏图炸崩整个APP
     function base64ToBlob(base64, contentType = '', sliceSize = 512) {
-        const byteCharacters = atob(base64.split(',')[1]);
-        const byteArrays = [];
+        try {
+            // 1. 安全检查：确保是有效的数据 URI
+            if (!base64 || typeof base64 !== 'string') return null;
+            
+            // 2. 提取 Base64 部分
+            const parts = base64.split(',');
+            const data = parts.length > 1 ? parts[1] : base64; // 如果没有逗号，尝试直接用原字符串
+            
+            // 3. 清洗数据：去掉可能存在的空格或换行 (iOS 对此非常敏感)
+            const cleanData = data.replace(/\s/g, '');
 
-        for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-            const slice = byteCharacters.slice(offset, offset + sliceSize);
-            const byteNumbers = new Array(slice.length);
-            for (let i = 0; i < slice.length; i++) {
-                byteNumbers[i] = slice.charCodeAt(i);
+            // 4. 解码
+            const byteCharacters = atob(cleanData);
+            const byteArrays = [];
+
+            for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+                const slice = byteCharacters.slice(offset, offset + sliceSize);
+                const byteNumbers = new Array(slice.length);
+                for (let i = 0; i < slice.length; i++) {
+                    byteNumbers[i] = slice.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                byteArrays.push(byteArray);
             }
-            const byteArray = new Uint8Array(byteNumbers);
-            byteArrays.push(byteArray);
+            return new Blob(byteArrays, { type: contentType });
+        } catch (e) {
+            console.warn("Base64 转换失败 (已自动忽略坏图):", e);
+            return null; // 失败时返回 null，而不是报错崩溃
         }
-        return new Blob(byteArrays, { type: contentType });
     }
 
     async function rehydrateDataFromPortable(data) {
@@ -42249,14 +42266,19 @@ async function handleRemoveMember() {
         }
     }
 
-    // =========================================================================
+        // =========================================================================
     // ================= START: HYBRID BUBBLE RENDERING CACHE ==================
     // =========================================================================
     const base64ToBlobUrlCache = new Map();
 
+    // 【核心修复】统一使用安全增强版，增加 .replace(/\s/g, '') 处理，防止 iOS 报错
     function base64ToBlob(base64, contentType = '', sliceSize = 512) {
         try {
-            const byteCharacters = atob(base64.split(',')[1]);
+            if (!base64 || typeof base64 !== 'string') return null;
+            const parts = base64.split(',');
+            const data = parts.length > 1 ? parts[1] : base64;
+            const cleanData = data.replace(/\s/g, ''); // 必须清洗空格，否则 iOS 会炸
+            const byteCharacters = atob(cleanData);
             const byteArrays = [];
             for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
                 const slice = byteCharacters.slice(offset, offset + sliceSize);
@@ -42275,6 +42297,7 @@ async function handleRemoveMember() {
     }
 
     async function getCachedBlobUrl(base64Url) {
+
         if (base64ToBlobUrlCache.has(base64Url)) {
             return base64ToBlobUrlCache.get(base64Url);
         }
