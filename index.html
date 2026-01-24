@@ -41719,6 +41719,7 @@ async function handleRemoveMember() {
         triggerFileInput(file => {
             const reader = new FileReader();
             
+            // 核心修改：根据文件后缀决定读取方式
             if (file.name.endsWith('.zip')) {
                 reader.readAsArrayBuffer(file);
             } else {
@@ -41731,124 +41732,112 @@ async function handleRemoveMember() {
                     const isZip = file.name.endsWith('.zip');
 
                     const confirmed = await conversationManager.customConfirm(
-                        '【最终修正】系统将严格区分数据类型，确保API设置和历史记录能正确读取。\n确定要导入吗？',
-                        '覆盖导入确认'
+                        '这将清除并覆盖当前应用的所有数据（包括聊天记录、设置、头像等），此操作不可逆，确定要导入吗？',
+                        '危险操作确认'
                     );
                     if (!confirmed) return;
 
-                    await conversationManager.customAlert("正在解析数据...");
+                    await conversationManager.customAlert("正在解压并恢复数据，请稍候...");
 
-                    // 1. 解析数据
                     if (isZip) {
+                        // --- 处理新版 ZIP 备份 ---
                         const zip = await JSZip.loadAsync(event.target.result);
+                        
+                        // 1. 恢复图片数据到 IndexedDB (直接存入二进制，不经过Base64)
                         const blobFolder = zip.folder("blobs");
                         if (blobFolder) {
                             const blobFiles = [];
                             blobFolder.forEach((relativePath, zipEntry) => {
                                 if (!zipEntry.dir) blobFiles.push(zipEntry);
                             });
+                            
                             for (const zipEntry of blobFiles) {
                                 const blob = await zipEntry.async("blob");
                                 const fileName = zipEntry.name.split('/').pop();
                                 await imageStore.setItem(fileName, blob);
-                                await new Promise(r => setTimeout(r, 2));
                             }
                         }
+
+                        // 2. 读取文本数据
                         const contentFile = zip.file("backup_content.json");
                         if (!contentFile) throw new Error("压缩包内缺少 backup_content.json");
                         const contentText = await contentFile.async("string");
                         importedRawData = JSON.parse(contentText);
                     } else {
+                        // --- 处理旧版 JSON 备份 ---
                         const parsedData = JSON.parse(event.target.result);
+                        // 旧版需要 Base64 递归转换
                         importedRawData = await rehydrateDataFromPortable(parsedData);
                     }
 
-                    // 2. 清空旧数据
-                    localStorage.clear(); 
-                    const bigKeysToWipe = [
-                        'app-chat-list', 'chat-worldbook', 'app-stickers', 
-                        'moments_feed_data', 'jjForumData', 'app_music_playlist'
+                    // 3. 清除当前相关的旧数据
+                    const CLEANUP_PREFIXES = [ 
+                        'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
+                        'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
+                        'tuqu_', 'token_usage_', 'blacklist_reply_count_',
+                        'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_' 
                     ];
-                    for (const k of bigKeysToWipe) {
-                        await imageStore.removeItem(k);
+
+                    const keysToRemove = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                       const key = localStorage.key(i);
+                       if (CLEANUP_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                           keysToRemove.push(key);
+                       }
                     }
+                    keysToRemove.forEach(key => localStorage.removeItem(key));
 
-                    // 3. 智能写入 (格式保活)
-                    await conversationManager.customAlert("正在写入数据，请耐心等待...");
+                    // 4. 写入新数据 (带错误捕获和智能分流)
+                    let failedKeys = [];
                     
-                    const keys = Object.keys(importedRawData);
-                    let dbCount = 0;
-                    let lsCount = 0;
-
-                    for (let i = 0; i < keys.length; i++) {
-                        const key = keys[i];
-                        let value = importedRawData[key];
-
-                        if (i % 50 === 0) await new Promise(r => setTimeout(r, 10));
-
-                        try {
-                            // 预处理：确保我们同时拥有“对象版”和“字符串版”
-                            let objectValue = value;
-                            let stringValue = "";
-
-                            if (typeof value === 'string') {
-                                // 如果源数据是字符串（比如旧版备份），尝试转回对象
-                                stringValue = value;
-                                try { objectValue = JSON.parse(value); } catch(e) { objectValue = value; }
-                            } else {
-                                // 如果源数据是对象（新版备份），生成字符串副本
-                                objectValue = value;
-                                stringValue = JSON.stringify(value);
-                            }
-
-                            // 判断是否为大数据
-                            const isBigByName = key.startsWith('novel_data_') || 
-                                                key.startsWith('conversation_') ||
-                                                key === 'app_music_playlist' || 
-                                                key === 'moments_feed_data' ||
-                                                key === 'app-chat-list' || 
-                                                key === 'chat-worldbook' || 
-                                                key === 'app-stickers' || 
-                                                key === 'jjForumData';
+                    for (const key in importedRawData) {
+                        if (Object.prototype.hasOwnProperty.call(importedRawData, key)) {
+                            let value = importedRawData[key];
                             
-                            const isBigBySize = stringValue.length > 100000; // 100KB
-
-                            if (isBigByName || isBigBySize) {
-                                // --- 大数据走数据库 ---
-                                // 关键：存入数据库的一定要是【对象】，方便直接读取
-                                await imageStore.setItem(key, objectValue);
-                                
-                                // 尝试在 LS 留个影（存不下就算了）
-                                try {
-                                    localStorage.setItem(key, stringValue);
-                                } catch (e) {}
-                                dbCount++;
-                            } else {
-                                // --- 小数据走缓存 (API设置、历史分支等) ---
-                                try {
-                                    // 关键：存入 LocalStorage 的一定要是【JSON字符串】
-                                    // 这样 loadFromLocalStorage 里的 JSON.parse 才能正常工作！
-                                    localStorage.setItem(key, stringValue);
-                                    lsCount++;
-                                } catch (e) {
-                                    // 如果满了，转存数据库（作为对象存）
-                                    console.warn(`[溢出保护] ${key} 转存数据库。`);
-                                    await imageStore.setItem(key, objectValue);
-                                    dbCount++;
+                            try {
+                                                                                               // 【核心新增】如果是小说、音乐、聊天记录、朋友圈、表情包、好友列表，强制存入 IndexedDB (大容量存储)
+                                // 这样可以绕过 iOS 的 5MB 限制，确保任何数据都不会丢
+                                if (key.startsWith('novel_data_') || 
+                                    key === 'app_music_playlist' || 
+                                    key.startsWith('conversation_') ||
+                                    key === 'moments_feed_data' ||  // 朋友圈
+                                    // key === 'app-stickers' ||    <-- 这一行已经被删除了
+                                    key === 'app-chat-list') {      // 好友/聊天列表
+                                    
+                                    await imageStore.setItem(key, value);
+                                    continue;
                                 }
-                            }
 
-                        } catch (e) {
-                            console.error(`Write failed for key: ${key}`, e);
+
+
+                                let valueToStore;
+                                if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
+                                    valueToStore = value;
+                                } else {
+                                    if (isZip && typeof value === 'string') {
+                                        valueToStore = value;
+                                    } else {
+                                        valueToStore = JSON.stringify(value);
+                                    }
+                                }
+                                
+                                localStorage.setItem(key, valueToStore);
+                                
+                            } catch (e) {
+                                // 捕获 QuotaExceededError
+                                console.error(`Write failed for key: ${key}`, e);
+                                failedKeys.push(key);
+                            }
                         }
                     }
                     
-                    // 强制等待刷盘
-                    await new Promise(r => setTimeout(r, 500));
+                    if (failedKeys.length > 0) {
+                        await conversationManager.customAlert(`导入部分完成，但以下数据因 iOS 存储空间限制(5MB)而失败：\n\n${failedKeys.join(', ')}\n\n建议：删除一些不用的聊天或小说后再试。`);
+                    } else {
+                        await conversationManager.customAlert('数据导入成功！应用即将刷新以加载新数据。');
+                    }
                     
-                    await conversationManager.customAlert(`导入完成！\n数据库: ${dbCount} 项\n缓存: ${lsCount} 项\n\n点击确定刷新页面。`);
                     location.reload();
-
                 } catch (error) {
                     console.error("Import failed:", error);
                     await conversationManager.customAlert(`导入失败: ${error.message}`);
