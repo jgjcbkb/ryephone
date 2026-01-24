@@ -41857,153 +41857,218 @@ async function handleRemoveMember() {
                     const data = await rehydrateDataFromPortable(importedRawData);
 
                     const confirmed = await conversationManager.customConfirm(
-                        '确定要执行合并导入吗？系统将保留你现有的所有数据，仅追加文件中新增的聊天、世界书、朋友圈动态和消息。',
-                        '合并导入确认'
+                        '确定要执行合并导入吗？\n系统将智能分析文件，将新增的聊天、世界书、帖子、表情包等追加到现有数据中，而不会覆盖你现有的记录。',
+                        '全量智能合并'
                     );
                     if (!confirmed) return;
 
-                    await conversationManager.customAlert("正在执行智能合并，请稍候...");
+                    await conversationManager.customAlert("正在执行全量数据智能合并，已启动【防爆写入模式】，请耐心等待...");
 
-                    // 1. 合并聊天列表 (app-chat-list)
+                    // =========================================================
+                    // 1. 聊天列表合并 (app-chat-list)
+                    // =========================================================
                     if (data['app-chat-list']) {
-                        let existingList = loadFromLocalStorage('app-chat-list', []);
-                        if (existingList.length === 0) existingList = await imageStore.getItem('app-chat-list') || [];
-                        
-                        const importedList = data['app-chat-list'];
-                        importedList.forEach(newChat => {
-                            if (!existingList.some(c => c.id === newChat.id)) {
-                                existingList.push(newChat);
+                        let existing = await imageStore.getItem('app-chat-list') || loadFromLocalStorage('app-chat-list', []);
+                        let count = 0;
+                        data['app-chat-list'].forEach(newItem => {
+                            if (!existing.some(old => old.id === newItem.id)) {
+                                existing.push(newItem);
+                                count++;
                             }
                         });
-                        await imageStore.setItem('app-chat-list', existingList);
-                        localStorage.setItem('app-chat-list', JSON.stringify(existingList));
-                    }
-
-                    // 2. 合并世界书 (chat-worldbook)
-                    if (data['chat-worldbook']) {
-                        let existingWb = loadFromLocalStorage('chat-worldbook', []);
-                        if (existingWb.length === 0) existingWb = await imageStore.getItem('chat-worldbook') || [];
-                        
-                        const importedWb = data['chat-worldbook'];
-                        importedWb.forEach(newEntry => {
-                            if (!existingWb.some(e => e.name === newEntry.name)) {
-                                existingWb.push(newEntry);
-                            }
-                        });
-                        await imageStore.setItem('chat-worldbook', existingWb);
-                        localStorage.setItem('chat-worldbook', JSON.stringify(existingWb));
-                    }
-
-                    // 3. 合并朋友圈 (moments_feed_data)
-                    if (data['moments_feed_data']) {
-                        let existingFeed = loadFromLocalStorage('moments_feed_data', []);
-                        if (existingFeed.length === 0) existingFeed = await imageStore.getItem('moments_feed_data') || [];
-                        
-                        const importedFeed = data['moments_feed_data'];
-                        importedFeed.forEach(newPost => {
-                            const existingPost = existingFeed.find(p => p.id === newPost.id);
-                            if (!existingPost) {
-                                existingFeed.push(newPost);
-                            } else {
-                                // 如果帖子已存在，合并评论
-                                newPost.comments.forEach(newComment => {
-                                    if (!existingPost.comments.some(c => c.id === newComment.id)) {
-                                        existingPost.comments.push(newComment);
-                                    }
-                                });
-                            }
-                        });
-                        await imageStore.setItem('moments_feed_data', existingFeed);
-                        localStorage.setItem('moments_feed_data', JSON.stringify(existingFeed));
-                    }
-
-                                        // 4. 遍历所有键，执行真正的智能合并
-                    for (const key in data) {
-                        const isBigData = key.startsWith('novel_data_') || 
-                                         key === 'app_music_playlist' || 
-                                         key === 'moments_feed_data' ||
-                                         key === 'jjForumData' ||
-                                         key === 'chat-worldbook' ||
-                                         key === 'app-stickers' ||
-                                         key === 'app-chat-list';
-
-                        if (key.startsWith('conversation_')) {
-                            // --- 聊天记录合并逻辑 (保持不变) ---
-                            let existingMsgs = loadFromLocalStorage(key, []);
-                            if (existingMsgs.length === 0) existingMsgs = await imageStore.getItem(key) || [];
-                            
-                            const importedMsgs = data[key];
-                            if (Array.isArray(importedMsgs)) {
-                                importedMsgs.forEach(newMsg => {
-                                    if (!existingMsgs.some(m => m.id === newMsg.id)) {
-                                        existingMsgs.push(newMsg);
-                                    }
-                                });
-                                existingMsgs.sort((a, b) => a.timestamp - b.timestamp);
-                                await imageStore.setItem(key, existingMsgs);
-                                try { localStorage.setItem(key, JSON.stringify(existingMsgs)); } catch(e) {}
-                            }
-                        } else if (key === 'app-stickers') {
-                            // --- 【核心修复】表情包合并逻辑 ---
-                            let existingStickers = await imageStore.getItem('app-stickers') || loadFromLocalStorage('app-stickers', []);
-                            const importedStickers = data[key];
-                            
-                            if (Array.isArray(importedStickers)) {
-                                let hasChanges = false;
-                                importedStickers.forEach(newS => {
-                                    // 根据 URL 去重，防止重复添加
-                                    if (!existingStickers.some(oldS => oldS.url === newS.url)) {
-                                        existingStickers.push(newS);
-                                        hasChanges = true;
-                                    }
-                                });
-                                if (hasChanges) {
-                                    await imageStore.setItem('app-stickers', existingStickers);
-                                    // 尝试同步到 LS，存不下就算了
-                                    try { localStorage.setItem('app-stickers', JSON.stringify(existingStickers)); } catch(e) {}
-                                }
-                            }
-                        } else if (key === 'moments_feed_data') {
-                            // --- 【核心修复】朋友圈合并逻辑 ---
-                            let existingFeed = await imageStore.getItem('moments_feed_data') || loadFromLocalStorage('moments_feed_data', []);
-                            const importedFeed = data[key];
-                            
-                            if (Array.isArray(importedFeed)) {
-                                importedFeed.forEach(newPost => {
-                                    const existingPost = existingFeed.find(p => p.id === newPost.id);
-                                    if (!existingPost) {
-                                        existingFeed.push(newPost);
-                                    } else {
-                                        // 如果帖子已存在，合并评论
-                                        newPost.comments.forEach(newComment => {
-                                            if (!existingPost.comments.some(c => c.id === newComment.id)) {
-                                                existingPost.comments.push(newComment);
-                                            }
-                                        });
-                                    }
-                                });
-                                existingFeed.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                                await imageStore.setItem('moments_feed_data', existingFeed);
-                                try { localStorage.setItem('moments_feed_data', JSON.stringify(existingFeed)); } catch(e) {}
-                            }
-                        } else if (isBigData) {
-                            // --- 其他大数据 (小说、兔区等) ---
-                            // 对于这些数据，如果本地没有，直接写入；如果本地有，暂不覆盖（避免逻辑太复杂出错）
-                            const existing = await imageStore.getItem(key);
-                            if (!existing) {
-                                await imageStore.setItem(key, data[key]);
-                            }
-                        } else if (!localStorage.getItem(key)) {
-                            // --- 普通小数据 ---
-                            let val = data[key];
-                            if (typeof val !== 'string') val = JSON.stringify(val);
-                            localStorage.setItem(key, val);
+                        if (count > 0) {
+                            await imageStore.setItem('app-chat-list', existing);
+                            try { localStorage.setItem('app-chat-list', JSON.stringify(existing)); } catch(e){}
+                            console.log(`[合并] 新增 ${count} 个聊天窗口`);
                         }
                     }
 
+                    // =========================================================
+                    // 2. 世界书合并 (chat-worldbook)
+                    // =========================================================
+                    if (data['chat-worldbook']) {
+                        let existing = await imageStore.getItem('chat-worldbook') || loadFromLocalStorage('chat-worldbook', []);
+                        let count = 0;
+                        data['chat-worldbook'].forEach(newItem => {
+                            if (!existing.some(old => old.name === newItem.name)) {
+                                existing.push(newItem);
+                                count++;
+                            }
+                        });
+                        if (count > 0) {
+                            await imageStore.setItem('chat-worldbook', existing);
+                            try { localStorage.setItem('chat-worldbook', JSON.stringify(existing)); } catch(e){}
+                            console.log(`[合并] 新增 ${count} 条世界书`);
+                        }
+                    }
 
+                    // =========================================================
+                    // 3. 表情包合并 (app-stickers)
+                    // =========================================================
+                    if (data['app-stickers']) {
+                        let existing = await imageStore.getItem('app-stickers') || loadFromLocalStorage('app-stickers', []);
+                        let count = 0;
+                        data['app-stickers'].forEach(newItem => {
+                            if (!existing.some(old => old.url === newItem.url)) {
+                                existing.push(newItem);
+                                count++;
+                            }
+                        });
+                        if (count > 0) {
+                            await imageStore.setItem('app-stickers', existing);
+                            try { localStorage.setItem('app-stickers', JSON.stringify(existing)); } catch(e){}
+                            console.log(`[合并] 新增 ${count} 个表情包`);
+                        }
+                    }
 
-                    await conversationManager.customAlert('智能合并完成！应用即将刷新。');
+                    // =========================================================
+                    // 4. 音乐列表合并 (app_music_playlist)
+                    // =========================================================
+                    if (data['app_music_playlist']) {
+                        let existing = await imageStore.getItem('app_music_playlist') || loadFromLocalStorage('app_music_playlist', []);
+                        let count = 0;
+                        data['app_music_playlist'].forEach(newItem => {
+                            if (!existing.some(old => old.source === newItem.source)) {
+                                existing.push(newItem);
+                                count++;
+                            }
+                        });
+                        if (count > 0) {
+                            await imageStore.setItem('app_music_playlist', existing);
+                            try { localStorage.setItem('app_music_playlist', JSON.stringify(existing)); } catch(e){}
+                            console.log(`[合并] 新增 ${count} 首歌曲`);
+                        }
+                    }
+
+                    // =========================================================
+                    // 5. 朋友圈合并 (moments_feed_data)
+                    // =========================================================
+                    if (data['moments_feed_data']) {
+                        let existing = await imageStore.getItem('moments_feed_data') || loadFromLocalStorage('moments_feed_data', []);
+                        let postCount = 0;
+                        data['moments_feed_data'].forEach(newPost => {
+                            const oldPost = existing.find(p => p.id === newPost.id);
+                            if (!oldPost) {
+                                existing.push(newPost);
+                                postCount++;
+                            } else {
+                                if (newPost.comments && Array.isArray(newPost.comments)) {
+                                    newPost.comments.forEach(newComm => {
+                                        if (!oldPost.comments.some(c => c.id === newComm.id)) {
+                                            oldPost.comments.push(newComm);
+                                        }
+                                    });
+                                }
+                                if (newPost.reactions && newPost.reactions['点赞']) {
+                                    if (!oldPost.reactions['点赞']) oldPost.reactions['点赞'] = [];
+                                    newPost.reactions['点赞'].forEach(u => {
+                                        if (!oldPost.reactions['点赞'].includes(u)) {
+                                            oldPost.reactions['点赞'].push(u);
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                        existing.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                        await imageStore.setItem('moments_feed_data', existing);
+                        try { localStorage.setItem('moments_feed_data', JSON.stringify(existing)); } catch(e){}
+                        console.log(`[合并] 新增 ${postCount} 条朋友圈`);
+                    }
+
+                    // =========================================================
+                    // 6. 兔区数据合并 (jjForumData)
+                    // =========================================================
+                    if (data['jjForumData']) {
+                        let existing = await imageStore.getItem('jjForumData') || loadFromLocalStorage('jjForumData', {});
+                        for (const boardName in data['jjForumData']) {
+                            if (!existing[boardName]) {
+                                existing[boardName] = data['jjForumData'][boardName];
+                            } else {
+                                const importedPosts = data['jjForumData'][boardName];
+                                if (Array.isArray(importedPosts)) {
+                                    importedPosts.forEach(newPost => {
+                                        const oldPost = existing[boardName].find(p => p.id === newPost.id);
+                                        if (!oldPost) {
+                                            existing[boardName].push(newPost);
+                                        } else {
+                                            if (newPost.comments && Array.isArray(newPost.comments)) {
+                                                if (!oldPost.comments) oldPost.comments = [];
+                                                newPost.comments.forEach(newComm => {
+                                                    const isExist = oldPost.comments.some(c => c.content === newComm.content && c.author === newComm.author);
+                                                    if (!isExist) oldPost.comments.push(newComm);
+                                                });
+                                                oldPost.replies = oldPost.comments.length;
+                                            }
+                                        }
+                                    });
+                                    existing[boardName].sort((a, b) => {
+                                        const tA = new Date(a.timestamp.replace(/-/g, '/')).getTime();
+                                        const tB = new Date(b.timestamp.replace(/-/g, '/')).getTime();
+                                        return tB - tA;
+                                    });
+                                }
+                            }
+                        }
+                        await imageStore.setItem('jjForumData', existing);
+                        try { localStorage.setItem('jjForumData', JSON.stringify(existing)); } catch(e){}
+                        const iframe = document.querySelector('#tab-content-tuqu iframe');
+                        if (iframe) iframe.contentWindow.postMessage({ type: 'FORUM_DATA_SYNC', data: existing }, '*');
+                    }
+
+                    // =========================================================
+                    // 7. 通用数据循环 (聊天记录、小说、其他) - 【防爆版】
+                    // =========================================================
+                    for (const key in data) {
+                        // 跳过上面已经专门处理过的大数据 Key
+                        if (['app-chat-list', 'chat-worldbook', 'app-stickers', 'app_music_playlist', 'moments_feed_data', 'jjForumData'].includes(key)) {
+                            continue;
+                        }
+
+                        // --- 聊天记录 (conversation_*) ---
+                        if (key.startsWith('conversation_')) {
+                            let existingMsgs = await imageStore.getItem(key) || loadFromLocalStorage(key, []);
+                            const importedMsgs = data[key];
+                            if (Array.isArray(importedMsgs)) {
+                                let msgCount = 0;
+                                importedMsgs.forEach(newMsg => {
+                                    if (!existingMsgs.some(m => m.id === newMsg.id)) {
+                                        existingMsgs.push(newMsg);
+                                        msgCount++;
+                                    }
+                                });
+                                if (msgCount > 0) {
+                                    existingMsgs.sort((a, b) => a.timestamp - b.timestamp);
+                                    await imageStore.setItem(key, existingMsgs);
+                                    try { localStorage.setItem(key, JSON.stringify(existingMsgs)); } catch(e) {}
+                                }
+                            }
+                        } 
+                        // --- 小说数据 (novel_data_*) ---
+                        else if (key.startsWith('novel_data_')) {
+                            // 小说数据直接存数据库，绝对不碰 LocalStorage
+                            const existingBook = await imageStore.getItem(key);
+                            if (!existingBook) {
+                                await imageStore.setItem(key, data[key]);
+                                console.log(`[合并] 导入新小说: ${key}`);
+                            }
+                        }
+                        // --- 其他普通配置 ---
+                        else if (!localStorage.getItem(key)) {
+                            let val = data[key];
+                            if (typeof val !== 'string') val = JSON.stringify(val);
+                            
+                            // 【核心修复：防爆写入】
+                            try {
+                                localStorage.setItem(key, val);
+                            } catch (e) {
+                                // 如果 LocalStorage 满了，不要报错，转存到数据库！
+                                console.warn(`[防爆] Key "${key}" 写入缓存失败，转存数据库。`, e);
+                                await imageStore.setItem(key, data[key]); // 注意这里存原始对象
+                            }
+                        }
+                    }
+
+                    await conversationManager.customAlert('全量数据智能合并完成！\n所有模块（聊天/世界书/朋友圈/兔区/音乐/表情/小说）均已处理。\n应用即将刷新。');
                     location.reload();
 
                 } catch (error) {
@@ -42014,6 +42079,7 @@ async function handleRemoveMember() {
             reader.readAsText(file);
         });
     }
+
 
     async function resetEntireApp() {
         const confirmed1 = await conversationManager.customConfirm(
