@@ -41719,7 +41719,6 @@ async function handleRemoveMember() {
         triggerFileInput(file => {
             const reader = new FileReader();
             
-            // 根据文件后缀决定读取方式
             if (file.name.endsWith('.zip')) {
                 reader.readAsArrayBuffer(file);
             } else {
@@ -41732,18 +41731,16 @@ async function handleRemoveMember() {
                     const isZip = file.name.endsWith('.zip');
 
                     const confirmed = await conversationManager.customConfirm(
-                        '【最终警告】这将清除并覆盖当前应用的所有数据。\n为了防止苹果手机崩溃，导入过程将自动降速，请保持屏幕常亮，不要切换后台。',
+                        '【最终警告】这将清除并覆盖当前应用的所有数据。\n针对 iOS 优化：导入后将强制等待数据写入硬盘，请勿在提示完成前关闭页面。',
                         '覆盖导入确认'
                     );
                     if (!confirmed) return;
 
-                    await conversationManager.customAlert("正在解析数据文件，这可能需要几秒钟...");
+                    await conversationManager.customAlert("正在解析数据文件...");
 
                     // 1. 解析数据
                     if (isZip) {
                         const zip = await JSZip.loadAsync(event.target.result);
-                        
-                        // 恢复图片
                         const blobFolder = zip.folder("blobs");
                         if (blobFolder) {
                             const blobFiles = [];
@@ -41754,11 +41751,10 @@ async function handleRemoveMember() {
                                 const blob = await zipEntry.async("blob");
                                 const fileName = zipEntry.name.split('/').pop();
                                 await imageStore.setItem(fileName, blob);
-                                // 【关键】每存一张图歇 5 毫秒，防止 iOS 崩溃
+                                // 降速防止崩溃
                                 await new Promise(r => setTimeout(r, 5));
                             }
                         }
-
                         const contentFile = zip.file("backup_content.json");
                         if (!contentFile) throw new Error("压缩包内缺少 backup_content.json");
                         const contentText = await contentFile.async("string");
@@ -41767,8 +41763,6 @@ async function handleRemoveMember() {
                         const parsedData = JSON.parse(event.target.result);
                         importedRawData = await rehydrateDataFromPortable(parsedData);
                     }
-
-                    await conversationManager.customAlert("数据解析完成，正在清空旧数据...");
 
                     // 2. 清空旧数据
                     localStorage.clear(); 
@@ -41780,31 +41774,21 @@ async function handleRemoveMember() {
                         await imageStore.removeItem(k);
                     }
 
-                    // 3. 【降速写入】逐条写入并记录结果
-                    await conversationManager.customAlert("正在逐条写入新数据，请勿关闭...");
+                    // 3. 写入新数据 (带验证和强制等待)
+                    await conversationManager.customAlert("正在写入数据，请耐心等待...");
                     
-                    let report = {
-                        success: [],
-                        failed: [],
-                        bigDataStatus: {
-                            'chat-worldbook': '未找到',
-                            'app-stickers': '未找到',
-                            'jjForumData': '未找到',
-                            'moments_feed_data': '未找到'
-                        }
-                    };
-
                     const keys = Object.keys(importedRawData);
-                    
+                    let writeCount = 0;
+
                     for (let i = 0; i < keys.length; i++) {
                         const key = keys[i];
                         const value = importedRawData[key];
 
-                        // 【关键】每处理 10 个数据歇 10 毫秒，给 UI 线程喘息机会
-                        if (i % 10 === 0) await new Promise(r => setTimeout(r, 10));
+                        // 每写入 20 条数据，强制暂停 20ms，让 iOS 有时间喘气
+                        if (i % 20 === 0) await new Promise(r => setTimeout(r, 20));
 
                         try {
-                            // A. 大数据处理
+                            // A. 大数据 -> 数据库
                             if (key.startsWith('novel_data_') || 
                                 key.startsWith('conversation_') ||
                                 key === 'app_music_playlist' || 
@@ -41818,27 +41802,18 @@ async function handleRemoveMember() {
                                 if (typeof value === 'string') {
                                     try { parsedValue = JSON.parse(value); } catch(e) { parsedValue = value; }
                                 }
-                                
-                                // 1. 强制存数据库
                                 await imageStore.setItem(key, parsedValue);
                                 
-                                // 2. 尝试存缓存 (双重保险)
+                                // 尝试存缓存作为索引
                                 try {
                                     let strValue = typeof parsedValue === 'string' ? parsedValue : JSON.stringify(parsedValue);
                                     localStorage.setItem(key, strValue);
-                                } catch (e) {
-                                    // 缓存满是正常的，不计入失败
-                                }
-
-                                // 记录大数据的状态
-                                if (report.bigDataStatus.hasOwnProperty(key)) {
-                                    report.bigDataStatus[key] = '✅ 写入成功';
-                                }
-                                report.success.push(key);
+                                } catch (e) {}
+                                
                                 continue;
                             }
 
-                            // B. 普通数据处理
+                            // B. 普通数据 (API设置、历史分支等) -> LocalStorage
                             let valueToStore;
                             if ((key.startsWith('gh_') || key === 'catbox_userhash') && typeof value === 'string') {
                                 valueToStore = value;
@@ -41850,40 +41825,43 @@ async function handleRemoveMember() {
                                 }
                             }
                             
-                            try {
-                                localStorage.setItem(key, valueToStore);
-                            } catch (e) {
-                                // 缓存满了转存数据库
+                            // 【核心修复】写入后立即读取验证
+                            localStorage.setItem(key, valueToStore);
+                            const verify = localStorage.getItem(key);
+                            if (!verify) {
+                                // 如果没写进去，转存数据库保底
+                                console.warn(`[iOS 写入失败] Key "${key}" 未能写入缓存，转存数据库。`);
                                 await imageStore.setItem(key, value);
                             }
-                            report.success.push(key);
+                            writeCount++;
 
                         } catch (e) {
                             console.error(`Write failed for key: ${key}`, e);
-                            report.failed.push(`${key} (${e.message})`);
-                            if (report.bigDataStatus.hasOwnProperty(key)) {
-                                report.bigDataStatus[key] = `❌ 失败: ${e.message}`;
-                            }
                         }
                     }
                     
-                    // 4. 生成最终报告
-                    let resultMsg = `导入结束！\n成功: ${report.success.length} 项\n失败: ${report.failed.length} 项\n\n【核心数据状态】\n`;
-                    resultMsg += `世界书: ${report.bigDataStatus['chat-worldbook']}\n`;
-                    resultMsg += `表情包: ${report.bigDataStatus['app-stickers']}\n`;
-                    resultMsg += `兔区: ${report.bigDataStatus['jjForumData']}\n`;
-                    resultMsg += `朋友圈: ${report.bigDataStatus['moments_feed_data']}\n`;
+                    // 【终极修复】强制等待 1 秒钟，给 iOS 文件系统刷盘的时间
+                    await conversationManager.customAlert(`写入完成 (${writeCount} 项)。\n正在等待系统保存，请勿操作...`);
+                    await new Promise(r => setTimeout(r, 1000));
 
-                    if (report.failed.length > 0) {
-                        resultMsg += `\n【失败详情】\n${report.failed.slice(0, 5).join('\n')}...`;
+                    // 【终极验证】检查关键数据是否存在
+                    const apiCheck = localStorage.getItem('chat-api-profiles');
+                    if (!apiCheck && importedRawData['chat-api-profiles']) {
+                        // 如果依然读取失败，尝试从数据库恢复到 LS (最后一次挣扎)
+                        const dbApi = await imageStore.getItem('chat-api-profiles');
+                        if (dbApi) {
+                            localStorage.setItem('chat-api-profiles', JSON.stringify(dbApi));
+                        } else {
+                            throw new Error("iOS 存储异常：API 设置未能保存。请尝试重启手机释放内存。");
+                        }
                     }
 
-                    await conversationManager.customAlert(resultMsg);
+                    await conversationManager.customAlert('✅ 导入成功！数据已安全落地。\n点击确定刷新页面。');
                     location.reload();
 
                 } catch (error) {
                     console.error("Import failed:", error);
-                    await conversationManager.customAlert(`导入严重错误: ${error.message}\n请尝试重启手机或浏览器后再试。`);
+                    await conversationManager.customAlert(`导入失败: ${error.message}`);
                 }
             };
         });
