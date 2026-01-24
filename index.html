@@ -41719,6 +41719,7 @@ async function handleRemoveMember() {
         triggerFileInput(file => {
             const reader = new FileReader();
             
+            // 根据文件后缀决定读取方式
             if (file.name.endsWith('.zip')) {
                 reader.readAsArrayBuffer(file);
             } else {
@@ -41731,16 +41732,18 @@ async function handleRemoveMember() {
                     const isZip = file.name.endsWith('.zip');
 
                     const confirmed = await conversationManager.customConfirm(
-                        '【最终警告】这将清除并覆盖当前应用的所有数据。\n\n⚠️ iOS 用户注意：导入完成后请等待弹窗报告，不要立即关闭页面。',
+                        '【最终警告】这将清除并覆盖当前应用的所有数据。\n为了防止苹果手机崩溃，导入过程将自动降速，请保持屏幕常亮，不要切换后台。',
                         '覆盖导入确认'
                     );
                     if (!confirmed) return;
 
-                    await conversationManager.customAlert("正在清洗旧数据并写入新数据，过程可能较慢，请勿操作...");
+                    await conversationManager.customAlert("正在解析数据文件，这可能需要几秒钟...");
 
-                    // 1. 解压/解析数据
+                    // 1. 解析数据
                     if (isZip) {
                         const zip = await JSZip.loadAsync(event.target.result);
+                        
+                        // 恢复图片
                         const blobFolder = zip.folder("blobs");
                         if (blobFolder) {
                             const blobFiles = [];
@@ -41751,8 +41754,11 @@ async function handleRemoveMember() {
                                 const blob = await zipEntry.async("blob");
                                 const fileName = zipEntry.name.split('/').pop();
                                 await imageStore.setItem(fileName, blob);
+                                // 【关键】每存一张图歇 5 毫秒，防止 iOS 崩溃
+                                await new Promise(r => setTimeout(r, 5));
                             }
                         }
+
                         const contentFile = zip.file("backup_content.json");
                         if (!contentFile) throw new Error("压缩包内缺少 backup_content.json");
                         const contentText = await contentFile.async("string");
@@ -41762,7 +41768,9 @@ async function handleRemoveMember() {
                         importedRawData = await rehydrateDataFromPortable(parsedData);
                     }
 
-                    // 2. 暴力清空
+                    await conversationManager.customAlert("数据解析完成，正在清空旧数据...");
+
+                    // 2. 清空旧数据
                     localStorage.clear(); 
                     const bigKeysToWipe = [
                         'app-chat-list', 'chat-worldbook', 'app-stickers', 
@@ -41772,90 +41780,110 @@ async function handleRemoveMember() {
                         await imageStore.removeItem(k);
                     }
 
-                    // 3. 逐条写入并统计结果
-                    let successCount = 0;
-                    let dbCount = 0;
-                    let failLog = [];
+                    // 3. 【降速写入】逐条写入并记录结果
+                    await conversationManager.customAlert("正在逐条写入新数据，请勿关闭...");
+                    
+                    let report = {
+                        success: [],
+                        failed: [],
+                        bigDataStatus: {
+                            'chat-worldbook': '未找到',
+                            'app-stickers': '未找到',
+                            'jjForumData': '未找到',
+                            'moments_feed_data': '未找到'
+                        }
+                    };
 
-                    // 定义必须进数据库的大名单
-                    const DB_ONLY_KEYS = [
-                        'novel_data_', 'conversation_', 'app_music_playlist', 
-                        'moments_feed_data', 'app-chat-list', 'chat-worldbook', 
-                        'app-stickers', 'jjForumData'
-                    ];
+                    const keys = Object.keys(importedRawData);
+                    
+                    for (let i = 0; i < keys.length; i++) {
+                        const key = keys[i];
+                        const value = importedRawData[key];
 
-                    for (const key in importedRawData) {
-                        if (Object.prototype.hasOwnProperty.call(importedRawData, key)) {
-                            let value = importedRawData[key];
-                            try {
-                                // 判断是否是大户
-                                const isBig = DB_ONLY_KEYS.some(prefix => key.startsWith(prefix) || key === prefix);
+                        // 【关键】每处理 10 个数据歇 10 毫秒，给 UI 线程喘息机会
+                        if (i % 10 === 0) await new Promise(r => setTimeout(r, 10));
 
-                                if (isBig) {
-                                    // 强制存数据库
-                                    let parsedValue = value;
-                                    if (typeof value === 'string') {
-                                        try { parsedValue = JSON.parse(value); } catch(e) { parsedValue = value; }
-                                    }
-                                    await imageStore.setItem(key, parsedValue);
-                                    
-                                    // 同时也试着存个缓存（双重保险），但不计入失败
-                                    try {
-                                        let strValue = typeof parsedValue === 'string' ? parsedValue : JSON.stringify(parsedValue);
-                                        localStorage.setItem(key, strValue);
-                                    } catch(e) {}
-                                    
-                                    dbCount++;
-                                } else {
-                                    // 普通数据
-                                    let valueToStore;
-                                    if ((key.startsWith('gh_') || key === 'catbox_userhash') && typeof value === 'string') {
-                                        valueToStore = value;
-                                    } else {
-                                        valueToStore = (isZip && typeof value === 'string') ? value : JSON.stringify(value);
-                                    }
-                                    
-                                    try {
-                                        localStorage.setItem(key, valueToStore);
-                                    } catch (e) {
-                                        // 缓存满了，转存数据库
-                                        await imageStore.setItem(key, value);
-                                        dbCount++;
-                                    }
+                        try {
+                            // A. 大数据处理
+                            if (key.startsWith('novel_data_') || 
+                                key.startsWith('conversation_') ||
+                                key === 'app_music_playlist' || 
+                                key === 'moments_feed_data' ||
+                                key === 'app-chat-list' || 
+                                key === 'chat-worldbook' || 
+                                key === 'app-stickers' || 
+                                key === 'jjForumData') {
+                                
+                                let parsedValue = value;
+                                if (typeof value === 'string') {
+                                    try { parsedValue = JSON.parse(value); } catch(e) { parsedValue = value; }
                                 }
-                                successCount++;
+                                
+                                // 1. 强制存数据库
+                                await imageStore.setItem(key, parsedValue);
+                                
+                                // 2. 尝试存缓存 (双重保险)
+                                try {
+                                    let strValue = typeof parsedValue === 'string' ? parsedValue : JSON.stringify(parsedValue);
+                                    localStorage.setItem(key, strValue);
+                                } catch (e) {
+                                    // 缓存满是正常的，不计入失败
+                                }
+
+                                // 记录大数据的状态
+                                if (report.bigDataStatus.hasOwnProperty(key)) {
+                                    report.bigDataStatus[key] = '✅ 写入成功';
+                                }
+                                report.success.push(key);
+                                continue;
+                            }
+
+                            // B. 普通数据处理
+                            let valueToStore;
+                            if ((key.startsWith('gh_') || key === 'catbox_userhash') && typeof value === 'string') {
+                                valueToStore = value;
+                            } else {
+                                if (isZip && typeof value === 'string') {
+                                    valueToStore = value;
+                                } else {
+                                    valueToStore = JSON.stringify(value);
+                                }
+                            }
+                            
+                            try {
+                                localStorage.setItem(key, valueToStore);
                             } catch (e) {
-                                console.error(`写入失败: ${key}`, e);
-                                failLog.push(key);
+                                // 缓存满了转存数据库
+                                await imageStore.setItem(key, value);
+                            }
+                            report.success.push(key);
+
+                        } catch (e) {
+                            console.error(`Write failed for key: ${key}`, e);
+                            report.failed.push(`${key} (${e.message})`);
+                            if (report.bigDataStatus.hasOwnProperty(key)) {
+                                report.bigDataStatus[key] = `❌ 失败: ${e.message}`;
                             }
                         }
                     }
                     
-                    // 【关键】强制等待 500ms，让 iOS 把数据写完
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    // 4. 生成最终报告
+                    let resultMsg = `导入结束！\n成功: ${report.success.length} 项\n失败: ${report.failed.length} 项\n\n【核心数据状态】\n`;
+                    resultMsg += `世界书: ${report.bigDataStatus['chat-worldbook']}\n`;
+                    resultMsg += `表情包: ${report.bigDataStatus['app-stickers']}\n`;
+                    resultMsg += `兔区: ${report.bigDataStatus['jjForumData']}\n`;
+                    resultMsg += `朋友圈: ${report.bigDataStatus['moments_feed_data']}\n`;
 
-                    // 4. 生成体检报告
-                    let reportHtml = `
-                        <div style="text-align:left; font-size:14px;">
-                            <p>✅ 成功处理条目：<b>${successCount}</b></p>
-                            <p>💾 存入数据库(大文件)：<b>${dbCount}</b></p>
-                            ${failLog.length > 0 ? `<p style="color:red;">❌ 失败条目：${failLog.join(', ')}</p>` : '<p style="color:green;">✨ 所有数据写入无报错</p>'}
-                            <hr>
-                            <p style="font-size:12px; color:#666;">如果上方显示“失败”，请截图联系开发者。<br>如果显示成功，点击下方按钮刷新。</p>
-                        </div>
-                    `;
+                    if (report.failed.length > 0) {
+                        resultMsg += `\n【失败详情】\n${report.failed.slice(0, 5).join('\n')}...`;
+                    }
 
-                    await conversationManager.showCustomModal({
-                        title: '导入完成报告',
-                        html: reportHtml,
-                        buttons: [{ text: '确认并刷新', value: 'reload', class: 'primary' }]
-                    });
-                    
+                    await conversationManager.customAlert(resultMsg);
                     location.reload();
 
                 } catch (error) {
                     console.error("Import failed:", error);
-                    await conversationManager.customAlert(`导入严重失败: ${error.message}`);
+                    await conversationManager.customAlert(`导入严重错误: ${error.message}\n请尝试重启手机或浏览器后再试。`);
                 }
             };
         });
