@@ -41731,12 +41731,12 @@ async function handleRemoveMember() {
                     const isZip = file.name.endsWith('.zip');
 
                     const confirmed = await conversationManager.customConfirm(
-                        '【最终警告】这将清除并覆盖当前应用的所有数据。\n针对 iOS 优化：导入后将强制等待数据写入硬盘，请勿在提示完成前关闭页面。',
-                        '覆盖导入确认'
+                        '【最终防爆版】系统将自动检测数据体积。\n超过 100KB 的数据将直接存入数据库，彻底解决 Quota Exceeded 问题。\n确定要导入吗？',
+                        '智能分流导入'
                     );
                     if (!confirmed) return;
 
-                    await conversationManager.customAlert("正在解析数据文件...");
+                    await conversationManager.customAlert("正在解析并清洗数据，请稍候...");
 
                     // 1. 解析数据
                     if (isZip) {
@@ -41751,8 +41751,7 @@ async function handleRemoveMember() {
                                 const blob = await zipEntry.async("blob");
                                 const fileName = zipEntry.name.split('/').pop();
                                 await imageStore.setItem(fileName, blob);
-                                // 降速防止崩溃
-                                await new Promise(r => setTimeout(r, 5));
+                                await new Promise(r => setTimeout(r, 2)); // 微小延时防卡死
                             }
                         }
                         const contentFile = zip.file("backup_content.json");
@@ -41764,7 +41763,7 @@ async function handleRemoveMember() {
                         importedRawData = await rehydrateDataFromPortable(parsedData);
                     }
 
-                    // 2. 清空旧数据
+                    // 2. 暴力清空旧数据
                     localStorage.clear(); 
                     const bigKeysToWipe = [
                         'app-chat-list', 'chat-worldbook', 'app-stickers', 
@@ -41774,89 +41773,78 @@ async function handleRemoveMember() {
                         await imageStore.removeItem(k);
                     }
 
-                    // 3. 写入新数据 (带验证和强制等待)
-                    await conversationManager.customAlert("正在写入数据，请耐心等待...");
+                    // 3. 【核心：按体积智能分流写入】
+                    await conversationManager.customAlert("正在智能分流写入，大文件将自动入库...");
                     
                     const keys = Object.keys(importedRawData);
-                    let writeCount = 0;
+                    let dbCount = 0;
+                    let lsCount = 0;
 
                     for (let i = 0; i < keys.length; i++) {
                         const key = keys[i];
-                        const value = importedRawData[key];
+                        let value = importedRawData[key];
 
-                        // 每写入 20 条数据，强制暂停 20ms，让 iOS 有时间喘气
-                        if (i % 20 === 0) await new Promise(r => setTimeout(r, 20));
+                        // 每 50 条歇一下
+                        if (i % 50 === 0) await new Promise(r => setTimeout(r, 10));
 
                         try {
-                            // A. 大数据 -> 数据库
-                            if (key.startsWith('novel_data_') || 
-                                key.startsWith('conversation_') ||
-                                key === 'app_music_playlist' || 
-                                key === 'moments_feed_data' ||
-                                key === 'app-chat-list' || 
-                                key === 'chat-worldbook' || 
-                                key === 'app-stickers' || 
-                                key === 'jjForumData') {
-                                
-                                let parsedValue = value;
-                                if (typeof value === 'string') {
-                                    try { parsedValue = JSON.parse(value); } catch(e) { parsedValue = value; }
-                                }
-                                await imageStore.setItem(key, parsedValue);
-                                
-                                // 尝试存缓存作为索引
-                                try {
-                                    let strValue = typeof parsedValue === 'string' ? parsedValue : JSON.stringify(parsedValue);
-                                    localStorage.setItem(key, strValue);
-                                } catch (e) {}
-                                
-                                continue;
+                            // 预处理 value，确保是对象或字符串
+                            let parsedValue = value;
+                            let stringValue = "";
+                            
+                            if (typeof value === 'string') {
+                                stringValue = value;
+                                try { parsedValue = JSON.parse(value); } catch(e) { parsedValue = value; }
+                            } else {
+                                parsedValue = value;
+                                stringValue = JSON.stringify(value);
                             }
 
-                            // B. 普通数据 (API设置、历史分支等) -> LocalStorage
-                            let valueToStore;
-                            if ((key.startsWith('gh_') || key === 'catbox_userhash') && typeof value === 'string') {
-                                valueToStore = value;
+                            // 【终极判断】
+                            // 条件1：在传统的“大数据名单”里
+                            // 条件2：【关键】体积超过 100KB (100000 字符)
+                            const isBigByName = key.startsWith('novel_data_') || 
+                                                key.startsWith('conversation_') ||
+                                                key === 'app_music_playlist' || 
+                                                key === 'moments_feed_data' ||
+                                                key === 'app-chat-list' || 
+                                                key === 'chat-worldbook' || 
+                                                key === 'app-stickers' || 
+                                                key === 'jjForumData';
+                            
+                            const isBigBySize = stringValue.length > 100000; // 约 100KB
+
+                            if (isBigByName || isBigBySize) {
+                                // --- 走数据库通道 ---
+                                await imageStore.setItem(key, parsedValue);
+                                
+                                // 尝试在 LocalStorage 留个影（如果存不下就拉倒，不报错）
+                                try {
+                                    localStorage.setItem(key, stringValue);
+                                } catch (e) {
+                                    // 这里的报错是预期的，直接忽略，因为数据已经在数据库里安全了
+                                    console.log(`[分流] ${key} 太大 (${Math.round(stringValue.length/1024)}KB)，仅存入数据库。`);
+                                }
+                                dbCount++;
                             } else {
-                                if (isZip && typeof value === 'string') {
-                                    valueToStore = value;
-                                } else {
-                                    valueToStore = JSON.stringify(value);
+                                // --- 走缓存通道 (小文件) ---
+                                try {
+                                    localStorage.setItem(key, stringValue);
+                                    lsCount++;
+                                } catch (e) {
+                                    // 万一小文件也塞满了，立刻转存数据库保底！
+                                    console.warn(`[溢出保护] ${key} 写入缓存失败，转存数据库。`);
+                                    await imageStore.setItem(key, parsedValue);
+                                    dbCount++;
                                 }
                             }
-                            
-                            // 【核心修复】写入后立即读取验证
-                            localStorage.setItem(key, valueToStore);
-                            const verify = localStorage.getItem(key);
-                            if (!verify) {
-                                // 如果没写进去，转存数据库保底
-                                console.warn(`[iOS 写入失败] Key "${key}" 未能写入缓存，转存数据库。`);
-                                await imageStore.setItem(key, value);
-                            }
-                            writeCount++;
 
                         } catch (e) {
                             console.error(`Write failed for key: ${key}`, e);
                         }
                     }
                     
-                    // 【终极修复】强制等待 1 秒钟，给 iOS 文件系统刷盘的时间
-                    await conversationManager.customAlert(`写入完成 (${writeCount} 项)。\n正在等待系统保存，请勿操作...`);
-                    await new Promise(r => setTimeout(r, 1000));
-
-                    // 【终极验证】检查关键数据是否存在
-                    const apiCheck = localStorage.getItem('chat-api-profiles');
-                    if (!apiCheck && importedRawData['chat-api-profiles']) {
-                        // 如果依然读取失败，尝试从数据库恢复到 LS (最后一次挣扎)
-                        const dbApi = await imageStore.getItem('chat-api-profiles');
-                        if (dbApi) {
-                            localStorage.setItem('chat-api-profiles', JSON.stringify(dbApi));
-                        } else {
-                            throw new Error("iOS 存储异常：API 设置未能保存。请尝试重启手机释放内存。");
-                        }
-                    }
-
-                    await conversationManager.customAlert('✅ 导入成功！数据已安全落地。\n点击确定刷新页面。');
+                    await conversationManager.customAlert(`导入完成！\n数据库存储: ${dbCount} 项 (大文件)\n缓存存储: ${lsCount} 项 (配置)\n\n点击确定刷新页面。`);
                     location.reload();
 
                 } catch (error) {
