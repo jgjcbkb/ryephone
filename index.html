@@ -41717,9 +41717,31 @@ async function handleRemoveMember() {
 
     function importAllData() {
         triggerFileInput(file => {
+            // 1. 创建一个全屏日志窗口，让你亲眼看到导入过程
+            const logOverlay = document.createElement('div');
+            logOverlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;color:#00ff00;font-family:monospace;padding:20px;box-sizing:border-box;overflow-y:auto;white-space:pre-wrap;font-size:12px;";
+            document.body.appendChild(logOverlay);
+
+            const log = (msg, color = '#00ff00') => {
+                const span = document.createElement('div');
+                span.style.color = color;
+                span.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                logOverlay.appendChild(span);
+                logOverlay.scrollTop = logOverlay.scrollHeight; // 自动滚动到底部
+            };
+
+            const closeLog = () => {
+                const btn = document.createElement('button');
+                btn.textContent = "关闭日志并刷新";
+                btn.style.cssText = "position:fixed;bottom:20px;right:20px;padding:15px;background:#fff;color:#000;border:none;border-radius:8px;font-weight:bold;z-index:10000;";
+                btn.onclick = () => location.reload();
+                document.body.appendChild(btn);
+            };
+
+            log(">>> 开始读取文件...");
+
             const reader = new FileReader();
             
-            // 根据文件后缀决定读取方式
             if (file.name.endsWith('.zip')) {
                 reader.readAsArrayBuffer(file);
             } else {
@@ -41731,47 +41753,45 @@ async function handleRemoveMember() {
                     let importedRawData;
                     const isZip = file.name.endsWith('.zip');
 
-                    const confirmed = await conversationManager.customConfirm(
-                        '【最终警告】这将清除并覆盖当前应用的所有数据（包括聊天、世界书、表情包、兔区等）。\n确定要导入吗？',
-                        '覆盖导入确认'
-                    );
-                    if (!confirmed) return;
-
-                    await conversationManager.customAlert("正在清洗旧数据并写入新数据，请稍候...");
+                    log(">>> 文件读取完成，正在解析数据结构...");
 
                     if (isZip) {
-                        // --- 处理 ZIP 备份 ---
                         const zip = await JSZip.loadAsync(event.target.result);
+                        log(">>> ZIP 解压成功。正在恢复图片资源...");
                         
-                        // 1. 恢复图片
                         const blobFolder = zip.folder("blobs");
                         if (blobFolder) {
                             const blobFiles = [];
                             blobFolder.forEach((relativePath, zipEntry) => {
                                 if (!zipEntry.dir) blobFiles.push(zipEntry);
                             });
+                            
+                            let imgCount = 0;
                             for (const zipEntry of blobFiles) {
-                                const blob = await zipEntry.async("blob");
-                                const fileName = zipEntry.name.split('/').pop();
-                                await imageStore.setItem(fileName, blob);
+                                try {
+                                    const blob = await zipEntry.async("blob");
+                                    const fileName = zipEntry.name.split('/').pop();
+                                    await imageStore.setItem(fileName, blob);
+                                    imgCount++;
+                                } catch (e) {
+                                    log(`!!! 图片 ${zipEntry.name} 恢复失败: ${e.message}`, 'red');
+                                }
                             }
+                            log(`>>> 图片资源恢复完成：共 ${imgCount} 张`);
                         }
 
-                        // 2. 读取文本数据
                         const contentFile = zip.file("backup_content.json");
                         if (!contentFile) throw new Error("压缩包内缺少 backup_content.json");
                         const contentText = await contentFile.async("string");
                         importedRawData = JSON.parse(contentText);
                     } else {
-                        // --- 处理 JSON 备份 ---
                         const parsedData = JSON.parse(event.target.result);
+                        log(">>> JSON 解析成功。正在处理 Base64 图片转换...");
                         importedRawData = await rehydrateDataFromPortable(parsedData);
                     }
 
-                    // 3. 【暴力清空】清除所有旧数据 (缓存 + 数据库核心表)
+                    log(">>> 正在清空旧数据...");
                     localStorage.clear(); 
-                    
-                    // 还要把数据库里的核心大文件也删了，防止新数据没覆盖到，残留旧的
                     const bigKeysToWipe = [
                         'app-chat-list', 'chat-worldbook', 'app-stickers', 
                         'moments_feed_data', 'jjForumData', 'app_music_playlist'
@@ -41779,78 +41799,87 @@ async function handleRemoveMember() {
                     for (const k of bigKeysToWipe) {
                         await imageStore.removeItem(k);
                     }
+                    log(">>> 旧数据已清空。开始写入新数据...");
 
-                    // 4. 【终极写入逻辑】 (双重保险机制)
-                    for (const key in importedRawData) {
-                        if (Object.prototype.hasOwnProperty.call(importedRawData, key)) {
-                            let value = importedRawData[key];
-                            
-                            // 定义大容量数据名单
-                            const isBigData = key.startsWith('novel_data_') || 
-                                              key.startsWith('conversation_') ||
-                                              key === 'app_music_playlist' || 
-                                              key === 'moments_feed_data' ||
-                                              key === 'app-chat-list' || 
-                                              key === 'chat-worldbook' || 
-                                              key === 'app-stickers' || 
-                                              key === 'jjForumData';
+                    // 4. 【可视化写入逻辑】
+                    const keys = Object.keys(importedRawData);
+                    log(`>>> 检测到 ${keys.length} 个数据项，开始逐一写入...`);
 
-                            try {
-                                if (isBigData) {
-                                    // 【核心修复】如果是大数据：
-                                    // 1. 必须先存入数据库 (IndexedDB) 作为绝对的保底
-                                    let parsedValue = value;
-                                    if (typeof value === 'string') {
-                                        try { parsedValue = JSON.parse(value); } catch(e) { parsedValue = value; }
-                                    }
-                                    await imageStore.setItem(key, parsedValue);
-
-                                    // 2. 【关键修复】同时也尝试存入 LocalStorage！
-                                    // 之前就是因为少了这一步，导致如果不读数据库的逻辑生效，数据就“消失”了
-                                    // 我们尝试存一下，存不下也没关系，反正数据库里有了
+                    for (const key of keys) {
+                        let value = importedRawData[key];
+                        
+                        try {
+                            // A. 强制进数据库的大数据
+                            if (key.startsWith('novel_data_') || 
+                                key.startsWith('conversation_') ||
+                                key === 'app_music_playlist' || 
+                                key === 'moments_feed_data' ||
+                                key === 'app-chat-list' ||
+                                key === 'chat-worldbook' ||
+                                key === 'app-stickers' ||
+                                key === 'jjForumData') {
+                                
+                                let parsedValue = value;
+                                if (typeof value === 'string') {
+                                    try { parsedValue = JSON.parse(value); } catch(e) { parsedValue = value; }
+                                }
+                                
+                                await imageStore.setItem(key, parsedValue);
+                                
+                                // 【关键】如果是配置类的大数据，同时也尝试写一份到 LocalStorage 方便读取
+                                // 即使失败也不报错，因为数据库里已经有了
+                                if (['app-chat-list', 'app-stickers', 'app_music_playlist'].includes(key)) {
                                     try {
                                         let strValue = typeof parsedValue === 'string' ? parsedValue : JSON.stringify(parsedValue);
                                         localStorage.setItem(key, strValue);
-                                    } catch (e) {
-                                        console.warn(`[覆盖导入] Key "${key}" 太大无法存入缓存，但已安全存入数据库。`);
-                                    }
-                                } else {
-                                    // 普通数据逻辑 (保持不变)
-                                    let valueToStore;
-                                    if ((key.startsWith('gh_') || key === 'catbox_userhash') && typeof value === 'string') {
-                                        valueToStore = value;
-                                    } else {
-                                        if (isZip && typeof value === 'string') {
-                                            valueToStore = value;
-                                        } else {
-                                            valueToStore = JSON.stringify(value);
-                                        }
-                                    }
-                                    
-                                    try {
-                                        localStorage.setItem(key, valueToStore);
-                                    } catch (e) {
-                                        // 防爆兜底
-                                        console.warn(`[覆盖导入] Key "${key}" 写入缓存失败，转存数据库。`);
-                                        await imageStore.setItem(key, value);
-                                    }
+                                    } catch(e) {}
                                 }
-                            } catch (e) {
-                                console.error(`Write failed for key: ${key}`, e);
+
+                                log(`√ [数据库] ${key} 写入成功`, '#00ff00');
+                                continue; 
                             }
+
+                            // B. 普通数据 (设置、外观、人设等)
+                            let valueToStore;
+                            if ((key.startsWith('gh_') || key === 'catbox_userhash') && typeof value === 'string') {
+                                valueToStore = value;
+                            } else {
+                                if (isZip && typeof value === 'string') {
+                                    valueToStore = value;
+                                } else {
+                                    valueToStore = JSON.stringify(value);
+                                }
+                            }
+                            
+                            try {
+                                localStorage.setItem(key, valueToStore);
+                                log(`√ [缓存] ${key} 写入成功`, '#88ff88');
+                            } catch (e) {
+                                // C. 防爆兜底
+                                log(`! [缓存满] ${key} 转存数据库...`, 'yellow');
+                                await imageStore.setItem(key, value);
+                                log(`√ [数据库] ${key} 补救写入成功`, '#00ff00');
+                            }
+                            
+                        } catch (e) {
+                            log(`X [失败] ${key}: ${e.message}`, 'red');
                         }
                     }
                     
-                    await conversationManager.customAlert('数据覆盖导入成功！应用即将刷新。');
-                    location.reload();
+                    log("\n==============================");
+                    log(">>> 全部操作完成！请点击右下角按钮刷新。");
+                    log("==============================");
+                    closeLog();
 
                 } catch (error) {
+                    log(`\n!!! 致命错误: ${error.message}`, 'red');
                     console.error("Import failed:", error);
-                    await conversationManager.customAlert(`导入失败: ${error.message}`);
+                    closeLog();
                 }
             };
         });
     }
+
 
 
     async function mergeAllData() {
