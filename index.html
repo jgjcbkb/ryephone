@@ -45649,7 +45649,8 @@ const cloudBackupManager = (function() {
     }
 
     async function performBackup(isAuto = false) {
-        // 【核心新增 1】备份开始时，强制启动后台保活
+        // 【核心新增 1】备份开始时，强制启动后台保活 (播放静音音频)
+        // 这能防止你切屏去回微信时，浏览器把上传任务杀掉
         if (typeof conversationManager !== 'undefined') {
             conversationManager.enableKeepAlive();
             console.log("☁️ 云端备份：已启动后台保活模式");
@@ -45658,6 +45659,7 @@ const cloudBackupManager = (function() {
         var info = getRepoInfo();
         if (!info) {
             if (!isAuto) alert("请先填写仓库链接和Token！");
+            // 失败也要记得关掉保活
             if (typeof conversationManager !== 'undefined') conversationManager.disableKeepAlive();
             return;
         }
@@ -45684,8 +45686,6 @@ const cloudBackupManager = (function() {
             // 1. 准备文本数据和图片引用列表
             const allTextData = {};
             const blobKeys = new Set();
-            
-            // 【核心修复】只读取，绝不删除！
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
                 if (APP_DATA_PREFIXES.some(prefix => key.startsWith(prefix))) {
@@ -45700,7 +45700,6 @@ const cloudBackupManager = (function() {
             }
 
             // 【核心修复：防丢失补丁】GitHub 备份也要去数据库捞大文件
-            // 注意：这里只做 getItem，绝对不执行 removeItem！
             
             // 1. 捞取音乐
             if (!allTextData['app_music_playlist']) {
@@ -45708,13 +45707,7 @@ const cloudBackupManager = (function() {
                 if (musicDb) allTextData['app_music_playlist'] = JSON.stringify(musicDb);
             }
 
-            // 2. 捞取世界书 (这是你丢失的数据！)
-            if (!allTextData['chat-worldbook']) {
-                const wbDb = await imageStore.getItem('chat-worldbook');
-                if (wbDb) allTextData['chat-worldbook'] = JSON.stringify(wbDb);
-            }
-
-            // 3. 捞取聊天记录
+            // 2. 捞取聊天记录
             let chatListForBackup = JSON.parse(localStorage.getItem('app-chat-list') || 'null');
             if (!chatListForBackup) {
                 chatListForBackup = await imageStore.getItem('app-chat-list') || [];
@@ -45733,7 +45726,7 @@ const cloudBackupManager = (function() {
                 }
             }
 
-            // 4. 捞取朋友圈和表情包
+            // 【核心修复】捞取朋友圈和表情包
             if (!allTextData['moments_feed_data']) {
                 const momentsDb = await imageStore.getItem('moments_feed_data');
                 if (momentsDb) allTextData['moments_feed_data'] = JSON.stringify(momentsDb);
@@ -45743,12 +45736,13 @@ const cloudBackupManager = (function() {
                 if (stickersDb) allTextData['app-stickers'] = JSON.stringify(stickersDb);
             }
 
-            // 5. 捞取小说内容
+            // 【核心新增】捞取小说内容
             const bookshelf = loadFromLocalStorage('app_novel_bookshelf', []);
             for (const book of bookshelf) {
                 try {
                     const bookContent = await imageStore.getItem(`novel_data_${book.id}`);
                     if (bookContent) {
+                        // 注意：小说内容是对象，需要转字符串
                         allTextData[`novel_data_${book.id}`] = JSON.stringify(bookContent);
                     }
                 } catch (e) {
@@ -45769,7 +45763,6 @@ const cloudBackupManager = (function() {
 
             // 3. 上传文本配置文件 (data.json)
             if (statusEl) statusEl.textContent = "正在同步文本数据...";
-            // 核心：使用 unescape(encodeURIComponent(...)) 处理中文乱码
             const jsonContent = btoa(unescape(encodeURIComponent(JSON.stringify(allTextData))));
             const jsonSha = getSha(existingFiles, "data.json");
             
@@ -45783,7 +45776,7 @@ const cloudBackupManager = (function() {
                 })
             });
 
-            // 4. 逐个上传图片
+            // 4. 逐个上传图片 (核心：一张一张处理，防止白屏)
             let count = 0;
             const total = blobKeys.size;
             for (const blobKey of blobKeys) {
@@ -45834,6 +45827,7 @@ const cloudBackupManager = (function() {
             }
             if (!isAuto) alert("备份失败: " + e.message);
         } finally {
+            // 【核心新增 2】无论成功还是失败，最后都要关闭后台保活，释放资源
             if (typeof conversationManager !== 'undefined') {
                 conversationManager.disableKeepAlive();
                 console.log("☁️ 云端备份：保活已关闭");
@@ -45878,6 +45872,7 @@ const cloudBackupManager = (function() {
             const blobKeys = new Set();
             for (const key in allTextData) {
                 const rawValue = allTextData[key];
+                // 简单的正则检查，防止非字符串报错
                 if (typeof rawValue === 'string') {
                     const matches = rawValue.match(/indexeddb:([a-zA-Z0-9_-]+)/g);
                     if (matches) matches.forEach(m => blobKeys.add(m.split(':')[1]));
@@ -45907,53 +45902,48 @@ const cloudBackupManager = (function() {
                 }
             }
 
-            // 4. 清理旧数据并写入新数据
+            // 4. 清理旧数据并写入新数据 (核心修复：加入大容量分流)
             if (statusEl) statusEl.textContent = "正在应用更改...";
             
             // 先清理旧数据
-            localStorage.clear();
-            const bigKeysToWipe = [
-                'app-chat-list', 'chat-worldbook', 'app-stickers', 
-                'moments_feed_data', 'jjForumData', 'app_music_playlist'
+            const CLEANUP_PREFIXES = [ 
+                'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
+                'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
+                'tuqu_', 'token_usage_', 'blacklist_reply_count_',
+                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_' 
             ];
-            for (const k of bigKeysToWipe) {
-                await imageStore.removeItem(k);
-            }
 
-            // 【终极修复】写入新数据时的智能分流逻辑 (双重保险)
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (CLEANUP_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+
+            // 【核心修复】写入新数据时的智能分流逻辑
             let failedKeys = [];
             for (const key in allTextData) {
                 let value = allTextData[key];
                 
                 try {
-                    // 1. 定义大容量数据名单
-                    const isBigData = key.startsWith('novel_data_') || 
-                                      key.startsWith('conversation_') ||
-                                      key === 'app_music_playlist' || 
-                                      key === 'moments_feed_data' ||
-                                      key === 'jjForumData' ||
-                                      key === 'chat-worldbook' ||
-                                      key === 'app-stickers' ||
-                                      key === 'app-chat-list';
-
-                    if (isBigData) {
+                    // 1. 如果是大容量数据的 Key，强制存入 IndexedDB
+                    if (key.startsWith('novel_data_') || 
+                        key === 'app_music_playlist' || 
+                        key.startsWith('conversation_') ||
+                        key === 'moments_feed_data' ||
+                        key === 'app-chat-list') {
+                        
                         // GitHub 上存的是字符串化的 JSON，存入 DB 前需要解析回对象
+                        // 否则读取时会报错
                         let parsedValue = value;
                         if (typeof value === 'string') {
-                            try { parsedValue = JSON.parse(value); } catch(e) { parsedValue = value; }
+                            try { parsedValue = JSON.parse(value); } catch(e) {}
                         }
                         
-                        // A. 强制存入数据库 (保底)
                         await imageStore.setItem(key, parsedValue);
-
-                        // B. 尝试存入 LocalStorage (为了兼容性)
-                        try {
-                            let strValue = typeof parsedValue === 'string' ? parsedValue : JSON.stringify(parsedValue);
-                            localStorage.setItem(key, strValue);
-                        } catch (e) {
-                            console.warn(`[云端恢复] Key "${key}" 太大无法存入缓存，但已安全存入数据库。`);
-                        }
-                        continue; 
+                        continue; // 跳过后续的 localStorage 写入
                     }
 
                     // 2. 普通小数据存入 localStorage
@@ -45970,7 +45960,11 @@ const cloudBackupManager = (function() {
                 statusEl.textContent = "✅ 恢复成功！正在重启...";
             }
             
-            alert("恢复成功！应用即将刷新。");
+            if (failedKeys.length > 0) {
+                alert(`恢复完成，但有 ${failedKeys.length} 个非关键配置因空间不足未写入。核心数据已安全恢复。`);
+            } else {
+                alert("恢复成功！应用即将刷新。");
+            }
             location.reload();
 
         } catch (e) {
@@ -45982,6 +45976,7 @@ const cloudBackupManager = (function() {
             alert("恢复失败: " + e.message);
         }
     }
+    
 
 
     function setupAutoBackup(intervalMinutes) {
