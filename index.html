@@ -24189,8 +24189,9 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                                 border-radius: 8px; 
                                 padding: 10px; 
                                 box-sizing: border-box; 
-                                white-space: pre; 
-                                overflow-x: auto;
+                                /* 【核心修改】改为自动换行，方便截图 */
+                                white-space: pre-wrap; 
+                                word-break: break-all;
                             " readonly>${escapeHtml(errorDetails)}</textarea>
                         </div>
                     `,
@@ -24198,6 +24199,7 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                 });
 
             } finally {
+
 
     // 标记【当前聊天】的加载状态为结束
     loadingStates[originatingChatId] = false;
