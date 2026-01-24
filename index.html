@@ -7721,9 +7721,9 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 
     <!-- 【修改：三按钮布局 (初始化 + 备份 + 恢复)】 -->
     <div class="form-group" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px;">
-        <button id="gh-init-btn" class="btn-primary" style="flex: 1; min-width: 120px; background-color: #6f42c1;">初始化仓库</button>
-        <button id="gh-backup-btn" class="btn-primary" style="flex: 1; min-width: 120px; background-color: #28a745;">立即备份</button>
-        <button id="gh-restore-btn" class="btn-primary" style="flex: 1; min-width: 120px; background-color: #007aff;">从云端恢复</button>
+        <button id="gh-init-btn" class="btn-primary" style="flex: 1; min-width: 120px; background-color: #6f42c1;">配置云端仓库</button>
+        <button id="gh-backup-btn" class="btn-primary" style="flex: 1; min-width: 120px; background-color: #28a745;">执行云端同步</button>
+        <button id="gh-restore-btn" class="btn-primary" style="flex: 1; min-width: 120px; background-color: #007aff;">恢复云端数据</button>
     </div>
     
     <p id="gh-status-msg" style="font-size: 12px; color: #666; text-align: center; margin-top: 10px; min-height: 1.5em;"></p>
@@ -7744,14 +7744,15 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 <div class="form-section danger-zone" style="margin-top: 20px;">
                         <h3>数据管理</h3>
                         <div class="data-management-buttons" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 15px;">
-                            <button id="export-all-data-btn" class="data-management-btn" style="margin: 0; width: 100%; height: 45px;">导出全部数据</button>
-                            <button id="import-all-data-btn" class="data-management-btn danger" style="margin: 0; width: 100%; height: 45px;">覆盖导入数据</button>
-                            <button id="merge-all-data-btn" class="data-management-btn" style="grid-column: span 2; margin: 0; width: 100%; height: 45px; background-color: #28a745; color: white; font-weight: bold;">合并导入数据 (不覆盖现有内容)</button>
-                            <button id="convert-catbox-url-btn" class="data-management-btn" style="grid-column: span 2; margin: 0; width: 100%; height: 45px; background-color: #f39c12; color: white; font-weight: bold;">一键转换 Catbox 链接</button>
-                            <button id="reset-entire-app-btn" class="data-management-btn danger" style="grid-column: span 2; margin-top: 10px; width: 100%; height: 45px; background-color: #dc3545; color: white; font-weight: bold;">清空全量数据 (重置应用)</button>
-                        </div>
-                         <p class="form-hint" style="padding: 0 15px 15px;"><b>覆盖导入：</b>清空当前手机，完全替换为文件内容。<br><b>合并导入：</b>保留当前内容，仅追加文件中新增的聊天、世界书或消息。</p>
-                         <p class="form-hint" style="padding: 0 15px 15px; color: #e67e22;"><b>链接转换：</b>一键将所有 catbox.moe 链接替换为国内可用的镜像链接。</p>
+    <button id="export-all-data-btn" class="data-management-btn" style="margin: 0; width: 100%; height: 45px;">导出全部数据</button>
+    <button id="import-all-data-btn" class="data-management-btn danger" style="margin: 0; width: 100%; height: 45px;">导入所有数据</button>
+    <button id="merge-all-data-btn" class="data-management-btn" style="grid-column: span 2; margin: 0; width: 100%; height: 45px; background-color: #28a745; color: white; font-weight: bold;">合并数据</button>
+    <button id="convert-catbox-url-btn" class="data-management-btn" style="grid-column: span 2; margin: 0; width: 100%; height: 45px; background-color: #f39c12; color: white; font-weight: bold;">一键转换 Catbox 链接</button>
+    <button id="reset-entire-app-btn" class="data-management-btn danger" style="grid-column: span 2; margin-top: 10px; width: 100%; height: 45px; background-color: #dc3545; color: white; font-weight: bold;">清空所有数据 (恢复初始)</button>
+</div>
+ <p class="form-hint" style="padding: 0 15px 15px;"><b>导入所有数据：</b>清除当前系统存储，并以备份文件内容进行完整覆盖。<br><b>合并数据：</b>保留当前系统存储，仅追加备份文件中新增的会话记录、世界书及多媒体资源。</p>
+ <p class="form-hint" style="padding: 0 15px 15px; color: #e67e22;"><b>链接转换：</b>将系统内所有 catbox.moe 资源链接批量替换为国内可用镜像地址。</p>
+
                     </div>
 </div></div>
                 <!-- PAGE 5: Conversation -->
@@ -10484,8 +10485,8 @@ if ('serviceWorker' in navigator) {
             try {
                 // 【核心逻辑】：如果是在线歌曲，且有ID，就去换新链接
                 
-                // 1. 新增：网易/QQ/酷狗 源的自动解析/续期逻辑
-                if (['netease', 'tencent', 'kugou'].includes(song.apiSource) && song.apiId) {
+                // 1. 新增：QQ/酷狗 源的自动解析/续期逻辑 (移除了 netease，让它走 GD)
+                if (['tencent', 'kugou'].includes(song.apiSource) && song.apiId) {
                     console.log(`正在从 ${song.apiSource} 源获取《${song.title}》的最新链接...`);
                     const targetUrl = `https://ovoeo.cn/Api.php?types=url&id=${song.apiId}&source=${song.apiSource}`;
                     const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
@@ -10690,13 +10691,15 @@ if ('serviceWorker' in navigator) {
                     btn.textContent = "...";
                     try {
                         let urlApi = "";
-                        if (song.apiSource === 'kugou') {
-                            urlApi = `https://ovoeo.cn/Api.php?types=url&id=${song.apiId}&source=kugou`;
+                        // 修改：QQ和酷狗走 Ovoeo，网易云走 GD (else)
+                        if (['kugou', 'tencent'].includes(song.apiSource)) {
+                            urlApi = `https://ovoeo.cn/Api.php?types=url&id=${song.apiId}&source=${song.apiSource}`;
                         } else if (song.apiSource === 'qqmp3') {
                             // QQMP3 需要特殊处理，这里简化逻辑，假设它已在播放时更新了 source
                             // 或者你可以复制上面的 fetch 逻辑。为了简洁，我们尝试直接获取
                             urlApi = `https://api.qqmp3.vip/api/kw.php?rid=${song.apiId}&type=json&level=exhigh`;
                         } else {
+                            // 网易云 (netease) 和其他 GD 源走这里
                             urlApi = `https://music-api.gdstudio.xyz/api.php?types=url&source=${song.apiSource}&id=${song.apiId}`;
                         }
 
@@ -10751,9 +10754,9 @@ if ('serviceWorker' in navigator) {
                         if (song.type === 'online') {
                             let fetchUrl = "";
                             try {
-                                if (song.apiSource === 'kugou') {
-                                    // 酷狗源续期
-                                    const res = await fetch(`https://ovoeo.cn/Api.php?types=url&id=${song.apiId}&source=kugou`);
+                                // 修改：QQ和酷狗源续期
+                                if (['kugou', 'tencent'].includes(song.apiSource)) {
+                                    const res = await fetch(`https://ovoeo.cn/Api.php?types=url&id=${song.apiId}&source=${song.apiSource}`);
                                     const d = await res.json();
                                     if (d.url) fetchUrl = d.url;
                                 } else if (song.apiSource === 'qqmp3') {
@@ -10762,7 +10765,7 @@ if ('serviceWorker' in navigator) {
                                     const d = await res.json();
                                     if (d.code === 200 && d.data && d.data.url) fetchUrl = d.data.url;
                                 } else {
-                                    // GD源续期 (网易/酷我等)
+                                    // GD源续期 (网易 netease 会走这里)
                                     const res = await fetch(`https://music-api.gdstudio.xyz/api.php?types=url&source=${song.apiSource}&id=${song.apiId}`);
                                     const d = await res.json();
                                     if (d.url) fetchUrl = d.url;
@@ -11307,18 +11310,23 @@ if ('serviceWorker' in navigator) {
 
     function downloadHelper(content, filename, contentType) {
         try {
-            const blob = new Blob([content], { type: contentType });
+            // 针对大文件，确保使用数组包裹以减少内存拷贝
+            const blob = (content instanceof Blob) ? content : new Blob([content], { type: contentType });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
+            
+            a.style.display = 'none';
             a.href = url;
             a.download = filename;
+            
             document.body.appendChild(a);
             a.click();
-            // 核心修复：将清理操作延迟执行，给浏览器反应时间
+            
+            // 增加延迟时间，确保移动端浏览器唤起下载进程
             setTimeout(() => {
                 document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 100);
+                window.URL.revokeObjectURL(url);
+            }, 1000); 
         } catch(error) {
             console.error("Download failed:", error);
             alert("文件下载失败: " + error.message);
@@ -11383,8 +11391,16 @@ if ('serviceWorker' in navigator) {
             });
         }
         
-        // 【核心修复】必须在这里同时返回 setItem, getItem 和新增加的 removeItem
-        return { setItem, getItem, removeItem };
+        // 新增：强制关闭数据库连接函数
+        async function closeDB() {
+            if (db) {
+                db.close();
+                db = null;
+                console.log("Database connection closed.");
+            }
+        }
+        
+        return { setItem, getItem, removeItem, closeDB };
     })();
     
     // =================================================================================
@@ -41599,7 +41615,7 @@ async function handleRemoveMember() {
     }
     
     async function exportAllData() {
-        await conversationManager.customAlert('正在暴力扫描数据库并打包全量数据，数据量大时请耐心等待，不要关闭页面...');
+        await conversationManager.customAlert('系统正在检索数据库并打包全量数据。数据量较大时处理时间较长，请保持页面开启。');
         
         const allData = {};
         
@@ -41700,14 +41716,28 @@ async function handleRemoveMember() {
                 }
             }
         
-            // 6. 生成文件并下载
-            const jsonString = JSON.stringify(allData, null, 2);
+            // 6. 压缩并生成文件
+            const jsonString = JSON.stringify(allData); // 移除缩进以减小体积
+            const zip = new JSZip();
+            
+            // 将数据存入压缩包内的 backup_content.json
+            zip.file("backup_content.json", jsonString);
+            
+            // 执行压缩，使用最高压缩率
+            const zipContent = await zip.generateAsync({
+                type: "blob",
+                compression: "DEFLATE",
+                compressionOptions: { level: 9 }
+            });
+
             const now = new Date();
             const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
-            const filename = `全量暴力备份_${timestamp}.json`;
+            const filename = `系统全量备份_${timestamp}.zip`;
 
-            downloadHelper(jsonString, filename, 'application/json');
-            await conversationManager.customAlert('✅ 导出成功！\n\n这份备份包含了数据库里的深层数据，请妥善保存。'); 
+            // 调用辅助函数下载生成的 Blob
+            downloadHelper(zipContent, filename, 'application/zip');
+            
+            await conversationManager.customAlert('全量数据导出成功。系统已完成高比例压缩以适配浏览器下载限制，请妥善保管。'); 
         } catch (error) { 
             console.error("Export Critical Error:", error);
             await conversationManager.customAlert('导出崩溃: ' + error.message + "\n\n请截图联系开发者。"); 
@@ -41732,37 +41762,55 @@ async function handleRemoveMember() {
                     const isZip = file.name.endsWith('.zip');
 
                     const confirmed = await conversationManager.customConfirm(
-                        '这将清除并覆盖当前应用的所有数据（包括聊天记录、设置、头像等），此操作不可逆，确定要导入吗？',
-                        '危险操作确认'
+                        '此操作将清除并覆盖当前系统的所有数据，包括但不限于聊天记录、系统设置及多媒体资源。该操作不可撤销，是否确认导入？',
+                        '数据导入确认'
                     );
                     if (!confirmed) return;
 
-                    await conversationManager.customAlert("正在解压并恢复数据，请稍候...");
+                    await conversationManager.customAlert("正在解析并恢复系统数据，请稍候。");
 
                     if (isZip) {
-                        // --- 处理新版 ZIP 备份 ---
+                        // --- 处理 ZIP 备份 (兼容云端复杂包和本地简单包) ---
                         const zip = await JSZip.loadAsync(event.target.result);
                         
-                        // 1. 恢复图片数据到 IndexedDB (直接存入二进制，不经过Base64)
-                        const blobFolder = zip.folder("blobs");
-                        if (blobFolder) {
-                            const blobFiles = [];
-                            blobFolder.forEach((relativePath, zipEntry) => {
-                                if (!zipEntry.dir) blobFiles.push(zipEntry);
-                            });
+                        // 1. 尝试读取 backup_content.json (这是我们刚才导出时生成的文件名)
+                        const contentFile = zip.file("backup_content.json");
+                        
+                        // 2. 如果找不到，尝试读取 data.json (云端备份的格式)
+                        const cloudFile = zip.file("data.json");
+
+                        if (contentFile) {
+                            // --- 情况 A: 本地导出的 ZIP 包 ---
+                            const contentText = await contentFile.async("string");
+                            const parsedData = JSON.parse(contentText);
                             
-                            for (const zipEntry of blobFiles) {
-                                const blob = await zipEntry.async("blob");
-                                const fileName = zipEntry.name.split('/').pop();
-                                await imageStore.setItem(fileName, blob);
+                            // 关键步骤：因为本地导出时图片是 Base64 字符串存在 JSON 里的
+                            // 所以解压后，必须调用 rehydrateDataFromPortable 把 Base64 还原成 Blob 存入数据库
+                            // 否则这些巨大的 Base64 字符串会直接撑爆 localStorage，导致你截图里的报错
+                            importedRawData = await rehydrateDataFromPortable(parsedData);
+
+                        } else if (cloudFile) {
+                            // --- 情况 B: 云端备份的 ZIP 包 (含 blobs 文件夹) ---
+                            // 1. 先恢复图片文件夹
+                            const blobFolder = zip.folder("blobs");
+                            if (blobFolder) {
+                                const blobFiles = [];
+                                blobFolder.forEach((relativePath, zipEntry) => {
+                                    if (!zipEntry.dir) blobFiles.push(zipEntry);
+                                });
+                                for (const zipEntry of blobFiles) {
+                                    const blob = await zipEntry.async("blob");
+                                    const fileName = zipEntry.name.split('/').pop();
+                                    await imageStore.setItem(fileName, blob);
+                                }
                             }
+                            // 2. 读取文本数据 (云端备份的 JSON 里存的是引用，不需要 rehydrate)
+                            const contentText = await cloudFile.async("string");
+                            importedRawData = JSON.parse(contentText);
+                        } else {
+                            throw new Error("压缩包格式无法识别，缺少关键数据文件。");
                         }
 
-                        // 2. 读取文本数据
-                        const contentFile = zip.file("backup_content.json");
-                        if (!contentFile) throw new Error("压缩包内缺少 backup_content.json");
-                        const contentText = await contentFile.async("string");
-                        importedRawData = JSON.parse(contentText);
                     } else {
                         // --- 处理旧版 JSON 备份 ---
                         const parsedData = JSON.parse(event.target.result);
@@ -41832,9 +41880,9 @@ async function handleRemoveMember() {
                     }
                     
                     if (failedKeys.length > 0) {
-                        await conversationManager.customAlert(`导入部分完成，但以下数据因 iOS 存储空间限制(5MB)而失败：\n\n${failedKeys.join(', ')}\n\n建议：删除一些不用的聊天或小说后再试。`);
+                        await conversationManager.customAlert(`数据导入已部分完成。受系统存储配额限制，以下项未能成功写入：\n\n${failedKeys.join(', ')}\n\n建议清理冗余会话或文档后重试。`);
                     } else {
-                        await conversationManager.customAlert('数据导入成功！应用即将刷新以加载新数据。');
+                        await conversationManager.customAlert('数据导入成功。系统即将重新加载以应用更改。');
                     }
                     
                     location.reload();
@@ -41857,12 +41905,12 @@ async function handleRemoveMember() {
                     const data = await rehydrateDataFromPortable(importedRawData);
 
                     const confirmed = await conversationManager.customConfirm(
-                        '确定要执行合并导入吗？\n系统将智能分析文件，将新增的聊天、世界书、帖子、表情包、字体、CSS等追加到现有数据中。',
-                        '全量智能合并'
+                        '系统将对备份文件进行解析，并将新增的会话、世界书条目、社交动态及自定义配置追加至当前数据库。是否确认执行合并？',
+                        '数据合并确认'
                     );
                     if (!confirmed) return;
 
-                    await conversationManager.customAlert("正在执行全量数据智能合并，涉及数据库操作，请耐心等待...");
+                    await conversationManager.customAlert("正在执行数据增量合并，请勿关闭页面。");
 
                     // =========================================================
                     // 1. 聊天列表合并
@@ -42113,7 +42161,7 @@ async function handleRemoveMember() {
                         }
                     }
 
-                    await conversationManager.customAlert('全量数据智能合并完成！\n所有模块（含字体/CSS/正则）均已处理。\n应用即将刷新。');
+                    await conversationManager.customAlert('全量数据增量合并已完成。系统已同步所有模块、自定义配置及多媒体资源。系统即将重新加载。');
                     location.reload();
 
                 } catch (error) {
@@ -42129,49 +42177,77 @@ async function handleRemoveMember() {
 
     async function resetEntireApp() {
         const confirmed1 = await conversationManager.customConfirm(
-            '【最终警告】这将永久删除手机内的所有数据，包括所有聊天记录、人设、世界书、图片、字体和API设置。此操作不可撤销！',
-            '全量数据清空'
+            '警告：此操作将永久删除系统内存储的所有数据，包括会话记录、用户人设、世界书及API配置。该过程无法撤销，请确认是否继续。',
+            '系统重置确认'
         );
         
         if (!confirmed1) return;
 
         const confirmed2 = await conversationManager.customConfirm(
-            '请再次确认：你真的要清空所有数据并重置应用吗？建议你在操作前先执行一次“导出全部数据”进行备份。',
-            '最后的确认'
+            '请再次确认：执行此操作将导致所有本地存储信息丢失。建议在重置前执行“导出全部数据”以完成备份。是否确认重置？',
+            '最终安全确认'
         );
 
         if (confirmed2) {
-            // 1. 清空 LocalStorage (文本数据)
+            // 【核心步骤 1】立即销毁页面 UI，防止视觉残留
+            document.body.innerHTML = `
+                <div style="display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; background:#f0f2f5; font-family:sans-serif;">
+                    <div style="font-size:18px; color:#333; font-weight:bold; margin-bottom:10px;">正在恢复出厂设置...</div>
+                    <div style="font-size:14px; color:#666;">请稍候，系统即将重启</div>
+                </div>
+            `;
+
+            // 【核心步骤 2】清空所有轻量级存储
             localStorage.clear();
+            sessionStorage.clear();
             
-            // 2. 清空 IndexedDB (大文件数据库)
+            // 【核心步骤 3】尝试断开数据库连接
+            if (imageStore && imageStore.closeDB) {
+                await imageStore.closeDB();
+            }
+
+            // 【核心步骤 4】注销 Service Worker 并清理缓存
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                        await registration.unregister();
+                    }
+                } catch(e) { console.error(e); }
+            }
+            if ('caches' in window) {
+                try {
+                    const cacheNames = await caches.keys();
+                    for (const cacheName of cacheNames) {
+                        await caches.delete(cacheName);
+                    }
+                } catch(e) { console.error(e); }
+            }
+            
+            // 【核心步骤 5】定义强制刷新函数
+            const forceReload = () => {
+                // 强制从服务器重新加载，忽略缓存
+                window.location.reload(true);
+            };
+
+            // 【核心步骤 6】尝试删除数据库 (带超时保险)
             try {
                 const dbName = 'ImageBlobStore';
                 const deleteRequest = indexedDB.deleteDatabase(dbName);
                 
-                deleteRequest.onsuccess = () => {
-                    console.log("IndexedDB deleted successfully");
-                    alert('全量数据已清空，应用即将重启。');
-                    location.reload();
-                };
-                
-                deleteRequest.onerror = () => {
-                    console.error("Error deleting IndexedDB");
-                    alert('LocalStorage 已清空，但 IndexedDB 删除失败。应用将尝试重启。');
-                    location.reload();
-                };
-                
-                deleteRequest.onblocked = () => {
-                    console.warn("IndexedDB delete blocked");
-                    alert('LocalStorage 已清空，但由于数据库被占用，部分大文件可能未删除。应用将尝试重启。');
-                    location.reload();
-                };
+                deleteRequest.onsuccess = forceReload;
+                deleteRequest.onerror = forceReload; // 即使出错也刷新，靠清空LS来重置
+                deleteRequest.onblocked = forceReload; // 即使被占用也刷新
             } catch (e) {
-                console.error(e);
-                location.reload();
+                forceReload();
             }
+
+            // 【双重保险】无论上述数据库操作是否卡死，1000毫秒后强制重启
+            // 只要 localStorage 没了，重启后就是一个全新的应用
+            setTimeout(forceReload, 1000);
         }
     }
+
     // =========================================================================
     // ================= START: HYBRID BUBBLE RENDERING CACHE ==================
     // =========================================================================
@@ -45680,22 +45756,18 @@ const cloudBackupManager = (function() {
     }
 
     async function performBackup(isAuto = false) {
-        // 【核心新增 1】备份开始时，强制启动后台保活 (播放静音音频)
-        // 这能防止你切屏去回微信时，浏览器把上传任务杀掉
         if (typeof conversationManager !== 'undefined') {
             conversationManager.enableKeepAlive();
-            console.log("☁️ 云端备份：已启动后台保活模式");
+            console.log("云端同步：后台保活模式已激活");
         }
 
         var info = getRepoInfo();
         if (!info) {
-            if (!isAuto) alert("请先填写仓库链接和Token！");
-            // 失败也要记得关掉保活
+            if (!isAuto) alert("请填写仓库链接及访问令牌。");
             if (typeof conversationManager !== 'undefined') conversationManager.disableKeepAlive();
             return;
         }
 
-        // 保存设置
         localStorage.setItem('gh_saved_url', document.getElementById('gh-full-url').value);
         localStorage.setItem('gh_saved_token', info.token);
         localStorage.setItem('gh_saved_filename', info.filename);
@@ -45704,7 +45776,7 @@ const cloudBackupManager = (function() {
         if (!isAuto) setupAutoBackup(info.autoInterval);
 
         var statusEl = document.getElementById('gh-status-msg');
-        if (statusEl) statusEl.textContent = isAuto ? "正在增量备份..." : "正在准备增量备份...";
+        if (statusEl) statusEl.textContent = isAuto ? "正在执行自动同步..." : "正在准备云端数据同步...";
         
         try {
             const APP_DATA_PREFIXES = [ 
@@ -45869,18 +45941,18 @@ const cloudBackupManager = (function() {
 
     async function performRestore() {
         var info = getRepoInfo();
-        if (!info) return alert("请先填写仓库链接和Token！");
+        if (!info) return alert("请填写仓库链接及访问令牌。");
 
         const confirmed = await conversationManager.customConfirm(
-            "这将从 GitHub 下载并覆盖当前手机的所有数据。建议操作前先手动备份一次。确定要继续吗？",
-            "云端恢复确认"
+            "此操作将从云端下载备份并覆盖当前系统的所有数据。建议在执行前进行本地备份。是否确认继续？",
+            "数据恢复确认"
         );
         if (!confirmed) return;
 
         var statusEl = document.getElementById('gh-status-msg');
         if (statusEl) {
             statusEl.style.color = "#007aff";
-            statusEl.textContent = "正在连接云端...";
+            statusEl.textContent = "正在连接远程服务器...";
         }
 
         try {
@@ -45988,13 +46060,13 @@ const cloudBackupManager = (function() {
 
             if (statusEl) {
                 statusEl.style.color = "#28a745";
-                statusEl.textContent = "✅ 恢复成功！正在重启...";
+                statusEl.textContent = "数据恢复成功。系统重启中...";
             }
             
             if (failedKeys.length > 0) {
-                alert(`恢复完成，但有 ${failedKeys.length} 个非关键配置因空间不足未写入。核心数据已安全恢复。`);
+                alert(`恢复操作已完成。由于系统存储限制，${failedKeys.length} 项非核心配置未能写入，主要数据已成功恢复。`);
             } else {
-                alert("恢复成功！应用即将刷新。");
+                alert("云端数据恢复成功。系统即将重新加载。");
             }
             location.reload();
 
@@ -46146,7 +46218,7 @@ const cloudBackupManager = (function() {
                          }
                      }
 
-                     await conversationManager.customAlert(`转换完成！\n共处理了 ${affectedKeysCount} 个数据模块。\n页面即将刷新以应用更改。`);
+                     await conversationManager.customAlert(`资源链接转换已完成。共处理数据模块：${affectedKeysCount} 项。系统即将重新加载以应用新配置。`);
                      location.reload();
 
                  } catch (error) {
