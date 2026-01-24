@@ -41731,12 +41731,12 @@ async function handleRemoveMember() {
                     const isZip = file.name.endsWith('.zip');
 
                     const confirmed = await conversationManager.customConfirm(
-                        '【最终防爆版】系统将自动检测数据体积。\n超过 100KB 的数据将直接存入数据库，彻底解决 Quota Exceeded 问题。\n确定要导入吗？',
-                        '智能分流导入'
+                        '【最终修正】系统将严格区分数据类型，确保API设置和历史记录能正确读取。\n确定要导入吗？',
+                        '覆盖导入确认'
                     );
                     if (!confirmed) return;
 
-                    await conversationManager.customAlert("正在解析并清洗数据，请稍候...");
+                    await conversationManager.customAlert("正在解析数据...");
 
                     // 1. 解析数据
                     if (isZip) {
@@ -41751,7 +41751,7 @@ async function handleRemoveMember() {
                                 const blob = await zipEntry.async("blob");
                                 const fileName = zipEntry.name.split('/').pop();
                                 await imageStore.setItem(fileName, blob);
-                                await new Promise(r => setTimeout(r, 2)); // 微小延时防卡死
+                                await new Promise(r => setTimeout(r, 2));
                             }
                         }
                         const contentFile = zip.file("backup_content.json");
@@ -41763,7 +41763,7 @@ async function handleRemoveMember() {
                         importedRawData = await rehydrateDataFromPortable(parsedData);
                     }
 
-                    // 2. 暴力清空旧数据
+                    // 2. 清空旧数据
                     localStorage.clear(); 
                     const bigKeysToWipe = [
                         'app-chat-list', 'chat-worldbook', 'app-stickers', 
@@ -41773,8 +41773,8 @@ async function handleRemoveMember() {
                         await imageStore.removeItem(k);
                     }
 
-                    // 3. 【核心：按体积智能分流写入】
-                    await conversationManager.customAlert("正在智能分流写入，大文件将自动入库...");
+                    // 3. 智能写入 (格式保活)
+                    await conversationManager.customAlert("正在写入数据，请耐心等待...");
                     
                     const keys = Object.keys(importedRawData);
                     let dbCount = 0;
@@ -41784,25 +41784,24 @@ async function handleRemoveMember() {
                         const key = keys[i];
                         let value = importedRawData[key];
 
-                        // 每 50 条歇一下
                         if (i % 50 === 0) await new Promise(r => setTimeout(r, 10));
 
                         try {
-                            // 预处理 value，确保是对象或字符串
-                            let parsedValue = value;
+                            // 预处理：确保我们同时拥有“对象版”和“字符串版”
+                            let objectValue = value;
                             let stringValue = "";
-                            
+
                             if (typeof value === 'string') {
+                                // 如果源数据是字符串（比如旧版备份），尝试转回对象
                                 stringValue = value;
-                                try { parsedValue = JSON.parse(value); } catch(e) { parsedValue = value; }
+                                try { objectValue = JSON.parse(value); } catch(e) { objectValue = value; }
                             } else {
-                                parsedValue = value;
+                                // 如果源数据是对象（新版备份），生成字符串副本
+                                objectValue = value;
                                 stringValue = JSON.stringify(value);
                             }
 
-                            // 【终极判断】
-                            // 条件1：在传统的“大数据名单”里
-                            // 条件2：【关键】体积超过 100KB (100000 字符)
+                            // 判断是否为大数据
                             const isBigByName = key.startsWith('novel_data_') || 
                                                 key.startsWith('conversation_') ||
                                                 key === 'app_music_playlist' || 
@@ -41812,29 +41811,29 @@ async function handleRemoveMember() {
                                                 key === 'app-stickers' || 
                                                 key === 'jjForumData';
                             
-                            const isBigBySize = stringValue.length > 100000; // 约 100KB
+                            const isBigBySize = stringValue.length > 100000; // 100KB
 
                             if (isBigByName || isBigBySize) {
-                                // --- 走数据库通道 ---
-                                await imageStore.setItem(key, parsedValue);
+                                // --- 大数据走数据库 ---
+                                // 关键：存入数据库的一定要是【对象】，方便直接读取
+                                await imageStore.setItem(key, objectValue);
                                 
-                                // 尝试在 LocalStorage 留个影（如果存不下就拉倒，不报错）
+                                // 尝试在 LS 留个影（存不下就算了）
                                 try {
                                     localStorage.setItem(key, stringValue);
-                                } catch (e) {
-                                    // 这里的报错是预期的，直接忽略，因为数据已经在数据库里安全了
-                                    console.log(`[分流] ${key} 太大 (${Math.round(stringValue.length/1024)}KB)，仅存入数据库。`);
-                                }
+                                } catch (e) {}
                                 dbCount++;
                             } else {
-                                // --- 走缓存通道 (小文件) ---
+                                // --- 小数据走缓存 (API设置、历史分支等) ---
                                 try {
+                                    // 关键：存入 LocalStorage 的一定要是【JSON字符串】
+                                    // 这样 loadFromLocalStorage 里的 JSON.parse 才能正常工作！
                                     localStorage.setItem(key, stringValue);
                                     lsCount++;
                                 } catch (e) {
-                                    // 万一小文件也塞满了，立刻转存数据库保底！
-                                    console.warn(`[溢出保护] ${key} 写入缓存失败，转存数据库。`);
-                                    await imageStore.setItem(key, parsedValue);
+                                    // 如果满了，转存数据库（作为对象存）
+                                    console.warn(`[溢出保护] ${key} 转存数据库。`);
+                                    await imageStore.setItem(key, objectValue);
                                     dbCount++;
                                 }
                             }
@@ -41844,7 +41843,10 @@ async function handleRemoveMember() {
                         }
                     }
                     
-                    await conversationManager.customAlert(`导入完成！\n数据库存储: ${dbCount} 项 (大文件)\n缓存存储: ${lsCount} 项 (配置)\n\n点击确定刷新页面。`);
+                    // 强制等待刷盘
+                    await new Promise(r => setTimeout(r, 500));
+                    
+                    await conversationManager.customAlert(`导入完成！\n数据库: ${dbCount} 项\n缓存: ${lsCount} 项\n\n点击确定刷新页面。`);
                     location.reload();
 
                 } catch (error) {
