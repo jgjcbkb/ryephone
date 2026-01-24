@@ -41843,7 +41843,7 @@ async function handleRemoveMember() {
                             let value = importedRawData[key];
                             
                             try {
-                                                                                               // 【核心新增】如果是小说、音乐、聊天记录、朋友圈、表情包、好友列表，强制存入 IndexedDB (大容量存储)
+                                // 【核心新增】如果是小说、音乐、聊天记录、朋友圈、表情包、好友列表，强制存入 IndexedDB (大容量存储)
                                 // 这样可以绕过 iOS 的 5MB 限制，确保任何数据都不会丢
                                 if (key.startsWith('novel_data_') || 
                                     key === 'app_music_playlist' || 
@@ -41856,17 +41856,15 @@ async function handleRemoveMember() {
                                     continue;
                                 }
 
-
-
                                 let valueToStore;
+                                // 【核心修复】移除了 isZip 的判断。
+                                // 只有那些明确不经过 JSON.parse 读取的 Key (如 gh_ 设置)，才直接存储字符串。
+                                // 其他所有数据（包括头像 chat_avatar_...）都必须 stringify，否则 loadFromLocalStorage 读不出来。
                                 if ((key.startsWith('gh_') || key === 'catbox_userhash' || key === 'jjForumData') && typeof value === 'string') {
                                     valueToStore = value;
                                 } else {
-                                    if (isZip && typeof value === 'string') {
-                                        valueToStore = value;
-                                    } else {
-                                        valueToStore = JSON.stringify(value);
-                                    }
+                                    // 无论是否为 ZIP，只要不是上面的特殊 Key，统统转为 JSON 字符串存储
+                                    valueToStore = typeof value === 'string' ? JSON.stringify(value) : JSON.stringify(value);
                                 }
                                 
                                 localStorage.setItem(key, valueToStore);
@@ -41878,6 +41876,7 @@ async function handleRemoveMember() {
                             }
                         }
                     }
+
                     
                     if (failedKeys.length > 0) {
                         await conversationManager.customAlert(`数据导入已部分完成。受系统存储配额限制，以下项未能成功写入：\n\n${failedKeys.join(', ')}\n\n建议清理冗余会话或文档后重试。`);
