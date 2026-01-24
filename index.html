@@ -41599,102 +41599,121 @@ async function handleRemoveMember() {
     }
     
     async function exportAllData() {
-        await conversationManager.customAlert('正在准备导出数据，包含图片转换，请稍候...（如果数据量大，页面可能会无响应，请耐心等待）');
+        await conversationManager.customAlert('正在暴力扫描数据库并打包全量数据，数据量大时请耐心等待，不要关闭页面...');
+        
         const allData = {};
         
         try {
-            // 新增：定义需要导出的完整前缀列表
-            const EXPORT_PREFIXES = [ 
-                'app-', 'app_', 'chat-', 'chat_', 'my_', 'conversation_', 'moments_', 
-                'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'jjForumData',
+            // 1. 【核心修复】定义一份“必须检查”的大数据名单
+            // 之前的逻辑只看 LocalStorage，所以这些存进数据库的“隐形”数据都被漏掉了
+            const bigDataKeys = [
+                'app-chat-list',       // 聊天列表
+                'chat-worldbook',      // 世界书
+                'app-stickers',        // 表情包
+                'moments_feed_data',   // 朋友圈
+                'app_music_playlist',  // 音乐列表
+                'jjForumData'          // 兔区数据
+            ];
+
+            // 2. 【暴力搜查】挨个去数据库捞这些大户
+            for (const key of bigDataKeys) {
+                let data = null;
+                
+                // 先看缓存里有没有
+                const lsRaw = localStorage.getItem(key);
+                if (lsRaw && lsRaw !== '[]' && lsRaw !== '{}' && lsRaw !== 'null') {
+                    try { data = JSON.parse(lsRaw); } catch(e) { data = lsRaw; }
+                }
+                
+                // 缓存没有？去数据库死命捞！
+                if (!data) {
+                    try {
+                        data = await imageStore.getItem(key);
+                    } catch(e) { console.error(`DB read error for ${key}`, e); }
+                }
+
+                // 捞到了就处理图片引用并打包
+                if (data) {
+                    console.log(`已捕获数据: ${key}`);
+                    allData[key] = await conversationManager.makeDataPortable(data);
+                }
+            }
+
+            // 3. 【定向抓捕】根据捞回来的聊天列表，去抓每一个聊天的记录
+            // 之前因为聊天列表可能在数据库里，导致这一步直接跳过了，现在修复了
+            const chatListRef = allData['app-chat-list'] || [];
+            if (Array.isArray(chatListRef)) {
+                for (const chat of chatListRef) {
+                    const convKey = `conversation_${chat.id}`;
+                    
+                    // 同样的逻辑：先看缓存，再看数据库
+                    let convData = null;
+                    const lsConv = localStorage.getItem(convKey);
+                    if (lsConv && lsConv !== '[]') {
+                        try { convData = JSON.parse(lsConv); } catch(e){}
+                    }
+                    if (!convData) {
+                        convData = await imageStore.getItem(convKey);
+                    }
+                    
+                    if (convData) {
+                        allData[convKey] = await conversationManager.makeDataPortable(convData);
+                    }
+                }
+            }
+
+            // 4. 【扫尾工作】把剩下的小配置（设置、人设等）从 LocalStorage 里扫进去
+            // 这些数据体积小，通常都在 LS 里
+            const CONFIG_PREFIXES = [ 
+                'app-', 'app_', 'chat-', 'chat_', 'my_', 
+                'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash',
                 'tuqu_', 'token_usage_', 'blacklist_reply_count_',
-                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_' 
+                'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 
+                'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 
+                'chat_favorites_', 'chat_identity_' 
             ];
 
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                
-                // 检查 key 是否匹配任何一个需要备份的前缀
-                if (EXPORT_PREFIXES.some(prefix => key.startsWith(prefix))) {
-                    const rawValue = localStorage.getItem(key);
-                    
-                    // 核心修复：不再盲目解析，而是先尝试解析，如果失败则直接当作字符串处理
-                    let valueToProcess;
-                    try {
-                        // 尝试将值解析为 JSON 对象或数组
-                        valueToProcess = JSON.parse(rawValue);
-                    } catch (e) {
-                        // 如果解析失败 (说明它本身就是个字符串, 比如 "profile_idx_0" 或者 null),
-                        // 就直接使用原始字符串值
-                        valueToProcess = rawValue;
-                    }
-                    
-                    // 无论 valueToProcess 是对象、数组还是字符串，都送去处理图片引用
-                    allData[key] = await conversationManager.makeDataPortable(valueToProcess);
+                // 如果这个 key 已经被上面的大户逻辑处理过了，就跳过，防止重复
+                if (allData[key]) continue;
+
+                if (CONFIG_PREFIXES.some(prefix => key.startsWith(prefix))) {
+                    const raw = localStorage.getItem(key);
+                    let val = raw;
+                    try { val = JSON.parse(raw); } catch(e){}
+                    allData[key] = await conversationManager.makeDataPortable(val);
                 }
             }
 
-            // 【核心修复：防丢失补丁】主动去数据库捞取可能不在 LocalStorage 里的“大户”数据
-            
-            // 1. 捞取音乐列表
-            if (!allData['app_music_playlist']) {
-                const musicDb = await imageStore.getItem('app_music_playlist');
-                if (musicDb) allData['app_music_playlist'] = await conversationManager.makeDataPortable(musicDb);
-            }
-
-            // 2. 捞取所有聊天记录 (通过遍历聊天列表来找 ID)
-            // 先尝试从 LocalStorage 获取列表，如果没有，去数据库捞
-            let chatListForExport = loadFromLocalStorage('app-chat-list', null);
-            if (!chatListForExport) {
-                chatListForExport = await imageStore.getItem('app-chat-list') || [];
-                // 如果是从数据库捞出来的，也要放入导出包
-                if (chatListForExport.length > 0) {
-                    allData['app-chat-list'] = await conversationManager.makeDataPortable(chatListForExport);
-                }
-            }
-
-            for (const chat of chatListForExport) {
-                const convKey = `conversation_${chat.id}`;
-                // 如果 LocalStorage 里没导出到（说明存数据库了），就去数据库捞
-                if (!allData[convKey]) {
-                    const convDb = await imageStore.getItem(convKey);
-                    if (convDb) allData[convKey] = await conversationManager.makeDataPortable(convDb);
-                }
-            }
-
-            // 【核心修复：防丢失补丁】捞取朋友圈和表情包
-            if (!allData['moments_feed_data']) {
-                const momentsDb = await imageStore.getItem('moments_feed_data');
-                if (momentsDb) allData['moments_feed_data'] = await conversationManager.makeDataPortable(momentsDb);
-            }
-            if (!allData['app-stickers']) {
-                const stickersDb = await imageStore.getItem('app-stickers');
-                if (stickersDb) allData['app-stickers'] = await conversationManager.makeDataPortable(stickersDb);
-            }
-
-            // 【核心新增】导出小说内容 (从 IndexedDB 读取)
+            // 5. 【小说特供】小说也是大户，单独去数据库捞
             const bookshelf = loadFromLocalStorage('app_novel_bookshelf', []);
             for (const book of bookshelf) {
                 try {
-                    const bookContent = await imageStore.getItem(`novel_data_${book.id}`);
+                    const bookKey = `novel_data_${book.id}`;
+                    const bookContent = await imageStore.getItem(bookKey);
                     if (bookContent) {
-                        allData[`novel_data_${book.id}`] = bookContent;
+                        allData[bookKey] = bookContent; // 小说纯文本，直接存
                     }
                 } catch (e) {
-                    console.warn(`Failed to export novel content for ${book.title}`, e);
+                    console.warn(`小说导出失败 ${book.title}`, e);
                 }
             }
         
+            // 6. 生成文件并下载
             const jsonString = JSON.stringify(allData, null, 2);
-            const timestamp = new Date().toISOString().slice(0, 19).replace(/[-T:]/g, "");
-            const filename = `app_backup_full_${timestamp}.json`;
+            const now = new Date();
+            const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+            const filename = `全量暴力备份_${timestamp}.json`;
+
             downloadHelper(jsonString, filename, 'application/json');
-            await conversationManager.customAlert('全量数据已导出！现在可以安全地将此文件用于在其他设备上导入。');
-        } catch (error) {
-            console.error("Export failed:", error);
-            await conversationManager.customAlert('导出失败: ' + error.message);
-        }
+            await conversationManager.customAlert('✅ 导出成功！\n\n这份备份包含了数据库里的深层数据，请妥善保存。'); 
+        } catch (error) { 
+            console.error("Export Critical Error:", error);
+            await conversationManager.customAlert('导出崩溃: ' + error.message + "\n\n请截图联系开发者。"); 
+        } 
     }
+
 
     function importAllData() {
         triggerFileInput(file => {
@@ -41776,20 +41795,20 @@ async function handleRemoveMember() {
                             let value = importedRawData[key];
                             
                             try {
-                                                                                               // 【核心新增】如果是小说、音乐、聊天记录、朋友圈、表情包、好友列表，强制存入 IndexedDB (大容量存储)
-                                // 这样可以绕过 iOS 的 5MB 限制，确保任何数据都不会丢
+                                                                                               // 【终极修复】如果是大数据，强制存入 IndexedDB
                                 if (key.startsWith('novel_data_') || 
-                                    key === 'app_music_playlist' || 
                                     key.startsWith('conversation_') ||
+                                    key === 'app_music_playlist' || 
                                     key === 'moments_feed_data' ||
-                                    key === 'jjForumData' ||        // 兔区数据
-                                    key === 'chat-worldbook' ||     // 【核心新增】世界书
-                                    key === 'app-stickers' ||       // 【核心新增】表情包列表
+                                    key === 'jjForumData' ||
+                                    key === 'chat-worldbook' ||
+                                    key === 'app-stickers' ||
                                     key === 'app-chat-list') {
                                     
                                     await imageStore.setItem(key, value);
                                     continue;
                                 }
+
 
 
 
@@ -41898,9 +41917,18 @@ async function handleRemoveMember() {
                         localStorage.setItem('moments_feed_data', JSON.stringify(existingFeed));
                     }
 
-                    // 4. 遍历所有键，处理聊天记录 (conversation_xxx) 和其他数据
+                                        // 4. 遍历所有键，执行真正的智能合并
                     for (const key in data) {
+                        const isBigData = key.startsWith('novel_data_') || 
+                                         key === 'app_music_playlist' || 
+                                         key === 'moments_feed_data' ||
+                                         key === 'jjForumData' ||
+                                         key === 'chat-worldbook' ||
+                                         key === 'app-stickers' ||
+                                         key === 'app-chat-list';
+
                         if (key.startsWith('conversation_')) {
+                            // --- 聊天记录合并逻辑 (保持不变) ---
                             let existingMsgs = loadFromLocalStorage(key, []);
                             if (existingMsgs.length === 0) existingMsgs = await imageStore.getItem(key) || [];
                             
@@ -41915,13 +41943,65 @@ async function handleRemoveMember() {
                                 await imageStore.setItem(key, existingMsgs);
                                 try { localStorage.setItem(key, JSON.stringify(existingMsgs)); } catch(e) {}
                             }
+                        } else if (key === 'app-stickers') {
+                            // --- 【核心修复】表情包合并逻辑 ---
+                            let existingStickers = await imageStore.getItem('app-stickers') || loadFromLocalStorage('app-stickers', []);
+                            const importedStickers = data[key];
+                            
+                            if (Array.isArray(importedStickers)) {
+                                let hasChanges = false;
+                                importedStickers.forEach(newS => {
+                                    // 根据 URL 去重，防止重复添加
+                                    if (!existingStickers.some(oldS => oldS.url === newS.url)) {
+                                        existingStickers.push(newS);
+                                        hasChanges = true;
+                                    }
+                                });
+                                if (hasChanges) {
+                                    await imageStore.setItem('app-stickers', existingStickers);
+                                    // 尝试同步到 LS，存不下就算了
+                                    try { localStorage.setItem('app-stickers', JSON.stringify(existingStickers)); } catch(e) {}
+                                }
+                            }
+                        } else if (key === 'moments_feed_data') {
+                            // --- 【核心修复】朋友圈合并逻辑 ---
+                            let existingFeed = await imageStore.getItem('moments_feed_data') || loadFromLocalStorage('moments_feed_data', []);
+                            const importedFeed = data[key];
+                            
+                            if (Array.isArray(importedFeed)) {
+                                importedFeed.forEach(newPost => {
+                                    const existingPost = existingFeed.find(p => p.id === newPost.id);
+                                    if (!existingPost) {
+                                        existingFeed.push(newPost);
+                                    } else {
+                                        // 如果帖子已存在，合并评论
+                                        newPost.comments.forEach(newComment => {
+                                            if (!existingPost.comments.some(c => c.id === newComment.id)) {
+                                                existingPost.comments.push(newComment);
+                                            }
+                                        });
+                                    }
+                                });
+                                existingFeed.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                                await imageStore.setItem('moments_feed_data', existingFeed);
+                                try { localStorage.setItem('moments_feed_data', JSON.stringify(existingFeed)); } catch(e) {}
+                            }
+                        } else if (isBigData) {
+                            // --- 其他大数据 (小说、兔区等) ---
+                            // 对于这些数据，如果本地没有，直接写入；如果本地有，暂不覆盖（避免逻辑太复杂出错）
+                            const existing = await imageStore.getItem(key);
+                            if (!existing) {
+                                await imageStore.setItem(key, data[key]);
+                            }
                         } else if (!localStorage.getItem(key)) {
-                            // 对于其他不存在的配置键（如新的API配置、人设），直接写入
+                            // --- 普通小数据 ---
                             let val = data[key];
                             if (typeof val !== 'string') val = JSON.stringify(val);
                             localStorage.setItem(key, val);
                         }
                     }
+
+
 
                     await conversationManager.customAlert('智能合并完成！应用即将刷新。');
                     location.reload();
@@ -45736,36 +45816,32 @@ const cloudBackupManager = (function() {
             }
             keysToRemove.forEach(key => localStorage.removeItem(key));
 
-            // 【核心修复】写入新数据时的智能分流逻辑
+            // 【终极修复】写入新数据时的智能分流逻辑 - 覆盖所有大数据 Key
             let failedKeys = [];
             for (const key in allTextData) {
                 let value = allTextData[key];
                 
                 try {
-                    // 1. 如果是大容量数据的 Key，强制存入 IndexedDB
-                    if (key.startsWith('novel_data_') || 
-                        key === 'app_music_playlist' || 
-                        key.startsWith('conversation_') ||
-                        key === 'moments_feed_data' ||
-                        key === 'app-chat-list' || 
-                        // 【↓↓↓ 核心救命补丁：把这三个大户强制加进去！ ↓↓↓】
-                        key === 'jjForumData' ||      // 兔区数据
-                        key === 'chat-worldbook' ||   // 世界书
-                        key === 'app-stickers') {     // 表情包列表
-                        
-                        // GitHub 上存的是字符串化的 JSON，存入 DB 前需要解析回对象
-                        // 否则读取时会报错
+                    // 1. 定义所有必须进数据库的大户名单
+                    const isBigData = key.startsWith('novel_data_') || 
+                                     key.startsWith('conversation_') ||
+                                     key === 'app_music_playlist' || 
+                                     key === 'moments_feed_data' ||
+                                     key === 'jjForumData' ||
+                                     key === 'chat-worldbook' ||
+                                     key === 'app-stickers' ||
+                                     key === 'app-chat-list';
+
+                    if (isBigData) {
                         let parsedValue = value;
                         if (typeof value === 'string') {
-                            try { parsedValue = JSON.parse(value); } catch(e) {}
+                            try { parsedValue = JSON.parse(value); } catch(e) { parsedValue = value; }
                         }
-                        
                         await imageStore.setItem(key, parsedValue);
-                        continue; // 跳过后续的 localStorage 写入
+                        continue; 
                     }
 
-
-                    // 2. 普通小数据存入 localStorage
+                    // 2. 普通小数据才存入 localStorage
                     localStorage.setItem(key, value);
                     
                 } catch (e) {
@@ -45773,6 +45849,7 @@ const cloudBackupManager = (function() {
                     failedKeys.push(key);
                 }
             }
+
 
             if (statusEl) {
                 statusEl.style.color = "#28a745";
@@ -45892,11 +45969,12 @@ const cloudBackupManager = (function() {
                         key === 'app_music_playlist' || 
                         key.startsWith('conversation_') ||
                         key === 'moments_feed_data' ||
+                        key === 'jjForumData' ||
                         key === 'app-chat-list' || 
-                        // 【↓↓↓ 核心救命补丁：把这三个大户强制加进去！ ↓↓↓】
-                        key === 'jjForumData' ||      // 兔区数据
-                        key === 'chat-worldbook' ||   // 世界书
-                        key === 'app-stickers') {     // 表情包列表
+                        // 【核心新增】把世界书和表情包列表也加进来
+                        key === 'chat-worldbook' ||
+                        key === 'app-stickers') {
+
                         
                         // GitHub 上存的是字符串化的 JSON，存入 DB 前需要解析回对象
                         // 否则读取时会报错
@@ -45908,7 +45986,6 @@ const cloudBackupManager = (function() {
                         await imageStore.setItem(key, parsedValue);
                         continue; // 跳过后续的 localStorage 写入
                     }
-
 
                     // 2. 普通小数据存入 localStorage
                     localStorage.setItem(key, value);
