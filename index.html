@@ -43284,7 +43284,11 @@ If the user sends an image/screenshot, simply react to it naturally in your dial
                 return;
             }
 
-            callState.conversation.splice(lastUserMessageIndex + 1);
+            // 核心修复：截断对话数组
+            callState.conversation = callState.conversation.slice(0, lastUserMessageIndex + 1);
+            // 同步更新显示索引
+            callState.currentDialogueIndex = Math.max(0, callState.conversation.filter(m => m.sender !== '{{user}}').length - 1);
+            updateDialogueDisplay();
 
             const typingIndicator = page.querySelector('.typing-indicator-vc');
             dialogueTextEl.textContent = '...';
@@ -43876,22 +43880,32 @@ If the user sends an image/screenshot, simply react to it naturally in your dial
                     { text: '本地上传', value: 'upload', class: 'primary' },
                     { text: '输入链接', value: 'url', class: 'primary' },
                     { text: '取消', value: 'cancel', class: 'secondary' }
-                ]
+                ],
+                // 新增：利用 onRender 在按钮上覆盖透明 input
+                onRender: (modalDOM, closeModal) => {
+                    const localBtn = modalDOM.querySelector('button[data-value="upload"]');
+                    if (localBtn) {
+                        const fileInput = document.createElement('input');
+                        fileInput.type = 'file';
+                        fileInput.accept = 'image/*';
+                        fileInput.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:10;';
+                        localBtn.style.position = 'relative';
+                        localBtn.style.overflow = 'hidden';
+                        localBtn.appendChild(fileInput);
+
+                        fileInput.onchange = async (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            closeModal();
+                            await applyVideoBackground(file);
+                        };
+                    }
+                }
             });
 
-            if (!result || result.value === 'cancel') return;
+            if (!result || result.value === 'cancel' || result.value === 'upload') return; // upload 已在 onRender 处理
 
-            if (result.value === 'upload') {
-                const fileInput = document.createElement('input');
-                fileInput.type = 'file';
-                fileInput.accept = 'image/*';
-                fileInput.onchange = (e) => {
-                    if (e.target.files && e.target.files[0]) {
-                        applyVideoBackground(e.target.files[0]);
-                    }
-                };
-                fileInput.click();
-            } else if (result.value === 'url') {
+            if (result.value === 'url') {
                 const url = await conversationManager.showContentInputModal({
                     title: '输入图片链接',
                     placeholder: 'https://...'
@@ -43904,7 +43918,24 @@ If the user sends an image/screenshot, simply react to it naturally in your dial
 
         function init() {
             endCallBtn.addEventListener('click', endCall);
-            dialogueOverlay.addEventListener('click', () => replyModal.classList.add('visible'));
+            
+            // 修改：判断点击目标，如果是重新生成按钮则拦截，不打开输入框
+            dialogueOverlay.addEventListener('click', (e) => {
+                if (e.target.closest('#vc-regenerate-btn')) {
+                    e.stopPropagation();
+                    return;
+                }
+                replyModal.classList.add('visible');
+            });
+
+            // 新增：正式绑定重新生成按钮的点击事件
+            const regenBtn = page.querySelector('#vc-regenerate-btn');
+            if (regenBtn) {
+                regenBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    regenerateLastAiDialogue();
+                });
+            }
             
             prevBtn.addEventListener('click', e => { 
                 // 统一逻辑：只要不是用户发的，都算作AI台词（包括旁白）
