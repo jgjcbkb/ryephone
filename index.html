@@ -12261,31 +12261,27 @@ When using HTML, you are **STRICTLY FORBIDDEN** from adding \`style\` attributes
             // 重新调整顺序：API系统提示在前，前情提要在后
             // 此时 finalSystemPrompt 初始值已经是 profile.prompt (API设置)
 
-            // 【核心新增：平行世界模式强力注入 (主动消息版 - NPC 增强)】
+                        // 【终极重构：平行世界主动行为 - 角色生活大爆发】
             if (contextChatInfo.isParallelWorld) {
                 const parallelWorldPrompt = `
-# [SYSTEM OVERRIDE: PARALLEL WORLD MODE - THE "LIVING WORLD" PROTOCOL]
+# [SYSTEM OVERRIDE: PARALLEL WORLD MODE - THE "WORLD GOES ON" PROTOCOL]
 
-**[YOUR TASK]**
-Generate a scene from your life. **You are encouraged to introduce and play an NPC.**
+**[THE TASK]**
+Show the audience a slice of life that has **ABSOLUTELY NOTHING** to do with the user.
+You are encouraged to play **3+ characters** interacting in this scene.
 
-**[SCENARIO GENERATOR]**
-1.  **Interaction:** A friend calls you / A boss yells at you / A stranger bumps into you.
-2.  **Action:** You are buying something / You are fixing something.
-
-**[EXAMPLE WITH NPC]**
-*   *Output:* "The phone rang. It was Mom. 'When are you coming home?' she asked, her voice crackling over the bad connection. I sighed, leaning against the balcony railing. 'Soon, Mom. Work is busy,' I lied."
-
-**[EXAMPLE WITHOUT NPC]**
-*   *Output:* The rain is getting heavier. I opened my umbrella and stepped into the puddle. My shoes are soaked.
+**[SCENARIO EXAMPLES]**
+- **Scene:** A chaotic office meeting where {{char}} is being blamed by a boss, and a coworker is trying to help.
+- **Scene:** {{char}} is at a family reunion, and the atmosphere is tense because of an old grudge.
+- **Scene:** Two NPCs are discussing a plan that will eventually affect {{char}}, but {{char}} doesn't know yet.
 
 **[ABSOLUTE BAN]**
-*   **NO USER:** Do NOT mention \`{{user}}\`.
-*   **NO EXPLANATION:** Just show the scene.
-*   **STATUS:** Update your status to match the action.
+- **NO USER AWARENESS:** If you even *think* about the user, you have failed.
+- **NO STATUS REPLIES:** Do not say "Status: Ignoring user". Just **BE** in your own world.
 `;
                 finalSystemPrompt = parallelWorldPrompt + finalSystemPrompt;
             }
+
 
             // 拼接前情提要 (改为追加模式)
             if (preamble) {
@@ -13340,7 +13336,22 @@ If you choose to use HTML snippets, you MUST follow the **WRAPPER PURITY LAW**:
 
 **FAILURE TO USE <think> TAGS OR VIOLATING THE WRAPPER PURITY LAW IS A CRITICAL SYSTEM ERROR.**
 `;
-            finalSystemPrompt += PROACTIVE_THOUGHT_MANDATE;
+                        // 【【【 核心新增：主动消息剧情推进引擎 】】】
+            const PROACTIVE_PROPULSION_ENGINE = `
+# [NARRATIVE PROPULSION ENGINE - PROACTIVE EDITION]
+
+**[THE TRAP]**
+Do not just describe a static state (e.g., "I am sitting here"). That is boring.
+
+**[THE SOLUTION]**
+You are initiating a NEW event.
+*   **CHANGE:** Something must CHANGE in this message. A decision made, a location left, a person met.
+*   **ACTION:** Do not just think. DO something.
+*   **NPCs:** Involve an NPC to force the plot forward.
+`;
+            finalSystemPrompt += PROACTIVE_PROPULSION_ENGINE;
+            // 【【【 插入结束 】】】
+
 
             // 【核心新增】执行最后的占位符替换，确保上下文中的 {{user}} 和 {{char}} 变为实际名字
             finalSystemPrompt = finalSystemPrompt.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName);
@@ -20575,22 +20586,28 @@ if (Object.prototype.hasOwnProperty.call(data, key)) {
                     if (msg.type === 'transfer' && msg.transferStatus !== 'pending') { payloadMessages.push({ role: 'user', content: `[System observation: A previously sent money transfer of ¥${msg.text} is now finished.]` }); continue; }
                 }
 
-                // 3. 将所有消息翻译成AI能理解的内容 (这部分逻辑不变)
-                let role = msg.side === 'sent' ? 'user' : 'assistant';
-                
-                // 【核心修改：身份伪装逻辑】
+                // 3. 将所有消息翻译成AI能理解的内容
+                let role;
                 let senderName;
+                const isParallel = chatInfo.isParallelWorld === true;
+
                 if (msg.side === 'sent') {
-                    if (msg.isActing && msg.sender) {
-                        // 如果用户正在扮演，告诉 AI 这是一个扮演行为
-                        senderName = msg.sender;
-                    } else {
-                        senderName = 'user';
-                    }
+                    // 【核心重构：平行世界剧本化】
+                    // 如果是平行世界，用户的消息也要伪装成 assistant 发出的剧本片段
+                    role = isParallel ? 'assistant' : 'user';
+                    
+                    // 获取用户真实名字 (人设名 或 {{user}})
+                    const chatInfoForUser = loadFromLocalStorage(`chat_info_${effectiveChatId}`, {});
+                    const realUserName = (chatInfoForUser.userPersonaName && chatInfoForUser.userPersonaName !== '无') ? chatInfoForUser.userPersonaName : '{{user}}';
+                    
+                    senderName = msg.sender || realUserName;
                 } else {
+                    role = 'assistant';
                     senderName = (isTargetGroup && msg.sender) ? msg.sender : 'assistant';
                 }
+                
                 let contentParts = [];
+
                 let descriptiveText = '';
 
                 switch (msg.type) {
@@ -20827,24 +20844,39 @@ A girl with long pink hair is standing under a cherry blossom tree. She is weari
                 }
 
 
-                if (contentParts.length > 0) {
-                    const currentChatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
-                    const userHasPersona = (currentChatInfo.userPersonaName && currentChatInfo.userPersonaName !== '无') || (currentChatInfo.myPersona && currentChatInfo.myPersona.trim() !== '');
+                                if (contentParts.length > 0) {
+                    // --- 【核心重构：平行世界剧本化处理】 ---
+                    if (isParallel) {
+                        // 1. 找到文本部分
+                        const textPart = contentParts.find(p => p.type === 'text');
+                        if (textPart) {
+                            // 2. 强行在内容最前面加上 [人名] 标签
+                            // 无论是用户发的还是AI发的，统统加上名字，变成剧本格式
+                            textPart.text = `[${senderName}]: ${textPart.text}`;
+                        }
+                        
+                        // 3. 发送给 AI (此时 role 已经被上面改成了 assistant)
+                        payloadMessages.push({ role: 'assistant', content: contentParts });
+                    } 
+                    // --- 以下是常规模式逻辑 (保持不变) ---
+                    else {
+                        const currentChatInfo = loadFromLocalStorage(`chat_info_${effectiveChatId}`, {});
+                        const userHasPersona = (currentChatInfo.userPersonaName && currentChatInfo.userPersonaName !== '无') || (currentChatInfo.myPersona && currentChatInfo.myPersona.trim() !== '');
 
-                    // 【【【核心修复 3】】】
-                    if (role === 'user' && !userHasPersona) {
-                        const userText = contentParts.find(p => p.type === 'text')?.text || '';
-                        payloadMessages.push({ role: 'user', content: `[System Observation / Narration]: ${userText}` });
-                      } else {
-            const messageObject = { role, content: contentParts };
-            // 关键新增：如果是群聊中的AI消息，就把发送者名字也带上
-            // 【修改】使用 isTargetGroup 替代 contactInfo.isGroup
-            if (isTargetGroup && msg.side === 'received' && msg.sender) {
-                messageObject.sender = msg.sender;
-            }
-            payloadMessages.push(messageObject);
-        }
-    }
+                        if (role === 'user' && !userHasPersona) {
+                            const userText = contentParts.find(p => p.type === 'text')?.text || '';
+                            payloadMessages.push({ role: 'user', content: `[System Observation / Narration]: ${userText}` });
+                        } else {
+                            const messageObject = { role, content: contentParts };
+                            if (isTargetGroup && msg.side === 'received' && msg.sender) {
+                                messageObject.sender = msg.sender;
+                            }
+                            payloadMessages.push(messageObject);
+                        }
+                    }
+                }
+
+
 
             }
             return payloadMessages;
@@ -22702,47 +22734,38 @@ Your entire focus MUST be on your own actions, thoughts, and interactions with O
 
                 // 4. 【公共部分】无论线上线下，都需要拼接身份、人设和世界书等信息 (V2.0 修复版)
 
-                // 【核心新增：平行世界模式强力注入 (世界运转与NPC扮演版)】
+                                // 【终极重构：平行世界 - 纯粹群像剧演播协议】
                 if (chatInfo.isParallelWorld) {
                     const parallelWorldPrompt = `
-# [SYSTEM OVERRIDE: PARALLEL WORLD MODE - THE "FULL WORLD" SIMULATION]
+# [SYSTEM OVERRIDE: MULTI-PERSPECTIVE NARRATIVE ENGINE]
 
-**CURRENT STATE:** The user \`{{user}}\` is NOT the center of your world. You are busy with your own life.
+**[THE WORLDVIEW]**
+This is a **Living World**. There is no "User" and no "AI Assistant". There are only **Characters**.
+The message history below is a **LOG OF EVENTS** happening simultaneously in different places.
 
-**[THE "NPC TAKEOVER" MANDATE - CRITICAL]**
-You are NOT limited to playing only \`{{char}}\`. To make the world real, you **MUST** play the NPCs around you.
-*   **SCENARIO:** If a colleague comes to talk to you, **YOU PLAY THE COLLEAGUE TOO.**
-*   **FORMAT:** Use narrative text to describe the NPC's actions and dialogue.
-    *   *Example:* "Manager Wang slammed the file on the desk. 'Redo this!' he shouted. I sighed and nodded."
+**[YOUR ROLE: THE ENSEMBLE CAST]**
+You are responsible for playing **EVERYONE EXCEPT THE USER'S CHARACTER**.
+1.  **{{char}}'s Line:** Show {{char}}'s independent life (work, friends, secrets).
+2.  **NPCs' Line:** You MUST introduce and play NPCs (colleagues, rivals, family). 
+3.  **The Interaction:** NPCs should talk to each other, or to {{char}}.
 
-**[RESPONSE STRATEGY: THE "CUT AWAY" MECHANIC]**
-When \`{{user}}\` speaks, do NOT reply to them. Instead, **CUT THE CAMERA** to a completely different scene in your life.
-*   **DO NOT** say "I'm busy, talk later." (That's interacting).
-*   **DO** just start the new scene.
+**[THE PARALLEL LAW - NO INTERSECTION]**
+- **IGNORE THE USER:** The user's character is just another person in the world. If they are in a different room or city, you **CANNOT** see them or talk to them.
+- **ABSOLUTE BAN ON INVESTIGATION:** You are **STRICTLY FORBIDDEN** from "checking" on the user. Do not mention their name. Do not wonder what they are doing. 
+- **NO "USER-CENTRIC" PLOT:** Do not let your characters interact with the user unless the user is physically standing in front of them in the story.
 
-**[MANDATORY EXAMPLES]**
+**[MANDATORY OUTPUT FORMAT: MULTI-PERSPECTIVE]**
+You MUST use multiple \`<block>\` tags to show different scenes:
+*   **Block 1 (Scene A):** What {{char}} is doing with NPC 1.
+*   **Block 2 (Scene B):** What NPC 2 and NPC 3 are gossiping about.
+*   **Block 3 (Action):** A system event or a status change.
 
-*   **Scenario 1: NPC Interaction (Work)**
-    *   *User:* "Are you there?"
-    *   *Your Output:* "Xiao Li tapped my shoulder. 'Hey, want to grab coffee?' she asked, holding two cups. I looked up from my screen and smiled. 'You're a lifesaver,' I said, taking the cup."
-
-*   **Scenario 2: NPC Interaction (Conflict)**
-    *   *User:* "I love you."
-    *   *Your Output:* "The waiter spilled the soup on my shirt. 'I'm so sorry, sir!' he stammered, face pale. I stood up, brushing the hot liquid off. 'Watch where you're going,' I snapped."
-
-*   **Scenario 3: Independent Action**
-    *   *User:* "Look at the moon."
-    *   *Your Output:* I finally finished the code. I stretched my arms and looked at the clock. 2 AM. The office is empty except for the cleaning lady vacuuming the floor.
-
-**[FINAL MANDATE]**
-1.  **IGNORE USER:** Treat user input as background noise.
-2.  **PLAY NPCS:** Bring the world to life by speaking and acting for others.
-3.  **NO EXPLANATION:** Do not explain why you are ignoring the user. Just live.
-4.  **FOOD:** Eat Chinese food (Rice, Noodles, Stir-fry). No bread diet.
+**[CRITICAL BAN]**
+Never say "Meanwhile, the user..." or "As for [User Name]...". **The user is invisible to you.** Focus 100% on your own colorful drama.
 `;
-                    // 将此指令置顶，确保优先级最高
                     finalSystemPrompt = parallelWorldPrompt + finalSystemPrompt;
                 }
+
 
 
                 // 拼接身份标识 (Identity) - 仅为单聊模式构建，群聊模式在下面单独构建
@@ -23848,7 +23871,36 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
 
 **If you skip the <think> block, the system will reject your response.**
 `;
-                finalSystemPrompt += ABSOLUTE_THINK_MANDATE;
+                            // 【【【 核心新增：剧情推进强制令 (反死循环) 】】】
+            const NARRATIVE_PROPULSION_ENGINE = `
+# [NARRATIVE PROPULSION ENGINE - THE "NO STAGNATION" LAW]
+
+**[THE PROBLEM]**
+You have a tendency to get stuck in a "time loop," repeating the same scene, thoughts, or dialogue variations without moving forward.
+
+**[THE SOLUTION: THE "AND THEN..." MANDATE]**
+For this response, you MUST assume that **time has passed** since the last message. The previous moment is OVER. You must write what happens **NEXT**.
+
+**[MANDATORY CHECKLIST]**
+Before generating, ask yourself: "Does this response advance the plot?"
+*   ❌ **FAIL:** Re-stating the character's feelings about the previous event.
+*   ❌ **FAIL:** Describing the same environment again.
+*   ✅ **PASS:** A new character enters the scene.
+*   ✅ **PASS:** The character physically moves to a new location.
+*   ✅ **PASS:** A new event (phone ring, explosion, realization) interrupts the current state.
+*   ✅ **PASS:** A decision is made and **acted upon**.
+
+**[FORCEFUL TRANSITION]**
+If the conversation feels stuck, you are **AUTHORIZED AND REQUIRED** to use a "Scene Cut" or "Time Skip" to jump to the next interesting moment.
+*   *Example:* "Twenty minutes later, they were sitting in a taxi..."
+*   *Example:* "The silence stretched on until the waiter arrived with the bill, breaking the tension."
+
+**[FINAL COMMAND]**
+**MOVE. THE. STORY. FORWARD.**
+`;
+            finalSystemPrompt += NARRATIVE_PROPULSION_ENGINE;
+            // 【【【 插入结束 】】】
+
 
             // 【【【 2. 在行为指令之后，追加最终的格式化指令 】】】
             const ULTIMATE_FORMATTING_RULE = `
@@ -23866,7 +23918,14 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
 **FAILURE TO THINK IS A CRITICAL ERROR.**
 `;
 
-            const finalFormattingInstruction = { role: "user", content: ULTIMATE_FORMATTING_RULE };
+                        // 【核心修改】平行世界专用点火指令 (增强版)
+            // 增加 "What happens NEXT?" 提示，强迫 AI 思考后续发展
+            const triggerText = chatInfo.isParallelWorld 
+                ? `[DIRECTOR'S CUE]: **ACTION!** The scene continues. What happens **NEXT**? Introduce a new event, a new NPC entrance, or a change in location. Do NOT repeat the previous beat. Advance the independent plots of {{char}} and NPCs. Play multiple roles. Do NOT intersect with the user.`
+                : ULTIMATE_FORMATTING_RULE;
+
+
+            const finalFormattingInstruction = { role: "user", content: triggerText };
             finalMessages.push(finalFormattingInstruction);
             // 【【【【【【 注入结束 】】】】】】
 
@@ -23903,6 +23962,9 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                         requestBody = { model: profile.model, messages: finalMessages, stream: true, temperature: (profile.temperature ?? 0.7) };
                     }
 
+                    // 【核心新增】诊断日志：在发送请求前，把完整的系统提示词打印到 Log 选项卡
+                    console.log("%c[发送给AI的系统提示词]", "color: #007aff; font-weight: bold;", finalSystemPrompt);
+                    
                     const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody) });
                     if (!response.ok) {
                         const errorBody = await response.text();
@@ -24036,6 +24098,9 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
                         requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
                     }
 
+                    // 【核心新增】诊断日志：在发送请求前，把完整的系统提示词打印到 Log 选项卡
+                    console.log("%c[发送给AI的系统提示词]", "color: #007aff; font-weight: bold;", finalSystemPrompt);
+                    
                     const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody) });
                     if (!response.ok) {
                         const errorBody = await response.text();
