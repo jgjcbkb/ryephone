@@ -23962,9 +23962,6 @@ If the conversation feels stuck, you are **AUTHORIZED AND REQUIRED** to use a "S
                         requestBody = { model: profile.model, messages: finalMessages, stream: true, temperature: (profile.temperature ?? 0.7) };
                     }
 
-                    // 【核心新增】诊断日志：在发送请求前，把完整的系统提示词打印到 Log 选项卡
-                    console.log("%c[发送给AI的系统提示词]", "color: #007aff; font-weight: bold;", finalSystemPrompt);
-                    
                     const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody) });
                     if (!response.ok) {
                         const errorBody = await response.text();
@@ -24098,9 +24095,6 @@ If the conversation feels stuck, you are **AUTHORIZED AND REQUIRED** to use a "S
                         requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
                     }
 
-                    // 【核心新增】诊断日志：在发送请求前，把完整的系统提示词打印到 Log 选项卡
-                    console.log("%c[发送给AI的系统提示词]", "color: #007aff; font-weight: bold;", finalSystemPrompt);
-                    
                     const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody) });
                     if (!response.ok) {
                         const errorBody = await response.text();
