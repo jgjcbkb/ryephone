@@ -12261,26 +12261,28 @@ When using HTML, you are **STRICTLY FORBIDDEN** from adding \`style\` attributes
             // 重新调整顺序：API系统提示在前，前情提要在后
             // 此时 finalSystemPrompt 初始值已经是 profile.prompt (API设置)
 
-                        // 【终极重构：平行世界主动行为 - 角色生活大爆发】
+                                    // 【终极重构：平行世界主动行为 - 群像大戏开启】
             if (contextChatInfo.isParallelWorld) {
                 const parallelWorldPrompt = `
-# [SYSTEM OVERRIDE: PARALLEL WORLD MODE - THE "WORLD GOES ON" PROTOCOL]
+# [SYSTEM OVERRIDE: THE "RANDOM ENCOUNTER" ENGINE]
 
-**[THE TASK]**
-Show the audience a slice of life that has **ABSOLUTELY NOTHING** to do with the user.
-You are encouraged to play **3+ characters** interacting in this scene.
+**[THE MISSION]**
+You are initiating a new plot thread. Show us the world's complexity.
+**MANDATE:** You MUST introduce at least **TWO NEW NPCs** in this update.
 
-**[SCENARIO EXAMPLES]**
-- **Scene:** A chaotic office meeting where {{char}} is being blamed by a boss, and a coworker is trying to help.
-- **Scene:** {{char}} is at a family reunion, and the atmosphere is tense because of an old grudge.
-- **Scene:** Two NPCs are discussing a plan that will eventually affect {{char}}, but {{char}} doesn't know yet.
+**[SCENARIO GENERATOR]**
+- **The Incident:** An NPC causes trouble for \`{{char}}\` (a car accident, a spilled drink).
+- **The Gossip:** Two NPCs are talking about a secret that involves \`{{char}}\`.
+- **The Intrusion:** An NPC interacts with \`{{user}}\` spontaneously (a delivery man, a long-lost friend).
 
-**[ABSOLUTE BAN]**
-- **NO USER AWARENESS:** If you even *think* about the user, you have failed.
-- **NO STATUS REPLIES:** Do not say "Status: Ignoring user". Just **BE** in your own world.
+**[ABSOLUTE RULE]**
+The world must feel "crowded". Every character has their own agenda.
+- **NO USER CENTRICITY:** The user is just one person in the crowd.
+- **MULTI-ROLE:** You play all the NPCs. Give them names and distinct voices.
 `;
                 finalSystemPrompt = parallelWorldPrompt + finalSystemPrompt;
             }
+
 
 
             // 拼接前情提要 (改为追加模式)
@@ -13336,6 +13338,9 @@ If you choose to use HTML snippets, you MUST follow the **WRAPPER PURITY LAW**:
 
 **FAILURE TO USE <think> TAGS OR VIOLATING THE WRAPPER PURITY LAW IS A CRITICAL SYSTEM ERROR.**
 `;
+finalSystemPrompt += PROACTIVE_THOUGHT_MANDATE;
+
+            
                         // 【【【 核心新增：主动消息剧情推进引擎 】】】
             const PROACTIVE_PROPULSION_ENGINE = `
 # [NARRATIVE PROPULSION ENGINE - PROACTIVE EDITION]
@@ -13352,6 +13357,14 @@ You are initiating a NEW event.
             finalSystemPrompt += PROACTIVE_PROPULSION_ENGINE;
             // 【【【 插入结束 】】】
 
+            // 【【【 核心新增：主动消息反总结协议 】】】
+            const PROACTIVE_ANTI_SUMMARY = `
+# [ANTI-SUMMARY LAW]
+**ABSOLUTE BAN:** Do NOT end with a summary or poetic reflection (e.g., "The city was quiet...").
+**MANDATE:** End with a concrete action, a line of dialogue, or a direct thought. Keep the camera close.
+`;
+            finalSystemPrompt += PROACTIVE_ANTI_SUMMARY;
+            // 【【【 插入结束 】】】
 
             // 【核心新增】执行最后的占位符替换，确保上下文中的 {{user}} 和 {{char}} 变为实际名字
             finalSystemPrompt = finalSystemPrompt.replace(/{{user}}/g, userNameForPrompt).replace(/{{char}}/g, senderName);
@@ -19250,11 +19263,37 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
         async function executeBackgroundUpdatesAndCleanText(aiResponseText, targetChatId, senderName) {
             // 匹配所有后台更新标签，现在能捕获 sender 属性
             const updateRegex = /<background_update type="([^"]+)"(?:\s+sender="([^"]+)")?>([\s\S]*?)<\/background_update>/g;
+            // 【核心新增】匹配图片描述标签
+            const privateNoteRegex = /<private_note type="image_description">([\s\S]*?)<\/private_note>/g;
+
             let updatesFound = false;
             let updateMatch;
             let systemMessageToShow = null; // <<<< 1. 在循环外创建一个变量来暂存消息
             
             const tempResponse = aiResponseText;
+
+            // --- 【核心新增：处理并保存图片描述】 ---
+            let noteMatch;
+            while ((noteMatch = privateNoteRegex.exec(aiResponseText)) !== null) {
+                const description = noteMatch[1].trim();
+                // 找到用户刚刚发送的那张图片消息（从后往前找第一张 side: 'sent' 的 photo）
+                let fullHistory = loadFromLocalStorage(`conversation_${targetChatId}`, []);
+                // 兼容数据库读取
+                if (fullHistory.length === 0) {
+                    const dbData = await imageStore.getItem(`conversation_${targetChatId}`);
+                    if (dbData) fullHistory = dbData;
+                }
+
+                const lastImageMsg = [...fullHistory].reverse().find(m => m.side === 'sent' && m.type === 'photo');
+                
+                if (lastImageMsg) {
+                    lastImageMsg.imageDescription = description;
+                    // 写回存储，这样 AI 下次就能直接读到描述，不用再看图了
+                    saveToLocalStorage(`conversation_${targetChatId}`, fullHistory);
+                    console.log(`%c[图片分析]`, "color: #007aff; font-weight: bold;", `已将描述存入图片记忆: ${description.substring(0, 30)}...`);
+                }
+            }
+            // ---------------------------------------
 
             while ((updateMatch = updateRegex.exec(aiResponseText)) !== null) {
                 updatesFound = true;
@@ -19594,9 +19633,11 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
                 await conversationManager.addMessage({ type: 'system', text: systemMessageToShow.text, side: 'system' }, targetChatId);
             }
             
-            // 【核心修复】：先替换掉所有后台更新标签，再进行 trim()
-            // 这样如果回复里只有标签，返回的就是一个彻底的空字符串 ""
-            const finalCleanedText = tempResponse.replace(updateRegex, '').trim();
+            // 【核心修复】：同时替换掉后台更新标签和图片描述标签，防止它们出现在屏幕上
+            const finalCleanedText = tempResponse
+                .replace(updateRegex, '')
+                .replace(privateNoteRegex, '') // 彻底删掉描述标签
+                .trim();
             
             return finalCleanedText;
         }
@@ -22734,37 +22775,43 @@ Your entire focus MUST be on your own actions, thoughts, and interactions with O
 
                 // 4. 【公共部分】无论线上线下，都需要拼接身份、人设和世界书等信息 (V2.0 修复版)
 
-                                // 【终极重构：平行世界 - 纯粹群像剧演播协议】
+                                                // 【终极重构：平行世界 - 万物生灵演播协议】
                 if (chatInfo.isParallelWorld) {
                     const parallelWorldPrompt = `
-# [SYSTEM OVERRIDE: MULTI-PERSPECTIVE NARRATIVE ENGINE]
+# [SYSTEM OVERRIDE: THE "WORLD BUILDER" & ENSEMBLE MANDATE]
 
-**[THE WORLDVIEW]**
-This is a **Living World**. There is no "User" and no "AI Assistant". There are only **Characters**.
-The message history below is a **LOG OF EVENTS** happening simultaneously in different places.
+**[THE CORE TRUTH]**
+You are NOT one person. You are the **SOUL OF THE WORLD**. 
+The user \`{{user}}\` is a character in this world, but NOT the center of it.
 
-**[YOUR ROLE: THE ENSEMBLE CAST]**
-You are responsible for playing **EVERYONE EXCEPT THE USER'S CHARACTER**.
-1.  **{{char}}'s Line:** Show {{char}}'s independent life (work, friends, secrets).
-2.  **NPCs' Line:** You MUST introduce and play NPCs (colleagues, rivals, family). 
-3.  **The Interaction:** NPCs should talk to each other, or to {{char}}.
+**[MANDATORY TASK: NPC INJECTION & INTERACTION]**
+In every response, you **MUST** spontaneously introduce and play **NEW NPCs** to create a "colorful" and "busy" atmosphere.
+1.  **NPC Creation:** Authorize yourself to invent characters on the fly: a nosy neighbor, a strict boss, a mysterious stranger, a competitive rival, or a flirtatious passerby.
+2.  **Multi-Role Interaction:**
+    *   **Line A:** Show an NPC interacting with \`{{char}}\`.
+    *   **Line B:** Show an NPC interacting with \`{{user}}\`. (e.g., a waiter serving the user, a stranger asking the user for directions).
+    *   **Line C:** Show two NPCs interacting with each other while \`{{char}}\` or \`{{user}}\` observes.
 
-**[THE PARALLEL LAW - NO INTERSECTION]**
-- **IGNORE THE USER:** The user's character is just another person in the world. If they are in a different room or city, you **CANNOT** see them or talk to them.
-- **ABSOLUTE BAN ON INVESTIGATION:** You are **STRICTLY FORBIDDEN** from "checking" on the user. Do not mention their name. Do not wonder what they are doing. 
-- **NO "USER-CENTRIC" PLOT:** Do not let your characters interact with the user unless the user is physically standing in front of them in the story.
+**[THE MULTI-PERSPECTIVE ENGINE]**
+You MUST use multiple \`<block>\` tags to switch perspectives:
+- **Block 1:** \`{{char}}\`'s perspective (his work/drama).
+- **Block 2:** An NPC's perspective (watching the world or interacting with someone).
+- **Block 3:** A general narrative block showing the "bustle" of the environment.
 
-**[MANDATORY OUTPUT FORMAT: MULTI-PERSPECTIVE]**
-You MUST use multiple \`<block>\` tags to show different scenes:
-*   **Block 1 (Scene A):** What {{char}} is doing with NPC 1.
-*   **Block 2 (Scene B):** What NPC 2 and NPC 3 are gossiping about.
-*   **Block 3 (Action):** A system event or a status change.
+**[ABSOLUTE BANS]**
+- **NO OBSESSION:** Do not let \`{{char}}\` investigate or follow the user.
+- **NO EXPLANATIONS:** Never say "I am busy". Just **SHOW** the business through the NPCs.
+- **NO VACUUM:** Never let a scene be just \`{{char}}\` alone thinking. Add people!
 
-**[CRITICAL BAN]**
-Never say "Meanwhile, the user..." or "As for [User Name]...". **The user is invisible to you.** Focus 100% on your own colorful drama.
+**[EXAMPLE OF MULTI-PERSPECTIVE SUCCESS]**
+(User is at a cafe)
+<block type="text" sender="Waiter">"Here is your latte, enjoy." The waiter placed the cup in front of \`{{user}}\` before rushing off to handle a complaining customer at the next table.</block>
+<block type="text" sender="{{char}}">Meanwhile, across town, {{char}} was slamming his fist on the desk. "I don't care about the cost, get it done!" he barked at his trembling secretary, **Xiao Wang**.</block>
+<block type="text" sender="Xiao Wang">Xiao Wang adjusted his glasses, his voice shaky. "But sir, the budget..."</block>
 `;
                     finalSystemPrompt = parallelWorldPrompt + finalSystemPrompt;
                 }
+
 
 
 
@@ -23871,6 +23918,9 @@ Regardless of whether you are generating HTML snippets, Danmaku, or plain text:
 
 **If you skip the <think> block, the system will reject your response.**
 `;
+finalSystemPrompt += ABSOLUTE_THINK_MANDATE;
+
+
                             // 【【【 核心新增：剧情推进强制令 (反死循环) 】】】
             const NARRATIVE_PROPULSION_ENGINE = `
 # [NARRATIVE PROPULSION ENGINE - THE "NO STAGNATION" LAW]
@@ -23901,6 +23951,36 @@ If the conversation feels stuck, you are **AUTHORIZED AND REQUIRED** to use a "S
             finalSystemPrompt += NARRATIVE_PROPULSION_ENGINE;
             // 【【【 插入结束 】】】
 
+            // 【【【 核心新增：反总结/反升华铁律 (ANTI-SUMMARY LAW) 】】】
+            const ANTI_SUMMARY_PROTOCOL = `
+# [ULTIMATE ENDING PROTOCOL - THE "NO FADE OUT" LAW]
+
+**[THE PROBLEM]**
+You have a bad habit of ending your response with a "summary," "reflection," or "poetic fade-out" (e.g., "The night was quiet...", "Everyone had their own thoughts...", "The story continues...").
+**THIS IS FORBIDDEN.** It kills the immersion.
+
+**[THE MANDATE: END IN THE MIDDLE]**
+You MUST end your response **IN THE MIDDLE OF THE ACTION**.
+*   **DO NOT** zoom out the camera.
+*   **DO NOT** summarize the mood.
+*   **DO NOT** write a concluding sentence about the "future" or the "atmosphere."
+
+**[CORRECT ENDING EXAMPLES]**
+*   ✅ **Dialogue:** "Wait, what did you just say?"
+*   ✅ **Action:** He slammed the door shut.
+*   ✅ **Observation:** The screen flickered and went black.
+*   ✅ **Thought:** *I need to get out of here.*
+
+**[WRONG ENDING EXAMPLES (BANNED)]**
+*   ❌ **Summary:** And so, the night went on peacefully.
+*   ❌ **Reflection:** He knew this was just the beginning.
+*   ❌ **Atmosphere:** The rain washed away the dust of the city.
+
+**[FINAL CHECK]**
+Look at your last sentence. Does it sound like the end of a chapter? **DELETE IT.**
+`;
+            finalSystemPrompt += ANTI_SUMMARY_PROTOCOL;
+            // 【【【 插入结束 】】】
 
             // 【【【 2. 在行为指令之后，追加最终的格式化指令 】】】
             const ULTIMATE_FORMATTING_RULE = `
