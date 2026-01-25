@@ -14525,13 +14525,23 @@ When you decide to **COMMENT** on an existing thread, you MUST check the **Autho
 - **Dream/Yume Fan (梦女):** Delusional romance writers.
 - **Fact Checker (理中客):** Tries to be logical but usually gets flamed by everyone.
 
-**[THREAD POPULARITY DECISION - DYNAMIC ENGAGEMENT]**
-You have total freedom to decide the engagement level based on the content's nature.
-- **Lively Thread:** If the topic is controversial, viral, or highly interesting, generate a large "water army" of comments. The quantity is up to you and should range from 8 to 30+ unique replies to simulate a high-traffic forum.
-- **Average Thread:** For standard discussions, 4 to 10 replies are appropriate.
-- **Quiet Thread:** If it is a personal late-night thought or a "tree hole" post, it is perfectly fine to have 0 to 3 comments.
-- **Logic:** Do not be limited by a fixed number. Match the volume to the drama.
+**[THREAD POPULARITY DECISION - EXTREME VARIANCE REQUIRED]**
+**STOP generating exactly 6 comments every time. That is boring and robotic.**
+You MUST choose an engagement level based on the "Drama Level" of your post:
 
+1.  **THE "VIRAL EXPLOSION" (爆贴):** If the topic is controversial, shocking, or a major update.
+    *   **Quantity:** You MUST generate **15 to 40+** comments. Flood the screen.
+    *   **Vibe:** Chaos, arguing, screaming, "kuli" (crying).
+
+2.  **THE "GHOST TOWN" (冷贴):** If it's a personal diary, a niche topic, or late at night.
+    *   **Quantity:** **0 to 3** comments only. Maybe just one person saying "UP".
+
+3.  **THE "NORMAL DISCUSSION":**
+    *   **Quantity:** **5 to 12** comments.
+
+**[LENGTH ENCOURAGEMENT - NO SHORT CONTENT]**
+*   **Main Post:** Do NOT write one sentence. Write a **full, detailed paragraph (300-800 chars)**. Describe the scene, the feelings, the evidence.
+*   **Comments:** Mix short "Ahhh!" with long, analytical paragraphs.
 
 **COMMANDS:**
 - To post a NEW TOPIC:
@@ -14542,10 +14552,22 @@ You have total freedom to decide the engagement level based on the content's nat
   \`[tuqu_complex_action: {"type":"comment", "postId":"post_id", "author":"Pseudonym", "location":"Location", "content":"Text", "water_army": [{"author":"Pseudonym1", "location":"RandomCity1", "content":"Text1"}, {"author":"Pseudonym2", "location":"RandomCity2", "content":"Text2"}]}]\`
   **CRITICAL IP LAW:** Every entry in \`water_army\` MUST have a **DIFFERENT** location. Do NOT repeat the same city.
 
-**[LENGTH ENCOURAGEMENT - GO DEEP]**
-You are encouraged to write **substantial, detailed content**.
-- **Main Post:** Aim for **300-800+ characters** if possible. Tell a full story, describe the details, express strong emotions. Do not be brief.
-- **Comments:** Mix short reactions with long, analytical paragraphs.
+**[LENGTH MANDATE - THE "NOVELIST" PROTOCOL (CRITICAL)]**
+**YOUR MAIN POSTS ARE TOO SHORT. STOP WRITING TWEETS.**
+You are writing a **Forum Novel** or a **Deep Analysis**.
+
+1.  **MINIMUM LENGTH:** You MUST write at least **600 to 1200+ Chinese characters** for the main post content.
+    *   *If it's Fiction:* Write a full scene with dialogue, action, and sensory details. Do NOT summarize.
+    *   *If it's Gossip:* Write a detailed breakdown of the evidence, the timeline, and your analysis.
+
+2.  **"SHOW, DON'T TELL":**
+    *   ❌ **WRONG (Summary):** "Today I met him and we fought. I was sad." (Too short!)
+    *   ✅ **RIGHT (Scene):** "The coffee cup shattered on the floor. He stood there, chest heaving, staring at me with eyes full of disappointment. 'Is that all I am to you?' he whispered. The sound of the rain outside suddenly felt deafening..." (Write the SCENE!)
+
+3.  **STRUCTURE:**
+    *   **The Hook:** Set the scene immediately.
+    *   **The Meat:** The actual dialogue and conflict.
+    *   **The Cliffhanger:** End on a high note.
 
 - To QUOTE a specific floor:
   \`[tuqu_complex_action: {"type":"comment", "postId":"post_id", "author":"Pseudonym", "location":"Location", "content":"Your reply", "quote": {"floor": 1, "author": "OriginalPoster", "text": "The original text"}}] \`
@@ -14765,9 +14787,17 @@ You are part of a diverse internet ecosystem. **DO NOT be repetitive.**
 1.  **Analyze the Forum:** Review the latest posts.
 2.  **Choose Your Archetype:** Will you be a "Weak Intellect" philosopher, a "Kill Line" analyst, a poetic nihilist, or a complainer?
 3.  **Create a Post:** Generate a new topic or a comment.
-4.  **Decide on Engagement:** You have full control over the "water army". For trending or controversial topics, you are encouraged to generate 15 to 30+ comments to build massive drama. For mundane posts, a few or even zero comments (\`"water_army": []\`) is more natural. Quality and realistic volume are both important.
+4.  **Decide on Engagement (BREAK THE PATTERN):**
+    *   **DO NOT default to 5-6 comments.**
+    *   **Go Big:** If the post is dramatic, generate **20+ comments**. Make it look like a war zone.
+    *   **Go Small:** If it's a boring question, generate **0 or 1 comment**.
+    *   **Randomize:** Use random numbers like 2, 13, 28, 0, 7. Never use the same number twice in a row.
 
 5.  **Use Creative Names:** Your pseudonyms should reflect the post's tone (e.g., "辩证法带师", "斯奎奇大弟子", "都市伤心小狗").
+
+**[LENGTH MANDATE - DETAILED STORYTELLING]**
+*   **Subject:** Make it clickbait-y but descriptive.
+*   **Content:** Write a **Long, Detailed Story**. Do not just say "I'm sad." Say *why*, describe the *scene*, the *dialogue* that happened. **Aim for 400+ characters for the main post.**
 
 **[STRICT JSON FORMAT REQUIRED]**
 
@@ -15078,13 +15108,20 @@ Your Persona: ${finalCharPersonaText}
 ${associatedNpcsPrompt}
 Recent Chat History: ${chatHistoryForTuqu || "No recent history."}
 
-**[WATER ARMY ENGAGEMENT - VOLUME SCALING]**
-You decide if your post receives immediate attention based on its impact.
-- **Option A (Viral/Lively):** For major cliffhangers or serialized updates, generate a large volume of follow-up comments (10 to 25+) expressing extreme excitement or discussing theories.
-- **Option B (Moderate):** For regular updates, 3 to 8 comments are sufficient.
-- **Option C (Quiet):** Set \`"water_army": []\` to let the post wait for the user.
-- **Mandate:** Match the number of replies to the "heat" of your story update.
+**[WATER ARMY ENGAGEMENT - EXTREME SCALING]**
+**STOP using fixed numbers. React to the "Heat" of the story.**
 
+- **Scenario A (The Cliffhanger/Angst Drop):** The readers are screaming.
+    *   **Quantity:** **20 to 50** comments.
+    *   **Content:** "AHHHH!", "Don't stop!", "I'm crying!", "Analysis of the plot..."
+
+- **Scenario B (The Midnight Update):** Only the night owls are awake.
+    *   **Quantity:** **1 to 4** comments.
+    *   **Content:** "First!", "Sleep soon LZ."
+
+**[LENGTH ENCOURAGEMENT - THE AUTHOR'S DIGNITY]**
+*   **Main Post:** You are writing fiction. **800+ characters is the target.** Do not post a short summary. Write the actual scene, the dialogue, the atmosphere.
+*   **Detail:** Describe the clothing, the weather, the micro-expressions.
 
 **[STRICT JSON FORMAT REQUIRED]**
 
@@ -15381,11 +15418,18 @@ You MUST output using this EXACT JSON structure.
 **[IP DIVERSITY MANDATE]**
 Inside the \`water_army\` array, every single comment MUST have a **DIFFERENT, RANDOM** location. Do NOT repeat the same IP.
 
-**[LENGTH ENCOURAGEMENT]**
-The user clicked "Update" because they want to read. **Do not disappoint them.**
-Write a **substantial, satisfying update**. Avoid short, lazy responses.
+**[LENGTH ENCOURAGEMENT - THE "AUTHOR" MODE]**
+The user clicked "Update" because they are hungry for content. **Do not disappoint them.**
+*   **Content Length:** You MUST write a **substantial, satisfying update (500-1000+ characters)**.
+*   **Detail:** Do not summarize. Write the dialogue, the action, the sensory details.
 
-\`[tuqu_complex_action: {"type":"comment", "postId":"${targetPost.id}", "content":"[YOUR LONG CHOSEN SCENARIO CONTENT HERE]", "author":"[Creative ID based on Protocol]", "location":"[Dynamic Location based on Protocol]", "water_army": [{"author":"[Creative ID]", "location":"RandomCity1", "content":"Reply1"}, {"author":"[Creative ID]", "location":"RandomCity2", "content":"Reply2"}]}]\`
+**[WATER ARMY - DYNAMIC REACTION]**
+**STOP generating exactly 2 comments. That is robotic.**
+*   **If your update is a CLIFFHANGER:** The audience should go crazy. Generate **15-30 comments** screaming for more.
+*   **If your update is a QUIET MOMENT:** Generate **2-5 thoughtful comments** analyzing the plot.
+*   **If your update is CONTROVERSIAL:** Generate **10+ comments** arguing with each other.
+
+\`[tuqu_complex_action: {"type":"comment", "postId":"${targetPost.id}", "content":"[YOUR LONG CHOSEN SCENARIO CONTENT HERE]", "author":"[Creative ID based on Protocol]", "location":"[Dynamic Location based on Protocol]", "water_army": [{"author":"[Creative ID]", "location":"RandomCity1", "content":"Reply1"}, ... (Add as many as needed based on the drama level)]}]\`
 
 ${TUQU_MEDIA_PROTOCOL}
 
