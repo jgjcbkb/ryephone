@@ -7743,16 +7743,6 @@ body.preview-fullscreen-active #page-conversation .chat-content {
 
 <div class="form-section danger-zone" style="margin-top: 20px;">
                         <h3>数据管理</h3>
-                        <!-- 新增：自动下载备份开关 -->
-                        <div class="form-group-toggle" style="border-bottom: 1px solid #f8d7da !important;">
-                            <label for="toggle-auto-download" class="toggle-label" style="color: var(--danger-color); font-weight: bold;">退出时自动下载备份</label>
-                            <label class="switch">
-                                <input type="checkbox" id="toggle-auto-download">
-                                <span class="slider"></span>
-                            </label>
-                        </div>
-                        <p class="form-hint" style="padding: 10px 15px; color: #721c24;">开启后，每次刷新或关闭网页都会自动触发一次全量数据下载。建议仅在数据变动频繁且不方便使用云端备份时开启。</p>
-                        
                         <div class="data-management-buttons" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 15px;">
     <button id="export-all-data-btn" class="data-management-btn" style="margin: 0; width: 100%; height: 45px;">导出全部数据</button>
     <button id="import-all-data-btn" class="data-management-btn danger" style="margin: 0; width: 100%; height: 45px;">导入所有数据</button>
@@ -36750,7 +36740,6 @@ Your ENTIRE output MUST be a sequence of one or more \`<block>\` elements, each 
                 showStatusBarInfo: true, // 是否显示状态栏电量时间
                 lowBatteryAlertThreshold: 20, // 触发提醒的电量阈值
                 enableVConsole: false, // 【核心新增：vConsole 调试工具开关】
-                autoDownloadOnClose: false, // 新增：自动下载开关默认关闭
                 // 【新增：提示音默认设置】
                 notificationSounds: [
                     { name: '默认(微信)', url: 'https://files.catbox.moe/x4yz5w.wav' },
@@ -46392,17 +46381,6 @@ const cloudBackupManager = (function() {
          const importBtn = document.getElementById('import-all-data-btn');
          const mergeBtn = document.getElementById('merge-all-data-btn'); // 新增
          const resetBtn = document.getElementById('reset-entire-app-btn');
-         
-         // 新增：自动下载开关监听
-         const autoDownloadToggle = document.getElementById('toggle-auto-download');
-         if (autoDownloadToggle) {
-             autoDownloadToggle.checked = appearanceSettings.autoDownloadOnClose || false;
-             autoDownloadToggle.addEventListener('change', () => {
-                 appearanceSettings.autoDownloadOnClose = autoDownloadToggle.checked;
-                 saveToLocalStorage('app-appearance-settings', appearanceSettings);
-             });
-         }
-
          if(exportBtn) exportBtn.addEventListener('click', exportAllData);
          if(importBtn) importBtn.addEventListener('click', importAllData);
          if(mergeBtn) mergeBtn.addEventListener('click', mergeAllData); // 新增
@@ -48015,58 +47993,6 @@ const cloudBackupManager = (function() {
     
     // 立即执行
     checkDisplayMode();
-
-    // 新增：静默导出函数（不带弹窗提示，专供退出时使用）
-    async function silentExportAllData() {
-        const allData = {};
-        try {
-            const bigDataKeys = ['app-chat-list', 'chat-worldbook', 'app-stickers', 'moments_feed_data', 'app_music_playlist', 'jjForumData'];
-            for (const key of bigDataKeys) {
-                let data = await imageStore.getItem(key) || loadFromLocalStorage(key, null);
-                if (data) allData[key] = await conversationManager.makeDataPortable(data);
-            }
-            const chatListRef = allData['app-chat-list'] || [];
-            if (Array.isArray(chatListRef)) {
-                for (const chat of chatListRef) {
-                    const convKey = `conversation_${chat.id}`;
-                    let convData = await imageStore.getItem(convKey) || loadFromLocalStorage(convKey, null);
-                    if (convData) allData[convKey] = await conversationManager.makeDataPortable(convData);
-                }
-            }
-            const CONFIG_PREFIXES = ['app-', 'app_', 'chat-', 'chat_', 'my_', 'gh_', 'auto_', 'video_', 'pending_', 'catbox_userhash', 'tuqu_', 'chat_avatar_', 'chat_user_avatar_', 'chat_bg_', 'chat_mounted_wb_', 'chat_associated_npcs_', 'chat_branches_', 'chat_favorites_', 'chat_identity_'];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (!allData[key] && CONFIG_PREFIXES.some(prefix => key.startsWith(prefix))) {
-                    let val = loadFromLocalStorage(key, null);
-                    allData[key] = await conversationManager.makeDataPortable(val);
-                }
-            }
-            const jsonString = JSON.stringify(allData);
-            const zip = new JSZip();
-            zip.file("backup_content.json", jsonString);
-            const zipContent = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
-            const now = new Date();
-            const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
-            
-            const url = URL.createObjectURL(zipContent);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `自动备份_${timestamp}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        } catch (e) { console.error("Silent backup failed", e); }
-    }
-
-    // 新增：监听窗口关闭/刷新事件
-    window.addEventListener('beforeunload', (event) => {
-        const settings = loadFromLocalStorage('app-appearance-settings', {});
-        if (settings.autoDownloadOnClose) {
-            silentExportAllData();
-            // 注意：现代浏览器出于安全考虑，可能无法在 beforeunload 中 100% 成功触发下载
-            // 但在 PWA 模式或部分浏览器下依然有效
-        }
-    });
 
     document.addEventListener('DOMContentLoaded', initializeApp);
 
