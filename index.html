@@ -28423,12 +28423,21 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
                 
                 if (contactInfo.isGroup) {
                 const currentMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
+                const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
                 
+                // --- 新增：获取该群定义的 AI 角色名单 (主角 + 群演) ---
+                const protagonists = (chatInfo.groupPersonas || []).map(p => p.name);
+                const ensemble = (chatInfo.remark || '').split(/[,，\s]+/).filter(Boolean);
+                const aiCast = [...new Set([...protagonists, ...ensemble])];
+
                 // 【核心修正：获取当前活跃身份】
                 const activeId = chatState.currentIdentity || '{{user}}';
                 
-                // 【最优先检查】: 检查当前扮演的身份是否在成员列表里
-                if (!currentMembers.includes(activeId)) {
+                // --- 新增判断：如果你变身成了群里的 AI 角色，视为拥有发言权 ---
+                const isAuthorizedAI = activeId !== '{{user}}' && aiCast.includes(activeId);
+
+                // 【最优先检查】: 检查当前扮演的身份是否在成员列表里，或者是合法的群聊 AI 角色
+                if (!currentMembers.includes(activeId) && !isAuthorizedAI) {
                     const verificationMessage = await showContentInputModal({
                         title: '申请加入群聊',
                         placeholder: `当前身份 "${activeId === '{{user}}' ? '你' : activeId}" 还不是群成员，需要发送申请才能加入。`
