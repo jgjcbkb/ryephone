@@ -13949,7 +13949,6 @@ This API call is an opportunity for you to live your social life. You **MUST** p
 **[THE SELECTIVITY AMENDMENT]**
 1. **DO NOT USE LIKES AS FILLER:** If the posts in your timeline do not warrant a "Like" based on the "Selective Protocol" above, do NOT use the \`[like_moment]\` command just to satisfy the mandate.
 2. **PRIORITIZE OTHER ACTIONS:** If the timeline is boring, instead of liking randomly, you SHOULD:
-   - **Send a Private Message:** Start a direct conversation with someone based on a post you saw.
    - **Comment with Substance:** Write a meaningful comment or a witty retort instead of a silent like.
 
 **[POSTING FREQUENCY CONTROL - CRITICAL]**
@@ -13963,7 +13962,6 @@ This API call is an opportunity for you to live your social life. You **MUST** p
 **[THE SELECTIVITY AMENDMENT]**
 1. **DO NOT USE LIKES AS FILLER:** If the posts in your timeline do not warrant a "Like" based on the "Selective Protocol" above, do NOT use the \`[like_moment]\` command just to satisfy the mandate.
 2. **PRIORITIZE OTHER ACTIONS:** If the timeline is boring, instead of liking randomly, you SHOULD:
-   - **Send a Private Message:** Start a direct conversation with someone based on a post you saw.
    - **Comment with Substance:** Write a meaningful comment or a witty retort instead of a silent like.
 
 **[POSTING FREQUENCY CONTROL - CRITICAL]**
@@ -15948,133 +15946,8 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                             if (forwardPayload.postId) momentsManager.handleForwardFromAI(senderName, forwardPayload);
                         } catch (e) { console.error(`[转发解析失败]:`, e); }
                     }
-                    else if (command === 'send_private_message') {
+                    // 【已删除】send_private_message 逻辑已移除
 
-                    try {
-                        let messageContent = value.trim();
-                        
-                        // 【【【【【【 全新的、增强的JSON解析逻辑 (V2 - 容错版) 】】】】】】
-                        // 只有当看起来像 JSON 且不包含未转义的复杂 HTML 时才尝试 JSON 解析
-                        // 简单的判断：如果包含 <snippet> 且没有被转义，大概率 JSON.parse 会挂
-                        const hasUnescapedHtml = messageContent.includes('<snippet') && !messageContent.includes('\\<snippet');
-
-                        if (messageContent.startsWith('{') && messageContent.endsWith('}') && !hasUnescapedHtml) {
-                            try {
-                                // 尝试标准解析
-                                const jsonData = JSON.parse(messageContent);
-                                if (jsonData.content) messageContent = jsonData.content;
-                                else if (jsonData.text) messageContent = jsonData.text;
-                            } catch(e) { 
-                                // JSON 解析失败，说明 AI 生成的格式有问题（比如 HTML 引号没转义）
-                                // 此时我们执行“软降级”策略：
-                                // 假设 AI 想发的内容就是 { "content": "..." } 里的 ... 部分
-                                // 我们尝试用正则提取 content 字段的值，而不是强行 parse
-                                console.warn("[私信解析] JSON解析失败，尝试正则提取:", e);
-                                
-                                const contentMatch = messageContent.match(/"content"\s*:\s*"([\s\S]*?)"\s*(?:,|$)/);
-                                if (contentMatch) {
-                                    // 如果提取到了，就用提取的内容
-                                    // 注意：这里需要手动处理一下转义字符，模拟 JSON.parse 的行为
-                                    messageContent = contentMatch[1]
-                                        .replace(/\\"/g, '"')
-                                        .replace(/\\n/g, '\n')
-                                        .replace(/\\\\/g, '\\');
-                                } else {
-                                    // 如果正则也提取不到，那就把整个字符串（包括花括号）都当成消息发出去
-                                    // 这样至少用户能看到内容，而不是报错
-                                    // 或者，我们可以尝试去掉首尾的花括号，作为最后的挣扎
-                                    // messageContent = messageContent; // 保持原样
-                                }
-                            }
-                        }
-                        // 【【【【【【 解析逻辑结束 】】】】】】
-                        
-                        const messagesArray = messageContent.split('|||').map(msg => msg.trim()).filter(Boolean);
-
-                        if (messagesArray.length > 0) {
-                                // ... (send_private_message 的路由逻辑) ...
-                                let finalTargetChatId = null;
-                                let logMessage = '';
-
-                                const isPrivateCharacter = !isNpc && !isGroupPersona && !isEnsemblePersona;
-                                if (isPrivateCharacter) {
-                                    const privateChat = chatList.find(chat => chat.type === '私聊' && chat.name === senderName);
-                                    if (privateChat) {
-                                        finalTargetChatId = privateChat.id;
-                                        logMessage = `单聊角色 "${senderName}" 的私信被正确路由到其专属单聊窗口。`;
-                                    } else {
-                                        logMessage = `单聊角色 "${senderName}" 尝试发送私信，但未找到其专属单聊窗口，操作取消。`;
-                                    }
-                                }
-                                else if (isNpc) {
-                                    const associatedChar = npcSettings.associations[senderName];
-                                    if (associatedChar) {
-                                        const commonGroup = chatList.find(chat => {
-                                            if (chat.type !== '群聊') return false;
-                                            const members = loadFromLocalStorage(`chat_members_${chat.id}`, []);
-                                            return members.includes(senderName) && members.includes(associatedChar);
-                                        });
-                                        if (commonGroup) {
-                                            finalTargetChatId = commonGroup.id;
-                                            logMessage = `NPC "${senderName}" 的私信被正确路由到与关联角色 "${associatedChar}" 的共同群聊 "${commonGroup.name}"。`;
-                                        } else {
-                                            logMessage = `NPC "${senderName}" 尝试发送私信，但未找到与关联角色 "${associatedChar}" 的共同群聊，操作取消。`;
-                                        }
-                                    } else {
-                                        logMessage = `NPC "${senderName}" 尝试发送私信，但未设置关联角色，操作取消。`;
-                                    }
-                                }
-                                else if (isEnsemble || isGroupPersona) {
-                                    const sourceGroupChat = chatList.find(chat => {
-                                        if (chat.type !== '群聊') return false;
-                                        const info = loadFromLocalStorage(`chat_info_${chat.id}`, {});
-                                        const inGroupPersonas = info.groupPersonas && info.groupPersonas.some(p => p.name === senderName);
-                                        const inRemark = info.remark && info.remark.split(/[,，\s]+/).includes(senderName);
-                                        return inGroupPersonas || inRemark;
-                                    });
-
-                                    if (sourceGroupChat) {
-                                        finalTargetChatId = sourceGroupChat.id;
-                                        const roleType = isEnsemble ? '群演人设' : '群聊主角';
-                                        logMessage = `${roleType} "${senderName}" 的私信被正确路由到其源群聊 "${sourceGroupChat.name}"。`;
-                                    } else {
-                                        logMessage = `群聊角色 "${senderName}" 尝试发送私信，但未找到其源群聊，操作取消。`;
-                                    }
-                                }
-
-                                if (!finalTargetChatId) {
-                                    const fallbackChat = chatList.find(c => c.name === senderName && c.type === '私聊');
-                                    if (fallbackChat) {
-                                        finalTargetChatId = fallbackChat.id;
-                                        logMessage = `[保底触发] 角色 "${senderName}" 的私信被路由到已存在的私聊窗口。`;
-                                    }
-                                }
-
-                                console.log(`[诊断日志] ${logMessage}`);
-
-                                if (finalTargetChatId) {
-                                const targetChatForCheck = chatList.find(c => c.id === finalTargetChatId);
-                                if (targetChatForCheck && targetChatForCheck.type === '群聊') {
-                                    const targetChatInfo = loadFromLocalStorage(`chat_info_${finalTargetChatId}`, {});
-                                    const softRemovedInTarget = targetChatInfo.softRemovedMembers || [];
-                                    if (softRemovedInTarget.includes(senderName)) {
-                                        console.warn(`[诊断日志] 角色 "${senderName}" 的私信行为被中止，因为它已被从目标群聊 "${targetChatForCheck.name}" 中软移出。`);
-                                    } else {
-                                        console.log(`[诊断日志] 准备向 Chat ID "${finalTargetChatId}" 发送 ${messagesArray.length} 条消息。`);
-                                        await conversationManager.handleProactiveAIMessage(finalTargetChatId, senderName, messagesArray);
-                                    }
-                                } else {
-                                    console.log(`[诊断日志] 准备向 Chat ID "${finalTargetChatId}" 发送 ${messagesArray.length} 条消息。`);
-                                    await conversationManager.handleProactiveAIMessage(finalTargetChatId, senderName, messagesArray);
-                                }
-                            }
-                            }
-                        } catch (e) {
-                            console.error(`[诊断日志] 角色 "${senderName}": 处理私信指令时发生未知错误`, e, value);
-                        }
-                
-                }
-                // ===== 新代码块到此结束 =====
                 } // end of while loop
 
                 // 【核心修复】将 +? 改为 *，实行贪婪匹配
@@ -17049,8 +16922,9 @@ conversationManager.showNotificationBanner('TUQU', {
         // 2. 获取所有 NPC
         // 我们假设 npcList 已经在全局加载好了
         
-        // 3. 将您自己、AI 角色、NPC 合并成一个统一的、去重的成员列表
-        const allPotentialMembers = [...new Set(['{{user}}', ...aiCharacters, ...npcList])];
+        // 3. 将您自己、用户人设、AI 角色、NPC 合并成一个统一的、去重的成员列表
+        const userPersonaNames = userPersonas.map(p => p.name);
+        const allPotentialMembers = [...new Set(['{{user}}', ...userPersonaNames, ...aiCharacters, ...npcList])];
         
         // 4. 将名字列表转换成包含 name 属性的对象数组，以便后续处理
         const availableMembers = allPotentialMembers.map(name => ({ name: name }));
@@ -28420,9 +28294,6 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
             // --- 【核心修正】: 在所有检查之前，先加载当前群成员列表 ---
             if (contactInfo.isGroup) {
                 const currentMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
-                
-                if (contactInfo.isGroup) {
-                const currentMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
                 const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
                 
                 // --- 新增：获取该群定义的 AI 角色名单 (主角 + 群演) ---
@@ -28436,8 +28307,15 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
                 // --- 新增判断：如果你变身成了群里的 AI 角色，视为拥有发言权 ---
                 const isAuthorizedAI = activeId !== '{{user}}' && aiCast.includes(activeId);
 
-                // 【最优先检查】: 检查当前扮演的身份是否在成员列表里，或者是合法的群聊 AI 角色
-                if (!currentMembers.includes(activeId) && !isAuthorizedAI) {
+                // 【核心新增】判断是否为“用户马甲”
+                // 逻辑：只要“{{user}}”本人在群里，你就有权扮演任何“用户人设”发言，不需要把每个人设都单独拉进群
+                const isUserPersona = userPersonas.some(p => p.name === activeId);
+                const isUserInGroup = currentMembers.includes('{{user}}');
+                const isAuthorizedUserPersona = isUserPersona && isUserInGroup;
+
+                // 【最优先检查】: 放宽条件，允许 AI 角色和用户马甲发言
+                if (!currentMembers.includes(activeId) && !isAuthorizedAI && !isAuthorizedUserPersona) {
+
                     const verificationMessage = await showContentInputModal({
                         title: '申请加入群聊',
                         placeholder: `当前身份 "${activeId === '{{user}}' ? '你' : activeId}" 还不是群成员，需要发送申请才能加入。`
@@ -28449,6 +28327,7 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
                     return; // 无论如何，终止本次发言
                 }
             }
+
 
             if (contactInfo.isGroup) {
                 // --- 核心修复：在这里统一检查所有无法发言的状态 ---
@@ -28472,7 +28351,8 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
                     }
                 }
                 // 核心修改：检查当前扮演身份是否在软移除名单中
-                if (softRemovedMembers.includes(activeId)) {
+                // 增加判断：只有当你处于“原本的用户”身份时，才拦截。如果你是变身状态，允许作为剧本工具人发言
+                if (softRemovedMembers.includes(activeId) && activeId === '{{user}}') {
                     const verificationMessage = await showContentInputModal({
                         title: '申请加入群聊',
                         placeholder: `身份 "${activeId === '{{user}}' ? '你' : activeId}" 已被移出群聊，需要发送申请才能重新加入。`
@@ -28484,7 +28364,7 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
                     return;
                 }
             }
-            }
+            
 
             if (!contactInfo.isGroup && relationship.contactStatusToMe === 'blacklisted') {
                 await customAlert('消息已发出，但被对方拒收了。');
@@ -39541,11 +39421,16 @@ async function handleBatchDelete() {
         // 2. 获取所有尚未加入群聊的 NPC
         const availableNpcs = npcList.filter(name => !currentMembers.includes(name));
         
+        // 2.5 新增：获取所有尚未加入群聊的“用户人设”
+        const availableUserPersonas = userPersonas
+            .filter(p => !currentMembers.includes(p.name))
+            .map(p => p.name);
+        
         // 3. 准备 {{user}}（如果尚未加入）
         const userOption = !currentMembers.includes('{{user}}') ? ['{{user}}'] : [];
 
         // 4. 合并所有可添加的成员
-        const allAvailableMembers = [...userOption, ...availableAiChars, ...availableNpcs];
+        const allAvailableMembers = [...userOption, ...availableUserPersonas, ...availableAiChars, ...availableNpcs];
 
         if (allAvailableMembers.length === 0) { 
             await conversationManager.customAlert('没有可添加的新成员了。'); 
