@@ -24526,29 +24526,39 @@ You MUST process the **"NEW EVIDENCE"** by expanding on the substance while igno
 
 
     async function regenerateLastResponse() {
-        // 从后往前找到第一条不是由 AI 发送的消息的位置
-        let firstUserOrSystemMessageIndex = -1;
+        // --- 核心优化：优先寻找最后一条用户发送的消息，以跳过系统干扰 ---
+        let targetIndex = -1;
+        
+        // 1. 优先寻找最后一条用户发送的消息 (sent)
         for (let i = chatState.messages.length - 1; i >= 0; i--) {
-            if (chatState.messages[i].side !== 'received') {
-                firstUserOrSystemMessageIndex = i;
+            if (chatState.messages[i].side === 'sent') {
+                targetIndex = i;
                 break;
             }
         }
 
-        // 如果最后一条消息就不是AI发的，说明没有可供重新生成的内容
-        if (firstUserOrSystemMessageIndex === chatState.messages.length - 1) {
+        // 2. 如果没找到用户消息（比如刚开场全是AI在说话），则回退到找最后一条非AI消息
+        if (targetIndex === -1) {
+            for (let i = chatState.messages.length - 1; i >= 0; i--) {
+                if (chatState.messages[i].side !== 'received') {
+                    targetIndex = i;
+                    break;
+                }
+            }
+        }
+
+        // 如果依然找不到分界点，或者分界点就是最后一条，说明没有可重新生成的
+        if (targetIndex === -1 || targetIndex === chatState.messages.length - 1) {
             await customAlert('没有可重新生成的消息。');
             return;
         }
-        
-        // --- 核心修复：彻底删除了那个会清空所有数据的灾难性 else if 分支 ---
-        // 现在，如果找不到分界点，代码会直接跳过，什么也不做，保证数据绝对安全。
 
-        // 在临时的“账本”中，删除AI的所有回复
-        chatState.messages.splice(firstUserOrSystemMessageIndex + 1);
+        // 在临时的“账本”中，删除分界点之后的所有内容（含系统消息）
+        chatState.messages.splice(targetIndex + 1);
 
         // 找到分界点那条消息，用于在永久“账本”中定位
-        const lastMessageBeforeAI = chatState.messages[firstUserOrSystemMessageIndex];
+        const lastMessageBeforeAI = chatState.messages[targetIndex];
+
         if (lastMessageBeforeAI) {
             // 在永久的“账本”中，找到同样的分界点
             const fullHistoryIndex = fullMessageHistory.findIndex(m => m.id === lastMessageBeforeAI.id);
