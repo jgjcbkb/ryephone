@@ -46227,7 +46227,18 @@ const cloudBackupManager = (function() {
             for (const key in allTextData) {
                 let value = allTextData[key];
                 try {
-                    if (key.startsWith('novel_data_') || key === 'app_music_playlist' || key.startsWith('conversation_') || key === 'moments_feed_data' || key === 'app-chat-list') {
+                    // 【核心修复】扩充大容量数据白名单，防止 LocalStorage 爆满
+                    if (key.startsWith('novel_data_') || 
+                        key === 'app_music_playlist' || 
+                        key.startsWith('conversation_') || 
+                        key === 'moments_feed_data' || 
+                        key === 'app-chat-list' || 
+                        // --- 新增以下几项 ---
+                        key.startsWith('chat_branches_') ||   // 历史分支/剧本存档 (罪魁祸首)
+                        key.startsWith('app-mood-cards_') ||  // 心事卡片
+                        key.startsWith('app-pager-notes_') || // 备忘录
+                        key.startsWith('app_account_data_')   // 账户数据
+                       ) {
                         let parsedValue = value;
                         if (typeof value === 'string') { try { parsedValue = JSON.parse(value); } catch(e) {} }
                         await imageStore.setItem(key, parsedValue);
