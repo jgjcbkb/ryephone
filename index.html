@@ -28311,41 +28311,43 @@ async function handleSendMessageAttempt(type, text, extraData = {}) {
 
             if (!text || (typeof text === 'string' && text.trim() === '')) return;
 
-            // --- 【核心修正】: 在所有检查之前，先加载当前群成员列表 ---
+            // --- 【核心修正】: 群聊发言权限检查 (修复版) ---
             if (contactInfo.isGroup) {
                 const currentMembers = loadFromLocalStorage(`chat_members_${chatState.chatId}`, []);
                 const chatInfo = loadFromLocalStorage(`chat_info_${chatState.chatId}`, {});
                 
-                // --- 新增：获取该群定义的 AI 角色名单 (主角 + 群演) ---
+                // 1. 获取所有“我有权使用的身份”
+                const activeId = chatState.currentIdentity || '{{user}}'; // 当前变身
+                const boundName = chatInfo.userPersonaName && chatInfo.userPersonaName !== '无' ? chatInfo.userPersonaName : '{{user}}'; // 当前绑定的本名(如: 阿衍)
+
+                // 2. 核心判定：我在群里吗？
+                // 只要 [变身名] 或 [绑定名] 任意一个在群成员列表里，就算在群里
+                const amIInGroup = currentMembers.includes(activeId) || currentMembers.includes(boundName) || currentMembers.includes('{{user}}');
+
+                // 3. 获取AI角色白名单 (主角 + 群演)
                 const protagonists = (chatInfo.groupPersonas || []).map(p => p.name);
                 const ensemble = (chatInfo.remark || '').split(/[,，\s]+/).filter(Boolean);
                 const aiCast = [...new Set([...protagonists, ...ensemble])];
-
-                // 【核心修正：获取当前活跃身份】
-                const activeId = chatState.currentIdentity || '{{user}}';
-                
-                // --- 新增判断：如果你变身成了群里的 AI 角色，视为拥有发言权 ---
                 const isAuthorizedAI = activeId !== '{{user}}' && aiCast.includes(activeId);
 
-                // 【核心新增】判断是否为“用户马甲”
-                // 逻辑：只要“{{user}}”本人在群里，你就有权扮演任何“用户人设”发言，不需要把每个人设都单独拉进群
-                const isUserPersona = userPersonas.some(p => p.name === activeId);
-                const isUserInGroup = currentMembers.includes('{{user}}');
-                const isAuthorizedUserPersona = isUserPersona && isUserInGroup;
+                // 4. 最终放行条件：
+                // A. 我(本名或变身)在群里
+                // B. 我变身成了群里的AI角色
+                // C. 我是用户人设，且我的本体(boundName)在群里
+                const hasPermission = amIInGroup || isAuthorizedAI;
 
-                // 【最优先检查】: 放宽条件，允许 AI 角色和用户马甲发言
-                if (!currentMembers.includes(activeId) && !isAuthorizedAI && !isAuthorizedUserPersona) {
-
+                if (!hasPermission) {
                     const verificationMessage = await showContentInputModal({
                         title: '申请加入群聊',
-                        placeholder: `当前身份 "${activeId === '{{user}}' ? '你' : activeId}" 还不是群成员，需要发送申请才能加入。`
+                        placeholder: `当前身份 "${activeId === '{{user}}' ? '你' : activeId}" (或绑定身份 "${boundName}") 还不是群成员，需要发送申请才能加入。`
                     });
                     if (verificationMessage !== null) {
                         const actionText = activeId === '{{user}}' ? '你' : `你代表 "${activeId}"`;
                         await addMessage({ type: 'system', side: 'system', text: `${actionText}发送了加群申请，附言：${verificationMessage}` });
                     }
-                    return; // 无论如何，终止本次发言
+                    return; 
                 }
+
             }
 
 
@@ -38215,57 +38217,65 @@ function saveSettings() {
                     const reader = new FileReader();
                     reader.onload = async (event) => {
                         try {
-                            const importedRules = JSON.parse(event.target.result);
-                            if (!Array.isArray(importedRules)) {
-                                throw new Error('文件格式不正确，需要是规则数组。');
-                            }
+                            const rawData = JSON.parse(event.target.result);
+                            // 【核心修复】自动识别：如果是单个对象则转为数组
+                            let importedList = Array.isArray(rawData) ? rawData : [rawData];
                             
-                            // 简单的验证
-                            const isValid = importedRules.every(rule => 
-                                typeof rule.name === 'string' &&
-                                typeof rule.pattern === 'string' &&
-                                typeof rule.template !== 'undefined'
-                            );
+                            // 【核心修复】格式转换：将酒馆字段映射为黑麦字段
+                            const normalizedRules = importedList.map(raw => {
+                                let pattern = raw.pattern || raw.findRegex || '';
+                                let flags = raw.flags || raw.regex_flags || 'g';
+                                let name = raw.name || raw.scriptName || '未命名规则';
+                                let template = raw.template !== undefined ? raw.template : (raw.replaceString !== undefined ? raw.replaceString : '');
 
-                            if (!isValid) {
-                                throw new Error('导入的数据缺少必要的字段 (name, pattern, template)。');
-                            }
+                                // 处理酒馆格式的正则斜杠：/pattern/flags
+                                if (typeof pattern === 'string' && pattern.startsWith('/') && pattern.lastIndexOf('/') > 0) {
+                                    const lastSlash = pattern.lastIndexOf('/');
+                                    const extractedFlags = pattern.substring(lastSlash + 1);
+                                    if (extractedFlags) flags = extractedFlags;
+                                    pattern = pattern.substring(1, lastSlash);
+                                }
+
+                                return {
+                                    name: name,
+                                    category: raw.category || '酒馆导入',
+                                    pattern: pattern,
+                                    flags: flags,
+                                    template: template,
+                                    enabled: raw.enabled !== false && raw.disabled !== true
+                                };
+                            });
 
                             const confirmed = await conversationManager.customConfirm(
-                                `即将导入 ${importedRules.length} 条规则。这将覆盖所有同名规则，并追加新规则。确定要继续吗？`,
+                                `检测到 ${normalizedRules.length} 条规则。确定要导入并应用吗？`,
                                 '导入确认'
                             );
                             
                             if (confirmed) {
-                                const existingRules = appearanceSettings.regexReplacements || [];
-                                let updatedCount = 0;
-                                let newCount = 0;
-
-                                importedRules.forEach(newRule => {
+                                if (!appearanceSettings.regexReplacements) appearanceSettings.regexReplacements = [];
+                                const existingRules = appearanceSettings.regexReplacements;
+                                
+                                normalizedRules.forEach(newRule => {
                                     const existingIndex = existingRules.findIndex(r => r.name === newRule.name);
                                     if (existingIndex > -1) {
-                                        // 覆盖同名规则
                                         existingRules[existingIndex] = newRule;
-                                        updatedCount++;
                                     } else {
-                                        // 追加新规则
                                         existingRules.push(newRule);
-                                        newCount++;
                                     }
                                 });
 
-                                appearanceSettings.regexReplacements = existingRules;
                                 saveSettings();
-                                renderRegexList(); // 刷新列表
-                                alert(`导入完成！\n新增 ${newCount} 条规则。\n更新 ${updatedCount} 条规则。`);
+                                renderRegexList();
+                                alert('导入成功！酒馆格式已自动转换。');
                             }
                         } catch (error) {
-                            await conversationManager.customAlert('导入失败: ' + error.message);
+                            await conversationManager.customAlert('导入失败，文件格式可能损坏: ' + error.message);
                         }
                     };
                     reader.readAsText(file);
                 });
             });
+
             // END: 新增正则规则的导出/导入事件监听
             // ========================================================================
             // ================= 【【【 全新的CSS片段导入导出逻辑 】】】 ================
