@@ -12344,11 +12344,12 @@ Since you are initiating a new message in a group where the user is NOT present:
                 const activeAiMembers = allAiEntitiesInChat.filter(name => 
                     name !== '{{user}}' && 
                     name !== userNameForPrompt && 
-                    name !== currentIdentityInThisChat
+                    name !== currentIdentityInThisChat // <--- 关键：剔除用户占用的身份
                 );
 
 
                 groupPersonasPrompt += `
+
 ---
 [Active Cast & Role Mandate - UNBREAKABLE RULE]
 This is the official list of AI characters you are currently allowed to play in this scene.
@@ -22996,11 +22997,12 @@ This is a **PRIVATE** conversation strictly between the AI characters present in
                     const activeAiMembers = allAiEntitiesInChat.filter(name => 
                         name !== '{{user}}' && 
                         name !== userNameForPrompt &&
-                        name !== currentUserActiveIdentity &&
+                        name !== currentUserActiveIdentity && // <--- 关键：如果我变成了张三，AI就不能演张三
                         !softRemovedMembers.includes(name)
                     );
 
                     // 4. 构建指令
+
                     groupPersonasPrompt += `
 ---
 [Active Cast & Role Mandate - UNBREAKABLE RULE]
@@ -23720,6 +23722,62 @@ The Director has whispered a secret instruction to you for this specific respons
                 }
 
                 let finalMessages = [{ role: "system", content: finalSystemPrompt }, ...apiPayloadMessages];
+
+                // 【【【 核心新增：自动注入“最高圣旨” (Auto-Whisper) 】】】
+                // 无论有没有手动耳麦，都在最后强插一条 User 消息，作为最高优先级的格式锁
+                
+                // 0. 获取当前已知状态，用于让 AI 自检
+                const allStatusesForCheck = loadFromLocalStorage('app_character_statuses', {});
+                const myCurrentKnownStatus = allStatusesForCheck[chatState.chatName] || "Unknown";
+
+                // 1. 判断当前是线上还是线下，决定锁什么格式
+                let enforcementText = "";
+                if (chatInfo.mode === 'offline') {
+                    // 线下模式：强制小说格式
+                    enforcementText = `
+[SYSTEM: FORMAT ENFORCEMENT - OFFLINE MODE]
+1. **ROLE:** You are a **NOVELIST**. Use third-person narration.
+2. **FORMAT:** You MUST use \`<block type="text" sender="...">\` for every paragraph.
+`;
+                } else {
+                    // 线上模式：强制聊天软件格式
+                    enforcementText = `
+[SYSTEM: FORMAT ENFORCEMENT - ONLINE MODE]
+1. **ROLE:** You are in a **CHAT APP**.
+2. **BAN:** NO narration, NO actions in brackets. Text ONLY.
+3. **FORMAT:** You MUST use \`<block type="text" sender="...">\`.
+4. **COMMANDS:** Commands MUST be in \`<block type="command">\`.
+`;
+                }
+
+                // 2. 构建“记忆唤醒 + 状态自检”指令
+                const recallAndCheckPrompt = `
+${enforcementText}
+
+[CRITICAL: CONTEXT REVIEW & STATE AUDIT]
+Before generating your response, you MUST perform these checks:
+
+**CHECK 1: CUSTOM RULES RECALL**
+Look back at the **[System Prompt]** and **[Worldbook]** entries provided at the very beginning of this context.
+- Did the user define specific formatting rules there? (e.g. "Always use brackets", "Specific speaking style").
+- **IF YES:** You **MUST** apply those custom rules NOW, overriding any habits from recent chat history.
+
+**CHECK 2: STATUS CONSISTENCY AUDIT**
+- **Your Last Known Status:** "${myCurrentKnownStatus}"
+- **Your New Action:** What are you about to do in this response? (e.g. Sleeping? Eating? Working?)
+- **DECISION:** If your new action conflicts with the "Last Known Status", you **MUST** append a \`[set_status: New Status]\` command at the end.
+  - *Example:* If status was "Sleeping" and you are now talking, you MUST output \`[set_status: Awake]\`.
+
+**[IMMEDIATE INSTRUCTION]**
+Execute the response now. Follow the [Online/Offline] format AND your custom Worldbook rules.
+`;
+
+                // 3. 将这条“圣旨”作为最后一条 User 消息插入
+                finalMessages.push({
+                    role: "user",
+                    content: recallAndCheckPrompt
+                });
+                // 【【【 新增结束 】】】
 
                 // 【【【 终极修复：在 finalMessages 创建后，修改它的 system 消息 】】】
             const _currentId = chatState.chatId; 
