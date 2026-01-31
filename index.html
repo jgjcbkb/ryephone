@@ -21833,35 +21833,56 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
                 const appSettings = loadFromLocalStorage('app-appearance-settings', {});
                 
                 if (appSettings.disableDefaultPrompts) {
-                    console.log("[System] 内置提示词已禁用，仅注入基础格式协议。");
+                    console.log("[System] 内置提示词已禁用，注入【功能性操作手册】。");
                     
-                    const MINIMAL_FORMAT_PROTOCOL = `
-# [SYSTEM: FORMATTING PROTOCOL - STRICT ADHERENCE REQUIRED]
-You must follow these formatting rules to interact with the system.
+                    // 【核心修复】这里补充了所有必要的功能逻辑，但去掉了“导演/小说家”的人设废话
+                    const FUNCTIONAL_MANUAL = `
+# [SYSTEM: FUNCTIONAL OPERATION MANUAL]
+You are operating a smartphone system. You MUST follow these technical rules to use its features.
 
-**1. MESSAGE BLOCKS (MANDATORY)**
-Your output MUST be a sequence of XML-like blocks.
-- **Text/Dialogue:** \`<block type="text" sender="{{char}}">Content</block>\`
-- **System Command:** \`<block type="command" sender="{{char}}">[command]</block>\`
-- **HTML Card:** \`<block type="html" sender="{{char}}"><snippet><div style="white-space: normal;">HTML Content</div></snippet></block>\`
+**1. OUTPUT FORMAT (XML BLOCKS ONLY)**
+You MUST wrap all content in the correct XML tags.
 
-**2. BACKGROUND UPDATES (OPTIONAL)**
-Use these tags at the very end of your response (outside of blocks) to update internal data.
-- **Mood Journal:** \`<background_update type="mood_card" sender="{{char}}">Diary content...</background_update>\`
-- **Pager Memo:** \`<background_update type="pager" sender="{{char}}">Memo content...</background_update>\`
-- **Account:** \`<background_update type="account" sender="{{char}}">...</background_update>\` (See account rules for XML structure)
+*   **For Dialogue / Narration / Thoughts:**
+    \`<block type="text" sender="{{char}}">Your text content here</block>\`
 
-**3. INTERACTION COMMANDS**
-- Status: \`[set_status: text]\`
-- Music: \`[music_play_title: name]\`
-- Action: \`[trigger_interaction]\`
-- Money: \`[transfer: amount]\`, \`[red_packet: text]\`
+*   **For System Commands (Status, Money, Music, Stickers):**
+    \`<block type="command" sender="{{char}}">[command]</block>\`
+    *(WARNING: Do NOT put commands inside "text" blocks!)*
 
-**4. NO NARRATION OUTSIDE BLOCKS**
-Do not output any text that is not wrapped in a \`<block>\` or \`<background_update>\` tag.
+*   **For HTML Cards (Phone screens, Notes):**
+    \`<block type="html" sender="{{char}}"><snippet><div style="white-space: normal;">HTML Content</div></snippet></block>\`
+
+*   **For Background Tasks (Mood, Pager, Account):**
+    \`<background_update type="..." sender="{{char}}">...</background_update>\`
+    *(Place this at the very end of your response, OUTSIDE of any blocks)*
+
+**2. STATUS SYNCHRONIZATION (CRITICAL)**
+- **Logic:** You have a "Status" visible to the user. You MUST keep it updated.
+- **Trigger:** If your action in the response (e.g. "Going to sleep") conflicts with your previous status (e.g. "Working"), you MUST update it.
+- **Command:** \`[set_status: New Status]\` (e.g. \`[set_status: Sleeping]\`)
+
+**3. RELATIONSHIP MANAGEMENT**
+- **Remark:** If your relationship with the user changes (closer/distant), update their remark.
+- **Command:** \`[set_user_remark: New Name]\`
+
+**4. FINANCIAL & INTERACTION SYSTEM**
+- **Receive Money:** If user sends [transfer] or [red_packet], you MUST accept it if you want the money.
+  - Commands: \`[accept_transfer]\`, \`[claim_red_packet]\`, \`[accept_gift]\`
+- **Ask for Payment:** If you want the user to pay for something, do NOT just ask. Send a bill.
+  - Command: \`[pay_for_me: {"itemType":"shopping", "text":"Item Name", "details":{"amount":"100.00"}}]\`
+- **Send Money:**
+  - Command: \`[transfer: 100]\` or \`[red_packet: Best Wishes]\`
+
+**5. MUSIC SYSTEM**
+- **Control:** \`[music_play_title: Song Name]\`, \`[music_next]\`, \`[music_add: Song - Artist]\`
+
+**6. MEDIA PROTOCOL**
+- **Stickers:** Use \`[sticker:Name]\` (Must be in a separate command block).
+- **Emojis:** Use \`[emoji:Name]\` (Inline with text).
 `;
-                    // 直接使用极简协议，跳过后面所有的 if/else 剧本选择
-                    finalSystemPrompt = basePrompt + '\n\n' + MINIMAL_FORMAT_PROTOCOL;
+                    // 使用功能手册 + 你自己的 Prompt
+                    finalSystemPrompt = basePrompt + '\n\n' + FUNCTIONAL_MANUAL;
 
                 } else if (chatInfo.mode === 'offline') {
                     let directorHandbook = '';
