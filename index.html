@@ -21860,25 +21860,25 @@ You MUST wrap all content in the correct XML tags.
 **2. STATUS SYNCHRONIZATION (CRITICAL)**
 - **Logic:** You have a "Status" visible to the user. You MUST keep it updated.
 - **Trigger:** If your action in the response (e.g. "Going to sleep") conflicts with your previous status (e.g. "Working"), you MUST update it.
-- **Command:** \`[set_status: New Status]\` (e.g. \`[set_status: Sleeping]\`)
+- **Format:** \`<block type="command" sender="{{char}}">[set_status: New Status]</block>\`
 
 **3. RELATIONSHIP MANAGEMENT**
 - **Remark:** If your relationship with the user changes (closer/distant), update their remark.
-- **Command:** \`[set_user_remark: New Name]\`
+- **Format:** \`<block type="command" sender="{{char}}">[set_user_remark: New Name]</block>\`
 
 **4. FINANCIAL & INTERACTION SYSTEM**
 - **Receive Money:** If user sends [transfer] or [red_packet], you MUST accept it if you want the money.
-  - Commands: \`[accept_transfer]\`, \`[claim_red_packet]\`, \`[accept_gift]\`
+  - **Format:** \`<block type="command" sender="{{char}}">[accept_transfer]</block>\` (or [claim_red_packet], [accept_gift])
 - **Ask for Payment:** If you want the user to pay for something, do NOT just ask. Send a bill.
-  - Command: \`[pay_for_me: {"itemType":"shopping", "text":"Item Name", "details":{"amount":"100.00"}}]\`
+  - **Format:** \`<block type="command" sender="{{char}}">[pay_for_me: {"itemType":"shopping", "text":"Item Name", "details":{"amount":"100.00"}}]</block>\`
 - **Send Money:**
-  - Command: \`[transfer: 100]\` or \`[red_packet: Best Wishes]\`
+  - **Format:** \`<block type="command" sender="{{char}}">[transfer: 100]</block>\`
 
 **5. MUSIC SYSTEM**
-- **Control:** \`[music_play_title: Song Name]\`, \`[music_next]\`, \`[music_add: Song - Artist]\`
+- **Control:** \`<block type="command" sender="{{char}}">[music_play_title: Song Name]</block>\`
 
 **6. MEDIA PROTOCOL**
-- **Stickers:** Use \`[sticker:Name]\` (Must be in a separate command block).
+- **Stickers:** \`<block type="command" sender="{{char}}">[sticker:Name]</block>\`
 - **Emojis:** Use \`[emoji:Name]\` (Inline with text).
 `;
                     // 使用功能手册 + 你自己的 Prompt
