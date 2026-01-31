@@ -24025,11 +24025,9 @@ Look at your last sentence. Does it sound like the end of a chapter? **DELETE IT
 
                     async function updateStreamingMessage(delta) {
                         // 【核心修复】：实时计算排除思考后的可见文本（处理已闭合和未闭合的标签）
+                        // 增加 thinking 标签支持
                         const displayableText = fullResponseText
-                            .replace(/<think>[\s\S]*?<\/think>/gi, '') 
-                            .replace(/<think>[\s\S]*/gi, '')           
-                            .replace(/<thought>[\s\S]*?<\/thought>/gi, '')
-                            .replace(/<thought>[\s\S]*/gi, '')
+                            .replace(/<(?:think|thought|thinking)>[\s\S]*?(?:<\/(?:think|thought|thinking)>|$)/gi, '')
                             .trim();
 
                         // 如果当前全部是思考内容，则不创建气泡，也不更新内容
@@ -24144,7 +24142,8 @@ Look at your last sentence. Does it sound like the end of a chapter? **DELETE IT
 
                     if (aiResponse) {
                         // 核心修复：使用混合正则，无论 AI 用哪种标签开头或结尾，都能准确识别并抹除思考内容
-                        aiResponse = aiResponse.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '').trim();
+                        // 【核心修复】增加 thinking 标签支持
+                        aiResponse = aiResponse.replace(/<(?:think|thought|thinking)>[\s\S]*?(?:<\/(?:think|thought|thinking)>|$)/gi, '').trim();
                     }
                     
 
@@ -24409,6 +24408,9 @@ Look at your last sentence. Does it sound like the end of a chapter? **DELETE IT
                  throw new Error("API 返回了成功状态，但未能提取有效内容。请检查API后台日志或更换模型。");
             }
             
+            // 【核心修复】在这里也统一清洗掉 thinking/think/thought
+            aiResponse = aiResponse.replace(/<(?:think|thought|thinking)>[\s\S]*?(?:<\/(?:think|thought|thinking)>|$)/gi, '').trim();
+
             return aiResponse;
             // =================================================================
             // ======================== 修复结束 =========================
@@ -25212,10 +25214,11 @@ You are the Director. If multiple characters react to the rejection, generate a 
 
         async function processAIResponseLine(line, targetChatId = null, forcedSender = null) {
             // 1. 暴力清除所有思考标签及其内容 (支持跨行)
-            line = line.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '');
+            // 【核心修复】增加 thinking 标签支持
+            line = line.replace(/<(?:think|thought|thinking)>[\s\S]*?(?:<\/(?:think|thought|thinking)>|$)/gi, '');
             
             // 2. 清除可能残留的空标签
-            line = line.replace(/<thought>[\s\S]*?<\/thought>/gi, '');
+            line = line.replace(/<(?:think|thought|thinking)>[\s\S]*?<\/(?:think|thought|thinking)>/gi, '');
 
             // 3. 恢复换行符
             line = line.replace(/__NEWLINE__/g, '\n');
