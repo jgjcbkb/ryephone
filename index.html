@@ -24084,7 +24084,8 @@ Look at your last sentence. Does it sound like the end of a chapter? **DELETE IT
                     }
                     
                     // 【核心修复2】将流式结果赋值给全局变量，交由函数底部的公共逻辑统一处理
-                    aiResponse = fullResponseText; 
+                    // 在这里也清洗一遍，确保万无一失
+                    aiResponse = fullResponseText.replace(/<(?:think|thought|thinking)>[\s\S]*?(?:<\/(?:think|thought|thinking)>|$)/gi, '').trim();
 
                     // 【已删除重复的处理逻辑，防止出现双重回复】
 
@@ -24920,6 +24921,11 @@ You MUST output one of these two tags at the very beginning of your response. Do
                 aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
             } else {
                 aiResponse = data.choices?.[0]?.message?.content;
+            }
+
+            // 【核心修复】增加 thinking 清洗
+            if (aiResponse) {
+                aiResponse = aiResponse.replace(/<(?:think|thought|thinking)>[\s\S]*?(?:<\/(?:think|thought|thinking)>|$)/gi, '').trim();
             }
 
             return aiResponse || ""; // 返回AI的回复
@@ -43597,8 +43603,9 @@ If the user sends an image/screenshot, simply react to it naturally in your dial
                 }
 
                 // 【核心修复】先清洗掉 AI 的思考过程，防止 AI 在思考中提到挂断指令导致误判
+                // 增加 thinking 标签支持
                 if (aiResponse) {
-                    aiResponse = aiResponse.replace(/<(?:think|thought)>[\s\S]*?(?:<\/(?:think|thought)>|$)/gi, '').trim();
+                    aiResponse = aiResponse.replace(/<(?:think|thought|thinking)>[\s\S]*?(?:<\/(?:think|thought|thinking)>|$)/gi, '').trim();
                 }
 
                 if (aiResponse && aiResponse.includes('[hang_up_call]')) {
