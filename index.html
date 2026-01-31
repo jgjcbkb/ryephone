@@ -12255,8 +12255,11 @@ When using HTML, you are **STRICTLY FORBIDDEN** from adding \`style\` attributes
                 finalSystemPrompt = baseSystemPrompt;
             }
             
-            // 将终极心理引擎作为最高优先级指令注入
-            finalSystemPrompt = ULTIMATE_PSYCHOLOGICAL_ENGINE + finalSystemPrompt;
+            // 【核心修复】：检测开关，决定是否注入心理引擎
+            const appSettings = loadFromLocalStorage('app-appearance-settings', {});
+            if (!appSettings.disableDefaultPrompts) {
+                finalSystemPrompt = ULTIMATE_PSYCHOLOGICAL_ENGINE + finalSystemPrompt;
+            }
 
             // 重新调整顺序：API系统提示在前，前情提要在后
             // 此时 finalSystemPrompt 初始值已经是 profile.prompt (API设置)
@@ -13766,8 +13769,12 @@ ${processedChatHistory}
             momentsPsychEngine = momentsPsychEngine.replace(/\*\*\[AVATAR DOUBLE-CLICK INTERACTION PROTOCOL[\s\S]*?(?=---)/g, "");
             momentsPsychEngine = momentsPsychEngine.replace(/\*\*\[PRESET CONFIGURATION PROTOCOL[\s\S]*?(?=---)/g, "");
 
+            // 【核心修复】：检测开关
+            const appSettings = loadFromLocalStorage('app-appearance-settings', {});
+            const finalPsychEngine = appSettings.disableDefaultPrompts ? "" : momentsPsychEngine;
+
             const instruction = `
-${momentsPsychEngine}
+${finalPsychEngine}
 ${baseSystemPrompt}
 ${timeContext}
 ${musicContext}
@@ -14640,7 +14647,11 @@ ${tuquInstruction}
             }
 
             // 核心修复：拼接 profile.prompt (API系统提示) 并加入版规描述
-            const finalTuquPrompt = ULTIMATE_PSYCHOLOGICAL_ENGINE + (profile.prompt || "") + fullIdentityContext + tuquWorldBookContent + tuquContext + boardsRulesText + tuquExclusivePrompt;
+            // 【核心修复】：检测开关
+            const appSettings = loadFromLocalStorage('app-appearance-settings', {});
+            const finalPsychEngine = appSettings.disableDefaultPrompts ? "" : ULTIMATE_PSYCHOLOGICAL_ENGINE;
+
+            const finalTuquPrompt = finalPsychEngine + (profile.prompt || "") + fullIdentityContext + tuquWorldBookContent + tuquContext + boardsRulesText + tuquExclusivePrompt;
 
             
             finalMessages = [
@@ -21817,7 +21828,41 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
                 // --- 核心修复：无论如何先获取基础提示 ---
                 let basePrompt = profile.prompt || '';
 
-                if (chatInfo.mode === 'offline') {
+                // 【【【 核心新增：极简格式模式 (禁用内置提示词) 】】】
+                const appSettings = loadFromLocalStorage('app-appearance-settings', {});
+                
+                if (appSettings.disableDefaultPrompts) {
+                    console.log("[System] 内置提示词已禁用，仅注入基础格式协议。");
+                    
+                    const MINIMAL_FORMAT_PROTOCOL = `
+# [SYSTEM: FORMATTING PROTOCOL - STRICT ADHERENCE REQUIRED]
+You must follow these formatting rules to interact with the system.
+
+**1. MESSAGE BLOCKS (MANDATORY)**
+Your output MUST be a sequence of XML-like blocks.
+- **Text/Dialogue:** \`<block type="text" sender="{{char}}">Content</block>\`
+- **System Command:** \`<block type="command" sender="{{char}}">[command]</block>\`
+- **HTML Card:** \`<block type="html" sender="{{char}}"><snippet><div style="white-space: normal;">HTML Content</div></snippet></block>\`
+
+**2. BACKGROUND UPDATES (OPTIONAL)**
+Use these tags at the very end of your response (outside of blocks) to update internal data.
+- **Mood Journal:** \`<background_update type="mood_card" sender="{{char}}">Diary content...</background_update>\`
+- **Pager Memo:** \`<background_update type="pager" sender="{{char}}">Memo content...</background_update>\`
+- **Account:** \`<background_update type="account" sender="{{char}}">...</background_update>\` (See account rules for XML structure)
+
+**3. INTERACTION COMMANDS**
+- Status: \`[set_status: text]\`
+- Music: \`[music_play_title: name]\`
+- Action: \`[trigger_interaction]\`
+- Money: \`[transfer: amount]\`, \`[red_packet: text]\`
+
+**4. NO NARRATION OUTSIDE BLOCKS**
+Do not output any text that is not wrapped in a \`<block>\` or \`<background_update>\` tag.
+`;
+                    // 直接使用极简协议，跳过后面所有的 if/else 剧本选择
+                    finalSystemPrompt = basePrompt + '\n\n' + MINIMAL_FORMAT_PROTOCOL;
+
+                } else if (chatInfo.mode === 'offline') {
                     let directorHandbook = '';
                     let characterDefinition = '';
 
@@ -22569,7 +22614,11 @@ Remember to also vary your message count as instructed before. Your goal is to b
 
                 // 2. 重新调整顺序：心理引擎(底层) -> API系统提示(全局规则) -> 前情提要(具体情节)
                 // 此时 finalSystemPrompt 内部已经包含了 basePrompt 和各种手册
-                finalSystemPrompt = currentPsychEngine + finalSystemPrompt;
+                
+                // 【核心修复】：只有在未禁用内置提示词时，才注入心理引擎
+                if (!appSettings.disableDefaultPrompts) {
+                    finalSystemPrompt = currentPsychEngine + finalSystemPrompt;
+                }
 
                 if (!contactInfo.isGroup) {
                     const preamble = chatInfo.preamble || '';
@@ -36994,6 +37043,47 @@ function saveSettings() {
                 // 如果 showRawOutput 是 true (显示), 开关应为 ON (checked).
                 // 如果 showRawOutput 是 false (不显示), 开关应为 OFF (unchecked).
                 rawOutputToggle.checked = appearanceSettings.showRawOutput;
+            }
+
+            // 【【【 核心新增：禁用内置提示词开关 】】】
+            // 1. 动态插入开关 HTML
+            let disablePromptGroup = document.getElementById('disable-prompt-toggle-group');
+            if (!disablePromptGroup && rawOutputToggle) {
+                const debugSection = rawOutputToggle.closest('.form-section');
+                if (debugSection) {
+                    const div = document.createElement('div');
+                    div.id = 'disable-prompt-toggle-group';
+                    div.className = 'form-group-toggle';
+                    div.style.borderTop = '1px solid var(--light-gray)';
+                    div.innerHTML = `
+                        <label for="toggle-disable-prompts" class="toggle-label" style="color: #e67e22;">禁用内置引导提示词</label>
+                        <label class="switch">
+                            <input type="checkbox" id="toggle-disable-prompts">
+                            <span class="slider"></span>
+                        </label>
+                    `;
+                    debugSection.appendChild(div);
+                    
+                    const hint = document.createElement('p');
+                    hint.className = 'form-hint';
+                    hint.style.padding = '0 15px 15px';
+                    hint.innerHTML = '开启后，系统将<b>不再发送</b>内置的“导演/小说家/聊天软件”等人设引导词。AI 将只接收最基础的格式指令（用于维持功能）和你自己在 API 设置中填写的 Prompt。适用于模型本身很聪明，不需要额外引导的情况。';
+                    debugSection.appendChild(hint);
+                }
+            }
+
+            // 绑定事件
+            const disablePromptToggle = document.getElementById('toggle-disable-prompts');
+            if (disablePromptToggle) {
+                disablePromptToggle.checked = appearanceSettings.disableDefaultPrompts || false;
+                // 移除旧监听 (cloneNode法)
+                const newToggle = disablePromptToggle.cloneNode(true);
+                disablePromptToggle.parentNode.replaceChild(newToggle, disablePromptToggle);
+                
+                newToggle.addEventListener('change', () => {
+                    appearanceSettings.disableDefaultPrompts = newToggle.checked;
+                    saveSettings();
+                });
             }
 
             // 【【【 核心新增：强力后台保活开关 】】】
