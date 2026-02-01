@@ -19768,74 +19768,77 @@ let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一�
         }
 
 
-        function saveConversation() {
-            if (!chatState.chatId) return;
+        function saveConversation(specificChatId = null) {
+            // 1. 确定要保存的目标 ID
+            // 如果没有指定 ID，就用当前屏幕的 ID
+            const targetId = specificChatId || chatState.chatId;
+            if (!targetId) return;
 
-            // 【核心修复】保存保护锁
-            // 如果内存中的历史记录为空，且当前并不处于“新创建的空聊天”状态，则禁止保存
-            // 这能防止因为加载失败或加载延迟导致的“数据被清空”事故
+            // 【核心安全锁】防止串台的最后一道防线
+            // 如果我们正在试图保存全局的 fullMessageHistory，必须确保它属于 targetId
+            // 如果 targetId 和当前屏幕的 chatState.chatId 不一致，说明发生了切屏，绝对禁止保存全局变量！
+            if (!specificChatId && targetId !== chatState.chatId) {
+                console.error(`[严重警告] 拦截了一次串台保存！试图将当前屏幕数据写入 ID: ${targetId}，但当前屏幕 ID 是: ${chatState.chatId}`);
+                return;
+            }
+
+            // 2. 空数据保护锁
             if ((!fullMessageHistory || fullMessageHistory.length === 0)) {
-                // 只有当这是一个全新的聊天（列表里显示还没有消息）时，才允许保存空数组
-                const currentChatInList = chatList.find(c => c.id === chatState.chatId);
+                const currentChatInList = chatList.find(c => c.id === targetId);
                 if (currentChatInList && currentChatInList.lastMessage !== '可以开始聊天了' && currentChatInList.lastMessage !== '群聊已创建') {
                     console.warn("[安全拦截] 内存数据为空，阻止了可能导致数据丢失的保存操作。");
                     return;
                 }
             }
 
-            console.log(`[诊断探针] 1. 开始执行 saveConversation，目标 chat ID: ${chatState.chatId}`);
+            console.log(`[数据保存] 执行保存，目标 ID: ${targetId}`);
             
             try {
-                const key = `conversation_${chatState.chatId}`;
-
+                const key = `conversation_${targetId}`;
                 
-                // 【核心修改】智能保存逻辑 (防复活版)
+                // 【核心】保存 fullMessageHistory
                 try {
-                    // 1. 先尝试存入 LocalStorage
                     localStorage.setItem(key, JSON.stringify(fullMessageHistory));
-                    
-                    // 【关键修复】如果 LS 保存成功，必须把数据库里的旧备份删掉！
-                    imageStore.removeItem(key).catch(e => console.warn("清理旧数据库失败", e));
-                    
+                    imageStore.removeItem(key).catch(e => {}); 
                 } catch (e) {
-                    // 2. 如果 LS 满了，存入 IndexedDB
                     if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
-                        console.warn(`[诊断探针] LocalStorage 已满，转存至 IndexedDB: ${key}`);
-                        
                         imageStore.setItem(key, fullMessageHistory).then(() => {
-                            // 【关键修复】如果存入了数据库，必须把 LS 里的残余数据删掉！
                             localStorage.removeItem(key);
-                        }).catch(err => {
-                            console.error("IndexedDB 保存也失败:", err);
-                            // 此时不弹窗打扰用户，因为addMessage已经尝试过保存了
                         });
                     } else {
-                        console.error('[诊断探针] 致命错误：', e);
+                        console.error('[保存失败]', e);
                     }
                 }
 
             } catch (error) {
-                console.error('[诊断探针] 致命错误：', error);
+                console.error('[致命错误]', error);
             }
             
-            // 更新聊天列表预览
-            const chatInList = chatList.find(c => c.id === chatState.chatId);
-            if (chatInList) {
-                const lastMsg = [...chatState.messages].filter(m => m.type !== 'time_divider' && m.side !== 'system').pop();
-                if (lastMsg) {
-                    let lastMessageText = lastMsg.text;
-                    if(lastMsg.type !== 'text') { const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'transfer': '[转账]', 'red_packet': '[红包]', 'photo-description': '[图文]', 'video': '[视频]', 'location': '[位置]', 'gift': '[礼物]', 'pay_for_me': '[代付]', 'call_summary': '[视频通话]', 'tuqu_share': '[分享]' }; lastMessageText = typeMap[lastMsg.type] || '[消息]'; }
-                    if(lastMsg.side === 'sent') lastMessageText = "{{user}}: " + lastMessageText;
-                    else if(contactInfo.isGroup && lastMsg.sender) lastMessageText = `${lastMsg.sender}: ${lastMessageText}`;
-                    chatInList.lastMessage = lastMessageText.length > 25 ? lastMessageText.substring(0, 25) + '...' : lastMessageText;
-                    chatInList.timestamp = formatTimestamp(lastMsg.timestamp).split(' ')[0];
+            // 更新列表预览 (仅当保存的是当前聊天时)
+            if (targetId === chatState.chatId) {
+                const chatInList = chatList.find(c => c.id === targetId);
+                if (chatInList) {
+                    const lastMsg = [...chatState.messages].filter(m => m.type !== 'time_divider' && m.side !== 'system').pop();
+                    if (lastMsg) {
+                        let lastMessageText = lastMsg.text;
+                        if(lastMsg.type !== 'text') { 
+                            const typeMap = { 'photo': '[图片]', 'voice': '[语音]', 'transfer': '[转账]', 'red_packet': '[红包]', 'photo-description': '[图文]', 'video': '[视频]', 'location': '[位置]', 'gift': '[礼物]', 'pay_for_me': '[代付]', 'call_summary': '[视频通话]', 'tuqu_share': '[分享]' }; 
+                            lastMessageText = typeMap[lastMsg.type] || '[消息]'; 
+                        }
+                        if(lastMsg.side === 'sent') lastMessageText = "{{user}}: " + lastMessageText;
+                        else if(contactInfo.isGroup && lastMsg.sender) lastMessageText = `${lastMsg.sender}: ${lastMessageText}`;
+                        
+                        chatInList.lastMessage = lastMessageText.length > 25 ? lastMessageText.substring(0, 25) + '...' : lastMessageText;
+                        chatInList.timestamp = formatTimestamp(lastMsg.timestamp).split(' ')[0];
+                    }
+                    const chatListIndex = chatList.findIndex(c => c.id === targetId);
+                    if (chatListIndex > 0) { const [item] = chatList.splice(chatListIndex, 1); chatList.unshift(item); }
+                    saveChatList();
+                    renderChatList();
                 }
-                const chatListIndex = chatList.findIndex(c => c.id === chatState.chatId);
-                if (chatListIndex > 0) { const [item] = chatList.splice(chatListIndex, 1); chatList.unshift(item); }
-                saveChatList();
-                renderChatList();
             }
         }
+
 
 
         // 【核心修改】增加 async 关键字
@@ -26055,49 +26058,52 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
             }
 
             // =================================================================
-            // 【【【 核心安全保存逻辑 (READ-MODIFY-WRITE) 】】】
+            // 【【【 核心安全保存逻辑 (隔离沙箱版) 】】】
             // =================================================================
             
-            // A. 先从硬盘加载“绝对真理” (优先LS，失败查DB)
-            let safeHistory = loadFromLocalStorage(`conversation_${finalTargetChatId}`, []);
-            if (safeHistory.length === 0) {
+            // 1. 无论当前在看哪个窗口，必须先从硬盘里把【目标窗口】的档案袋取出来
+            // 绝对不使用 fullMessageHistory 这个全局变量来做保存，因为它可能已经被切屏污染了
+            let targetHistory = loadFromLocalStorage(`conversation_${finalTargetChatId}`, []);
+            
+            // 数据库回退检查
+            if (!targetHistory || targetHistory.length === 0) {
                 try {
                     const dbData = await imageStore.getItem(`conversation_${finalTargetChatId}`);
                     if (dbData && Array.isArray(dbData)) {
-                        safeHistory = dbData;
+                        targetHistory = dbData;
                     }
                 } catch (e) { console.error("DB Read Error in addMessage", e); }
             }
 
-            // B. 在完整历史中追加新消息
-            safeHistory.push(msgData);
+            // 2. 将新消息放入这个独立的档案袋
+            targetHistory.push(msgData);
 
-            // C. 安全写回硬盘 (优先LS，超限存DB)
+            // 3. 将档案袋封口，写回硬盘
+            // 这一步是完全独立的，跟屏幕上显示什么没有任何关系，绝对不会串台
             const storageKey = `conversation_${finalTargetChatId}`;
             try {
-                localStorage.setItem(storageKey, JSON.stringify(safeHistory));
-                // 如果存入LS成功，务必清理DB中的旧副本，防止数据版本冲突
+                localStorage.setItem(storageKey, JSON.stringify(targetHistory));
                 await imageStore.removeItem(storageKey);
             } catch (e) {
                 if (e.name === 'QuotaExceededError' || e.message.includes('quota')) {
-                    console.warn(`LocalStorage full, saving chat ${finalTargetChatId} to IndexedDB.`);
-                    await imageStore.setItem(storageKey, safeHistory);
-                    localStorage.removeItem(storageKey); // 清理LS残余
+                    await imageStore.setItem(storageKey, targetHistory);
+                    localStorage.removeItem(storageKey);
                 } else {
                     console.error("Critical Save Error:", e);
-                    await customAlert("保存失败！存储空间可能不足。");
-                    return; // 保存失败则终止，防止UI不同步
+                    return; 
                 }
             }
             // =================================================================
 
-            // 3. 更新 UI 状态 (如果用户正在看这个聊天)
-            const isCurrentChat = (finalTargetChatId === activeChatId) && document.getElementById('page-conversation').classList.contains('active');
+            // 4. 只有当【目标ID】等于【当前屏幕显示的ID】时，才更新屏幕
+            // 这是一个只读操作，不会反向污染数据库
+            const isCurrentChat = (finalTargetChatId === chatState.chatId) && document.getElementById('page-conversation').classList.contains('active');
             
             if (isCurrentChat) {
-                // 同步内存中的全局变量
-                fullMessageHistory = safeHistory;
-                chatState.messages = fullMessageHistory.slice(-40); // 仅保持最近40条在渲染池
+                // 只有在这里，才允许更新全局的显示数据
+                // 直接使用我们刚存好的 targetHistory，保证内存和硬盘一致
+                fullMessageHistory = targetHistory;
+                chatState.messages = fullMessageHistory.slice(-40); 
 
                 // 播放提示音 (仅接收到的非系统消息)
                 if (msgData.side === 'received' && msgData.type !== 'time_divider' && msgData.side !== 'system') {
