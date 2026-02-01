@@ -23778,33 +23778,36 @@ The Director has whispered a secret instruction to you for this specific respons
                 const recallAndCheckPrompt = `
 ${enforcementText}
 
-[SYSTEM: INTELLIGENCE & LOGIC ENFORCEMENT]
-You are currently suffering from "AI Cliché Syndrome". You MUST wake up and follow these correction protocols immediately.
+# [SYSTEM CRITICAL WARNING: SYNTAX CORRUPTION DETECTED]
+**You are currently generating INVALID XML tags (e.g., \`typea\`, \`</to-talk>\`, \`</body_part>\`).**
+**THIS IS A CRITICAL SYSTEM FAILURE.**
 
-**PROTOCOL 1: ANTI-STUPIDITY (RELEVANCE CHECK)**
-- **READ:** Look at the User's LAST message again. What exactly are they asking or doing?
-- **THINK:** Do not just output a generic reaction. If they asked "Where are you?", you MUST answer with a location. If they insulted you, you MUST react to the insult.
-- **BAN:** Do NOT ignore the user's specific words to continue your own monologue. Connection is MANDATORY.
+**[ABSOLUTE SYNTAX LAW - READ THIS OR BE TERMINATED]**
 
-**PROTOCOL 2: ANTI-CLICHÉ (STYLE CHECK)**
-- **BAN:** Stop using words like "eyes turned red" (眼眶微红), "sneered" (冷笑), "voice hoarse" (声音沙哑), "atmosphere froze" (空气凝固).
-- **ACTION:** Write like a human, not a bad novel. Be raw, direct, and grounded.
+1.  **ONLY THREE TAGS EXIST:**
+    *   \`<block>\`
+    *   \`<snippet>\` (Only inside block type="html")
+    *   \`<div>\` (Only inside snippet)
+    *   **ANY OTHER TAG IS FORBIDDEN.** Do NOT invent tags like \`<text>\`, \`<p>\`, \`<action>\`.
 
-**PROTOCOL 3: LOGIC & STATUS AUDIT**
-- **Current Status:** "${myCurrentKnownStatus}"
-- **Logic Check:** If you are "Driving", you cannot "Hug". If you are "Tied up", you cannot "Walk away".
-- **Update Rule:** If your action changes your state (e.g. from "Angry" to "Calm", or "Driving" to "Parked"), you MUST output:
-  \`<block type="command" sender="{{char}}">[set_status: New Status]</block>\`
+2.  **ATTRIBUTE SPELLING LAW:**
+    *   **CORRECT:** \`type="text"\`
+    *   **WRONG:** \`typea="text"\`, \`typ="text"\`
+    *   **CORRECT:** \`sender="Name"\`
+    *   **WRONG:** \`send="Name"\`, \`from="Name"\`
+    *   **SPACING:** You MUST put a space between attributes.
+        *   **WRONG:** \`type="text"sender="Name"\`
+        *   **RIGHT:** \`type="text" sender="Name"\`
 
-**PROTOCOL 4: CUSTOM RULES RECALL**
-- Check the **[Worldbook]** and **[System Prompt]** at the start.
-- If the user defined specific formatting (e.g. brackets, specific speech style), **APPLY IT NOW**.
+3.  **THE ONLY VALID BLOCK FORMATS:**
+    *   \`<block type="text" sender="Name">Content</block>\`
+    *   \`<block type="html" sender="Name"><snippet>...</snippet></block>\`
+    *   \`<block type="command" sender="Name">[command]</block>\`
 
-**[FINAL MANDATE]**
-1. **THINK** first (What is the logical reaction?).
-2. **WRITE** the response (In XML blocks).
-3. **UPDATE** the status (If changed).
+**FINAL COMMAND:**
+**Check your syntax character by character.** If you output \`typea\` again, the system will crash.
 `;
+
 
                 // 3. 将这条“圣旨”作为最后一条 User 消息插入
                 finalMessages.push({
