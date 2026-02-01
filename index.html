@@ -31682,14 +31682,20 @@ document.getElementById('delete-contact-btn').addEventListener('click', async ()
             conversationManager.open(chatId);
         }
     });
-document.getElementById('exit-group-btn').addEventListener('click', async () => { 
+    document.getElementById('exit-group-btn').addEventListener('click', async () => { 
         const chatId = getCurrentChatId();
         if (await customConfirm(`你确定要退出群聊“${chatState.chatName}”吗？`)) { 
             // 【核心修正】在发送消息前，立刻更新内部状态
             relationship.myStatus = 'exited';
-            await addMessage({type:'system', side: 'system', text:`你退出了群聊。`});
+            
+            // 【核心修改】判断当前身份
+            const activeId = chatState.currentIdentity || '{{user}}';
+            const actorDisplay = activeId === '{{user}}' ? '你' : `“${activeId}”`;
+
+            await addMessage({type:'system', side: 'system', text:`${actorDisplay}退出了群聊。`});
         } 
     });
+
 
     document.getElementById('disband-group-btn').addEventListener('click', async () => {
         const chatId = getCurrentChatId();
@@ -39731,6 +39737,7 @@ async function handleBatchDelete() {
     })();
 
     async function handleAddMember() {
+        // 【修复】改回使用通用方法获取ID，防止变量未定义报错
         const chatId = conversationManager.getCurrentChatId();
         const currentMembers = loadFromLocalStorage(`chat_members_${chatId}`, []);
 
@@ -39760,9 +39767,7 @@ async function handleBatchDelete() {
 
         // 5. 生成 HTML 列表
         const membersListHtml = allAvailableMembers.map(name => { 
-            // NPC 和 {{user}} 没有备注，直接用名字
             let displayName = name;
-            // 如果是 AI 角色，尝试获取备注
             const aiChar = chatList.find(c => c.name === name);
             if(aiChar) {
                 const chatInfo = loadFromLocalStorage(`chat_info_${aiChar.id}`, {});
@@ -39788,117 +39793,144 @@ async function handleBatchDelete() {
                 const updatedMembers = [...currentMembers, ...newMembers];
                 saveToLocalStorage(`chat_members_${chatId}`, updatedMembers);
                 
+                // 【核心修改】直接从硬盘读取当前身份，确保万无一失
+                const currentIdentity = loadFromLocalStorage(`chat_identity_${chatId}`, '{{user}}');
+                const actorDisplay = currentIdentity === '{{user}}' ? '你' : `“${currentIdentity}”`;
+
                 const addedMe = newMembers.includes('{{user}}');
                 const addedOthers = newMembers.filter(m => m !== '{{user}}');
                 let systemMessage = '';
+                
                 if (addedMe) {
-                    systemMessage = '你加入了群聊。';
+                    systemMessage = `${actorDisplay}加入了群聊。`;
                 }
                 if (addedOthers.length > 0) {
-                    systemMessage += (systemMessage ? '\n' : '') + `你邀请 "${addedOthers.join('", "')}" 加入了群聊。`;
+                    systemMessage += (systemMessage ? '\n' : '') + `${actorDisplay}邀请 "${addedOthers.join('", "')}" 加入了群聊。`;
                 }
 
+                // 【修复】显式调用 conversationManager.addMessage
                 await conversationManager.addMessage({type: 'system', side: 'system', text: systemMessage}); 
+                
+                // 【修复】显式调用
                 conversationManager.renderGroupMemberList(chatId); 
             }
         }
     }
+
     
     // 这是最终正确版，请用它替换整个旧函数
-async function handleRemoveMember() {
-    const chatId = conversationManager.getCurrentChatId();
-    const currentMembers = loadFromLocalStorage(`chat_members_${chatId}`, []);
-    const removableMembers = currentMembers.filter(m => m !== '{{user}}');
+    async function handleRemoveMember() {
+        // 【修复】改回使用通用方法获取ID
+        const chatId = conversationManager.getCurrentChatId();
+        const currentMembers = loadFromLocalStorage(`chat_members_${chatId}`, []);
+        const removableMembers = currentMembers.filter(m => m !== '{{user}}');
 
-    if (removableMembers.length === 0) {
-        await conversationManager.customAlert('没有可移出的成员。');
-        return;
-    }
+        if (removableMembers.length === 0) {
+            await conversationManager.customAlert('没有可移出的成员。');
+            return;
+        }
 
-    const membersListHtml = removableMembers.map(member => 
-        `<label class="inline-label"><input type="checkbox" value="${member}"> ${member}</label>`
-    ).join('');
-    
-    const modalHtml = `
-        <div style="max-height: 200px; overflow-y: auto; text-align: left; border: 1px solid #eee; padding: 10px; border-radius: 8px;">${membersListHtml}</div>
-        <div style="margin-top: 15px; text-align: left;">
-            <label class="inline-label">
-                <input type="checkbox" id="remove-permanently-checkbox">
-                <strong>彻底移出群聊 (无法重新加入)</strong>
-            </label>
-            <p class="form-hint" style="padding: 0; margin-top: 5px;">如果不勾选，被移出的成员将无法发言，但可以发送加群申请。</p>
-        </div>
-    `;
+        const membersListHtml = removableMembers.map(member => 
+            `<label class="inline-label"><input type="checkbox" value="${member}"> ${member}</label>`
+        ).join('');
+        
+        const modalHtml = `
+            <div style="max-height: 200px; overflow-y: auto; text-align: left; border: 1px solid #eee; padding: 10px; border-radius: 8px;">${membersListHtml}</div>
+            <div style="margin-top: 15px; text-align: left;">
+                <label class="inline-label">
+                    <input type="checkbox" id="remove-permanently-checkbox">
+                    <strong>彻底移出群聊 (无法重新加入)</strong>
+                </label>
+                <p class="form-hint" style="padding: 0; margin-top: 5px;">如果不勾选，被移出的成员将无法发言，但可以发送加群申请。</p>
+            </div>
+        `;
 
-    const result = await conversationManager.showCustomModal({
-        title: '移出成员',
-        html: modalHtml,
-        buttons: [
-            { text: '取消', value: 'cancel', class: 'secondary' },
-            { text: '确认移出', value: 'remove', class: 'danger' }
-        ],
-        showCloseButton: true
-    });
-    
-    if (result && result.value === 'remove') {
-        const modalBox = result.target.closest('.modal-box');
-        const selectedMembers = Array.from(modalBox.querySelectorAll('input[type="checkbox"]:not(#remove-permanently-checkbox):checked')).map(cb => cb.value);
-        const isPermanent = modalBox.querySelector('#remove-permanently-checkbox').checked;
+        const result = await conversationManager.showCustomModal({
+            title: '移出成员',
+            html: modalHtml,
+            buttons: [
+                { text: '取消', value: 'cancel', class: 'secondary' },
+                { text: '确认移出', value: 'remove', class: 'danger' }
+            ],
+            showCloseButton: true
+        });
+        
+        if (result && result.value === 'remove') {
+            const modalBox = result.target.closest('.modal-box');
+            const selectedMembers = Array.from(modalBox.querySelectorAll('input[type="checkbox"]:not(#remove-permanently-checkbox):checked')).map(cb => cb.value);
+            const isPermanent = modalBox.querySelector('#remove-permanently-checkbox').checked;
 
-        if (selectedMembers.length > 0) {
-            let membersToUpdate = loadFromLocalStorage(`chat_members_${chatId}`, []);
-            const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
-            let softRemovedMembers = chatInfo.softRemovedMembers || [];
+            if (selectedMembers.length > 0) {
+                let membersToUpdate = loadFromLocalStorage(`chat_members_${chatId}`, []);
+                const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+                let softRemovedMembers = chatInfo.softRemovedMembers || [];
 
-            if (isPermanent) {
-                // --- 彻底移出逻辑 (Hard Remove) ---
-                membersToUpdate = membersToUpdate.filter(m => !selectedMembers.includes(m));
-                softRemovedMembers = softRemovedMembers.filter(m => !selectedMembers.includes(m));
-                
-                saveToLocalStorage(`chat_members_${chatId}`, membersToUpdate);
-                chatInfo.softRemovedMembers = softRemovedMembers;
-                saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+                if (isPermanent) {
+                    // --- 彻底移出逻辑 ---
+                    membersToUpdate = membersToUpdate.filter(m => !selectedMembers.includes(m));
+                    softRemovedMembers = softRemovedMembers.filter(m => !selectedMembers.includes(m));
+                    
+                    saveToLocalStorage(`chat_members_${chatId}`, membersToUpdate);
+                    chatInfo.softRemovedMembers = softRemovedMembers;
+                    saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
 
-                alert('已彻底移出所选成员。');
+                    alert('已彻底移出所选成员。');
 
-            } else {
-                // --- 软移出逻辑 (Soft Remove) ---
-                membersToUpdate = membersToUpdate.filter(m => !selectedMembers.includes(m));
-                
-                selectedMembers.forEach(member => {
-                    if (!softRemovedMembers.includes(member)) {
-                        softRemovedMembers.push(member);
+                } else {
+                    // --- 软移出逻辑 ---
+                    membersToUpdate = membersToUpdate.filter(m => !selectedMembers.includes(m));
+                    
+                    selectedMembers.forEach(member => {
+                        if (!softRemovedMembers.includes(member)) {
+                            softRemovedMembers.push(member);
+                        }
+                    });
+
+                    saveToLocalStorage(`chat_members_${chatId}`, membersToUpdate);
+                    chatInfo.softRemovedMembers = softRemovedMembers;
+                    saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+                    
+                    // 【核心修改】直接从硬盘读取当前身份
+                    const currentIdentity = loadFromLocalStorage(`chat_identity_${chatId}`, '{{user}}');
+                    const actorDisplay = currentIdentity === '{{user}}' ? '你' : `“${currentIdentity}”`;
+
+                    // 【修复】显式调用 conversationManager.addMessage
+                    await conversationManager.addMessage({ 
+                        type: 'system', 
+                        side: 'system', 
+                        text: `${actorDisplay}将 "${selectedMembers.join('", "')}" 移出了群聊。` 
+                    });
+
+                    if (typeof notifyAIofMemberRemoval === 'function') {
+                        notifyAIofMemberRemoval(selectedMembers);
                     }
-                });
+                }
 
-                saveToLocalStorage(`chat_members_${chatId}`, membersToUpdate);
-                chatInfo.softRemovedMembers = softRemovedMembers;
-                saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
-                
-                await conversationManager.addMessage({ 
-                    type: 'system', 
-                    side: 'system', 
-                    text: `你将 "${selectedMembers.join('", "')}" 移出了群聊。` 
-                });
-
-                notifyAIofMemberRemoval(selectedMembers);
-            }
-
-            // 【【【【【【 终极修复：通过强制重建DOM来解决浏览器渲染缓存问题 】】】】】】
+                // 强制重绘列表
+                            // 【【【【【【 终极修复：通过强制重建DOM来解决浏览器渲染缓存问题 (位置修正版) 】】】】】】
             const memberListEl = document.getElementById('chat-info-member-list');
-            const parent = memberListEl.parentElement;
-            memberListEl.remove(); // 1. 先把旧的列表从DOM中彻底“撕掉”
+            const listHeader = document.querySelector('.member-list-header'); // 获取列表标题元素
+
+            if (memberListEl && listHeader) {
+                const parent = memberListEl.parentElement;
+                memberListEl.remove(); // 1. 移除旧列表
+                
+                const newMemberListEl = document.createElement('ul'); // 2. 创建新列表
+                newMemberListEl.id = 'chat-info-member-list';
+                newMemberListEl.className = 'member-list';
+                
+                // 3. 【核心修复】将新列表插入到标题 (listHeader) 的紧后面
+                // 这样它就会回到原来的位置，而不会跑到群演人设下面去
+                listHeader.after(newMemberListEl);
+            }
             
-            const newMemberListEl = document.createElement('ul'); // 2. 创建一个全新的、空白的ul元素
-            newMemberListEl.id = 'chat-info-member-list';
-            newMemberListEl.className = 'member-list';
-            parent.appendChild(newMemberListEl); // 3. 把这个新列表放回原位
-            
-            // 4. 现在，在全新的元素上调用渲染函数，浏览器别无选择，必须从头开始重新绘制所有内容
+            // 【修复】显式调用
             conversationManager.renderGroupMemberList(chatId);
+
+            }
         }
     }
-}
+
 
     const exportChatBtn = document.getElementById('export-chat-btn');
     const importChatBtn = document.getElementById('import-chat-btn');
