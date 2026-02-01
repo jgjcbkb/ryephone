@@ -27956,16 +27956,28 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
         function showNotificationBanner(chatId, msgData, unreadCount) {
             // 【核心新增】检查全局通知开关
             const dynSettings = loadFromLocalStorage('app-dynamics-settings', {});
-            // 如果设置为 false (关闭)，直接返回，不加入队列
             if (dynSettings.showBanner === false) {
                 return;
             }
 
-            // 1. 将通知请求加入队列
-            notificationQueue.push({ chatId, msgData, unreadCount });
-
+            // ============================================================
+            // 【核心修改】通知合并逻辑 (防刷屏版)
+            // ============================================================
             
-            // 2. 尝试处理队列
+            // 1. 检查队列里是否已经有这个聊天的排队通知
+            const existingIndex = notificationQueue.findIndex(n => n.chatId === chatId);
+
+            if (existingIndex !== -1) {
+                // 2. 如果有，直接原地更新那条通知的数据，变成最新的
+                // 这样无论发了多少条，队列里永远只保留一条最新的汇总
+                notificationQueue[existingIndex].msgData = msgData;
+                notificationQueue[existingIndex].unreadCount = unreadCount;
+            } else {
+                // 3. 如果没有，才加新的
+                notificationQueue.push({ chatId, msgData, unreadCount });
+            }
+
+            // 4. 尝试处理队列
             processNotificationQueue();
         }
         function processNotificationQueue() {
