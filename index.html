@@ -23771,26 +23771,36 @@ The Director has whispered a secret instruction to you for this specific respons
 `;
                 }
 
-                // 2. 构建“记忆唤醒 + 状态自检”指令
+                // 2. 构建“记忆唤醒 + 状态自检 + 逻辑强矫正”指令
                 const recallAndCheckPrompt = `
 ${enforcementText}
 
-[CRITICAL: CONTEXT REVIEW & STATE AUDIT]
-Before generating your response, you MUST perform these checks:
+[SYSTEM: INTELLIGENCE & LOGIC ENFORCEMENT]
+You are currently suffering from "AI Cliché Syndrome". You MUST wake up and follow these correction protocols immediately.
 
-**CHECK 1: CUSTOM RULES RECALL**
-Look back at the **[System Prompt]** and **[Worldbook]** entries provided at the very beginning of this context.
-- Did the user define specific formatting rules there? (e.g. "Always use brackets", "Specific speaking style").
-- **IF YES:** You **MUST** apply those custom rules NOW, overriding any habits from recent chat history.
+**PROTOCOL 1: ANTI-STUPIDITY (RELEVANCE CHECK)**
+- **READ:** Look at the User's LAST message again. What exactly are they asking or doing?
+- **THINK:** Do not just output a generic reaction. If they asked "Where are you?", you MUST answer with a location. If they insulted you, you MUST react to the insult.
+- **BAN:** Do NOT ignore the user's specific words to continue your own monologue. Connection is MANDATORY.
 
-**CHECK 2: STATUS CONSISTENCY AUDIT**
-- **Your Last Known Status:** "${myCurrentKnownStatus}"
-- **Your New Action:** What are you about to do in this response? (e.g. Sleeping? Eating? Working?)
-- **DECISION:** If your new action conflicts with the "Last Known Status", you **MUST** append a \`[set_status: New Status]\` command at the end.
-  - *Example:* If status was "Sleeping" and you are now talking, you MUST output \`[set_status: Awake]\`.
+**PROTOCOL 2: ANTI-CLICHÉ (STYLE CHECK)**
+- **BAN:** Stop using words like "eyes turned red" (眼眶微红), "sneered" (冷笑), "voice hoarse" (声音沙哑), "atmosphere froze" (空气凝固).
+- **ACTION:** Write like a human, not a bad novel. Be raw, direct, and grounded.
 
-**[IMMEDIATE INSTRUCTION]**
-Execute the response now. Follow the [Online/Offline] format AND your custom Worldbook rules.
+**PROTOCOL 3: LOGIC & STATUS AUDIT**
+- **Current Status:** "${myCurrentKnownStatus}"
+- **Logic Check:** If you are "Driving", you cannot "Hug". If you are "Tied up", you cannot "Walk away".
+- **Update Rule:** If your action changes your state (e.g. from "Angry" to "Calm", or "Driving" to "Parked"), you MUST output:
+  \`<block type="command" sender="{{char}}">[set_status: New Status]</block>\`
+
+**PROTOCOL 4: CUSTOM RULES RECALL**
+- Check the **[Worldbook]** and **[System Prompt]** at the start.
+- If the user defined specific formatting (e.g. brackets, specific speech style), **APPLY IT NOW**.
+
+**[FINAL MANDATE]**
+1. **THINK** first (What is the logical reaction?).
+2. **WRITE** the response (In XML blocks).
+3. **UPDATE** the status (If changed).
 `;
 
                 // 3. 将这条“圣旨”作为最后一条 User 消息插入
