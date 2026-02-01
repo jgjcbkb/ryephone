@@ -25335,27 +25335,38 @@ You are the Director. If multiple characters react to the rejection, generate a 
             if (!chatContent) return;
 
             // ============================================================
-            // 【核心新增】格式纠错与垃圾清洗 (Sanitizer)
+            // 【核心新增】白名单清洗 (Whitelist Sanitizer)
+            // 逻辑：只保留系统认识的合法标签，其他所有 <...> 统统删掉！
             // ============================================================
             
-            // 1. 清洗 AI 乱编的闭合标签 (如 </to-talk>, <p>, </p>)
-            // 使用正则全局替换，不留痕迹
-            chatContent = chatContent
-                .replace(/<\/to-talk>/gi, '')
-                .replace(/<to-talk>/gi, '')
-                .replace(/<p>/gi, '')
-                .replace(/<\/p>/gi, '');
-
-            // 2. 修复属性粘连问题 (type="text"sender="...")
-            // 逻辑：如果发现 引号后面紧跟着 sender=，就在中间强行加个空格
+            // 1. 修复属性粘连问题 (type="text"sender="...")
             chatContent = chatContent.replace(/"sender=/gi, '" sender=');
+
+            // 2. 定义白名单标签列表 (不含尖括号)
+            // block: 消息块
+            // snippet, div, details, summary: HTML卡片
+            // background_update: 后台任务
+            // dm: 弹幕
+            // think, thought, thinking: 思考 (虽然前面删过了，这里再保底)
+            const allowedTags = ['block', 'snippet', 'div', 'details', 'summary', 'background_update', 'dm', 'think', 'thought', 'thinking', 'img'];
+
+            // 3. 执行清洗：匹配所有 <...> 结构
+            chatContent = chatContent.replace(/<\/?([a-zA-Z0-9_\-]+)(?:\s+[^>]*)?>/g, (match, tagName) => {
+                // 如果标签名在白名单里，保留原样
+                if (allowedTags.includes(tagName.toLowerCase())) {
+                    return match;
+                }
+                // 否则，直接删掉！
+                // 例如 </to-talk>, <body_part>, <bullshit> 都会被删成空字符串
+                return '';
+            });
             
-            // 3. 再次去除可能产生的首尾空白
+            // 4. 再次去除可能产生的首尾空白
             chatContent = chatContent.trim();
             // ============================================================
             
             // <<< 新增：区块解析逻辑 开始 >>>
-            // 【核心修改】正则升级：(?:\s*sender=) 允许 sender 前面有0个或多个空格，以此兼容极端情况
+            // 【核心修改】正则升级：(?:\s*sender=) 允许 sender 前面有0个或多个空格
             const blockMatch = chatContent.match(/^<block\s+type="([^"]+)"(?:\s*sender="([^"]+)")?>([\s\S]*?)<\/block>$/);
 
 
