@@ -26012,19 +26012,45 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
             // 同步模拟时间
             simulatedCurrentTime = msgData.timestamp;
 
-            // 【核心修复：空消息拦截 & 标签清洗】
+            // 【核心修复：空消息拦截 & 标签清洗 & 实时物理删除】
             if (msgData.type === 'text') {
                 let rawText = msgData.text || '';
+
+                // =================================================================
+                // 【核心新增】实时死刑逻辑 (Instant Kill)
+                // 逻辑：在消息刚产生、还没存盘、还没上屏的时候，直接挖掉内容
+                // =================================================================
+                try {
+                    // 1. 强制读取最新规则
+                    const _settings = JSON.parse(localStorage.getItem('app-appearance-settings') || '{}');
+                    const _rules = _settings.regexReplacements || [];
+                    
+                    // 2. 找出“杀手规则” (替换为空的规则)
+                    const killers = _rules.filter(r => r.enabled && (!r.template || r.template === ''));
+                    
+                    if (killers.length > 0) {
+                        killers.forEach(r => {
+                            if (r.pattern) {
+                                const reg = new RegExp(r.pattern, r.flags || 'g');
+                                // 3. 物理删除：直接修改 rawText 变量
+                                rawText = rawText.replace(reg, '');
+                            }
+                        });
+                        // 4. 扫尾：吸掉删除后留下的多余空行
+                        rawText = rawText.replace(/\n\s*\n/g, '\n').trim();
+                    }
+                } catch (e) {
+                    console.error("实时物理删除出错:", e);
+                }
+                // =================================================================
                 
-                // 1. 拦截空消息
+                // 5. 再次检查：如果删完之后只剩空格了，直接拦截，不发了
                 const cleanText = rawText.replace(/\s/g, '');
                 if (cleanText.length === 0) {
-                    console.warn("[System] Blocked empty text message.");
                     return;
                 }
 
-                // 2. 【核心新增】清洗 <br> 标签 (不区分大小写)
-                // 彻底替换为空字符串，不留任何痕迹
+                // 6. 清洗 <br> 并赋值回 msgData，准备入库
                 msgData.text = rawText.replace(/<br\s*\/?>/gi, '');
             }
 
@@ -28091,12 +28117,63 @@ const commandsRegex = /\[\s*(react_to|trigger_interaction|set_interaction_action
 
             
 
-const reRenderMessages = (isInitialLoad = false) => {
-    const chatId = conversationManager.getCurrentChatId();
-    if (!chatId) return;
+    const reRenderMessages = (isInitialLoad = false) => {
+        const chatId = conversationManager.getCurrentChatId();
+        if (!chatId) return;
 
-    // 1. 清空容器
-    messagesContainer.innerHTML = '';
+        // =================================================================
+        // 【核心新增】历史记录强力清洗机 (Retroactive Cleaner)
+        // 逻辑：每次刷新界面时，强制遍历所有历史消息，把命中正则的内容永久挖掉并保存
+        // =================================================================
+        try {
+            // 1. 强制读取最新规则
+            const _settings = JSON.parse(localStorage.getItem('app-appearance-settings') || '{}');
+            const _rules = _settings.regexReplacements || [];
+            // 2. 找出“杀手规则”：启用且替换为空的规则
+            const killers = _rules.filter(r => r.enabled && (!r.template || r.template === ''));
+
+            if (killers.length > 0 && fullMessageHistory.length > 0) {
+                let hasChanged = false;
+
+                // 3. 遍历每一条历史消息
+                fullMessageHistory.forEach(msg => {
+                    if (msg.type === 'text' && msg.text) {
+                        let originalText = msg.text;
+                        
+                        killers.forEach(r => {
+                            if (r.pattern) {
+                                // 执行物理删除
+                                const reg = new RegExp(r.pattern, r.flags || 'g');
+                                msg.text = msg.text.replace(reg, '');
+                            }
+                        });
+
+                        // 扫尾：去空行
+                        msg.text = msg.text.replace(/\n\s*\n/g, '\n').trim();
+
+                        if (msg.text !== originalText) {
+                            hasChanged = true;
+                        }
+                    }
+                });
+
+                // 4. 如果有任何内容被删了，立刻存盘，永久生效
+                if (hasChanged) {
+                    // 顺便把被删成空壳的消息彻底移除
+                    fullMessageHistory = fullMessageHistory.filter(m => m.type !== 'text' || m.text.trim() !== '');
+                    // 同步更新当前显示列表
+                    chatState.messages = fullMessageHistory.slice(-40);
+                    // 写入硬盘
+                    saveConversation(); 
+                    console.log('已对历史记录执行正则清洗并保存。');
+                }
+            }
+        } catch (e) { console.error("清洗历史记录失败", e); }
+        // =================================================================
+
+        // 1. 清空容器
+        messagesContainer.innerHTML = '';
+
     
     // 2. 创建一个“文档碎片”（虚拟容器），在内存中操作，不触发浏览器重绘
     const fragment = document.createDocumentFragment();
@@ -38406,63 +38483,73 @@ function saveSettings() {
                     reader.onload = async (event) => {
                         try {
                             const rawData = JSON.parse(event.target.result);
-                            // 【核心修复】自动识别：如果是单个对象则转为数组
+                            // 兼容：如果是单个对象转数组，如果是数组直接用
                             let importedList = Array.isArray(rawData) ? rawData : [rawData];
                             
-                            // 【核心修复】格式转换：将酒馆字段映射为黑麦字段
                             const normalizedRules = importedList.map(raw => {
-                                let pattern = raw.pattern || raw.findRegex || '';
-                                let flags = raw.flags || raw.regex_flags || 'g';
-                                let name = raw.name || raw.scriptName || '未命名规则';
-                                let template = raw.template !== undefined ? raw.template : (raw.replaceString !== undefined ? raw.replaceString : '');
+                                // 1. 映射名称 (优先取 scriptName，没有则取 name)
+                                let name = raw.scriptName || raw.name || '未命名规则';
 
-                                // 处理酒馆格式的正则斜杠：/pattern/flags
+                                // 2. 映射匹配模式 (优先取 findRegex，没有则取 regex 或 pattern)
+                                // 不做任何删减，原样保留
+                                let pattern = raw.findRegex || raw.regex || raw.pattern || '';
+
+                                // 3. 映射替换模板 (优先取 replaceString，没有则取 replacement 或 template)
+                                let template = raw.replaceString || raw.replacement || raw.template || '';
+
+                                // 4. 映射标志 (优先取 regex_flags，没有则取 flags，默认为 'g')
+                                let flags = raw.regex_flags || raw.flags || 'g';
+
+                                // 特殊处理：如果导入的是 /pattern/flags 格式的字符串，必须拆分，否则 JS 正则会报错
+                                // (如果你确定你的源文件里只有纯 pattern，这段逻辑不会触发，很安全)
                                 if (typeof pattern === 'string' && pattern.startsWith('/') && pattern.lastIndexOf('/') > 0) {
                                     const lastSlash = pattern.lastIndexOf('/');
-                                    const extractedFlags = pattern.substring(lastSlash + 1);
-                                    if (extractedFlags) flags = extractedFlags;
-                                    pattern = pattern.substring(1, lastSlash);
+                                    const potentialFlags = pattern.substring(lastSlash + 1);
+                                    // 只有当后缀看起来像标志时才拆分
+                                    if (/^[gimsuy]*$/.test(potentialFlags)) {
+                                        pattern = pattern.substring(1, lastSlash);
+                                        flags = potentialFlags || flags;
+                                    }
                                 }
 
                                 return {
                                     name: name,
-                                    category: raw.category || '酒馆导入',
+                                    category: '导入规则', // 统一归类，方便管理
                                     pattern: pattern,
                                     flags: flags,
                                     template: template,
-                                    enabled: raw.enabled !== false && raw.disabled !== true
+                                    enabled: true
                                 };
-                            });
+                            }).filter(r => r.pattern); // 过滤掉空规则
+
+                            if (normalizedRules.length === 0) {
+                                alert('未在文件中找到有效的正则规则 (需要 findRegex 或 pattern 字段)。');
+                                return;
+                            }
 
                             const confirmed = await conversationManager.customConfirm(
-                                `检测到 ${normalizedRules.length} 条规则。确定要导入并应用吗？`,
+                                `解析出 ${normalizedRules.length} 条规则。确定导入吗？`,
                                 '导入确认'
                             );
                             
                             if (confirmed) {
                                 if (!appearanceSettings.regexReplacements) appearanceSettings.regexReplacements = [];
-                                const existingRules = appearanceSettings.regexReplacements;
                                 
-                                normalizedRules.forEach(newRule => {
-                                    const existingIndex = existingRules.findIndex(r => r.name === newRule.name);
-                                    if (existingIndex > -1) {
-                                        existingRules[existingIndex] = newRule;
-                                    } else {
-                                        existingRules.push(newRule);
-                                    }
-                                });
+                                // 直接追加，不覆盖旧的
+                                appearanceSettings.regexReplacements.push(...normalizedRules);
 
                                 saveSettings();
                                 renderRegexList();
-                                alert('导入成功！酒馆格式已自动转换。');
+                                alert(`成功导入 ${normalizedRules.length} 条规则！`);
                             }
                         } catch (error) {
-                            await conversationManager.customAlert('导入失败，文件格式可能损坏: ' + error.message);
+                            await conversationManager.customAlert('导入失败，JSON 格式错误: ' + error.message);
                         }
                     };
                     reader.readAsText(file);
                 });
             });
+
 
             // END: 新增正则规则的导出/导入事件监听
             // ========================================================================
