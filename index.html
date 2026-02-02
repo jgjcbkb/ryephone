@@ -11595,7 +11595,8 @@ if ('serviceWorker' in navigator) {
                         triggerProactiveAI(null, 'Anonymous_System', 'pure_tuqu_interaction', board, {
                             allBoards: event.data.allBoards,
                             includeContext: event.data.includeContext,
-                            selectedWorldbooks: event.data.selectedWorldbooks // 【核心修复】传递勾选的世界书
+                            selectedWorldbooks: event.data.selectedWorldbooks, // 【核心修复】传递勾选的世界书
+                            worldview: event.data.worldview // <--- 【核心新增】补上这行，把设定传给AI
                         });
                     }
                 }
@@ -14866,6 +14867,9 @@ ${TUQU_MEDIA_PROTOCOL}
 3.  **FALLBACK PROTOCOL:** If you want to use an expression but are unsure of the prefix or if it exists in the list, you **MUST** use the universal fallback image:
     *   **Command:** \`[sticker:地铁老人看手机]\` (Use this for confusion, shock, or speechlessness).
 
+**[WORLDVIEW / SCENARIO (CRITICAL)]**
+Setting: ${extraOptions.worldview || "Standard reality"}
+
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 `;
@@ -15192,6 +15196,9 @@ Check the **"Setting"** provided above.
 3.  **FALLBACK PROTOCOL:** If you want to use an expression but are unsure of the prefix or if it exists in the list, you **MUST** use the universal fallback image:
     *   **Command:** \`[sticker:地铁老人看手机]\` (Use this for confusion, shock, or speechlessness).
 
+**[WORLDVIEW / SCENARIO (CRITICAL)]**
+Setting: ${extraOptions.worldview || "Standard reality"}
+
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
 `;
@@ -15474,6 +15481,9 @@ ${TUQU_MEDIA_PROTOCOL}
     *   **Sticker:** \`[sticker:抓狂]\`
 3.  **FALLBACK PROTOCOL:** If you want to use an expression but are unsure of the prefix or if it exists in the list, you **MUST** use the universal fallback image:
     *   **Command:** \`[sticker:地铁老人看手机]\` (Use this for confusion, shock, or speechlessness).
+
+**[WORLDVIEW / SCENARIO (CRITICAL)]**
+Setting: ${extraOptions.worldview || "Standard reality"}
 
 **[COMMAND]**
 Output ONLY the \`[tuqu_complex_action: {...}]\` command.
