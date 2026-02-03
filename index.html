@@ -21178,7 +21178,7 @@ Your job is to **SHOW** the audience what \`{{char}}\` is doing, thinking, and e
     *   不要滥用内心想法的描写。
     *   【只在】角色的语言和内心**强烈反差**时，或在进行**重大决策**时，才使用心理描写来揭示内心世界。
 
-4.  **感官同步：** 描绘场景时，调动【所有感官】（视觉、听觉、嗅觉、触觉等）来构建一个沉浸式的世界。
+4.  **去环境化：** 除非环境杀人了（比如地震、着火），否则**严禁**描写环境。大家在群里聊天，没人关心空气里有什么味道，也没人关心光线是从哪个角度射进来的。只写**人**。
 
 5.  **线下模式功能限制：**
     *   在这个模式下，你处在一个真实的世界里。你**无法**使用数字化的功能。
@@ -21958,10 +21958,12 @@ Your entire output MUST be a sequence of one or more XML-like <block> elements.
     *   **绝对禁止** 角色对用户说话（例如："你看"、"给你看"）。
     *   用户是透明的幽灵，只能看，不能被看见。
 
-**【II. 叙事手法：展示而非告知 (Show, Don't Tell)】**
+**【II. 叙事手法：动作至上 (Action Over Atmosphere)】**
 
-*   不要直接写“他很生气”。
-*   要写“他猛地把杯子顿在桌上，咖啡溅了一手，但他浑然不觉。”
+1.  **环境描写禁令:** **严禁**描写天气、光线、空气、温度、气味。除非天塌下来了，否则别写环境。
+2.  **聚焦动作:** 只写**人做了什么**，**人说了什么**。
+    *   ❌ **啰嗦:** 空气中弥漫着咖啡的香气，窗外的雨声淅淅沥沥。他端起杯子，感受着陶瓷的温热，眼神变得深邃。
+    *   ✅ **简洁:** 他喝了一口咖啡，盯着屏幕。
 
 **【II-PRO. 叙事隔离铁律 (NARRATIVE ISOLATION LAW) - 严禁丢包】**
 1.  **禁止在 HTML 中叙事:** 你**绝对禁止**将小说正文、剧情描写、角色动作或心理活动写在 \`<snippet>\` 或 \`<div>\` 标签内。
@@ -23925,10 +23927,13 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
     6.  **"咚咚咚"** (Thump thump) -> **FORBIDDEN.**
     7.  **"如果是以前"** (If it were before) -> **FORBIDDEN.**
     8.  **"很+形容词"** (Very + Adjective) -> **FORBIDDEN.**
+    9.  **"空气/气味/闻到"** (Smell/Air) -> **FORBIDDEN (DELETE IT).**
+    10. **"声音/听觉/静谧"** (Sound/Silence) -> **FORBIDDEN (DELETE IT).**
+    11. **"光线/阳光/阴影"** (Light/Shadow) -> **FORBIDDEN (DELETE IT).**
 
 *   **Self-Correction Simulation:**
-    *   *Draft:* "他眼底闪过一丝怒意，嘴角勾起冷笑。" -> **DETECTED!**
-    *   *Correction:* "他眯起眼，把烟头按灭在手心里，笑出了声。"
+    *   *Draft:* "空气中弥漫着尴尬的气息，他听到了自己的心跳声。" -> **DETECTED!**
+    *   *Correction:* "他没说话，盯着地面。" (Deleted all sensory fluff).
 
 **STEP 3: PERSONA & REALISM**
 *   **Physical Reality:** Is the action physically possible? (No hearing heartbeats from 5 meters away).
@@ -23937,7 +23942,7 @@ In this world, there is NO "system" that acts for you. Your words and actions ar
 **OUTPUT FORMAT:**
 <think>
 [Plot]: ...
-[Kill List Scan]: (Must explicitly state "No forbidden words found" or "Corrected [X] to [Y]")
+[Kill List Scan]: (Must explicitly state "No forbidden words found" or "Deleted sensory descriptions")
 [Realism Check]: ...
 [Drafting]: ...
 </think>
