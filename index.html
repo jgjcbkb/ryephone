@@ -16553,11 +16553,10 @@ conversationManager.showNotificationBanner('TUQU', {
             saveToLocalStorage(`chat_members_${chatId}`, initialMembers);
         }
 
-        // 【核心新增】创建新聊天时，默认勾选分镜协议
-        // 注意：这里我们手动初始化 chat_info
+        // 【核心新增】创建新聊天时，初始化 chat_info
         const defaultChatInfo = {
-            // 默认把分镜协议的名字加进去
-            offlineWorldbookNames: ["分镜切割协议 (Split Bubble Protocol)(VC-IGNORE)"]
+            // 【核心修改】不再默认勾选分镜协议，改为空数组
+            offlineWorldbookNames: []
         };
         saveToLocalStorage(`chat_info_${chatId}`, defaultChatInfo);
 
@@ -23766,6 +23765,31 @@ The Director has whispered a secret instruction to you for this specific respons
                 const allStatusesForCheck = loadFromLocalStorage('app_character_statuses', {});
                 const myCurrentKnownStatus = allStatusesForCheck[chatState.chatName] || "Unknown";
 
+                // 【【【 核心新增：剧情锚点注入 (SCENE ANCHOR) 】】】
+                // 自动抓取上一条 AI 回复的最后一段话，强行塞给 AI，治好它的脸盲症
+                let sceneAnchorText = "";
+                // 从显示列表里找最后一条 AI 发的文本消息
+                const lastAiMsg = [...chatState.messages].reverse().find(m => m.side === 'received' && m.type === 'text');
+                
+                if (lastAiMsg && lastAiMsg.text) {
+                    // 清洗掉可能的 HTML 标签，只取纯文本
+                    let cleanLastText = lastAiMsg.text.replace(/<[^>]+>/g, '').trim();
+                    // 截取最后 300 个字
+                    if (cleanLastText.length > 300) cleanLastText = "..." + cleanLastText.slice(-300);
+                    
+                    sceneAnchorText = `
+**[STORY CONTINUITY ENFORCEMENT - CRITICAL]**
+**PREVIOUS SCENE ENDED WITH:**
+"${cleanLastText}"
+
+**MANDATE:**
+1.  **CONTINUE** exactly from the text above. Do NOT start a new story.
+2.  **NAME LOCK:** You MUST use the **SAME** character names as in the text above (e.g., if it was "姜屿", use "姜屿", DO NOT change it to "姜穗").
+3.  **LOGIC:** Connect your new paragraph directly to the action above.
+`;
+                }
+                // 【【【 新增结束 】】】
+
                 // 1. 判断当前是线上还是线下，决定锁什么格式
                 let enforcementText = "";
                 if (chatInfo.mode === 'offline') {
@@ -23788,6 +23812,7 @@ The Director has whispered a secret instruction to you for this specific respons
 
                 // 2. 构建“记忆唤醒 + 状态自检 + 逻辑强矫正”指令
                 const recallAndCheckPrompt = `
+${sceneAnchorText}
 ${enforcementText}
 
 # [SYSTEM CRITICAL WARNING: SYNTAX CORRUPTION DETECTED]
