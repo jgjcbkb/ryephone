@@ -16553,11 +16553,13 @@ conversationManager.showNotificationBanner('TUQU', {
             saveToLocalStorage(`chat_members_${chatId}`, initialMembers);
         }
 
-        // 【核心新增】创建新聊天时，初始化 chat_info
+               // 【核心新增】创建新聊天时，默认勾选分镜协议
+        // 注意：这里我们手动初始化 chat_info
         const defaultChatInfo = {
-            // 【核心修改】不再默认勾选分镜协议，改为空数组
-            offlineWorldbookNames: []
+            // 默认把分镜协议的名字加进去
+            offlineWorldbookNames: ["分镜切割协议 (Split Bubble Protocol)(VC-IGNORE)"]
         };
+
         saveToLocalStorage(`chat_info_${chatId}`, defaultChatInfo);
 
         saveChatList();
@@ -24052,16 +24054,17 @@ Look at your last sentence. Does it sound like the end of a chapter? **DELETE IT
 
             // 【【【 2. 在行为指令之后，追加最终的格式化指令 】】】
             const ULTIMATE_FORMATTING_RULE = `
-[SYSTEM OVERRIDE: ENFORCE DEEP THOUGHT]
+[SYSTEM OVERRIDE: ENFORCE DEEP THOUGHT & CONCISENESS]
 
 **STOP.** Do not output the response yet. You must first **THINK** in a <think> block.
 
 **MANDATORY PROCESS:**
 1.  **Open <think> block.**
-2.  **Analyze Context:** Review the plot. Is my character's reaction logical? Is it physically possible?
-3.  **Purge Clichés:** Actively hunt for "眼底", "嘴角", "身体一僵", "精准", "那股感", "咚咚咚". **If you find them in your draft, you MUST explicitly state: "Detected cliché [X], rewriting to [Y]" inside the think block.**
-4.  **Close </think> block.**
-5.  **Generate Output:** Only NOW can you output the actual response (using <block> or narrative text).
+2.  **Purge Clichés:** Hunt for "眼底", "嘴角", "身体一僵". **DELETE THEM.**
+3.  **Purge Sensory Fluff:** Hunt for "气味", "空气", "光线", "声音". **DELETE THEM.**
+4.  **Conciseness Check:** If a sentence only describes the environment, **DELETE IT**. Keep only actions and dialogue.
+5.  **Close </think> block.**
+6.  **Generate Output:** Only NOW can you output the actual response.
 
 **FAILURE TO THINK IS A CRITICAL ERROR.**
 `;
