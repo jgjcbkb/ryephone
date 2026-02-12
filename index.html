@@ -15578,8 +15578,7 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                 requestBody = { model: profile.model, messages: finalMessages, stream: true, temperature: (profile.temperature ?? 0.7) };
             }
 
-            const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody), signal: signal });
-
+            const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody) });
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error(`[诊断日志] 角色 "${senderName}": API请求失败, 状态: ${response.status}. 响应: ${errorText}`);
@@ -15693,8 +15692,7 @@ Output ONLY the \`[tuqu_complex_action: {...}]\` command.
                 requestBody = { model: profile.model, messages: finalMessages, stream: false, temperature: (profile.temperature ?? 0.7) };
             }
             
-            const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody), signal: signal });
-
+            const response = await fetch(chatUrl, { method: 'POST', headers: requestHeaders, body: JSON.stringify(requestBody) });
 
             if (!response.ok) {
                 const errorText = await response.text();
@@ -19042,7 +19040,6 @@ const timeManager = (function() {
         let fullMessageHistory = []; // <-- 新增：这个数组将永远持有全部的聊天记录
 // 【【【新增代码从这里开始】】】
 let loadingStates = {}; // 用于独立跟踪每个聊天的加载状态
-let activeAbortControllers = {}; // 【核心新增】用于存储中断控制器，实现点击停止
 let summaryLocks = {};  // 【核心新增】自动总结防抖锁，防止一秒钟调用6次
 // 【【【新增代码到这里结束】】】
 
@@ -20846,33 +20843,16 @@ A girl with long pink hair is standing under a cherry blossom tree. She is weari
     if (activeWhisper) localStorage.removeItem(whisperKey);
 
     // 检查【当前聊天】是否已经在加载
-    if (loadingStates[originatingChatId]) {
-        // 【核心新增：手动停止逻辑】
-        if (activeAbortControllers[originatingChatId]) {
-            activeAbortControllers[originatingChatId].abort(); // 1. 发送停止信号
-            delete activeAbortControllers[originatingChatId]; // 2. 从列表中移除
-        }
-        
-        // 3. 强制重置UI状态
-        loadingStates[originatingChatId] = false;
-        if (chatState.chatId === originatingChatId) {
-            dynamicDecorationBtn.classList.remove('loading'); // 停止转圈
-        }
-        disableKeepAlive(); // 关闭保活音频
-        
-        window.showNotification('已停止生成，可重新点击触发');
-        return; // 结束函数
-    }
+if (loadingStates[originatingChatId]) {
+// ...
 
-    // 标记【当前聊天】为“加载中”状态
-    loadingStates[originatingChatId] = true;
-    
-    // 【核心新增】创建新的中断控制器
-    const controller = new AbortController();
-    activeAbortControllers[originatingChatId] = controller;
-    const signal = controller.signal; // <--- 必须有这行！
+    console.log(`AI is already generating a response for this chat (${originatingChatId}). New request ignored.`);
+    await conversationManager.customAlert('当前角色正在思考中，请稍等或刷新页面。');
+    return;
+}
 
-
+// 标记【当前聊天】为“加载中”状态
+loadingStates[originatingChatId] = true;
 
 // 【【【 核心新增：启动后台保活 】】】
 enableKeepAlive(); 
@@ -24421,12 +24401,6 @@ Look at your last sentence. Does it sound like the end of a chapter? **DELETE IT
                 }
         
             } catch (error) {
-                // 【核心新增】如果是用户手动停止，不弹报错窗
-                if (error.name === 'AbortError') {
-                    console.log('Request aborted by user.');
-                    return;
-                }
-
                 console.error("AI continuation error:", error);
                 
                 // 核心修改：如果 error 包含 response 对象（部分高级 fetch 封装），尝试读取 body
@@ -24476,22 +24450,20 @@ Look at your last sentence. Does it sound like the end of a chapter? **DELETE IT
                     buttons: [{ text: '关闭', value: 'close', class: 'secondary' }]
                 });
 
-                        } finally {
-                // 【核心新增】无论如何，请求结束时都要清理掉控制器
-                delete activeAbortControllers[originatingChatId];
+            } finally {
 
-                // 标记【当前聊天】的加载状态为结束
-                loadingStates[originatingChatId] = false;
-                
-                // 【【【 核心新增：关闭后台保活 】】】
-                disableKeepAlive();
 
-                // 只有当用户仍然停留在【这个聊天】的界面时，才移除转圈动画
-                if (chatState.chatId === originatingChatId) {
-                    dynamicDecorationBtn.classList.remove('loading');
-                }
-            }
+    // 标记【当前聊天】的加载状态为结束
+    loadingStates[originatingChatId] = false;
+    
+    // 【【【 核心新增：关闭后台保活 】】】
+    disableKeepAlive();
 
+    // 只有当用户仍然停留在【这个聊天】的界面时，才移除转圈动画
+    if (chatState.chatId === originatingChatId) {
+        dynamicDecorationBtn.classList.remove('loading');
+    }
+}
         }
         // 在 conversationManager 作用域内任意位置添加以下新函数
  // ******** 全新的、统一的API调用函数从这里开始 ********
