@@ -30847,6 +30847,21 @@ footerStickerBtn.addEventListener('click', () => {
 
 // 【核心修改】给重新生成按钮也加上保活激活
 dynamicDecorationBtn.addEventListener('click', () => {
+    // 【核心新增】如果正在转圈，点击则强制停止 (手动重置状态)
+    if (dynamicDecorationBtn.classList.contains('loading')) {
+        dynamicDecorationBtn.classList.remove('loading');
+        
+        // 强制解锁内部状态，允许下次请求
+        const currentChatId = chatState.chatId;
+        if (currentChatId) {
+            loadingStates[currentChatId] = false;
+        }
+        
+        disableKeepAlive(); // 关闭保活音效
+        // window.showNotification('已强制停止加载'); // 可选提示
+        return;
+    }
+
     conversationManager.enableKeepAlive(); // 点击瞬间激活
     triggerAIContinuation();
 });
