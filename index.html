@@ -31922,12 +31922,26 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
             const result = await showCustomModal({
                 title: '回溯历史',
                 html: `
-                    <div style="background: #fffbe6; border: 1px solid #ffe58f; border-radius: 8px; padding: 10px; margin: -10px 10px 15px 10px; font-size: 12px; color: #856404; line-height: 1.5;">
+                    <div style="padding: 0 10px 10px 10px;">
+                        <button id="create-blank-branch-btn" class="modal-button primary" style="width: 100%; background: #28a745; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                            开启空白新分支
+                        </button>
+                    </div>
+                    <div style="background: #fffbe6; border: 1px solid #ffe58f; border-radius: 8px; padding: 10px; margin: 0 10px 15px 10px; font-size: 12px; color: #856404; line-height: 1.5;">
                         <b>系统说明：</b>为优化存储性能，本系统仅保留最近 100 条历史分支。其中标识为“存档”的自动记录将在生成 7 天后被永久清理。请及时为重要剧情节点执行“命名”操作以转为永久保存。
                     </div>
-                    <div style="max-height: 55vh; overflow-y: auto;">${branchesHtml}</div>`,
+                    <div style="max-height: 50vh; overflow-y: auto;">${branchesHtml}</div>`,
                 showCloseButton: true,
                 onRender: (modalDOM, closeModal) => {
+                    // 【核心新增】绑定创建空白分支按钮
+                    const createBtn = modalDOM.querySelector('#create-blank-branch-btn');
+                    if (createBtn) {
+                        createBtn.onclick = () => {
+                            closeModal();
+                            createBlankBranch(chatId);
+                        };
+                    }
 
                     modalDOM.addEventListener('click', async (e) => {
                         const button = e.target.closest('button[data-action]');
@@ -32079,6 +32093,76 @@ async function handleProactiveAIMessage(targetChatId, senderName, content) {
 
         }
 
+        // 【核心新增】开启空白新分支函数
+        async function createBlankBranch(chatId) {
+            const confirmed = await customConfirm('开启新分支将把【当前所有对话】自动存档，并清空聊天界面开始新剧情。\n确定要继续吗？', '开启新分支');
+            if (!confirmed) return;
+
+            const branchHistoryKey = `chat_branches_${chatId}`;
+            let branches = loadFromLocalStorage(branchHistoryKey, []);
+            const mainConversationKey = `conversation_${chatId}`;
+
+            // 1. 获取当前主线（增加数据库回退检查）
+            let currentMainMessages = loadFromLocalStorage(mainConversationKey, []);
+            if (currentMainMessages.length === 0) {
+                const dbData = await imageStore.getItem(mainConversationKey);
+                if (dbData) currentMainMessages = dbData;
+            }
+
+            // 2. 强制存档当前进度
+            if (currentMainMessages.length > 0) {
+                const lastMessage = currentMainMessages[currentMainMessages.length - 1];
+                const previewText = lastMessage ? (lastMessage.text || `[${lastMessage.type}]`).substring(0, 30) + '...' : '空分支';
+                const newBranchToSave = { 
+                    id: `branch_auto_${Date.now()}`, 
+                    name: `存档: ${new Date().toLocaleString()} (分支前)`, 
+                    timestamp: Date.now(), 
+                    messages: currentMainMessages, 
+                    preview: previewText 
+                };
+                branches.unshift(newBranchToSave);
+                
+                // 限制数量
+                if (branches.length > 100) branches = branches.slice(0, 100);
+                saveToLocalStorage(branchHistoryKey, branches);
+            }
+
+            // 3. 清空当前聊天记录 (同时清除 LS 和 DB)
+            localStorage.removeItem(mainConversationKey);
+            await imageStore.removeItem(mainConversationKey);
+            
+            // 4. 重置剧本溯源状态
+            sessionStorage.removeItem(`source_branch_${chatId}`);
+            sessionStorage.removeItem(`source_length_${chatId}`);
+
+            // 5. 重置当前聊天的状态/备注等 (开始新生活)
+            const statuses = loadFromLocalStorage('app_character_statuses', {});
+            const chatInfo = loadFromLocalStorage(`chat_info_${chatId}`, {});
+            
+            // 清理状态
+            const charsInChat = getCharactersInCurrentChat();
+            charsInChat.forEach(name => { if (name !== '{{user}}') delete statuses[name]; });
+            saveToLocalStorage('app_character_statuses', statuses);
+
+            // 清理备注和互动设置
+            delete chatInfo.ai_remarks;
+            delete chatInfo.ai_remark_for_user;
+            delete chatInfo.characterInteractions;
+            delete chatInfo.userInteractionAction;
+            delete chatInfo.myNudgeSuffix;
+            // 清除前情提要和总结，让新分支完全空白
+            delete chatInfo.preamble;
+            delete chatInfo.chatSummary;
+            delete chatInfo.lastSummaryMessageCount;
+            delete chatInfo.lastSummaryRoundCount;
+            
+            saveToLocalStorage(`chat_info_${chatId}`, chatInfo);
+
+            window.showNotification("新分支已开启，旧记录已存档。");
+            
+            // 6. 重新打开聊天
+            open(chatId);
+        }
 
 
         async function renameBranch(chatId, branchId, closeModalCallback) {
